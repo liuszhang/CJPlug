@@ -1,6 +1,6 @@
 # 寸金工具插座平台（CJPlug）
 
-![CJPlug](./03.Website/Picture/KKMM.png)
+![CJPlug](./03.Website/Picture/HomePage.png)
 
 ## 介绍
 寸金插座平台是可以将任意软件工具以“插头”的方式插入平台，并提供可视化拖拽设计器，设计和执行复杂的工具链调用流程。平台完全基于.net core。相关核心依赖项目:
