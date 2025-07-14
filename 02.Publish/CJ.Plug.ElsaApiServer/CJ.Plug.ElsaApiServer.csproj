@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CJ.Plug_Aspire.ElsaApi</RootNamespace>
+    <BaseOutputPath>..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+	  <!-- 添加此属性以控制是否跳过构建 -->
+	  <!--<SkipBuild Condition="'$(SkipBuild)' == 'true'">true</SkipBuild>-->
+	  <SkipBuild>true</SkipBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CJ.Plug-Aspire.ServiceDefaults\CJ.Plug-Aspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\PlugCore\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Handsontable - JavaScript Data Grid Example</title>
+    <link rel="stylesheet"
+          href="./hst/handsontable.min.css" />
+    <link rel="stylesheet"
+          href="./hst/ht-theme-main.min.css" />
+</head>
+<body>
+    <div id="handsontable-grid" class="ht-theme-main-dark-auto"></div>
+    <script src="./hst/handsontable.full.min.js"></script>
+    <script>
+        const element = document.getElementById("handsontable-grid");
+
+        new Handsontable(element, {
+            data: [
+                { company: "Tagcat", country: "United Kingdom", rating: 4.4 },
+                { company: "Zoomzone", country: "Japan", rating: 4.5 },
+                { company: "Meeveo", country: "United States", rating: 4.6 },
+            ],
+            columns: [
+                { data: "company", title: "Company", width: 200 },
+                { data: "country", title: "Country", width: 200,type: "dropdown", source: ["United Kingdom", "Japan", "United States"] },
+                { data: "rating", title: "Rating", width: 100, type: "numeric" },
+            ],
+            width: '100%',
+            rowHeaders: true,
+            navigableHeaders: true,
+            tabNavigation: true,
+            multiColumnSorting: true,
+            headerClassName: "htLeft",
+            licenseKey: "non-commercial-and-evaluation",
+            contextMenu: true,
+        });
+    </script>
+</body>
+</html>

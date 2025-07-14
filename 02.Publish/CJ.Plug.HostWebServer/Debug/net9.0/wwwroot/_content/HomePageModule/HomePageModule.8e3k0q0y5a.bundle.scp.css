@@ -1,0 +1,136 @@
+/* _content/HomePageModule/Components/Documentation/MyDiagram.razor.rz.scp.css */
+.diagram-container[b-6xanjgcfhb] {
+	width: 100%;
+	height: 400px;
+	border: 1px solid black;
+}
+/* _content/HomePageModule/Components/Documentation/Nodes/AddTwoNumbersWidget.razor.rz.scp.css */
+div[b-uqq5qoherd] {
+    width: 230px;
+    outline: 1px solid black;
+    padding: 20px;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
+
+    div > h5[b-uqq5qoherd] {
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+
+    div > input[type=number][b-uqq5qoherd] {
+        padding: 3px;
+        border-radius: 3px;
+        border: 1px solid black;
+        margin-bottom: 8px;
+    }
+
+[b-uqq5qoherd] .diagram-port {
+    position: absolute;
+    width: 30px;
+    height: 20px;
+    background-color: black;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+    [b-uqq5qoherd] .diagram-port.top {
+        border-top-left-radius: 50%;
+        border-top-right-radius: 50%;
+        top: -10px;
+    }
+
+    [b-uqq5qoherd] .diagram-port.bottom {
+        border-bottom-left-radius: 50%;
+        border-bottom-right-radius: 50%;
+        bottom: -30px;
+    }
+/* _content/HomePageModule/Components/Documentation/Nodes/ArithmeticContainerWidget.razor.rz.scp.css */
+.arithmetic-container[b-40v166uhdj] {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed black;
+}
+
+    .arithmetic-container .title[b-40v166uhdj] {
+        position: absolute;
+        right: 0;
+        padding: 8px;
+        text-align: right;
+        border-left: 2px dashed black;
+        border-bottom: 2px dashed black;
+    }
+
+[b-40v166uhdj] .diagram-port {
+    position: absolute;
+    width: 30px;
+    height: 20px;
+    background-color: black;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+    [b-40v166uhdj] .diagram-port.top {
+        border-top-left-radius: 50%;
+        border-top-right-radius: 50%;
+        top: -10px;
+    }
+
+    [b-40v166uhdj] .diagram-port.bottom {
+        border-bottom-left-radius: 50%;
+        border-bottom-right-radius: 50%;
+        bottom: -30px;
+    }
+/* _content/HomePageModule/Components/Documentation/Nodes/GingerbreadWidget.razor.rz.scp.css */
+.gingerbread .body[b-c9vrv7lhhu] {
+    fill: #cd803d;
+}
+
+.gingerbread .eye[b-c9vrv7lhhu] {
+    fill: white;
+}
+
+.gingerbread .mouth[b-c9vrv7lhhu] {
+    fill: none;
+    stroke: white;
+    stroke-width: 2px;
+}
+
+.gingerbread .limb[b-c9vrv7lhhu] {
+    stroke: #cd803d;
+    stroke-width: 35px;
+    stroke-linecap: round;
+}
+
+.gingerbread .hand[b-c9vrv7lhhu] {
+    fill: #cd803d;
+}
+
+    .gingerbread .hand:hover[b-c9vrv7lhhu] {
+        fill: #75441a;
+    }
+/* _content/HomePageModule/Components/Landing/LandingShowcaseDiagram.razor.rz.scp.css */
+[b-90e96fupp3] g.diagram-link path:not(.selection-helper) {
+    stroke-dasharray: 5;
+    animation: dash-b-90e96fupp3 .5s linear infinite;
+}
+
+@keyframes dash-b-90e96fupp3 {
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+/* _content/HomePageModule/HomePage - 复制.razor.rz.scp.css */
+.my-component[b-uzuo0h23kr] {
+    border: 2px dashed red;
+    padding: 1em;
+    margin: 1em 0;
+    background-image: url('background.png');
+}
+/* _content/HomePageModule/HomePage.razor.rz.scp.css */
+.my-component[b-3ays6982qd] {
+    border: 2px dashed red;
+    padding: 1em;
+    margin: 1em 0;
+    background-image: url('background.png');
+}

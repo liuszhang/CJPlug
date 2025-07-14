@@ -1,0 +1,132 @@
+{
+  "tools": [
+    {
+      "plugName": "CMDPlug",
+      "plugKey": "CMD",
+      "actions": [
+        {
+          "actionName": "ExecuteCMD",
+          "actionKey": "ExecuteCMD"
+        }
+      ]
+    },
+    {
+      "plugName": "JavaScriptPlug",
+      "plugKey": "JavaScript"
+    },
+    {
+      "plugName": "MatlabPlug",
+      "plugKey": "Matlab"
+    },
+    {
+      "plugName": "MCDataGetPlug",
+      "plugKey": "MCDataGet"
+    },
+    {
+      "plugName": "NXPlug",
+      "plugKey": "NX"
+    },
+    {
+      "plugName": "PythonPlug",
+      "plugKey": "Python"
+    },
+    {
+      "plugName": "RESTPlug",
+      "plugKey": "REST"
+    },
+    {
+      "plugName": "TextReaderPlug",
+      "plugKey": "TextReader"
+    },
+    {
+      "plugName": "WordPlug",
+      "plugKey": "Word"
+    },
+
+    //未完待续
+    {
+      "plugName": "SolidWorksPlug",
+      "plugKey": "SolidWorks"
+    },
+    {
+      "plugName": "ExcelPlug",
+      "plugKey": "Excel"
+    },
+    {
+      "plugName": "PowerPointPlug",
+      "plugKey": "PowerPoint"
+    },
+    {
+      "plugName": "PDFPlug",
+      "plugKey": "PDF"
+    },
+    {
+      "plugName": "ImagePlug",
+      "plugKey": "Image"
+    },
+    {
+      "plugName": "VideoPlug",
+      "plugKey": "Video"
+    },
+    {
+      "plugName": "AudioPlug",
+      "plugKey": "Audio"
+    },
+    {
+      "plugName": "TextPlug",
+      "plugKey": "Text"
+    },
+    {
+      "plugName": "FilePlug",
+      "plugKey": "File"
+    },
+    {
+      "plugName": "FolderPlug",
+      "plugKey": "Folder"
+    },
+    {
+      "plugName": "ZipPlug",
+      "plugKey": "Zip"
+    },
+    {
+      "plugName": "UnZipPlug",
+      "plugKey": "UnZip"
+    },
+    {
+      "plugName": "FTPPlug",
+      "plugKey": "FTP"
+    },
+    {
+      "plugName": "HTTPPlug",
+      "plugKey": "HTTP"
+    },
+    {
+      "plugName": "SQLPlug",
+      "plugKey": "SQL"
+    },
+    {
+      "plugName": "MongoDBPlug",
+      "plugKey": "MongoDB"
+    },
+    {
+      "plugName": "RedisPlug",
+      "plugKey": "Redis"
+    },
+    {
+      "plugName": "SQLitePlug",
+      "plugKey": "SQLite"
+    },
+    {
+      "plugName": "MySQLPlug",
+      "plugKey": "MySQL"
+    },
+    {
+      "plugName": "OraclePlug",
+      "plugKey": "Oracle"
+    },
+    {
+      "plugName": "SqlServerPlug",
+      "plugKey": "SqlServer"
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>test - stl</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<!--<link type="text/css" rel="stylesheet" href="main.css">-->
+		<style>
+			body {
+				background-color: #a0a0a0;
+			}
+            #myButton {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                z-index: 1000; /* 确保按钮在场景之上 */
+            }
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			<!--<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> -
+		<a href="http://3mf.io" target="_blank" rel="noopener">3MF</a> file with materials-->
+
+		</div>
+		<div id="myButton">居中</div>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./js/three.module.js",
+					"three/addons/": "./js/jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+
+			import * as THREE from 'three';
+
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+			let camera, scene, renderer;
+
+			let path;
+			const urlParams = new URLSearchParams(window.location.search);
+			path = urlParams.get('stlPath');
+			//console.log(path);
+			if (path == "") {
+				console.log("无模型，不加载");
+				//return;
+			}
+			else {
+				init();
+
+                //console.log('居中展示!');
+                //// 你可以在这里执行任何Three.js相关的操作，比如改变模型的颜色、位置等
+                //// 获取场景中的模型
+                //const mesh = scene.getObjectByName('ModelName');
+                //const boundingBox = new THREE.Box3().setFromObject(mesh);
+                //const center = boundingBox.getCenter(new THREE.Vector3());
+                //mesh.position.sub(center);
+			}
+
+			function init() {
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color(0xa0a0a0);
+                //scene.background = new THREE.Color(0x72645b);
+				//scene.fog = new THREE.Fog(0xa0a0a0, 10, 500);
+				camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 5000);
+				//camera.position.set(3, 0.15, 500);
+				//scene.add(camera);
+				renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setSize(window.innerWidth, window.innerHeight);
+                // 全局关闭阴影
+                //renderer.shadowMap.enabled = false;
+				document.body.appendChild(renderer.domElement);
+
+				// 添加光源
+				const light = new THREE.AmbientLight(0xffffff, 3); // soft white light
+				light.castShadow = false;
+				scene.add(light);
+				const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+				directionalLight.position.set(5, 5, 5).normalize();
+				directionalLight.castShadow = false;
+				//scene.add(directionalLight);
+
+                // 添加四个方向的平行光（无阴影）
+                const lightIntensity = 2;
+                const positions = [
+                    [5, 5, 5],   // 右上前方
+                    [-5, 5, -5], // 左后上方
+                    [5, -5, -5], // 右下后方
+                    [-5, -5, 5]  // 左前下方
+                ];
+
+                positions.forEach(pos => {
+                    const light = new THREE.DirectionalLight(0xffffff, lightIntensity);
+                    light.position.set(...pos);
+                    light.castShadow = false; // 关键：禁用阴影投射
+                    scene.add(light);
+                });
+
+
+
+				// 创建 OrbitControls 实例
+				const controls = new OrbitControls(camera, renderer.domElement);
+				controls.enablePan = true;
+				controls.enableZoom = true;
+				controls.enableRotate = true;
+
+				// 设置相机位置
+				camera.position.z = 5;
+
+                const material6 = new THREE.MeshPhongMaterial({ color: 0xd5d5d5, specular: 0x494949, shininess: 200 });
+				const loader = new STLLoader();
+				//loader.load('./models/3mf/truck.3mf', function (object) {
+				loader.load(path, function (geometry) {
+                    // 计算法线（STL模型需要）
+                    //geometry.computeVertexNormals(); // 新增关键步骤
+
+					//const material = new THREE.MeshPhongMaterial({ color: 0xffff00, specular: 0x494949, shininess: 200 });
+					//const material = new THREE.MeshPhongMaterial();
+                    const material = new THREE.MeshStandardMaterial({
+                        color: 0xFFD700,
+                        metalness: 0.7,    // 金属度（0-1）
+                        roughness: 0.3,    // 粗糙度（0-1）
+						//envMap: scene.environment // 如果需要环境反射
+					});
+					//不知道为啥材质无法加载
+                    const mesh = new THREE.Mesh(geometry, material);
+					mesh.name = 'ModelName';
+					mesh.castShadow = false;
+					mesh.receiveShadow = false;
+					scene.add(mesh);
+
+					// 计算模型的包围盒
+					const boundingBox = new THREE.Box3().setFromObject(mesh);
+					const center = boundingBox.getCenter(new THREE.Vector3());
+                    //mesh.position.sub(center);
+                    const size = boundingBox.getSize(new THREE.Vector3()).length();
+					//console.log(size);
+
+					// 缩放模型以适应场景
+					const scaleFactor = Math.min(window.innerWidth, window.innerHeight) / size * 0.005;
+					mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+                    // 将模型放置在相机前方的一个固定距离处
+                    //const cameraPositionZ = 5; // 相机在z轴上的位置
+                    //mesh.position.set(0, 0, camera.position.z / 2); // 模型的z位置取决于它的大小和相机位置
+
+                    // 确保模型面向相机
+                    //mesh.rotation.y = Math.PI; // 如果模型默认面向+Z轴，则需要旋转180度面向相机
+
+					//mesh.position.sub(center); // 将模型移动到中心
+                    // 将模型中心移动到世界坐标系的原点(0,0,0)
+                    //mesh.position.set(-center.x, -center.y, -center.z);
+                    //mesh.position.copy(center).multiplyScalar(-1);
+					                    
+					// 更新模型矩阵
+					mesh.updateMatrixWorld(true);
+				}, undefined, (error) => {
+					console.error('An error happened', error);
+				});
+
+				// 调整视口大小
+				window.addEventListener('resize', onWindowResize, false);
+
+				function onWindowResize() {
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+					renderer.setSize(window.innerWidth, window.innerHeight);
+				}
+
+				// 渲染循环
+				const animate = function () {
+					requestAnimationFrame(animate);
+					controls.update();
+					renderer.render(scene, camera);
+				};
+				animate();
+      
+
+			}
+
+			document.getElementById('myButton').addEventListener('click', function () {
+                // 当按钮被点击时执行的操作
+                console.log('居中展示!');
+                // 你可以在这里执行任何Three.js相关的操作，比如改变模型的颜色、位置等
+                // 获取场景中的模型
+                const mesh = scene.getObjectByName('ModelName');
+                const boundingBox = new THREE.Box3().setFromObject(mesh);
+                const center = boundingBox.getCenter(new THREE.Vector3());
+                mesh.position.sub(center);
+            });
+
+		</script>
+
+		<script>
+			
+		</script>
+	</body>
+</html>

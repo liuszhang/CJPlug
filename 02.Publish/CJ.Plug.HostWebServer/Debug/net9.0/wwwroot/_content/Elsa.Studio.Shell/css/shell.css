@@ -1,0 +1,70 @@
+.loading-splash {
+    background-color: #0f172a;
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: white;
+    font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.full-height {
+    height: 100%
+}
+
+/*****************************************************
+* CSS hacks for the MudBlazor and MudBlazorExtensions components
+******************************************************/
+.mud-select.timespan-operator {
+    min-width: 150px;
+}
+
+.mud-select-extended {
+    min-width: 100px;
+}
+
+.mud-select-has-incidents {
+    max-width: 160px;
+    justify-content: end;
+}
+
+/*****************************************************
+* Expression Editor
+******************************************************/
+.studio-expression-input-menu-item .mud-list-item-icon {
+    min-width: 33px;
+}
+
+.studio-expression-input-monaco-editor {
+    height: 120px;
+}
+
+.studio-monaco-editor-large {
+    height: 320px;
+}
+
+/*****************************************************
+* Monaco Editor
+******************************************************/
+.monaco-editor {
+    border-radius: 0.25rem;
+}
+
+.monaco-editor .overflow-guard {
+    border-radius: 0.25rem;
+}
+
+.monaco-editor .suggest-widget div.tree {
+    white-space: unset;
+    padding-bottom: 0;
+}
+
+/*****************************************************
+* Badge overlap for small icons
+******************************************************/
+.elsa-toolbar-icon .mud-badge.mud-badge-bottom.right.mud-badge-overlap
+{
+    inset: calc(100% - 20px) auto auto calc(100% - 20px)
+}
+

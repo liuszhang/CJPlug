@@ -1,0 +1,6 @@
+﻿<PlugsConfig>
+	<BasePath>Plugs</BasePath>
+	<UserPlugs>
+		<Plug Name="WhilePlug" DllPath="WhilePlug/WhilePlug.dll"/>
+	</UserPlugs>
+</PlugsConfig>

@@ -1,0 +1,14 @@
+/* _content/BlazorAmis/Components/Layout/MainLayout.razor.rz.scp.css */
+.outer[b-80ri6sg7z8] {
+    display: flex;
+}
+
+.left[b-80ri6sg7z8] {
+    flex: 0 0 264px; /* 左侧宽度固定 */
+
+}
+
+.right[b-80ri6sg7z8] {
+    flex-grow: 1; /* 右侧宽度自适应 */
+}
+/* _content/BlazorAmis/Components/Layout/NavMenu.razor.rz.scp.css */

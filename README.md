@@ -74,7 +74,6 @@
 ```csharp
 public class WordPlugCommonSettingContent : IPlugCommonSettingContent
     {
-        private WordPlugCommonSettingPage? _designerWrapper;
         public Task<RenderFragment?> GetPlugCommonSettingContent(Plug Plug)
         {
 
@@ -87,7 +86,6 @@ public class WordPlugCommonSettingContent : IPlugCommonSettingContent
                     builder.OpenComponent<WordPlugCommonSettingPage>(sequence++);
                     builder.SetKey(Plug.PlugTypeKey);
                     builder.AddAttribute(sequence++, nameof(WordPlugCommonSettingPage.Plug), Plug);
-                    builder.AddComponentReferenceCapture(sequence++, @ref => _designerWrapper = (WordPlugCommonSettingPage)@ref);
                     builder.CloseComponent();
 
                 });
