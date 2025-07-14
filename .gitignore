@@ -3,3 +3,7 @@
 ################################################################################
 
 /.vs
+/02.Publish/CJ.Plug.ElsaApiServer/Debug/net9.0/elsa.sqlite.db-shm
+/02.Publish/CJ.Plug.ElsaApiServer/Debug/net9.0/elsa.sqlite.db-wal
+/02.Publish/CJ.Plug.ApiServer/Debug/net9.0/main.db-wal
+/02.Publish/CJ.Plug.ApiServer/Debug/net9.0/main.db-shm
