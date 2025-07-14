@@ -30,6 +30,13 @@
 
 [文档完善中]().
 
+基本使用：
+- 下载后打开02.Publish文件夹
+- 双击启动CJ.Plug-Aspire.AppHost/Debug/net9.0/CJ.Plug-Aspire.AppHost.exe
+- 如果是linux环境，使用dotnet运行CJ.Plug-Aspire.AppHost.dll
+- 启动后，访问http://localhost:5066/ 即可访问CJPlug平台。
+- 访问http://localhost:15288/ 即可访问CJPlug平台的服务管理中心（登录密码在启动的控制台中）。
+
 ## 进展说明
 
 寸金插座平台任在不断完善中，以下是一些正在完善中的能力和目前的状态：
