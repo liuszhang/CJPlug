@@ -1,0 +1,165 @@
+﻿@using CJ.Plug.JobManageApiClient
+@using CJ.Plug.Models.Job
+@using CJ.Plug.Models.PlugProcess
+@using MudBlazor
+@using CJ.Plug.Models.Extensions
+@using Serilog
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJobManageApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+@if (Loading)
+{
+    <MudProgressLinear Indeterminate></MudProgressLinear>
+}
+else
+{
+
+
+    <MudTable @ref="_table"
+    T="ToolJob"
+    Items="ChildDatas"
+    Dense="true"
+    Hover="true"
+    Elevation="0"
+    OnRowClick="@OnRowClick"
+    RowStyle="cursor: pointer;"
+    SelectOnRowClick="false">
+
+        <HeaderContent>
+            <MudTh>作业 ID</MudTh>
+            @* <MudTh>父级 ID</MudTh> *@
+            <MudTd>工具名称</MudTd>
+            <MudTd>图站地址</MudTd>
+            <MudTh>类型</MudTh>
+            <MudTh>
+                <MudTableSortLabel SortLabel="SubStatus" T="BaseJob">状态</MudTableSortLabel>
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortLabel="CreatedAt" T="BaseJob" InitialDirection="SortDirection.Descending">创建于</MudTableSortLabel>
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortLabel="UpdatedAt" T="BaseJob">更新于</MudTableSortLabel>
+
+            </MudTh>
+            <MudTh>
+                <MudTableSortLabel SortLabel="FinishedAt" T="BaseJob">完成于</MudTableSortLabel>
+            </MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+
+        <RowTemplate>
+            <MudTd DataLabel="Correlation ID">
+                <MudTooltip Text="@("作业ID")">
+                    <div style="text-overflow: ellipsis; overflow: hidden; max-width: 200px; white-space: nowrap;">
+                        @context.JobDefinitionId
+                    </div>
+                </MudTooltip>
+            </MudTd>
+
+            <MudTd>@($"{context.ToolName}({context.ToolVersion})")</MudTd>
+            <MudTd>@context.StationIp</MudTd>
+            <MudTd DataLabel="Type">
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Label="true" Icon="@Icons.Material.Filled.Extension">
+                    @context.JobCategory
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="SubStatus">
+                <MudChip T="JobSubStatus" Variant="Variant.Text" Size="Size.Small">
+                    @context.JobSubStatus
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="CreatedAt">@context.CreatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="UpdatedAt">@context.UpdatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="FinishedAt">@context.FinishedAt?.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="" Style="text-align:right">
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                    <MudMenuItem OnClick="JobDetails" Icon="@Icons.Material.Outlined.ZoomIn">详情</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Cancel" Disabled="@(context.FinishedAt != null)">取消</MudMenuItem>
+                </MudMenu>
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <MudText>无工具运行作业数据</MudText>
+        </NoRecordsContent>
+
+        <LoadingContent>
+            <MudText>努力加载中...</MudText>
+        </LoadingContent>
+    </MudTable>
+
+
+}
+@code {
+    [Parameter]
+    public string? ParentJobCorrelationId { get; set; }
+
+    private List<ToolJob> ChildDatas { get; set; } = new List<ToolJob>();
+    private bool Loading { get; set; } = true;
+
+    public double? Amount { get; set; }
+    public int? Weight { get; set; }
+    public string? searchString { get; set; }
+
+
+    public HashSet<BaseJob> SelectedJobs { get; set; } = new HashSet<BaseJob>();
+    public bool ReadOnly;
+
+
+    private MudTable<ToolJob> _table = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrEmpty(ParentJobCorrelationId)) return;
+        Loading = true;
+        ChildDatas = await MainApiClient.GetToolJobsByParentJobAsync(ParentJobCorrelationId) ?? new();
+        //Log.Information($"All Data Num:{data?.Count()}");
+        Log.Information($"ChildDatas Num:{ChildDatas?.Count()}");
+        Loading = false;
+        StateHasChanged();
+    }
+
+    private void OnRowClick(TableRowClickEventArgs<ToolJob> e)
+    {
+        if (string.IsNullOrEmpty(e.Item.EngineInstanceId))
+        {
+            Snackbar.Add("还未生成作业ID，请稍后重试", Severity.Error);
+            //NavigationManager.NavigateTo($"JobMonitor3/{e.Item!.JobCorrelationId}");
+            //return;
+        }
+        else
+        {
+            var jobDefinitionId = e.Item!.JobDefinitionId;
+            var plugDefinitionId = e.Item!.JobCorrelationId?.GetPlugDefinitionId();
+            //NavigationManager.NavigateTo($"workflows/instances/{e.Item!.EngineInstanceId}/view");
+            //NavigationManager.NavigateTo($"JobMonitor3/{e.Item!.JobCorrelationId}");
+            //NavigationManager.NavigateTo($"process/{plugDefinitionId}/execute/{jobDefinitionId}");
+        }
+
+    }
+
+
+    private async Task DeleteSelectedJobs()
+    {
+        foreach (var j in SelectedJobs)
+        {
+            await MainApiClient.DeleteJobAsync(j);
+        }
+        await _table.ReloadServerData();
+        //StateHasChanged();
+    }
+
+
+    private void JobDetails()
+    {
+        //NavigationManager.NavigateTo($"workflows/instances/{e.Item!.JobCorrelationId}/view");
+        //NavigationManager.NavigateTo($"workflows/instances/{e.Item!.JobCorrelationId}/view");
+    }
+
+
+}
+

@@ -1,0 +1,246 @@
+﻿<Amis Data="GetMenu()"></Amis>
+
+@code
+{
+    private object GetMenu()
+    {
+        return new
+        {
+            type = "page",
+            body = new
+            {
+                type = "nav",
+                stacked = true,
+                links = new object[]
+                {
+                    new { label = "Home", to = "/", icon = "fa fa-home fa-fw" },
+                    new { label = "Counter", to = "/Counter", icon = "fa fa-plus-circle fa-fw" },
+                    new { label = "Weather", to = "/Weather", icon = "fa fa-user fa-fw" },
+                    new { label = "AmisDemo", to = "/AmisDemo", icon = "fa fa-camera-retro fa-fw" },
+                    new
+                    {
+                        label = "页面",
+                        icon = "fa fa-bars fa-th",
+                        unfolded = true,
+                        children = new object[]
+                        {
+                            new { label = "初始化出错", to = "/Page/Error" },
+                            new { label = "表单页面", to = "/Page/Form" },
+                            new { label = "简单页面", to = "/Page/Index" }
+                        }
+                    },
+                    new
+                    {
+                        label = "表单",
+                        icon = "fa fa-list-alt",
+                        children = new object[]
+                        {
+                            new { label = "表单展示模式", to = "/Form/Mode" },
+                            new { label = "所有类型汇总", to = "/Form/Full" },
+                            new { label = "静态展示", to = "/Form/Static" },
+                            // new { label = "输入态、展示态切换", to = "/Form/SwitchDisplay" },
+                            new { label = "输入提示", to = "/Form/Hint" },
+                            new { label = "FieldSet", to = "/Form/Fieldset" },
+                            new { label = "Tabs", to = "/Form/Tabs" },
+                            new { label = "FieldSet Tabs 组合", to = "/Form/FieldSetInTabs" },
+                            new { label = "动态数据", to = "/Form/Remote" },
+                            new { label = "显隐状态联动", to = "/Form/Reaction" },
+                            new { label = "表单验证", to = "/Form/Validation" },
+                            new { label = "组合类型", to = "/Form/Combo" },
+                            new { label = "穿梭器", to = "/Form/Transfer" },
+                            new { label = "多功能选择器", to = "/Form/Picker" },
+                            new { label = "子表单", to = "/Form/SubForm" },
+                            new { label = "富文本", to = "/Form/RichText" },
+                            new { label = "代码编辑器", to = "/Form/Ide" },
+                            new { label = "自定义组件", to = "/Form/Custom" },
+                            new { label = "表格编辑", to = "/Form/Table" },
+                            new { label = "公式示例", to = "/Form/Formula" },
+                            new { label = "条件组合", to = "/Form/ConditionBuilder" },
+                            new { label = "引用", to = "/Form/Definitions" },
+                            new { label = "锚点导航", to = "/Form/AnchorNav" },
+                            new { label = "复杂嵌套数据", to = "/Form/InputKVS" },
+                            new { label = "树形结构", to = "/Form/Tree" }
+                        }
+                    },
+                    new
+                    {
+                        label = "增删改查",
+                        icon = "fa fa-table",
+                        children = new object[]
+                        {
+                            new { label = "表格模式", to = "/CRUD/Table" },
+                            new { label = "表格高度自适应", to = "/CRUD/TableAutoFill" },
+                            new { label = "卡片模式", to = "/CRUD/Grid" },
+                            new { label = "列表模式", to = "/CRUD/List" },
+                            new { label = "加载更多模式", to = "/CRUD/LoadMore" },
+                            new { label = "操作交互显示", to = "/CRUD/ItemActions" },
+                            new { label = "列类型汇总", to = "/CRUD/Columns" },
+                            new { label = "可折叠", to = "/CRUD/Footable" },
+                            new { label = "嵌套", to = "/CRUD/Nested" },
+                            new { label = "合并单元格", to = "/CRUD/MergeCell" },
+                            new { label = "表头分组", to = "/CRUD/HeaderGroup" },
+                            new { label = "表头隐藏", to = "/CRUD/HeaderHide" },
+                            new { label = "带边栏（用 tree）", to = "/CRUD/Aside" },
+                            new { label = "带边栏（用 Nav）", to = "/CRUD/Aside2" },
+                            new { label = "固定表头/列", to = "/CRUD/Fixed" },
+                            new { label = "键盘操作编辑", to = "/CRUD/Keyboards" },
+                            new { label = "操作并下一个", to = "/CRUD/JumpNext" },
+                            new { label = "列展示详情", to = "/CRUD/Popover" },
+                            new
+                            {
+                                label = "前端分页", icon = "fa fa-list-ol",
+                                children = new[]
+                                {
+                                    new { label = "一次性加载", to = "/CRUD/LoadOnce" },
+                                    new { label = "匹配函数", to = "/CRUD/MatchFunc" }
+                                }
+                            },
+                            new { label = "点击联动", to = "/CRUD/ItemAction" },
+                            new { label = "导出 Excel/CSV", to = "/CRUD/ExportCSVExcel" },
+                            new { label = "动态列", to = "/CRUD/Dynamic" },
+                            new { label = "简单分页", to = "/CRUD/SimplePager" },
+                            new { label = "解析Query参数", to = "/CRUD/ParsePrimitiveQuery" }
+                        }
+                    },
+                    new
+                    {
+                        label = "弹框",
+                        icon = "fa fa-bomb",
+                        children = new object[]
+                        {
+                            new { label = "对话框", to = "/Dialog/Simple" },
+                            new { label = "侧边弹出", to = "/Dialog/Drawer" }
+                        }
+                    },
+                    new
+                    {
+                        label = "选项卡",
+                        icon = "fa fa-clone",
+                        children = new object[]
+                        {
+                            new { label = "常规选项卡", to = "/Tabs/Normal" },
+                            new { label = "表单中选项卡分组", to = "/Tabs/Form" },
+                            new { label = "动态选项卡", to = "/Tabs/Dynamic" },
+                            new { label = "选项卡页面1", to = "/Tabs/Tab1", },
+                            new { label = "选项卡页面2", to = "/Tabs/Tab2", },
+                            new { label = "选项卡页面3", to = "/Tabs/Tab3", }
+                        }
+                    },
+                    new
+                    {
+                        label = "联动",
+                        icon = "fa fa-bolt",
+                        children = new[]
+                        {
+                            new { label = "地址栏变化自动更新", to = "/Linkpage/Page", },
+                            new { label = "选项联动", to = "/Linkpage/OptionsLocal", },
+                            new { label = "选项远程联动", to = "/Linkpage/Options", },
+                            new { label = "表单和表单联动", to = "/Linkpage/Form", },
+                            new { label = "表单提交后显示结果", to = "/Linkpage/FormSubmit", },
+                            new { label = "表单自动更新", to = "/Linkpage/Form2", },
+                            new { label = "表单和列表联动", to = "/Linkpage/CRUD", }
+                        }
+                    },
+                    new
+                    {
+                        label = "事件动作机制",
+                        icon = "fa fa-bullhorn",
+                        children = new[]
+                        {
+                            new
+                            {
+                                label = "刷新",
+                                children = new[]
+                                {
+                                    new { label = "刷新表单", to = "/Event/Reload/Form" },
+                                    new { label = "刷新图表", to = "/Event/Reload/Chart" },
+                                    new { label = "刷新下拉框", to = "/Event/Reload/Select" }
+                                }
+                            },
+                            new
+                            {
+                                label = "更新数据",
+                                children = new[]
+                                {
+                                    new { label = "更新表单数据", to = "/Event/Update/Form" },
+                                    new { label = "更新弹窗数据", to = "/Event/Update/Dialog" },
+                                    new { label = "更新向导数据", to = "/Event/Update/Wizard" },
+                                    new { label = "更新图表数据", to = "/Event/Update/Chart" },
+                                    new { label = "更新输入框的值", to = "/Event/Update/Input" },
+                                    new { label = "更新下拉框的值", to = "/Event/Update/Select" },
+                                    new { label = "更新点选按钮的值", to = "/Event/Update/ButtonGroupSelect" },
+                                    new { label = "更新输入组合的值", to = "/Event/Update/Combo" },
+                                    new { label = "联动更新", to = "/Event/Update/Sync" },
+                                    new { label = "数据回填", to = "/Event/Update/Autofill" },
+                                    new { label = "更新全局变量数据", to = "/Event/Update/Variable" }
+                                }
+                            },
+                            new
+                            {
+                                label = "执行其他组件动作",
+                                children = new[]
+                                {
+                                    new { label = "按钮类组件", to = "/Event/Component/Button" },
+                                    new { label = "输入类组件", to = "/Event/Component/Input" },
+                                    new { label = "上传类组件", to = "/Event/Component/Upload" },
+                                    new { label = "下拉选择类", to = "/Event/Component/Select" },
+                                    new { label = "时间类组件", to = "/Event/Component/Date" },
+                                    new { label = "可关闭的tag group", to = "/Event/Component/EachTag" },
+                                    new { label = "开关组件", to = "/Event/Component/Switch" },
+                                    new { label = "选项卡组件", to = "/Event/Component/Tabs" },
+                                    new { label = "评分组件", to = "/Event/Component/InputRating" },
+                                    new { label = "excel", to = "/Event/Component/Excel" },
+                                    new { label = "向导组件", to = "/Event/Component/Wizard" },
+                                    new { label = "树形选择框", to = "/Event/Component/InputTree" },
+                                    new { label = "树形选择器", to = "/Event/Component/TreeSelect" },
+                                    new { label = "form表单", to = "/Event/Component/Form" },
+                                    new { label = "穿梭框类组件", to = "/Event/Component/Transfer" },
+                                    new { label = "轮播图组件", to = "/Event/Component/Carousel" },
+                                    new { label = "Service组件", to = "/Event/Component/Service" },
+                                    new { label = "表格组件", to = "/Event/Component/Table" },
+                                    new { label = "列表展示类组件", to = "/Event/Component/List" },
+                                    new { label = "chart组件", to = "/Event/Component/Chart" },
+                                    new { label = "SearchBox组件", to = "/Event/Component/Searchbox" },
+                                    new { label = "input-table组件", to = "/Event/Component/InputTable" }
+                                }
+                            },
+                            new
+                            {
+                                label = "阻止组件默认行为",
+                                children = new[]
+                                {
+                                    new { label = "阻止表单默认行为", to = "/Event/Prevent/Form" }
+                                }
+                            }
+                        }
+                    },
+
+                    new
+                    {
+                        label = "动态加载",
+                        icon = "fa fa-magic",
+                        children = new[]
+                        {
+                            new { label = "动态加载数据", to = "/Services/Data" },
+                            new { label = "动态加载页面", to = "/Services/Schema" },
+                            new { label = "动态加载部分表单", to = "/Services/Form" }
+                        }
+                    },
+                    new { label = "代码高亮", icon = "fa fa-code", to = "/Code", },
+                    new { label = "排版", icon = "fa fa-columns", to = "/Horizontal", },
+                    new { label = "图表", icon = "fa fa-bar-chart", to = "/Chart", },
+                    new { label = "向导", icon = "fa fa-desktop", to = "/Wizard", },
+                    new { label = "轮播图", icon = "fa fa-pause", to = "/Carousel", },
+                    new { label = "音频", icon = "fa fa-volume-up", to = "/Audio", },
+                    new { label = "视频", icon = "fa fa-video-camera", to = "/Video", },
+                    new { label = "异步任务", icon = "fa fa-tasks", to = "/Tasks", },
+                    new { label = "IFrame", icon = "fa fa-cloud", to = "/IFrame", },
+                    new { label = "Office文档预览", icon = "fa fa-file-word", to = "/OfficeViewer", },
+                    new { label = "PDF文档预览", icon = "fa fa-file-pdf", to = "/PdfViewer", },
+                    new { label = "多loading", icon = "fa fa-spinner", to = "/Loading", },
+                    new { label = "向导页面", icon = "fa fa-desktop", to = "/WizardPage", },
+                }
+            }
+        };
+    }
+}

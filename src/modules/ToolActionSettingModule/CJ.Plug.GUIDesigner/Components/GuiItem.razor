@@ -1,0 +1,31 @@
+﻿@using CJ.Plug.GUIDesigner.Models
+@using CJ.Plug.GUIDesigner.Models.Shared
+@using MudBlazor
+
+
+
+
+<MudPaper draggable="true" @ondragstart="@(e => OnDragStart(PlugTypeName))" Class="dragdrop-item">
+    <MudStack Row AlignItems="AlignItems.Center">
+        <MudIcon Icon="@Icons.Material.Filled.Work" Color="Color.Primary" />
+        <MudText>@PlugTypeName</MudText>
+    </MudStack>
+    
+    
+</MudPaper>
+
+@code{
+
+    [CascadingParameter]
+    public DragDropManager _draggedType { get; set; }
+    [Parameter]
+    public string? PlugTypeName{ get; set; }
+
+    private void OnDragStart(string? key)
+    {
+        _draggedType.Payload = key;
+
+        Console.WriteLine("start drag item:" + _draggedType.Payload);
+
+    }
+}

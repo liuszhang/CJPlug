@@ -1,0 +1,101 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+
+@inject IJSRuntime JSRuntime
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">导入本地文件</MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">导入系统文件</MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">保存</MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+    <MudTooltip Text="参数集成说明:setpara(name,value)\getpara(name)">
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Help" />
+    </MudTooltip>
+</MudStack>
+<MudText>文件内容(WorkPath/test.js)</MudText>
+<MudStack Row Justify="Justify.SpaceBetween">
+
+    <MudStack Style="width:100%">
+
+        <StandaloneCodeEditor CssClass="studio-monaco-editor-large-border"
+                              @ref="_editor"
+                              Id="my-javascript-editor"
+                              OnDidChangeModelContent="TextChanged"
+                              ConstructionOptions="EditorConstructionOptions" />
+
+    </MudStack>
+
+    <MudStack>
+        <MudStack Row Style="width:188px;">
+            <MudButton OnClick="TestJS" Variant="Variant.Outlined" Color="Color.Primary">执行测试</MudButton>
+            <MudButton OnClick="@(()=>{jsExeResult="";})" Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+        </MudStack>
+        <MudTextField T="string" Label="结果预览" ReadOnly Variant="Variant.Outlined" Text="@jsExeResult" Lines="12" />
+    </MudStack>
+
+</MudStack>
+
+@code{
+    private StandaloneCodeEditor _editor = null!;
+    private string jsCode = "alert(1)";
+    private string jsExeResult = "";
+
+
+
+    private async void TextChanged()
+    {
+        if (_editor != null)
+        {
+            var model = await _editor.GetModel();
+            jsCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+            //StateHasChanged();
+        }
+
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "javascript",
+                Value = jsCode
+            };
+    }
+
+    private async Task TestJS()
+    {
+        var result = await JSRuntime.InvokeAsync<object>("executeCode", jsCode);
+        jsExeResult += result?.ToString() + "\n";
+        //StateHasChanged();
+    }
+}
+
+
+<script type="text/javascript">
+    function executeCode(code) {
+        try {
+            // 使用 IIFE 包装 eval 代码
+            var result = (function () {
+                return eval(code);
+            })();
+            return result;
+        } catch (error) {
+            // 捕获并处理错误
+            console.error("执行代码时发生错误:", error);
+            return { error: true, message: error.message };
+        }
+    }
+</script>

@@ -1,0 +1,47 @@
+﻿
+@using CJ.Plug.Models.Shared
+@using MudBlazor
+<MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+    @if (IsValueFromOtherVariable)
+    {
+        <MudSelect T="PDZVariable" @bind-Value="@SelectedVariable" Dense Clearable>
+            @foreach (var p in VariablesOfPlug)
+            {
+                <MudSelectItem Value="@($"[{p.Name}]")">@p.Name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else
+    {
+        <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                      Value="@VariableValue" ValueChanged="(string? v)=>OnSettingValueChanged(VariableValue,v)"></MudTextField>
+    }
+    <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                 Value="@IsValueFromOtherVariable" ValueChanged="(bool b)=>ChangedIsFromOtherValue(IsValueFromOtherVariable,b)" />
+</MudStack>
+
+@code {
+    [Parameter]
+    public string? VariableValue { get; set; }
+    [Parameter]
+    public bool IsValueFromOtherVariable { get; set; } = false;
+    [Parameter]
+    public List<BaseVariable> VariablesOfPlug { get; set; } = new List<BaseVariable>();
+    [Parameter]
+    public EventCallback OnValueChanged { get; set; }
+
+    private PDZVariable? SelectedVariable { get; set; }
+
+
+    private async Task ChangedIsFromOtherValue(bool modelParameter, bool value)
+    {
+        modelParameter = value;
+        await OnValueChanged.InvokeAsync(null);
+    }
+
+    private async Task OnSettingValueChanged(string modelParameter, string? value)
+    {
+        modelParameter = value;
+        await OnValueChanged.InvokeAsync(null);
+    }
+}

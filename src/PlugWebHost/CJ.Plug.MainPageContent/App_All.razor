@@ -1,0 +1,95 @@
+﻿@using CJ.Plug.MainPageContent
+@using CJ.Plug.Models.Contracts
+@using Microsoft.AspNetCore.Components.Web
+@using Radzen.Blazor
+@using System.Reflection
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    @* <link rel="stylesheet" href="bootstrap/bootstrap.min.css" /> *@
+    <link rel="stylesheet" href="app.css" />
+    @* <link rel="stylesheet" href="CJ.Plug-Aspire.Web.styles.css" /> *@
+    <link rel="icon" type="image/png" href="plug2.png" />
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" rel="stylesheet" />
+
+    <link href="_content/CodeBeam.MudBlazor.Extensions/MudExtensions.min.css" rel="stylesheet" />
+
+    @* <link href="_content/Radzen.Blazor/css/material-base.css" rel="stylesheet"> *@
+    @* <link href="_content/Elsa.Studio.Shell/css/shell.css" rel="stylesheet"> *@
+
+    <link href="_content/Z.Blazor.Diagrams/style.min.css" rel="stylesheet" />
+    <!-- If you want the default style -->
+    <link href="_content/Z.Blazor.Diagrams/default.styles.min.css" rel="stylesheet" />
+
+
+    <link href="_content/CJ.Plug.HomePage/css/prism.css" rel="stylesheet" />
+    <link href="_content/CJ.Plug.HomePage/css/app.css" rel="stylesheet" />
+    <link href="_content/CJ.Plug.HomePage/css/test.css" rel="stylesheet" />
+
+
+
+
+    <script src="_content/BlazorMonaco/jsInterop.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
+
+
+    <link href="_content/ExcelPlug/hst/handsontable.min.css" rel="stylesheet" />
+    <link href="_content/ExcelPlug/hst/ht-theme-main.min.css" rel="stylesheet" />
+    @* <script src="_content/ExcelPlug/hst/handsontable.full.min.js"></script> *@
+
+    <link rel="stylesheet" href="_content/CJ.Plug.AmisIntegration/BlazorAmis.styles.css" />
+    <link rel="stylesheet" href="_content/CJ.Plug.AmisIntegration/font-awesome-4.7.0/css/font-awesome.min.css" />
+    <link rel="icon" type="_content/CJ.Plug.AmisIntegration/image/png" href="favicon.png" />
+
+    <link rel="stylesheet" href="_content/CJ.Plug.AmisIntegration/sdk/sdk.css" />
+    <link rel="stylesheet" href="_content/CJ.Plug.AmisIntegration/sdk/helper.css" />
+    <link rel="stylesheet" href="_content/CJ.Plug.AmisIntegration/sdk/iconfont.css" />
+
+
+    @* <RadzenTheme Theme="material" @rendermode="InteractiveAuto" /> *@
+    <RadzenTheme Theme="material" @rendermode="InteractiveServer" />
+
+
+
+    @* <HeadOutlet @rendermode="InteractiveAuto" /> *@
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    @* <Routes @rendermode="InteractiveAuto" /> *@
+    <Routes @rendermode="InteractiveServer" />
+
+    <script src="_framework/blazor.web.js"></script>
+
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+
+    <script src="_content/CodeBeam.MudBlazor.Extensions/MudExtensions.min.js"></script>
+
+    <script src="_content/Z.Blazor.Diagrams/script.min.js"></script>
+
+    @* <script src="js/dialogDraggable.js"></script> *@
+
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
+
+    <script src="_content/CJ.Plug.AmisIntegration/sdk/sdk.js"></script>
+    <script type="text/javascript">
+        amisLoad=(id,json) =>{
+            const obj = JSON.parse(json);
+            let amis=amisRequire("amis/embed");
+            let amisScoped = amis.embed("#"+id, obj);
+        };
+    </script>
+</body>
+
+</html>

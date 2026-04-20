@@ -1,0 +1,261 @@
+﻿@using System.Net.Http.Json
+@using System.Collections.ObjectModel
+@using CJ.Plug.Models.Station
+@using CJ.Plug.StationAndTool.Dialogs
+@using CJ.Plug.StationAndToolApiClient
+@inject HttpClient httpClient
+
+@inject IDialogService DialogService
+@inject IStationAndToolApiClient StationAndToolApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>工具配置</PageTitle>
+
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudButton OnClick="@AddItem" Color="@Color.Primary" Class="add-item-btn" Variant="Variant.Outlined">添加工具</MudButton>
+    <MudButton OnClick="ImportTools" Variant="Variant.Outlined">导入默认</MudButton>
+    <MudButton Variant="Variant.Outlined">导入</MudButton>
+    <MudButton Variant="Variant.Outlined">导出</MudButton>
+    <MudSpacer />
+    <MudTextField Margin="Margin.Dense" Label="Search" @bind-Value="@searchTerm" Variant="Variant.Outlined" />
+</MudStack>
+@if (Loading)
+{
+    <MudProgressLinear Indeterminate Color="Color.Primary"></MudProgressLinear>
+}
+
+<MudDataGrid T="Tool" Items="@Tools" Hover CommittedItemChanges="@(async (e)=>await CommittedItemChanges(e))"
+RowContextMenuClick="OpenMenuContent"
+ColumnResizeMode="ResizeMode.Column" SortMode="SortMode.None" ShowColumnOptions="false"
+ReadOnly="false" EditMode="DataGridEditMode.Cell" EditTrigger="DataGridEditTrigger.Manual">
+    <Columns>
+        <HierarchyColumn T="Tool" />
+        <PropertyColumn Property="x => x.ToolName" CellStyle="width:160px" Title="工具名称"/>
+        <PropertyColumn Property="x => x.ToolVersion" Title="工具版本" CellStyle="width:100px" />
+        <PropertyColumn Property="x => x.ToolPath" Title="默认路径" Required="false" >
+            <EditTemplate>
+                <MudTextField Margin="Margin.Dense" FullWidth Value="@context.Item.ToolPath" AutoGrow
+                ValueChanged="@(async(string e)=>{context.Item.ToolPath=e;await CommittedItemChanges(context.Item);})">
+                </MudTextField>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.ToolType" Title="工具类型" CellStyle="width:150px">
+            <EditTemplate>
+                <MudSelect Dense Margin="Margin.Dense" Value="@context.Item.ToolType" ValueChanged="@(async(string e)=>{context.Item.ToolType=e;await CommittedItemChanges(context.Item);})">
+                    @foreach (var c in Enum.GetNames(typeof(ToolTypeEnum)).ToList())
+                    {
+                        <MudSelectItem T="string" Value=@c>@c</MudSelectItem>
+                    }
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.ToolCompany" Title="工具厂商" Required="false" CellStyle="width:100px" />
+        <PropertyColumn Property="x => x.CommandParameter" Title="命令行配置" Required="false" CellStyle="width:220px" >
+            <EditTemplate>
+                <MudTextField Margin="Margin.Dense" FullWidth Value="@context.Item.CommandParameter" AutoGrow MaxLines=6 Variant="Variant.Outlined"
+                ValueChanged="@(async(string e)=>{context.Item.CommandParameter=e;await CommittedItemChanges(context.Item);})">
+                </MudTextField>
+            </EditTemplate>
+        </PropertyColumn>
+        <TemplateColumn Title="可用图站" CellStyle="width:280px">
+            <EditTemplate>
+                <MudList Dense>
+                    @foreach (var station in OnlineStations)
+                    {
+                        <MudListItem>
+                            <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                                <MudToggleIconButton @bind-Toggled="@context.Item.IsEnabled"
+                                                     Icon="@Icons.Material.Outlined.DeveloperBoardOff"
+                                                     Size="Size.Small"
+                                                     Color="@Color.Error"
+                                                     ToggledIcon="@Icons.Material.Outlined.DeveloperBoard"
+                                                     ToggledColor="@Color.Success" />
+                                <MudText Typo="Typo.body2">@($"{station.StationIp}(DSBLSZ)")</MudText>
+                            </MudStack>
+                        </MudListItem>
+                    }
+                    @* <MudListItem>
+                        <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                            <MudToggleIconButton @bind-Toggled="@context.Item.IsEnabled"
+                                                 Icon="@Icons.Material.Outlined.DeveloperBoardOff"
+                            Size="Size.Small"
+                            Color="@Color.Error"
+                                                 ToggledIcon="@Icons.Material.Outlined.DeveloperBoard"
+                            ToggledColor="@Color.Success" />
+                            <MudText Typo="Typo.body2">192.168.101.101:6060(DSBLSZ)</MudText>
+                        </MudStack>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudStack Row Spacing="0" AlignItems="AlignItems.Center">
+                            <MudToggleIconButton @bind-Toggled="@context.Item.IsEnabled"
+                                                 Icon="@Icons.Material.Outlined.DeveloperBoardOff"
+                            Size="Size.Small"
+                            Color="@Color.Error"
+                                                 ToggledIcon="@Icons.Material.Outlined.DeveloperBoard"
+                            ToggledColor="@Color.Success" />
+                            <MudText Typo="Typo.body2">192.168.101.101:6061(DSBLSZ)</MudText>
+                        </MudStack>
+                    </MudListItem> *@
+                </MudList>
+            </EditTemplate>
+        </TemplateColumn>
+        <TemplateColumn CellClass="justify-end" Title="操作" CellStyle="width:120px">
+            <EditTemplate>
+                <MudStack Spacing="1">
+                    <MudButton OnClick="@(()=>ToolDeploySetting(context.Item))" Size="@Size.Small" Variant="@Variant.Outlined" Color="@Color.Primary">部署配置</MudButton>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">编辑工具</MudButton>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Error">删除工具</MudButton>
+                </MudStack>
+            </EditTemplate>
+        </TemplateColumn>
+    </Columns>
+    <ChildRowContent>
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">工具描述</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTextField Value="@context.Item.ToolDescription" ValueChanged="@(async(string e)=>{context.Item.ToolDescription=e;await CommittedItemChanges(context.Item);})"></MudTextField>
+            </MudCardContent>
+        </MudCard>
+    </ChildRowContent>
+</MudDataGrid>
+<MudMenu PositionAtCursor="true" @ref="_contextMenu" id="_contextMenu">
+    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@DeleteTool">
+        删除 @_contextRow?.ToolName
+    </MudMenuItem>
+</MudMenu>
+
+@code {
+    [Parameter]
+    public List<Station>? OnlineStations { get; set; } = new();
+
+    public record Model(string Name, int Age, Severity Status, decimal Salary, DateTime HireDate, bool IsManager);
+    private MudMenu _contextMenu = null!;
+    private Tool? _contextRow;
+    private string searchTerm = "";
+    private bool Loading = true;
+    private Dictionary<int, List<Station>> UsableStations { get; set; } = new();
+
+
+    List<Tool> Tools = new List<Tool>();
+    List<Tool> DefaultTools = new List<Tool>()
+    {
+        new Tool(){ToolName="获取NX模型参数",ToolVersion="1.0",ToolCompany="CJ",
+        ToolPath=@"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXGetParameters\bin\Debug\net4.8\NXGetParameters.exe",
+        CommandParameter="[ToolPath] [ModelFilePath]",ToolType=ToolTypeEnum.桌面类_商业.ToString(),
+        ToolDescription="获取NX模型参数"},
+        new Tool(){ToolName="设置NX模型参数",ToolVersion="1.0",ToolCompany="CJ",
+        ToolPath=@"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXUpdateParameters\bin\Debug\net4.8\NXUpdateParameters.exe",
+        CommandParameter="[ToolPath] [ModelFilePath] [NewParameterString]",ToolType=ToolTypeEnum.桌面类_商业.ToString(),
+        ToolDescription="设置NX模型参数"},
+        new Tool(){ToolName="NX模型转STL",ToolVersion="1.0",ToolCompany="CJ",
+        ToolPath=@"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXToStl\bin\Debug\net4.8\NXToStl.exe",
+        CommandParameter="[ToolPath] [ModelFilePath] [StlFilePath]",ToolType=ToolTypeEnum.桌面类_商业.ToString(),
+        ToolDescription="NX模型转STL"},
+
+        new Tool(){ToolName="NX",ToolVersion="12.0",ToolCompany="Siemens",ToolPath=@"C:\Program Files\Siemens\NX 12.0\NXBIN\ugraf.exe",
+        ToolDescription="NX 软件（前身为 Unigraphics，简称 UG）是由西门子数字工业软件（Siemens Digital Industries Software）开发和维护的，集 CAD、CAM、CAE 于一体的高效紧密集成软件。"},
+        new Tool(){ToolName="CMD",ToolVersion="1.0",ToolCompany="Microsoft",
+        ToolPath=@"C:\Windows\System32\cmd.exe",
+        CommandParameter="[CMDCommand]",ToolType=ToolTypeEnum.桌面类_商业.ToString(),
+        ToolDescription="系统CMD命令"},        
+        new Tool(){ToolName="Nastran",ToolVersion="2019",ToolCompany="",
+        ToolPath=@"C:\\Program Files\\MSC.Software\\MSC Nastran 2019\\bin\\nastran.exe",
+        ToolDescription="Nastran是进行网格计算的求解器"},
+        new Tool(){ToolName="Word",ToolVersion="2016",ToolCompany="Microsft",
+        ToolDescription="Microsoft Word 是一款文字处理软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"},
+        new Tool(){ToolName="Excel",ToolVersion="2016",ToolCompany="Microsft",
+        ToolDescription="Microsoft Excel 是一款电子表格软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"},
+        new Tool(){ToolName="PowerPoint",ToolVersion="2016",ToolCompany="Microsft",
+        ToolDescription="Microsoft PowerPoint 是一款幻灯片演示软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"},
+        new Tool(){ToolName="VS",ToolVersion="2022",ToolCompany="Microsoft",
+        ToolDescription="Visual Studio 是一种由微软公司开发的集成开发环境（IDE），用于开发计算机程序、网站、网页应用程序、网页服务和移动应用程序。"},
+
+
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 这里可以添加一些初始化代码
+            await RefreshTools();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshTools()
+    {
+        var tools = await StationAndToolApiClient.GetAllToolsAsync();
+        Tools.Clear();
+        //Tools.AddRange(DefaultTools);
+        Tools.InsertRange(0, tools);
+
+        foreach (var tool in Tools)
+        {
+            //获取工具当前可用的图站列表
+            var usableStations = new List<Station>();
+            var allStations = await StationAndToolApiClient.GetAllStationsAsync();
+        }
+
+        Loading = false;
+    }
+
+    private async Task OpenMenuContent(DataGridRowClickEventArgs<Tool> args)
+    {
+        _contextRow = args.Item;
+        await _contextMenu.OpenMenuAsync(args.MouseEventArgs);
+    }
+
+    private async Task DeleteTool()
+    {
+        if (_contextRow is not null)
+        {            
+            await StationAndToolApiClient.DeleteToolAsync(_contextRow.Id);
+            Snackbar.Add($"删除{_contextRow.ToolName}成功", Severity.Info);
+            Tools.Remove(_contextRow);
+            //await RefreshTools();
+            StateHasChanged();
+        }
+    }
+
+    async Task AddItem()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NewTool>("新建工具", options);
+        var result = await dialog.Result;
+        if (result != DialogResult.Cancel())
+        {
+            await RefreshTools();
+            StateHasChanged();
+        }
+        //_items.Add(new Model("New Person", 44, Severity.Warning, 85_000.00M, new DateTime(2022, 1, 1), true));
+    }
+    private async Task ImportTools()
+    {
+        foreach (var t in DefaultTools)
+        {
+            await StationAndToolApiClient.CreateToolAsync(t);
+        }
+        await RefreshTools();
+        StateHasChanged();
+    }
+
+    async Task<DataGridEditFormAction> CommittedItemChanges(Tool item)
+    {
+        //Console.WriteLine(item.ToolName);
+        await StationAndToolApiClient.UpdateToolAsync(item);
+        Snackbar.Add($"更新成功{item.ToolName}");
+
+        return DataGridEditFormAction.Close;
+    }
+
+    private async Task ToolDeploySetting(Tool Tool)
+    {
+        var parameters = new DialogParameters<ToolDeploySettingDialog> { { x => x.Tool, Tool } };
+        var dialog = await DialogService.ShowAsync<ToolDeploySettingDialog>($"{Tool.ToolName}({Tool.ToolVersion})部署配置",parameters);
+    }
+}

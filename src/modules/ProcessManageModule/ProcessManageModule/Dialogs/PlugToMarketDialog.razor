@@ -1,0 +1,167 @@
+﻿@using System.Net.Http.Json
+@using System.Text
+@using System.Text.Json
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Shared
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+@inject ILocalStorageService _localStorageService
+
+<MudDialog>
+    <DialogContent>
+        @* <div id="workflow-file-upload-button-wrapper" class="d-none">
+            <MudFileUpload T="IBrowserFile" FilesChanged="@StreamToBytes" />
+        </div> *@
+        <MudFileUpload T="IBrowserFile" FilesChanged="@StreamToBytes" Context="buttonContext">
+            <SelectedTemplate>
+                @if (buttonContext != null)
+                {                    
+                    <MudImage Src="@Base64ImageUrl" />
+
+                    @* <MudText>@buttonContext.Name</MudText> *@
+                    @* <MudText>@File.Name</MudText> *@
+                }
+                else
+                {
+                    @* <MudText>@element.Value</MudText> *@
+                }
+            </SelectedTemplate>
+            <CustomContent>
+                <MudIconButton Color="Color.Success"
+                Icon="@Icons.Material.Filled.AttachFile" />
+            </CustomContent>
+        </MudFileUpload>
+        <MudTextField @bind-Value="@element.MarketName" Label="发布名称" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="@element.Description" Label="描述" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+        <MudTextField @bind-Value="@element.Status" Label="版本" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@((e) => NewMarketPlug(element))">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code{
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    MarketPlug element = new MarketPlug { Name = "EXE执行程序", Type = "桌面类" };
+    [Parameter] public Plug Plug { get; set; }
+    public IBrowserFile? IconFile { get; set; }
+
+    private string Base64ImageUrl { get; set; } = string.Empty;
+    private byte[] MarketImageBytes { get; set; }
+    private bool IsLoaded { get; set; } = false;
+
+
+    public string Image { get; set; } = "tractor.jpg";
+
+    public bool SetHeight { get; set; } = false;
+    public bool SetWidth { get; set; } = true;
+
+    public int ImageHeight { get; set; } = 300;
+    public int ImageWidth { get; set; } = 300;
+
+    public ObjectFit ImageFit { get; set; } = ObjectFit.Cover;
+
+    protected override Task OnInitializedAsync()
+    {
+        // var options = new JsonSerializerOptions
+        //     {
+        //         //ReferenceHandler = JsonReferenceHandler.Default
+        //     };
+        //element = JsonSerializer.Deserialize<MarketPlug>(JsonSerializer.Serialize(Plug, options), options);
+        element.Name = Plug.Name;
+        element.Description = Plug.Description;
+        element.Status = Plug.Status;
+        return base.OnInitializedAsync();
+    }
+
+    public async void StreamToBytes(IBrowserFile IconFileTmp)
+    {
+        //MyCon1sole.WriteLine(IconFileTmp.Name);
+        if (IconFileTmp != null)
+        {
+            // 读取IBrowserFile的内容到内存流
+            Stream stream = IconFileTmp.OpenReadStream();
+            if (stream != null)
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    MarketImageBytes = memoryStream.ToArray();
+                    var Base64ImageUrl1 = Convert.ToBase64String(MarketImageBytes);
+                    Base64ImageUrl = string.Format("data:image/jpeg;base64,{0}", Base64ImageUrl1);
+                    //MyCon1sole.WriteLine(Base64ImageUrl.ToString());
+                    //return Base64ImageUrl;
+                    StateHasChanged();
+                }
+            }
+        }   
+    }
+
+    private async void NewMarketPlug(MarketPlug element)
+    {
+        if (!string.IsNullOrEmpty(element.MarketName))
+        {
+            element.Name = element.MarketName;
+            // var isUniqueName = await PlugManage.CheckNameIsUnique(element);
+            // if (!isUniqueName)
+            // {
+            //     Snackbar.Add("插头名称重复！");
+            //     return;
+            // }
+        }
+
+        // var uniqueMarketName = await PlugManage.GetUniquePlugName(element.Name);
+
+        element.Id = null;
+        element.DefinitionId = null;
+        element.MarketImageBytes = MarketImageBytes;
+        element.Base64ImageUrl = Base64ImageUrl;
+        element.Type = Plug.Type + "(M)";
+        element.Value = Plug.Value;
+        element.RootPlugID = Plug.Id;
+        element.Creater = Plug.Creater;
+        element.UsersCount = 1;
+        //element.DownloadUsers = new List<User>();//后续改为关系表
+        //element.DownloadUsers.Add(new User { Name = Plug.Creater });        
+        //element.Name = String.IsNullOrEmpty(element.MarketName) ? uniqueMarketName : element.MarketName;
+        //element.MarketName = String.IsNullOrEmpty(element.MarketName) ? uniqueMarketName : element.MarketName;
+        // var download = await InvokeWithBlazorServiceContext(() =>  WorkflowDefinitionService.ExportDefinitionAsync(Plug.DefinitionId, VersionOptions.Latest));
+        // string data = "";
+        // using (var reader = new StreamReader(download.Content, Encoding.UTF8))
+        // {
+        //     data = reader.ReadToEnd();
+        // }
+        // element.RealValuePath = data;
+
+        var createdPlug = await MainApiClient.CreateMarketPlugAsync(element);
+
+        var newRelation = new CommonRelation()
+            {
+                RelationCategory = RelationCategory.UserToMarketPlug.ToString(),
+                RoleAId = await _localStorageService.GetItemAsync<int>("userid"),
+                RoleBId = createdPlug.Id,
+                RoleAName = await _localStorageService.GetItemAsync<string>("username"),
+                RoleBName = createdPlug.Name,
+                RelationType = RelationTypes.发布者.ToString()
+            };
+
+        await MainApiClient.CreateOrUpdateRelationAsync(newRelation);
+        Snackbar.Add("发布到市场成功！", Severity.Success);
+
+        MudDialog.Close(DialogResult.Ok(createdPlug.Id));
+    }
+
+
+}

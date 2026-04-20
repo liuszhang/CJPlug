@@ -1,0 +1,175 @@
+﻿@using CJ.Plug.Models.Plug
+@using System.Text.Json
+@using CJ.Plug.Models.VariableType
+@using MudBlazor
+
+@* @if(Plug.ToolVersions.Count==0)
+{
+    <MudTextField FullWidth T="string" @bind-text="ToolPath" Margin="Margin.Dense" Variant="Variant.Outlined" Label="工具路径" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"></MudTextField>
+}
+else
+{
+    <MudTextField FullWidth T="string" @bind-text="tmpVersionPath" Margin="Margin.Dense" Variant="Variant.Outlined" Label="@Plug.ToolVersion" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"></MudTextField>
+}
+
+
+<MudChipSet T="string" SelectedValue="Plug.ToolVersion" CheckMark SelectionMode="SelectionMode.SingleSelection" SelectedValueChanged="ChangeVersion"
+AllClosable="@true"
+OnClose="@OnChipClosed">
+    @for (var i = 0; i < Plug.ToolVersions.Count; i++)
+    {
+        var localIndex = i;
+        <MudChip Value="@Plug.ToolVersions[localIndex]"/>
+    }
+</MudChipSet>
+<MudStack Row Justify="@Justify.Center" AlignItems="AlignItems.Center">
+    <MudTextField @bind-Value="tmpVersion" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+    <MudButton Size="Size.Small" OnClick="@AddChip" Variant="@Variant.Filled">
+        添加版本
+    </MudButton>
+</MudStack> *@
+
+<MudAlert Dense>运行参数定义</MudAlert>
+<MudStack Row AlignItems="AlignItems.Center">
+    @* <MudSelect @bind-Value="SelectedVariable" T="string" Label="参数列表" Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        @foreach(var p in Plug.PlugVariables)
+        {
+            <MudSelectItem T="string" Value="@(p.Name)">@p.Name</MudSelectItem>
+        }
+    </MudSelect> *@
+
+    <MudAutocomplete @bind-Value="SelectedVariable"
+                     SearchFunc="Search"
+                     CoerceText="true"
+                     CoerceValue="true"
+                     Variant="Variant.Outlined"
+                     Label="参数列表"
+                     Margin="Margin.Dense"
+                     Dense="true"                     
+                     Placeholder="选择或创建参数"
+                     Clearable="true" />
+
+    <MudButton OnClick="InsertVariable" Variant="Variant.Outlined" Color="Color.Primary">插入参数</MudButton>
+</MudStack>
+
+<MudTextField Value="CommandLine" ValueChanged="@((string c)=>SaveData(c))" T="string" Label="执行命令配置" Variant="Variant.Outlined" Lines="3" />
+@if(ShowSaveButton)
+{
+    <MudButton OnClick="@(()=>SaveAndClose())" Disabled="Processing" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small">保存</MudButton>
+}
+
+
+@code {
+    [Parameter]
+    public Plug? Plug { get; set; }
+    [Parameter]
+    public EventCallback<Plug> OnSaveClick { get; set; }
+    [Parameter]
+    public bool ShowSaveButton { get; set; } = true;
+
+    public PlugSettings? PlugSettings { get; set; }
+    public string? CommandLine { get; set; }
+    public string? SelectedVariable { get; set; }
+    public bool Processing { get; set; } = false;
+    //public string? ToolPath { get; set; }
+    public string? tmpVersionPath { get; set; }
+    public string? tmpVersion { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        PlugSettings = Plug.GetPlugSettings();
+        CommandLine = Plug.ToolCommandLineShema ?? PlugSettings.GetSetting(PlugSettingKey.CommandLineShema.ToString());
+    }
+
+    private async Task InsertVariable()
+    {
+        Plug.AddVariable(SelectedVariable,VariableTypeEnum.String.ToString(), false);
+        await SaveData(CommandLine + "[" + SelectedVariable + "]" + " ");
+        //CommandLine += "["+SelectedVariable+"]" + " ";
+        //PlugSettings.SetSetting(PlugSettingKey.CommandLineShema.ToString(), CommandLine);
+    }
+
+    private async Task<IEnumerable<string>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return Plug.PlugVariables.Select(v=>v.Name);
+
+        return Plug.PlugVariables.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+
+    private void AddChip()
+    {
+        if (string.IsNullOrEmpty(tmpVersion))
+        {
+            return;
+        }
+        Plug.ToolVersions.Add($"{tmpVersion}");
+        Plug.ToolVersion = tmpVersion;
+        PlugSettings.SetSetting(tmpVersion, tmpVersionPath);
+        //Plug.PlugSettingsJson = PlugSettings.GetSettingsJson();
+        //Plug.FullToolPath = JsonSerializer.Serialize(versonPathDic);
+        //Console.WriteLine(Plug.PlugSettingsJson);
+        Console.WriteLine(PlugSettings.GetSettingsJson());
+        Console.WriteLine(JsonSerializer.Serialize(PlugSettings));
+        Console.WriteLine(JsonSerializer.Serialize(Plug));
+        //toolItem.FullToolPath.Add($"{tmpVersion}-{tmpVersion}");
+        tmpVersion = "";
+        StateHasChanged();
+    }
+
+
+    private void OnChipClosed(MudChip<string> chip)
+    {
+        Plug.ToolVersions.Remove(chip.Value);
+        PlugSettings.RemoveSetting(chip.Value);
+        if (Plug.ToolVersions.Count > 0)
+        {
+            Plug.ToolVersion = Plug.ToolVersions.FirstOrDefault();
+        }
+        else
+        {
+            Plug.ToolVersion = "";
+        }
+    }
+
+    private async Task SaveAndClose(string? commandLine = null)
+    {
+        Processing = true;
+        await SaveData(commandLine);
+
+        await OnSaveClick.InvokeAsync(Plug);
+
+        Processing = false;
+    }
+
+
+    private async Task SaveData(string? commandLine = null)
+    {
+        if (!string.IsNullOrEmpty(commandLine))
+        {
+            CommandLine = commandLine;
+        }
+        
+        // if (Plug.ToolVersions.Count > 0 && string.IsNullOrEmpty(Plug.ToolVersion))
+        // {
+        //     Plug.ToolVersion = Plug.ToolVersions.FirstOrDefault();
+        // }
+        // if (Plug.ToolVersions.Count > 0)
+        // {
+        //     PlugSettings.SetSetting(Plug.ToolVersion, tmpVersionPath);
+        // }
+
+        // PlugSettings.SetSetting(PlugSettingKey.CommandLineShema.ToString(), CommandLine);        
+        // Plug.PlugSettingsJson = PlugSettings.GetSettingsJson();
+
+        Plug.ToolCommandLineShema = CommandLine;
+        //Console.WriteLine(JsonSerializer.Serialize(PlugSettings));
+        //StateHasChanged();
+    }
+
+}

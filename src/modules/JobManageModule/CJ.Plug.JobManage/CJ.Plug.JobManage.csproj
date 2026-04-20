@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    
+    <ProjectReference Include="..\CJ.Plug.JobManageApiClient\CJ.Plug.JobManageApiClient.csproj" />
+	  
+    
+    <ProjectReference Include="..\CJ.Plug.JobManageApi\CJ.Plug.JobManageApi.csproj" />
+  </ItemGroup>
+
+</Project>

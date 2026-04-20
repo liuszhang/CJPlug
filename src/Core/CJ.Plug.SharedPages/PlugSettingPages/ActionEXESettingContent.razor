@@ -1,0 +1,52 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using MudBlazor
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+<MudCheckBox Dense @bind-Value="PlugActionItem.NeedToolEnvirment" Label="依赖工具环境" Color="Color.Primary"></MudCheckBox>
+<MudCheckBox Dense @bind-Value="PlugActionItem.SupportNoWindow" Label="支持无界面执行" Color="Color.Primary"></MudCheckBox>
+
+<MudAlert Dense>运行参数定义</MudAlert>
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudSelect @bind-Value="SelectedVariable" T="string" Label="参数列表" Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        @foreach (var p in Plug.PlugVariables)
+        {
+            <MudSelectItem T="string" Value="@(p.Name)">@p.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudButton OnClick="InsertVariable" Variant="Variant.Outlined" Color="Color.Primary">插入参数</MudButton>
+</MudStack>
+
+<MudTextField Value="CommandLine" ValueChanged="@((string e)=>CommandLineChanged(e))" Label="执行命令配置" Variant="Variant.Outlined" Lines="3" />
+
+
+@code {
+
+    [Parameter]
+    public PlugAction? PlugActionItem { get; set; }
+    [Parameter]
+    public Plug? Plug { get; set; }
+
+    public string? CommandLine { get; set; }
+    public string? SelectedVariable { get; set; }
+    //public PlugSettings? PlugSettings { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //PlugSettings = PlugActionItem.GetPlugSettings();
+        //CommandLine = PlugSettings.GetSetting(PlugSettingKey.CommandLineShema.ToString());
+        CommandLine = PlugActionItem.GetPlugSetting(PlugSettingKey.CommandLineShema.ToString());
+    }
+
+    private async Task InsertVariable()
+    {
+        CommandLine += "[" + SelectedVariable + "]" + " ";
+        PlugActionItem.SetPlugSetting(PlugSettingKey.CommandLineShema.ToString(), CommandLine);
+    }
+
+    private async Task CommandLineChanged(string e)
+    {
+        PlugActionItem.SetPlugSetting(PlugSettingKey.CommandLineShema.ToString(), e);
+    }
+}

@@ -1,0 +1,97 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages.SharedComponents
+@using MudBlazor
+@using MudExtensions
+@using Serilog
+<MudStack Row>
+    <MudTextField @bind-Value="@StartLineKeyword" Margin="Margin.Dense" T="string" Label="起始行关键字"></MudTextField>
+    <MudNumericField @bind-Value="@tmpTextMapping.PositionOffset[0]" Variant="Variant.Text" Margin="Margin.Dense" Label="起始行偏移"></MudNumericField>
+
+</MudStack>
+<MudStack Row>
+    <MudTextField @bind-Value="@EndLineKeyword" Margin="Margin.Dense" T="string" Label="结束行关键字"></MudTextField>
+    <MudNumericField @bind-Value="@tmpTextMapping.PositionOffset[2]" Variant="Variant.Text" Margin="Margin.Dense" Label="结束行偏移"></MudNumericField>
+</MudStack>
+<MudComboBox @bind-SelectedValues="@SelectedColHeads" Variant="Variant.Outlined" Label="读取列头" InputPresenter="ValuePresenter.Chip" MultiSelection
+ChipCloseable ChipSize="Size.Small" ChipVariant="Variant.Filled" Color="Color.Primary" Clearable>
+    <ChildContent>
+        <MudComboBoxItem Value="@("列头1")"></MudComboBoxItem>
+        <MudComboBoxItem Value="@("列头2")"></MudComboBoxItem>
+        <MudComboBoxItem Value="@("列头3")"></MudComboBoxItem>
+    </ChildContent>
+</MudComboBox>
+<MudRadioGroup T="bool" @bind-Value="SaveMode">
+    <MudRadio Value="true" Color="Color.Primary" Dense>生成多个一维数组</MudRadio>
+    <MudRadio Value="false" Color="Color.Primary" Dense>生成二维数组</MudRadio>
+</MudRadioGroup>
+
+@if (SaveMode)
+{
+    <MudAlert Severity="Severity.Info">系统自动生成参数</MudAlert>
+}
+else
+{
+    <MudAutocomplete @bind-Value="@TmpOutputName" SearchFunc="Search"
+    CoerceText="true" CoerceValue="true"
+    Dense Margin="Margin.Dense" Label="输出至参数" Placeholder="选择或创建参数" />
+}
+
+
+
+<MudButton OnClick="InsertMapping"
+Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input"
+Color="Color.Info" Size="Size.Small">插入映射</MudButton>
+
+@code {
+    [CascadingParameter]
+    private MonacoEditorWrapper _editor { get; set; } = null!;
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public TextMapping tmpTextMapping { get; set; } = new TextMapping();
+    [Parameter]
+    public List<PlugVariableData>? PlugVariablesInPDZ { get; set; } = new List<PlugVariableData>();
+    [Parameter]
+    public EventCallback<TextMapping> OnInsertTextMapping { get; set; }
+
+
+    IEnumerable<string>? SelectedColHeads { get; set; } = new List<string>();
+    string? TmpOutputName { get; set; } = null;
+    bool SaveMode { get; set; } = true;
+    string? StartLineKeyword { get; set; } = null;
+    string? EndLineKeyword { get; set; } = null;
+
+
+    private async Task InsertMapping()
+    {
+        if (string.IsNullOrEmpty(StartLineKeyword)&&string.IsNullOrEmpty(EndLineKeyword))
+        {
+            Log.Information("起始行关键字和结束行关键字不能为空");
+            return;
+        }
+
+        tmpTextMapping.Keywords = StartLineKeyword + "|" + tmpTextMapping.PositionOffset[0] +
+            "|" + EndLineKeyword + "|" + tmpTextMapping.PositionOffset[2];
+        tmpTextMapping.BindingVariableName = TmpOutputName;
+        tmpTextMapping.ReadSchemaMode = ReadSchemaMode.表格;
+        tmpTextMapping.ReadSchemaValue = String.Join(",", tmpTextMapping.PositionOffset);
+
+        //await CheckKeywords();
+
+        if (OnInsertTextMapping.HasDelegate)
+            await OnInsertTextMapping.InvokeAsync(tmpTextMapping);
+    }
+
+    private async Task<IEnumerable<string?>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return PlugVariablesInPDZ.Select(v => v.Name);
+
+        return PlugVariablesInPDZ.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+}

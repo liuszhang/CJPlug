@@ -1,0 +1,35 @@
+@page "/Video"
+<PageTitle>视频</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            title = "视频播放器",
+            body = new object[]
+            {
+                "<p class=\"text-danger\">另外还支持直播流， flv 和 hls 格式</p>",
+                new
+                {
+                    type = "video",
+                    autoPlay = true,
+                    rates = new double[] { 1.0, 1.5, 2.0 },
+                    jumpFrame = true,
+                    jumpBufferDuration = 5,
+                    frames = new Dictionary<string,string>()
+                    {
+                        { "00:10" , "/photo/da6376bf988c_3360340.jpg"},
+                        { "00:20" , "/photo/da6376bf988c_3360340.jpg"},
+                        { "00:30" , "/photo/da6376bf988c_3360340.jpg"},
+                    },
+                    src = "/video/trailer_hd.mp4",
+                }
+            }
+        };
+        return data;
+    }
+
+}

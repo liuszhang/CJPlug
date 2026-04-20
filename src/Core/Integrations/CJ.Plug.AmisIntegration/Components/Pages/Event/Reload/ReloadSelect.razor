@@ -1,0 +1,57 @@
+@page "/Event/Reload/Select"
+<PageTitle>刷新下拉框</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            type = "page",
+            body = new object[]
+            {
+                new
+                {
+                    type = "alert",
+                    body = "刷新下拉框，使下拉框重新加载，这样可以触发下拉框的远程数据重新请求",
+                    level = "info",
+                    className = "mb-1"
+                },
+                new
+                {
+                    type = "button",
+                    label = "刷新",
+                    className = "mt-2 mb-2",
+                    level = "primary",
+                    onEvent = new
+                    {
+                        click = new
+                        {
+                            actions = new object[]
+                            {
+                                new
+                                {
+                                    actionType = "reload",
+                                    componentId = "select-reload"
+                                }
+                            }
+                        }
+                    }
+                },
+                new
+                {
+                    label = "下拉框",
+                    type = "select",
+                    id = "select-reload",
+                    mode = "horizontal",
+                    className = "mt-2",
+                    name = "select",
+                    source = "/api/mock/Form/GetOptions?waitSeconds=1"
+                }
+            }
+        };
+        return data;
+    }
+
+}

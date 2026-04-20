@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Elsa.Agents.Core" />
+	  <PackageReference Include="Elsa.Studio.Agents" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="MudX.MudBlazor.Extension" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\CJ.Plug.AIChat\CJ.Plug.AIChat.csproj" />
+    <ProjectReference Include="..\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
+  </ItemGroup>
+
+</Project>

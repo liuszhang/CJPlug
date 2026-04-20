@@ -1,0 +1,156 @@
+﻿@using Blazored.FluentValidation
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.PlugProcess
+@using Elsa.Api.Client.Resources.StorageDrivers.Models
+@using Elsa.Api.Client.Resources.VariableTypes.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Studio.Components
+@using Elsa.Studio.Workflows.Components.WorkflowDefinitionEditor.Components.WorkflowProperties.Tabs.InputOutput.Validators
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using MudExtensions
+
+@inherits StudioComponentBase
+
+<MudDialog Style="resize:both;">
+    <DialogContent>
+        <EditForm EditContext="_editContext" OnValidSubmit="OnValidSubmit">
+            <FluentValidationValidator @ref="_fluentValidationValidator" Validator="_validator" DisableAssemblyScanning="true"/>
+            <MudStack>
+                <MudTextField Label="名称" @bind-Value="_model.Name" For="@(() => _model.Name)" Variant="Variant.Outlined"/>
+                <MudSelect T="string" @bind-Value="_model.Type" Variant="Variant.Outlined" Label="参数类型" Dense="false" Margin="Margin.Normal">
+                    @foreach (var grouping in _groupedVariableTypes)
+                    {
+                        @* <MudAlert>@grouping.Key</MudAlert> *@
+                        
+                        @foreach (var variableType in grouping)
+                        {
+                            <MudSelectItem T="string" Value="@variableType.TypeName">@variableType.DisplayName</MudSelectItem>
+                        }
+                        
+                    }
+                </MudSelect>
+                <MudField Variant="Variant.Text" HelperText="标示参数是否为数组." Margin="Margin.None">
+                    <MudCheckBox T="bool" @bind-Value="_model.IsArray" Label="数组" Dense="true"></MudCheckBox>
+                </MudField>
+                <MudTextField Label="值" @bind-Value="_model.Value" HelperText="参数值" Variant="Variant.Outlined" />
+                <MudTextField Label="默认值" @bind-Value="_model.DefaultValue" HelperText="参数默认值" Variant="Variant.Outlined" />
+                <MudSelect T="string" @bind-Value="_model.InputAndOutput" Variant="Variant.Outlined" Dense="false" Label="输入输出">
+                    <MudSelectItem T="string" Value="@("I")">输入</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("O")">输出</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("IO")">输入输出</MudSelectItem>                    
+                </MudSelect>
+                <MudTextField Label="显示名称" @bind-Value="_model.DisplayName" HelperText="参数显示名称" Variant="Variant.Outlined" />
+                <MudTextField Label="描述" @bind-Value="_model.Description" HelperText="参数描述" Variant="Variant.Outlined" Lines="3" />
+                <MudTextField Label="分类" @bind-Value="_model.Category" HelperText="自定义参数分类名称" Variant="Variant.Outlined" />
+                <MudSelect T="string" @bind-Value="_model.UIHint" Variant="Variant.Outlined" Dense="false" Label="参数录入模式" HelperText="@(_model.UIHint)">
+                    @foreach(var uiHint in _uiHints)
+                    {
+                        <MudSelectItem T="string" Value="@uiHint.Name">@uiHint.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_model.StorageDriver" Variant="Variant.Outlined" Dense="false" Label="生命周期范围">
+                    @foreach (var storageDriver in _storageDriverDescriptors)
+                    {
+                        <MudSelectItem T="string" Value="@storageDriver.TypeName">@storageDriver.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="OnCancelClicked">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="OnSubmitClicked">确认</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public BaseVariable? BaseVariable { get; set; }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private EditContext _editContext = default!;
+    private FluentValidationValidator _fluentValidationValidator = default!;
+    private InputModelValidator _validator = default!;
+    private BaseVariable _model = new();
+    private ICollection<IGrouping<string, VariableTypeDescriptor>> _groupedVariableTypes = new List<IGrouping<string, VariableTypeDescriptor>>();
+    private ICollection<UIHintDescriptor> _uiHints = new List<UIHintDescriptor>();
+    private ICollection<StorageDriverDescriptor> _storageDriverDescriptors = new List<StorageDriverDescriptor>();
+    private ICollection<VariableTypeDescriptor> _variableTypes = new List<VariableTypeDescriptor>();
+    [Inject] private IStorageDriverService StorageDriverService { get; set; } = default!;
+    [Inject] private IVariableTypeService VariableTypeService { get; set; } = default!;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (BaseVariable != null)
+        {
+            _model = BaseVariable;
+        }
+        _model.InputAndOutput = "IO";
+        _editContext = new EditContext(_model);
+        _storageDriverDescriptors = (await StorageDriverService.GetStorageDriversAsync()).ToList();
+        _variableTypes = (await VariableTypeService.GetVariableTypesAsync()).ToList();
+        _uiHints = (await GetUIHintsAsync()).ToList();
+        _groupedVariableTypes = _variableTypes.GroupBy(x => x.Category).ToList();
+    }
+
+
+    private Task<IEnumerable<UIHintDescriptor>> GetUIHintsAsync()
+    {
+        // TODO: Get these from the backend.
+        var descriptors = new[]
+        {
+            new UIHintDescriptor("singleline", "Single line", "A single line of text input"),
+            new UIHintDescriptor("multiline", "Multi line", "Multiple lines of text input"),
+            new UIHintDescriptor("checkbox", "Checkbox", "A checkbox"),
+            new UIHintDescriptor("checklist", "Checklist", "A list of checkboxes"),
+            new UIHintDescriptor("radiolist", "Radio list", "A list of radio buttons"),
+            new UIHintDescriptor("dropdown", "Dropdown", "A dropdown list"),
+            new UIHintDescriptor("multitext", "Multi text", "An input for multiple words, like a tagging input"),
+            new UIHintDescriptor("code-editor", "Code editor", "A code editor"),
+            new UIHintDescriptor("variable-picker", "Variable picker", "A variable picker"),
+            new UIHintDescriptor("workflow-definition-picker", "Workflow definition picker", "A workflow definition picker"),
+            new UIHintDescriptor("output-picker", "Output picker", "A workflow output definition picker"),
+            new UIHintDescriptor("outcome-picker", "Outcome picker", "An outcome picker"),
+            new UIHintDescriptor("json-editor", "JSON editor", "A JSON editor"),
+        };
+
+        return Task.FromResult(descriptors.AsEnumerable());
+    }
+
+
+
+    private Task OnValidSubmit()
+    {
+        // var input = ProcessVariable ?? new ProcessVariable();
+
+        // input.Name = _model.Name;
+        // input.Type = _model.Type;
+        // input.IsArray = _model.IsArray;
+        
+        // input.StorageDriver = _model.StorageDriver;
+        // input.Category = _model.Category;
+        // input.UIHint = _model.UIHint;
+        // input.Description = _model.Description;
+        // input.DisplayName = _model.DisplayName;
+
+        MudDialog.Close(_model);
+        return Task.CompletedTask;
+    }
+
+    private Task OnCancelClicked()
+    {
+        MudDialog.Cancel();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnSubmitClicked()
+    {
+        // if (!await _fluentValidationValidator.ValidateAsync())
+        //     return;
+
+        await OnValidSubmit();
+    }
+}

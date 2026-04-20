@@ -1,0 +1,132 @@
+﻿@using Blazored.LocalStorage
+
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using System.Text.Json.Nodes
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using MudBlazor
+@using CJ.Plug.ProcessManageApiClient
+
+@inject IPDZApiClient PDZApiClient
+@inject IProcessManageApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+
+
+<MudDialog>
+    <DialogContent>
+        <MudStack>
+            <MudTextField @bind-Value="@Name" Margin="Margin.Dense" Label="名称" Variant="Variant.Outlined"></MudTextField>
+            @* <MudTextField @bind-Value="@Type" Margin="Margin.Dense" Label="类型" Variant="Variant.Outlined"></MudTextField> *@
+            <MudTextField @bind-Value="@Description" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined"></MudTextField>
+
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="Processing" OnClick="Cancel">取消</MudButton>
+        <MudButton Disabled="Processing" Color="Color.Primary" OnClick="Submit">提交</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    private string? Name{ get; set; }
+    private string? Type { get; set; }
+    private string? Description { get; set; }
+    private bool Processing = false;
+    [Parameter]
+    public Process? workflow1 { get; set; }
+    [Parameter] public int OrderID { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (workflow1!=null)
+        {
+            Name = workflow1.Name;
+            Type = workflow1.Type;
+            Description = workflow1.Description;
+        }
+    }
+
+    private async void Submit()
+    {
+        Processing = true;
+        if (workflow1==null)
+        {
+            CLog.Information(">>>>>>>>>start new workflow");
+            var process = new Process();
+            process.DefinitionId = RandomLongIdentityGenerator.GenerateId();
+            // process.ActivityJsonData = new JsonObject(new Dictionary<string, JsonNode?>
+            //     {
+            //         ["id"] = process.DefinitionId,
+            //         ["definitionId"] = process.DefinitionId,
+            //         ["type"] = "Elsa.Flowchart",
+            //         ["name"] = process.Name
+            //     }).ToString();
+            process.Name = Name;
+            process.Description = Description;
+            process.Version = 1;
+            process.Creater = await DomInteropService.GetCurrentUserName() ?? "null";
+            process.Type = PlugCategorys.流程.ToString();
+            process.Category = PlugCategorys.流程.ToString();
+            process.GroupName = PlugGroupEnum.我的流程.ToString();
+            process.ShowInPlugLibrary = false;
+            process.CreateType = PlugCreateTypeEnum.新建流程.ToString();
+            var result = await MainApiClient.CreateNewWorkflow(process);
+            workflow1 = result;
+            CLog.Information(result.WorkPath);
+            //同步创建相关PDZ
+            var newPDZ = new PlugDataZone();
+            newPDZ.UserName = process.Creater;
+            newPDZ.PlugDefinitionId = process.DefinitionId;
+            newPDZ.Type = PDZTypeEnum.Desi.ToString();
+            newPDZ.PDZId = process.Creater + process.DefinitionId + PDZTypeEnum.Desi.ToString();
+            newPDZ.PDZWorkPath = Path.Combine(newPDZ.UserName, newPDZ.PDZId);
+
+
+            newPDZ.FlowchartDatas.Add(new FlowchartData()
+                {
+                    PlugDefinitionId = process.DefinitionId,
+                    Value = new JsonObject(new Dictionary<string, JsonNode?>
+                    {
+                        ["id"] = process.DefinitionId,
+                        ["nodeId"] = process.DefinitionId,
+                        ["definitionId"] = process.DefinitionId,
+                        ["type"] = "Elsa.Flowchart",
+                        ["name"] = process.Name
+                    }).ToJsonString()
+                });
+            newPDZ.PlugDatas.Add(new PlugData()
+                {
+                    PlugDefinitionId = process.DefinitionId,
+                    Name = process.Name,
+                    Value = $"0 0",//记录插头坐标值，用于绘制数据流等功能
+                    WorkPath=newPDZ.PDZWorkPath,
+                });
+
+            await PDZApiClient.CreateOrUpdatePDZ(newPDZ);
+            //await MainApiClient.GetOrCreatePDZFromPlug(process,process.Creater);
+            //await MainApiClient.GetOrCreatePDZ(process.Creater, process.DefinitionId, PDZTypeEnum.Desi.ToString(),null);
+
+        }
+        else
+        {
+            Console.WriteLine(">>>>>>>>>start edit workflow");
+            workflow1.Name = Name;
+            workflow1.Description = Description;
+            //workflow1.Version++;
+            await MainApiClient.UpdateProcessAsync(workflow1.Id, workflow1);
+        }
+
+
+        MudDialog.Close(DialogResult.Ok(workflow1));
+    } 
+
+    private void Cancel() => MudDialog.Cancel();
+}

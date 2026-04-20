@@ -1,0 +1,35 @@
+﻿
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.VariableUIHandler.Models
+@using CJ.Plug.VariableUIHandler.Pages
+@using MudBlazor
+
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject MainApiClient MainApiClient
+
+<MudTextField Value="@EditorContext.Variable.Value" ValueChanged="(string v)=>ValueChanged(EditorContext.Variable,v)" Margin="Margin.Dense" T="string" AutoGrow/>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    async Task ValueChanged(BaseVariable PDZVariable,string value)
+    {
+        //Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
+        //PDZVariable.Value = value;
+        //await MainApiClient.CreateOrUpdatePDZ(EditorContext.PlugDataZone);
+
+        var plugVariableData = EditorContext.PlugDataZone.PlugVariableDatas?.FirstOrDefault(p => p.Id == PDZVariable.Id);
+        if (plugVariableData != null)
+        {
+            plugVariableData.Value = value;
+            plugVariableData.DisplayValue = value;
+        }
+        await MainApiClient.UpdatePlugVariableData(plugVariableData);
+
+
+        Snackbar.Add($"更新插头{EditorContext?.Variable?.Name}参数值成功");
+    }
+}

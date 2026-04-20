@@ -1,0 +1,319 @@
+﻿@page "/ProcessEdit/{ProcessDefinitionId?}"
+<PageTitle>@($"流程编辑({MainProcess.Name})")</PageTitle>
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ApiClient.Services
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.ElsaIntegration.Pages
+@using CJ.Plug.Models
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.EventAggregator.Notifications
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.ProcessEdit.Components
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Responses
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Studio
+@using Elsa.Studio.Components
+@using Elsa.Studio.Extensions
+@using Elsa.Studio.Models
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.Domain.Extensions
+@using Elsa.Studio.Workflows.Domain.Models
+@using Elsa.Studio.Workflows.UI.Models
+@using MediatR
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.JSInterop
+@using MudBlazor
+@using Orientation = Radzen.Orientation
+@using Radzen
+@using Radzen.Blazor
+@using Serilog
+@using Size = MudBlazor.Size
+@using ThrottleDebounce
+
+
+
+@* @inherits StudioComponentBase *@
+
+
+@inject NavigationManager NavigationManager
+
+
+
+
+@inject MainApiClient MainApiClient
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject IDomInteropService DomInteropService
+
+<CascadingValue Value="PlugDataZone">
+    <CascadingValue Value="ActivityStats">
+        <CascadingValue Value="SelectedPlugDefinitionId">
+            <CascadingValue Value="ActivitySelectedNotify">
+                <CascadingValue Value="SetDataGridShowNotify">
+
+                <MudStack Row StretchItems="StretchItems.Start">
+                    <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh - var(--mud-appbar-height));">
+                        <RadzenSplitterPane Size="70%" Min="910px">
+                            <CascadingValue Value="DragDropManager" >
+                                <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh - var(--mud-appbar-height));">
+                                    <RadzenSplitterPane Size="30%" Min="100px" Collapsed="ActivityPickerPanelCollapsed">
+                                        <MyActivityPicker></MyActivityPicker>
+                                    </RadzenSplitterPane>
+                                    <RadzenSplitterPane Size="70%" Min="710px">
+                                        <RadzenSplitter Orientation="Orientation.Vertical" Resize="OnResize">
+                                            <RadzenSplitterPane Size="65%">
+
+                                                <MudPaper Class="diagram-designer-container">
+
+                                                    <MyDiagramDesignerWrapper @ref="diagramDesignerWrapper"
+                                                    Process="MainProcess" ProcessDefinitionId="@ProcessDefinitionId" />
+
+                                                </MudPaper>
+
+                                            </RadzenSplitterPane>
+                                            <RadzenSplitterPane Size="35%" Collapsed="PDZDataPanelCollapsed">
+                                                <PDZVariableDataGrid 
+                                                HeightPercent="SplitterPanelPercent" 
+                                                TabTitle="参数"  
+                                                OnOnlyVariableUpdated="OnOnlyVariableUpdated" >
+                                                </PDZVariableDataGrid>
+
+                                            </RadzenSplitterPane>
+                                        </RadzenSplitter>
+
+                                    </RadzenSplitterPane>
+                                </RadzenSplitter>
+
+                            </CascadingValue>
+                        </RadzenSplitterPane>
+                        <RadzenSplitterPane Size="30%" Min="300px" Collapsed="InformationPanelCollapsed">
+                            <RadzenSplitter Orientation="Orientation.Vertical" Resize="OnResize2">
+                                <RadzenSplitterPane Size="30%">
+                                    <ActivityProperties HeightPercent="SplitterPanelPercent2"></ActivityProperties>
+                                </RadzenSplitterPane>
+                                <RadzenSplitterPane Size="70%">
+                                    <LogsWrapper HeightPercent="100-SplitterPanelPercent2"></LogsWrapper>
+                                </RadzenSplitterPane>
+                            </RadzenSplitter>
+                        </RadzenSplitterPane>
+                    </RadzenSplitter>
+                </MudStack>
+
+                </CascadingValue>
+            </CascadingValue>
+        </CascadingValue>
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    public double SplitterPanelPercent { get; set; } = 35;
+    public double SplitterPanelPercent2 { get; set; } = 30;
+    private bool ActivityPickerPanelCollapsed { get; set; } = false;
+    private bool PDZDataPanelCollapsed { get; set; } = false;
+    private bool InformationPanelCollapsed { get; set; } = false;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [CascadingParameter]
+    public MyDragDropManager DragDropManager { get; set; } = new();
+    [CascadingParameter]
+    public SetMenuNotify? SetMenuNotify { get; set; }
+
+    public SetDataGridShowNotify? SetDataGridShowNotify { get; set; }
+
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    private JsonObject? SelectedActivity { get; set; }
+    public string? SelectedPlugDefinitionId { get; private set; }
+    public ActivitySelectedNotify? ActivitySelectedNotify { get; set; }
+    //private Plug? SelectedPlug { get; set; }
+    public Plug? MainProcess { get; set; } = new();
+    private IDictionary<string, ActivityStats> ActivityStats = new Dictionary<string, ActivityStats>();
+    private MyDiagramDesignerWrapper? diagramDesignerWrapper;
+
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => MudDialog.Cancel();
+
+    [Parameter]
+    public string? ProcessDefinitionId { get; set; }
+
+    public bool tag { get; set; } = true;
+
+    bool _checked3 = false;    
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ProcessDefinitionId == null) return;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ProcessDefinitionId!=null)
+        {
+            ActivitySelectedNotify = new ActivitySelectedNotify(EventCallback.Factory.Create<JsonObject>(this, OnActivitySelected));
+            SetDataGridShowNotify = new SetDataGridShowNotify(EventCallback.Factory.Create<bool>(this, OnSetDataGridShow));
+
+            //await GlobalEventBus.SetMenuStatus(false);
+            SetMenuNotify.Invoke(false);
+            SelectedPlugDefinitionId = ProcessDefinitionId;
+
+            //获取流程数据
+            MainProcess = await MainApiClient.GetPlugByDefinitionIdAsync(ProcessDefinitionId);
+
+            //获取PDZ数据
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            PlugDataZone = await MainApiClient.GetOrCreatePDZFromPlugDefinitionId(ProcessDefinitionId, currentUser);
+            await DomInteropService.SetItemValue("PDZId",PlugDataZone?.PDZId);
+
+            //建立SignalR连接
+            await HubActivityStatus(PlugDataZone.PDZId);
+
+            StateHasChanged();
+        }
+        //Console.WriteLine("load done 2");
+
+    }
+
+    private async Task SaveChangesAsync(bool readDiagram, bool showLoader, bool publish, Func<SaveWorkflowDefinitionResponse, Task>? onSuccess = default, Func<ValidationErrors, Task>? onFailure = default)
+    {
+        await InvokeAsync(async () =>
+            {
+                Console.WriteLine(">>>>>>>>>save changes!");
+            }); 
+
+    }
+
+    private async void OnActivitySelected(JsonObject? activity)
+    {
+        await InvokeAsync(async () =>
+        {
+            SelectedActivity = null;
+            StateHasChanged();
+
+            SelectedActivity = activity;
+            SelectedPlugDefinitionId = activity?.GetId();
+            //SelectedPlug = await MainApiClient.GetPlugByDefinitionIdAsync(activity.GetId());
+
+            StateHasChanged();
+        });
+    }
+
+
+    private void OnMaxFlowDesigner(bool isMax)
+    {
+        InvokeAsync(() =>
+        {
+            Console.WriteLine("start max flow designer");
+            ActivityPickerPanelCollapsed = isMax;
+            PDZDataPanelCollapsed = isMax;
+            InformationPanelCollapsed = isMax;
+            StateHasChanged();
+        });
+    }
+    private void OnSetDataGridShow(bool isCollapsed)
+    {
+        InvokeAsync(() =>
+        {
+            PDZDataPanelCollapsed = isCollapsed;
+            StateHasChanged();
+        });
+    }
+
+    private async Task OnVariableUpdated(JsonObject activity)
+    {
+        //Log.Information("OnVariableUpdated>>>>>>>>>>>>>>>" + activity);
+        if (diagramDesignerWrapper != null)
+        {
+            await diagramDesignerWrapper.UpdateActivity(activity);
+        }        
+
+    }
+
+    private async Task OnOnlyVariableUpdated(BaseVariable plugVariable)
+    {
+        var value = JsonSerializer.SerializeToNode(plugVariable.Value, new JsonSerializerOptions { WriteIndented = true });
+        var propertyName = plugVariable.Name;
+        if (!string.IsNullOrEmpty(propertyName))
+            SelectedActivity?.SetProperty(value, propertyName);
+        //Log.Information("OnVariableUpdated>>>>>>>>>>>>>>>" + activity);
+        if (diagramDesignerWrapper != null&&SelectedActivity!=null)
+        {
+            await diagramDesignerWrapper.UpdateActivity(SelectedActivity);
+        }
+    }
+
+    private void ExecuteOption()
+    {
+
+    }
+
+
+    public async Task HubActivityStatus(string PDZId)
+    {
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.ActivityStatusNow.ToString()+PDZId);
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.PDZUpdatedInfo.ToString());
+        //通过长连接添加活动状态监听
+        HubConnectionManagerService._hubConnection.On<string, string, string>(LogTypeEnum.ActivityStatusNow.ToString() + PDZId,            
+            (PDZId, DefinitionId, status) =>
+           {
+               Console.WriteLine($"NewStatus:{PDZId}-{DefinitionId}-{status}");               
+               InvokeAsync(() =>
+               {
+                   var tmpStats = JsonSerializer.Deserialize<ActivityStats>(status);
+                   ActivityStats[DefinitionId] = tmpStats ?? new ActivityStats();
+                   StateHasChanged();
+               });
+           });
+
+        //通过长连接添加PDZ更新状态监听
+        HubConnectionManagerService._hubConnection.On<string>(LogTypeEnum.PDZUpdatedInfo.ToString(), 
+        (message) =>
+           {
+               var PDZId = message;
+               if (PlugDataZone.PDZId != PDZId)
+               {
+                   return;
+               }
+               //Log.Information($"PDZUpdated:{PDZId}");
+               InvokeAsync(async () =>
+               {
+                   PlugDataZone = await MainApiClient.GetPDZByPDZIdAsync(PDZId);
+                   StateHasChanged();
+               });
+           });
+    }
+
+    void OnResize(RadzenSplitterResizeEventArgs args)
+    {
+        //Log.Information($"Pane {args.PaneIndex} Resize (New size {args.NewSize})");
+        SplitterPanelPercent = 100-args.NewSize;
+    }
+
+    void OnResize2(RadzenSplitterResizeEventArgs args)
+    {
+        //Log.Information($"Pane {args.PaneIndex} Resize (New size {args.NewSize})");
+        SplitterPanelPercent2 = args.NewSize;
+    }
+
+}
+
+
+

@@ -1,0 +1,350 @@
+﻿@page "/ProcessManageList"
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.ProcessManage.Dialogs
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using Radzen.Blazor
+@using Serilog
+@using CJ.Plug.ProcessManageApiClient
+@using Size=MudBlazor.Size
+
+
+@inject HttpClient Http
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+@inject IJSRuntime JSRuntime
+
+<PageTitle>仿真流程管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+
+
+    <MudTable @ref="_table"
+    T="Process"
+    ServerData="LoadData"
+    Dense="true"
+    Hover="true"
+    Elevation="0"
+    RowStyle="cursor: pointer;"
+    MultiSelection="true"
+    SelectOnRowClick="true"
+    SelectedItemsChanged="OnSelectedItemsChanged"
+    Height="80%"
+    FixedHeader="true"              
+    >
+
+        <ToolBarContent>
+            <MudStack Row>
+                <MudButtonGroup Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                    <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Create" OnClick="NewProcess">新建流程</MudButton>
+                    <MudMenu Size="Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+                        <MudMenuItem OnClick="NewProcess">新建流程</MudMenuItem>
+                        <MudMenuItem>导入流程</MudMenuItem>
+                        <MudMenuItem>模板创建</MudMenuItem>
+                        <MudMenuItem>复制选中</MudMenuItem>
+                    </MudMenu>
+                </MudButtonGroup>
+                <MudButton OnClick="EditProcess" Disabled="(selectedItemNow == null) || Loading" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">
+                    
+                    @if (Loading)
+    {
+        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                        <MudText>流程设计</MudText>
+    }
+    else
+    {
+                        <MudText>流程设计</MudText>
+    }
+                    </MudButton>
+                <MudButton OnClick="() => DeleteProcess(null)" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Delete">删除流程</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Disabled="selectedItemNow == null" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ImportExport">导出流程</MudButton>
+                <MudButton OnClick="@(() => PublishToMarket(selectedItemNow))" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore">发布到市场</MudButton>
+                <MudButton OnClick="@(() => PublishToMCPServer(selectedItemNow))" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore">发布为MCP Tool</MudButton>
+                <MudButton OnClick="@(() => PublishToMCPServer(selectedItemNow))" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore">发布为Skill</MudButton>
+                @* <MudButton OnClick="TestElsa" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore">测试ElsaApi</MudButton> *@
+            </MudStack>
+            <MudSpacer></MudSpacer>
+
+            <MudTextField
+            T="string" 
+            ValueChanged="@(s=>OnSearch(s))"
+            Margin="Margin.Dense"
+
+            Placeholder="可搜索： 名称, ID, 版本, 状态"
+            Variant="Variant.Outlined"
+            AdornmentIcon="@Icons.Material.Outlined.Search"
+            IconSize="Size.Small"
+            Adornment="Adornment.End"
+            Clearable="true"
+
+            Immediate="true"
+            />
+
+
+        </ToolBarContent>
+
+        <HeaderContent>
+            <MudTh>流程 ID</MudTh>
+            <MudTh>名称</MudTh>
+            <MudTh>版本</MudTh>
+            <MudTh>描述</MudTh>
+            <MudTh>创建人</MudTh>
+            <MudTh>来源</MudTh>
+            <MudTh>
+                <MudTableSortLabel SortLabel="CreatedAt" T="Process" InitialDirection="SortDirection.Descending">创建于</MudTableSortLabel>
+            </MudTh>            
+            <MudTh>
+                <MudTableSortLabel SortLabel="UpdatedAt" T="Process">更新于</MudTableSortLabel>
+            </MudTh>
+            <MudTh>显示到组件库</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+
+        <RowTemplate>
+            <MudTd>@context.Id</MudTd>            
+            <MudTd>
+                <MudTooltip Text="@context.Name">
+                    <div style="text-overflow: ellipsis; overflow: hidden; max-width: 200px; white-space: nowrap;">
+                        @context.Name
+                    </div>
+                </MudTooltip>
+            </MudTd>
+            <MudTd>@context.Version</MudTd>
+            <MudTd>@context.Description</MudTd>
+            <MudTd>@context.Creater</MudTd>
+            <MudTd>@context.CreateType</MudTd>
+            <MudTd>@context.CreatedAt</MudTd>
+            <MudTd>@context.UpdatedAt</MudTd>
+            <MudTd>
+                <MudSwitch Value="@context.ShowInPlugLibrary" ValueChanged="@((bool e)=>PlugInProcess(context, e))" Color="Color.Success"></MudSwitch>
+            </MudTd>
+            <MudTd Style="text-align:right">
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudTooltip Text="已有流程实例在运行中,可在作业列表查看,点击启动一个新实例" Delay="100">
+                        <MudBadge Color="Color.Warning" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+                            <MudLink Href="@($"/process/{context.DefinitionId}/execute/")" Target="_blank">
+                                <MudIconButton Icon="@Icons.Material.Outlined.PlayArrow" Color="Color.Success" />
+
+                            </MudLink>
+                            @*  <MudIconButton OnClick="()=>ExeProcess(context)" Icon="@Icons.Material.Outlined.PlayArrow" Color="Color.Success" Variant="Variant.Text" />
+ *@
+                        </MudBadge>
+                    </MudTooltip>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="()=>UpdateProcess(context)" Icon="@Icons.Material.Outlined.ZoomIn">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="()=>DeleteProcess(context)" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                    </MudMenu>
+                </MudStack>
+
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <MudText>无流程运行实例</MudText>
+        </NoRecordsContent>
+
+        <LoadingContent>
+            <MudText>Loading...</MudText>
+        </LoadingContent>
+
+        <PagerContent>
+            <MudTablePager RowsPerPageString="每页展示条数"/>
+        </PagerContent>
+    </MudTable>
+
+
+
+
+</MudContainer>
+
+
+
+@code {
+
+    public double? Amount { get; set; }
+    public int? Weight { get; set; }
+    public string searchString { get; set; } = "";
+    private HashSet<Process> selectedItems1 = new HashSet<Process>();
+    private Process? selectedItemNow;
+
+
+    public bool ReadOnly;
+    public bool Loading = false;
+
+
+    private MudTable<Process> _table = null!;
+
+    private async Task<TableData<Process>> LoadData(TableState state, CancellationToken cancellationToken)
+    {        
+        Console.WriteLine(">>>>>>>>>>>>>> LoadData called");
+        var workflows = await MainApiClient.GetWorkflowsAsync();
+        workflows = workflows.Where(element =>
+        {
+            //Console.WriteLine(">>>>>>>>>>>searchString:" + searchString);
+            if (string.IsNullOrWhiteSpace(searchString))
+                return true;
+            if (element.Id.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if ($"{element.Description} {element.Type} {element.CreatedAt}".Contains(searchString))
+                return true;
+            return false;
+        }).ToArray();
+
+
+        return new TableData<Process> { TotalItems = workflows.Length, Items = workflows };
+    }
+
+    private void OnSelectedItemsChanged(HashSet<Process> elements)
+    {
+        if (elements.Any())
+            selectedItems1 = elements;
+        if (elements.Count == 1)
+            selectedItemNow = elements.First();
+        else
+            selectedItemNow = null;
+    }
+
+    private async Task NewProcess()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<NewProcess>("新建流程", options);
+        var result = await dialog.Result;
+        //Console.WriteLine(">>>>>>>>>>>>>>new process result:"+JsonSerializer.Serialize(result.ToString()));     
+        if (!result.Canceled)
+        {
+            var newProcess = ((Process)result.Data);
+            Console.WriteLine($"root process is:{JsonSerializer.Serialize(newProcess)}");
+            // 刷新表格数据
+            await _table.ReloadServerData();
+        }
+        return;
+        //OnSearch(searchString);
+    }
+    private async Task DeleteProcess(Process? workflow)
+    {
+        if (workflow==null)
+        {
+            foreach (var w in selectedItems1)
+            {
+                await MainApiClient.DeletePlug(w.Id);
+                await MainApiClient.DeletePDZByDeletePlug(w.DefinitionId);
+                //await ElsaEngineService.DeleteWorkflowByDefinitionId(w.DefinitionId);
+                //await WorkflowDefinitionService.DeleteAsync(w.DefinitionId);
+            }
+        }
+        else
+        {
+            await MainApiClient.DeletePlug(workflow.Id);
+            await MainApiClient.DeletePDZByDeletePlug(workflow.DefinitionId);
+            //await ElsaEngineService.DeleteWorkflowByDefinitionId(workflow.DefinitionId);
+            //await WorkflowDefinitionService.DeleteAsync(workflow.DefinitionId);
+        }
+        selectedItems1.Clear();
+        await _table.ReloadServerData();
+
+    }
+    private async Task UpdateProcess(Process workflow)
+    {
+        //var workflow = e.Item;
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var parameters = new DialogParameters<NewProcess>
+        {
+            { x => x.workflow1,workflow }
+        };
+        var dialog = await DialogService.ShowAsync<NewProcess>("编辑流程", parameters,options);
+        var result = await dialog.Result;
+        //Console.WriteLine(result.ToString());
+        if (!result.Canceled)
+        {
+            // 刷新表格数据
+            await _table.ReloadServerData();
+        }
+        else
+        {
+            Console.WriteLine(">>>>>>>>>>>>cancel edit");
+        }
+
+        return;
+        //OnSearch(searchString);
+    }
+
+    private async Task PlugInProcess(Process workflow,bool ShowInLib)
+    {
+        workflow.ShowInPlugLibrary = ShowInLib;
+
+        await MainApiClient.UpdateProcessAsync(workflow.Id, workflow);
+        //await ElsaEngineService.CreateOrUpdateWorkflowFromProcess(workflow);
+        Console.WriteLine("Plug in success");
+        StateHasChanged();
+    }
+
+    private void OnSearch(string text)
+    {
+        searchString = text;
+        _table.ReloadServerData();
+    }
+
+    private void EditProcess()
+    {
+        Loading = true;
+        //var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true ,FullScreen=true};
+
+        //return DialogService.ShowAsync<EditProcess>("编辑流程", options);
+        var id = selectedItems1.FirstOrDefault()?.DefinitionId;
+        if (id != null)
+            NavigationManager.NavigateTo($"/ProcessEdit/{id}");
+        else
+            Snackbar.Add("请选择一条数据操作");
+
+    }
+
+    private void ExeProcess(Process process)
+    {
+        var CorrelationId = RandomLongIdentityGenerator.GenerateId();
+        NavigationManager.NavigateTo($"/process/{process.DefinitionId}/execute/{CorrelationId}");
+    }
+
+
+    private async Task PublishToMarket(Plug? item)
+    {
+        if (item == null)
+        {
+            Snackbar.Add("请选择一条数据发布。");
+        }
+        var parameters = new DialogParameters<PlugToMarketDialog> { { x => x.Plug, item } };
+        var dialog = await DialogService.ShowAsync<PlugToMarketDialog>("发布到插头市场", parameters);
+        var result = await dialog.Result;
+        //await InitPlugData();
+        StateHasChanged();
+    }
+
+    private async Task PublishToMCPServer(Plug? item)
+    {
+        if (item == null)
+        {
+            Snackbar.Add("请选择一条数据发布。");
+        }
+        var parameters = new DialogParameters<PublishToMCPServerDialog> { { x => x.Plug, item } };
+        var dialog = await DialogService.ShowAsync<PublishToMCPServerDialog>("发布到MCPServer", parameters);
+        var result = await dialog.Result;
+        //await InitPlugData();
+        StateHasChanged();
+    }
+
+
+
+}
+

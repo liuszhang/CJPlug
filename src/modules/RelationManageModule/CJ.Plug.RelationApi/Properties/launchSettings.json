@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "CJ.Plug.RelationApi": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:42208;http://localhost:42209"
+    }
+  }
+}

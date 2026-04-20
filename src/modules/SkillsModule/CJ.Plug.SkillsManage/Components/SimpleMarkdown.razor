@@ -1,0 +1,107 @@
+@using Microsoft.AspNetCore.Components
+@using System.Text
+@using System.Text.Encodings.Web
+@using System.Text.RegularExpressions
+@using MudBlazor
+@using Radzen.Blazor
+
+<MudPaper Elevation="0" Class="p-4">
+    @((MarkupString)html)
+</MudPaper>
+@* <RadzenMarkdown Value="@Markdown" Style="height:600px"/> *@
+
+@code {
+    [Parameter]
+    public string? Markdown { get; set; }
+
+    private string html = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        html = ConvertMarkdown(Markdown ?? string.Empty);
+    }
+
+    private string Encode(string s) => HtmlEncoder.Default.Encode(s);
+
+    private string ConvertMarkdown(string md)
+    {
+        if (string.IsNullOrWhiteSpace(md))
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        var lines = md.Replace("\r\n", "\n").Split('\n');
+
+        bool inCode = false;
+        var codeSb = new StringBuilder();
+        bool inList = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+
+            if (line.StartsWith("```"))
+            {
+                if (!inCode)
+                {
+                    inCode = true;
+                    codeSb.Clear();
+                    continue;
+                }
+                else
+                {
+                    inCode = false;
+                    sb.Append("<pre><code>");
+                    sb.Append(Encode(codeSb.ToString()));
+                    sb.Append("</code></pre>");
+                    continue;
+                }
+            }
+
+            if (inCode)
+            {
+                codeSb.AppendLine(line);
+                continue;
+            }
+
+            if (line.StartsWith("###### ")) { sb.Append("<h6>"); sb.Append(Encode(line.Substring(7).Trim())); sb.Append("</h6>"); continue; }
+            if (line.StartsWith("##### "))  { sb.Append("<h5>"); sb.Append(Encode(line.Substring(6).Trim())); sb.Append("</h5>"); continue; }
+            if (line.StartsWith("#### "))   { sb.Append("<h4>"); sb.Append(Encode(line.Substring(5).Trim())); sb.Append("</h4>"); continue; }
+            if (line.StartsWith("### "))    { sb.Append("<h3>"); sb.Append(Encode(line.Substring(4).Trim())); sb.Append("</h3>"); continue; }
+            if (line.StartsWith("## "))     { sb.Append("<h2>"); sb.Append(Encode(line.Substring(3).Trim())); sb.Append("</h2>"); continue; }
+            if (line.StartsWith("# "))      { sb.Append("<h1>"); sb.Append(Encode(line.Substring(2).Trim())); sb.Append("</h1>"); continue; }
+
+            if (line.TrimStart().StartsWith("- ") || line.TrimStart().StartsWith("* "))
+            {
+                if (!inList) { inList = true; sb.Append("<ul>"); }
+                var item = line.TrimStart().Substring(2).Trim();
+                item = ProcessInline(item);
+                sb.Append("<li>"); sb.Append(item); sb.Append("</li>");
+                var nextIsList = (i + 1 < lines.Length) && (lines[i + 1].TrimStart().StartsWith("- ") || lines[i + 1].TrimStart().StartsWith("* "));
+                if (!nextIsList) { inList = false; sb.Append("</ul>"); }
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                sb.Append("<p></p>");
+                continue;
+            }
+
+            var content = ProcessInline(line.Trim());
+            sb.Append("<p>"); sb.Append(content); sb.Append("</p>");
+        }
+
+        return sb.ToString();
+    }
+
+    private string ProcessInline(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        text = Regex.Replace(text, "`([^`]*)`", m => "<code>" + Encode(m.Groups[1].Value) + "</code>");
+        text = Regex.Replace(text, "\\*\\*([^*]+)\\*\\*|__([^_]+)__", m => "<strong>" + Encode((m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value)) + "</strong>");
+        text = Regex.Replace(text, "\\*([^*]+)\\*|_([^_]+)_", m => "<em>" + Encode((m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value)) + "</em>");
+        text = Regex.Replace(text, "\\[([^\\]]+)\\]\\(([^)]+)\\)", m => "<a href=\"" + Encode(m.Groups[2].Value) + "\" target=\"_blank\">" + Encode(m.Groups[1].Value) + "</a>");
+
+        return text;
+    }
+}

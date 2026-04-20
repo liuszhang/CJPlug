@@ -1,0 +1,28 @@
+﻿@using Elsa.Api.Client.Extensions
+@using MudBlazor
+@using System.Text.Json.Nodes
+
+<MudStack Row AlignItems="AlignItems.Center" Spacing="0">
+    @* <MudToggleIconButton @bind-Toggled="@ShowDesigner"
+    Icon="@Icons.Material.Filled.AlarmOff"
+    Size="Size.Small"
+    Color="@Color.Error"
+    ToggledIcon="@Icons.Material.Filled.AlarmOn"
+    ToggledColor="@Color.Success" /> *@
+    <MudIcon Icon="@Icons.Material.Filled.Girl" Size="Size.Small"></MudIcon>
+    <MudText>@Activity.GetName()</MudText>
+</MudStack>
+
+@if (ShowDesigner)
+{
+     <ElsaFlowchartDesigner IsChildDesigner="true"></ElsaFlowchartDesigner>
+}
+
+
+
+@code {
+    [CascadingParameter]
+    public JsonObject Activity { get; set; } = default!;
+
+    private bool ShowDesigner { get; set; } = true;
+}

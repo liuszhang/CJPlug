@@ -1,0 +1,89 @@
+﻿@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Serilog
+
+<MudDataGrid T="ToolCommandVariable" Items="@ToolCommandVariables" Filterable="false" SortMode="SortMode.None" Height="250px"
+Hover FixedHeader ReadOnly="false"
+ColumnResizeMode="ResizeMode.Column" EditMode="@DataGridEditMode.Cell"
+Bordered="true" Dense="true">
+    <Columns>
+        <PropertyColumn Property="x => x.VariableName" Title="属性名" Editable="false" />
+        <PropertyColumn Property="x => x.VariableValue" Title="设定值" >
+            <EditTemplate>
+                <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    @if (@context.Item.IsFromPlugVariable)
+                    {
+                        <MudSelect T="string" @bind-Value="@context.Item.VariableValue" Dense Clearable>
+                            @foreach (var p in VariablesOfPlug)
+                            {
+                                <MudSelectItem Value="@($"[{p.Name}]")">@p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                                      Value="@context.Item.VariableValue" ValueChanged="(string? v)=>OnSettingValueChanged(context.Item,v)"></MudTextField>
+                    }
+                    <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                    Value="@context.Item.IsFromPlugVariable" ValueChanged="(bool b)=>ChangedIsFromOtherValue(context.Item,b)" />
+                </MudStack>
+            </EditTemplate>
+        </PropertyColumn>
+    </Columns>
+</MudDataGrid>
+
+
+
+
+
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+    [CascadingParameter]
+    public EventCallback<PlugDataZone> PDZUpdated { get; set; }
+
+
+    public List<PlugVariableData> VariablesOfPlug => EditorContext.PlugDataZone.GetVariablesOfPlug(EditorContext.PlugDefinitionId);
+
+    private List<ToolCommandVariable> ToolCommandVariables = new();
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Console.WriteLine("first after render");
+            try
+            {
+                ToolCommandVariables = JsonSerializer.Deserialize<List<ToolCommandVariable>?>(EditorContext.Variable.Value);
+            }
+            catch (Exception ex)
+            {
+                Log.Information(ex.Message);
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangedIsFromOtherValue(ToolCommandVariable modelParameter,bool value)
+    {
+        modelParameter.IsFromPlugVariable = value;
+        EditorContext.PlugDataZone.SetVariableValue(EditorContext.PlugDefinitionId,EditorContext.Variable.Name, JsonSerializer.Serialize(ToolCommandVariables));
+        
+        //await EditorContext.UpdateValueAsync(EditorContext.PlugDataZone);   
+        await PDZUpdated.InvokeAsync(EditorContext.PlugDataZone);
+    }
+
+    private async Task OnSettingValueChanged(ToolCommandVariable modelParameter, string? value)
+    {
+        modelParameter.VariableValue = value;
+        EditorContext.PlugDataZone.SetVariableValue(EditorContext.PlugDefinitionId, EditorContext.Variable.Name, JsonSerializer.Serialize(ToolCommandVariables));
+        Log.Information("子组件触发参数更新，准备执行回调");
+        //await EditorContext.UpdateValueAsync(EditorContext.PlugDataZone);
+        await PDZUpdated.InvokeAsync(EditorContext.PlugDataZone);
+    }
+}

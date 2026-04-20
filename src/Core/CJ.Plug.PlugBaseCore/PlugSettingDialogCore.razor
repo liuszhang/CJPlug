@@ -1,0 +1,255 @@
+﻿@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.EventAggregator.Notifications
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Station
+@using CJ.Plug.PlugBaseCore.Components
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.PlugBaseCore.Models
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages
+@using CJ.Plug.TASApiClient
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using EventAggregator.Blazor
+@using Humanizer
+@using MediatR
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using Radzen.Blazor
+@using Serilog
+@using Size=MudBlazor.Size
+
+@inject ISnackbar Snackbar
+@inject ITASApiClient MainApiClient
+@inject IExecuteApiClient ExecuteApiClient
+@inject IPDZApiClient PDZApiClient
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
+@inject IEnumerable<IPlugActionSettingContent> PlugActionSettingContent
+@inject IDialogService DialogService
+@inject HubConnectionManagerService HubConnectionManagerService
+
+<CascadingValue Value="PlugDataZone">
+    <CascadingValue Value="SelectedPlugDefinitionId">
+
+        <MudDialog Class="stack-resize" Style="height:880px;width:1500px;">
+            <TitleContent>
+                <MudStack Row>
+                    <MudText>@Activity.GetDisplayText()</MudText>
+                </MudStack>
+            </TitleContent>
+            <DialogContent>
+
+                <MudTabs Elevation="2" ActivePanelIndex="2" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="width:100%">
+                    <MudTabPanel Text="基础属性">
+                        @if (Loading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+                        }
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="编号" @bind-Text="@PlugData.PlugDefinitionId" ReadOnly Variant="Variant.Filled"></MudTextField>
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型" @bind-Text="@PlugData.PlugType" ReadOnly Variant="Variant.Filled"></MudTextField>                            
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="KEY" @bind-Text="@PlugData.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="名称" @bind-Text="@PlugData.Name" Variant="Variant.Outlined"></MudTextField>
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="描述" @bind-Text="@PlugData.Description" Variant="Variant.Outlined" Lines="3"></MudTextField>
+                    </MudTabPanel>
+                    <MudTabPanel Text="参数配置">
+                        <PDZVariableDataGrid HeightPercent="100"></PDZVariableDataGrid>
+
+                    </MudTabPanel>
+                    <MudTabPanel Text="插头配置">
+                        @PlugCommonExecuteSettingContent
+                    </MudTabPanel>
+                    <MudTabPanel Text="动作配置">
+                        <PlugActionSetting PlugData="PlugData"></PlugActionSetting>
+                    </MudTabPanel>
+                </MudTabs>
+
+
+
+            </DialogContent>
+            <DialogActions>
+                <MudButton Disabled="Processing" OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">取消</MudButton>
+
+                <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>ExecuteActivity(PlugData))">执行</MudButton>
+                <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlug(PlugData))">应用</MudButton>
+                <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlugAndCloseDialog(PlugData))">
+                    @if (Processing)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>        
+                    }
+                    else
+                    {
+                        <MudText>确定</MudText>
+                    }
+                </MudButton>
+            </DialogActions>
+
+        </MudDialog>
+
+    </CascadingValue>
+</CascadingValue>
+
+
+@code {
+    [Parameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+
+    public PlugData? PlugData { get; set; } = new();
+    public string? SelectedPlugDefinitionId { get; set; }
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public SetMenuNotify? SetMenuNofity { get; set; }
+
+
+    public RenderFragment? PlugCommonExecuteSettingContent { get; set; }
+    public RenderFragment? PlugActionExecuteSettingContent { get; set; }
+
+    private List<string> ToolVersions { get; set; } = new();
+    private List<Plug> RootPlugActions { get; set; } = new();
+    //private List<Plug> PlugActionsToExecute { get; set; } = new();
+    private List<ActionData> PlugActionsToExecute { get; set; } = new();
+    private ActionData? TmpSelectedToolAction { get; set; }
+
+
+    private List<PlugVariable> TmpVariables = new List<PlugVariable>();
+    private List<PlugVariable>? SelectedPlugVariables = new List<PlugVariable>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+
+    private bool Processing = false;
+
+
+    private bool Loading = true;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+    private bool LogShow = false;
+    private string LogPercent = "0%";
+    private string MainPercent = "100%";
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.ExtraLarge,
+            Position = DialogPosition.Center,
+            BackdropClick = false,
+            FullWidth=true            
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //await GlobalEventBus.SetMenuStatus(false);
+
+
+        await MudDialog.SetOptionsAsync(diaOption);
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            SetMenuNofity?.Invoke(false);
+
+
+            PlugData = PlugDataZone.PlugDatas.FirstOrDefault(v =>v.PlugDefinitionId == Activity.GetId());
+            SelectedPlugDefinitionId = PlugData?.PlugDefinitionId;
+            var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(PlugData?.PlugType);
+            ToolVersions = rootPlug?.ToolVersions ?? new();
+            //Log.Information($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
+            Console.WriteLine($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
+            RootPlugActions = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(rootPlug?.DefinitionId) ?? new();
+            //PlugActionsToExecute = await MainApiClient.GetPlugActionsToExecuteByPlugId(Plug.Id) ?? new();
+            //PlugActionsToExecute = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(PlugData.DefinitionId) ?? new();
+            PlugActionsToExecute = PlugDataZone.ActionDatas.Where(a=>a.PlugDefinitionId==Activity.GetId()).ToList();
+            foreach (var pcsc in PlugCommonSettingContent)
+            {
+                var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId);
+                var tmpContent = await pcsc.GetPlugCommonSettingContent(context);
+                if (tmpContent != null)
+                {
+                    PlugCommonExecuteSettingContent = tmpContent;
+                    break;
+                }
+            }
+            Loading = false;
+            Console.WriteLine("first loading data done");
+
+            StateHasChanged();
+        }
+        //Loading = false;
+        Console.WriteLine("loading data done");
+        //StateHasChanged();
+    }
+
+    async Task SavePlugAndCloseDialog(PlugData plug)
+    {
+        await SavePlug(plug);
+        Console.WriteLine($"the new activity is:{Activity}");
+
+        MudDialog.Close(Activity);
+    }
+
+    async Task SavePlug(PlugData plug)
+    {
+        Processing = true;
+        //Console.WriteLine($"prepare to update plug:{JsonSerializer.Serialize(plug.PlugVariables)}");
+        //更新插头的json数据，用于流程图显示
+        // foreach (var v in plug.PlugVariables)
+        // {
+        //     Activity.SetProperty(JsonSerializer.SerializeToNode(v.Value, new JsonSerializerOptions { WriteIndented = true }), v.Name);
+        // }
+        Activity.SetDisplayText(plug.Name);
+        Activity.SetName(plug.Name);
+
+
+        await PDZApiClient.CreateOrUpdatePDZ(PlugDataZone);
+        StatusReporter.PDZUpdated(PlugDataZone.PDZId);
+        StatusReporter.PlugUpdated(Activity.GetId());
+
+        Processing = false;
+    }
+
+    public async Task ExecuteActivity(PlugData plug)
+    {
+        LogShow = true;
+        LogPercent = "30%";
+        MainPercent = "70%";
+        //Console.WriteLine(">>>>>>>>>>>>start to execute activity:"+JsonSerializer.Serialize(Activity));
+
+        var request = new PlugExecutionRequest();
+        request.ExecuteResultData.Ids.PlugDefinitionId = Activity.GetId();
+        request.ExecuteResultData.Ids.PDZId = PlugDataZone.PDZId;
+        await ExecuteApiClient.ExecutePlug(request);
+        //await MainApiClient.ExecutePlugByDefifnitionId(plug.DefinitionId);
+        StateHasChanged();
+    }
+
+
+
+
+}

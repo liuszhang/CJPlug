@@ -1,0 +1,28 @@
+﻿<UserControl
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:StationSettingUI.Components"
+             xmlns:Collections="clr-namespace:System.Collections;assembly=System.Runtime" x:Class="StationSettingUI.Components.ToolRegistration"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <DataGrid ItemsSource="{Binding Tools}" AutoGenerateColumns="False" CanUserDeleteRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="编号" Binding="{Binding Id}"/>
+                <DataGridTextColumn Header="工具名称" Binding="{Binding ToolName}"/>
+                <DataGridTextColumn Header="工具版本" Binding="{Binding ToolVersion}"/>
+                <DataGridTextColumn Header="安装路径" Binding="{Binding ToolPath}" Width="*"/>
+                <DataGridTextColumn Header="启动命令" Binding="{Binding ToolCommand}" Width="*"/>
+                <DataGridCheckBoxColumn Header="安装状态" Binding="{Binding SetupStatus}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+
+        <Button Content="自动搜索" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,110,20"/>
+        <Button Content="配置下载" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,53,20"/>
+        <Button Content="应用" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,20"/>
+
+    </Grid>
+</UserControl>

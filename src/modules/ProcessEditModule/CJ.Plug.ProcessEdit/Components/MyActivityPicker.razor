@@ -1,0 +1,208 @@
+﻿@using Blazored.LocalStorage
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.Domain.Extensions
+@using System.Text.Json
+@using Elsa.Workflows.Management.Features
+
+@inject IActivityRegistry ActivityRegistry
+@inject IDomInteropService DomInteropService
+@inject IElsaStudioService ElsaStudioService
+@inject ElsaApiClient ElsaApiClient
+
+<MudPaper Class="pa-0" Style="min-width:220px">
+    <MudStack>
+        <MudTabs MinimumTabWidth="88" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0">
+            <MudTabPanel Text="组件库">
+                <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    <MudTextField @bind-Value="@_searchText"
+                    Margin="Margin.Dense"
+                    Placeholder="搜索组件"
+                    Variant="Variant.Outlined"
+                    AdornmentIcon="@Icons.Material.Outlined.Search"
+                    Adornment="Adornment.End"
+                    Clearable="true"
+                    DebounceInterval="1000"
+                    Immediate="true" />
+                    <MudIconButton OnClick="Refresh" Icon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary">刷新</MudIconButton>
+                    <MudToggleGroup @bind-Value="@ShowModel" T="string" Outlined Delimiters Size="Size.Small" Color="Color.Primary">
+                        <MudToggleItem Value="@("list")">
+                            <MudIcon Icon="@Icons.Material.Filled.FormatAlignLeft" />
+                        </MudToggleItem>
+                        <MudToggleItem Value="@("apps")">
+                            <MudIcon Icon="@Icons.Material.Filled.Apps" />
+                        </MudToggleItem>
+                    </MudToggleGroup>
+
+                </MudStack>
+
+                <VerticalWell ExtraPadding="100">
+                    <MudExpansionPanels Style="min-width:220px" MultiExpansion>
+                        @foreach (var grouping in GroupedActivityDescriptors.OrderBy(x => x.Key))
+                        {
+                            var activityDescriptors = grouping.OrderBy(x => x.DisplayName ?? x.Name).ToList();
+                            var category = grouping.Key;
+
+                            <MudExpansionPanel Text="@category">
+                                <MudStack Wrap="@Wrap.Wrap" Spacing="2" Row AlignItems="AlignItems.Start">
+                                    @foreach (var p in activityDescriptors)
+                                    {
+                                        <PlugItem PlugDisplayName="@p.Name" ActivityDescriptor="@p" ShowModel="@ShowModel" />
+                                    }
+                                </MudStack>
+                            </MudExpansionPanel>
+                        }                        
+                    </MudExpansionPanels>
+                </VerticalWell>
+            </MudTabPanel>
+            <MudTabPanel Text="共享流程">
+                <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    <MudTextField @bind-Value="@_searchText"
+                    Margin="Margin.Dense"
+                    Placeholder="搜索组件"
+                    Variant="Variant.Outlined"
+                    AdornmentIcon="@Icons.Material.Outlined.Search"
+                    Adornment="Adornment.End"
+                    Clearable="true"
+                    DebounceInterval="1000"
+                    Immediate="true" />
+                    <MudIconButton OnClick="Refresh" Icon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary">刷新</MudIconButton>
+                    <MudToggleGroup @bind-Value="@ShowModel" T="string" Outlined Delimiters Size="Size.Small" Color="Color.Primary">
+                        <MudToggleItem Value="@("list")">
+                            <MudIcon Icon="@Icons.Material.Filled.FormatAlignLeft" />
+                        </MudToggleItem>
+                        <MudToggleItem Value="@("apps")">
+                            <MudIcon Icon="@Icons.Material.Filled.Apps" />
+                        </MudToggleItem>
+                    </MudToggleGroup>
+
+                </MudStack>
+
+                <VerticalWell ExtraPadding="160">
+                    <MudExpansionPanels Style="min-width:220px" MultiExpansion>
+                        <MudExpansionPanel Text="我的流程" Expanded="true">
+                            <MudStack Wrap="@Wrap.Wrap" Spacing="2" Row AlignItems="AlignItems.Start">
+                                @foreach (var p in SharedActivityDescriptors)
+                                {
+                                    if (p.Category == "我的流程")
+                                    {
+                                        <PlugItem PlugDisplayName="@p.Name" ActivityDescriptor="@p" />
+                                    }
+                                }
+                            </MudStack>
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="共享流程">
+                            <MudStack Wrap="@Wrap.Wrap" Spacing="2" Row AlignItems="AlignItems.Start">
+                                @foreach (var p in SharedActivityDescriptors)
+                                {
+                                    if (p.Category == "共享流程")
+                                    {
+                                        <PlugItem PlugDisplayName="@p.Name" ActivityDescriptor="@p" />
+                                    }
+                                }
+                            </MudStack>
+                        </MudExpansionPanel>                        
+                    </MudExpansionPanels>
+                </VerticalWell>
+            </MudTabPanel>
+
+        </MudTabs>
+
+
+
+    </MudStack>
+
+</MudPaper>
+
+
+
+
+
+@code{
+    public string ShowModel = "list";
+    public string? CurrentUser { get; set; }
+
+    public IEnumerable<ActivityDescriptor>? ActivityDescriptors { get; set; } = new List<ActivityDescriptor>();
+    private string _searchText = "";
+
+    private IEnumerable<IGrouping<string, ActivityDescriptor>> GroupedActivityDescriptors
+    {
+        get
+        {            
+            var ActivityDescriptors2 = ActivityDescriptors.Where(item => !(item.Category.Contains("流程") && item.Category!=PlugGroupEnum.流程控制.ToString()));
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return ActivityDescriptors2.GroupBy(x => x.Category); // Return all items grouped by category
+
+            var items = ActivityDescriptors2.Where(item =>
+                item.Name.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                item.TypeName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                (item.DisplayName != null && item.DisplayName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase)) ||
+                item.Category.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                (item.Description != null && item.Description.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase))
+            );
+            Console.WriteLine(">>>>>>>>>>>>>>>>>search find activities:" + items.Count());
+            return items.GroupBy(x => x.Category);
+
+        }
+    }
+
+    private IEnumerable<ActivityDescriptor> SharedActivityDescriptors
+    {
+
+        get
+        {
+            var sharedActivities = ActivityDescriptors?.Where(item => (item.Category.Contains("流程") && item.Category!=PlugGroupEnum.流程控制.ToString()));
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return sharedActivities; // Return all items grouped by category
+
+            var items = sharedActivities.Where(item =>
+                item.Name.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                item.TypeName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                (item.DisplayName != null && item.DisplayName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase)) ||
+                item.Category.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                (item.Description != null && item.Description.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase))
+            );
+            Console.WriteLine(">>>>>>>>>>>>>>>>>search find activities:" + items.Count());
+            return items;
+
+        }
+    }
+    private async Task Refresh()
+    {      
+        //获取组件库数据
+        ActivityDescriptors = new List<ActivityDescriptor>();
+        StateHasChanged();
+        //ActivityDescriptors = await ElsaStudioService.GetElsaActivityDescriptors();
+        //var loginResult = await ElsaApiClient.LoginToElsaAsync();
+        //Console.WriteLine($"Log in To Elsa Result:{loginResult.IsAuthenticated}");
+        //ActivityDescriptors = await ElsaApiClient.ListAllActivityDescriptorsAsync();
+        //Console.WriteLine(">>>>>>>>>>>>>>>>>picker page find activities:" + ActivityDescriptors.Count());
+        //ActivityDescriptors = new List<ActivityDescriptor>();
+        await ActivityRegistry.RefreshAsync();
+        await ActivityRegistry.EnsureLoadedAsync();
+        ActivityDescriptors = ActivityRegistry.ListBrowsable();
+        Console.WriteLine(">>>>>>>>>>>>>>>>>activity picker find activities:" + ActivityDescriptors.Count());
+        // foreach(var a in ActivityDescriptors)
+        // {
+        //     Console.WriteLine(a.Name);
+        // }
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            CurrentUser = await DomInteropService.GetCurrentUserName();
+            await Refresh();
+        }
+    }
+}

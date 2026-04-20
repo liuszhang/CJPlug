@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+	  <VersionPrefix>1.0.3</VersionPrefix>
+	  <PackageOutputPath>..\..\..\04.Nuget</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Blazored.LocalStorage" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="System.Linq.Async" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\modules\AIModule\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
+    <ProjectReference Include="..\..\modules\FileManageModule\CJ.Plug.FileManageApiClient\CJ.Plug.FileManageApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\JobManageModule\CJ.Plug.JobManageApiClient\CJ.Plug.JobManageApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\LoginModule\CJ.Plug.LoginApiClient\CJ.Plug.LoginApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\MCPToolsModule\CJ.Plug.MCPToolApiClient\CJ.Plug.MCPToolApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\PDZManageModule\CJ.Plug.PlugDataZoneApiClient\CJ.Plug.PlugDataZoneApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\PlugExecuteModule\CJ.Plug.ExecuteApiClient\CJ.Plug.ExecuteApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\PlugMarketModule\CJ.Plug.PlugMarketApiClient\CJ.Plug.PlugMarketApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\ProcessManageModule\CJ.Plug.ProcessManageApiClient\CJ.Plug.ProcessManageApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\RelationManageModule\CJ.Plug.RelationApiClient\CJ.Plug.RelationApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\StationAndToolModule\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\UserManageModule\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
+  </ItemGroup>
+
+</Project>

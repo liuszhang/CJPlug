@@ -1,0 +1,116 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Blazored.LocalStorage
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+
+@inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+
+<MudDialog Class="stack-resize">
+    <DialogContent>     
+        <MudContainer Style="max-height: 350px; overflow-y: scroll">
+            <MudPaper Class="pa-4">
+                <MudTreeView ServerData="LoadServerData" Items="TreeItems" @bind-SelectedValue="SelectedNode" Hover="true" Color="Color.Success">
+                    <ItemTemplate>
+                        <MudTreeViewItem ExpandedChanged="@((e) =>OnExpandedChanged(context.Value))" Text="@context.Value.Name" Value="@context.Value"
+                        Icon="@(context.Value.IsDirectory ?Icons.Material.Filled.Folder: Icons.Custom.FileFormats.FileDocument)"
+                        LoadingIconColor="Color.Info"
+                        CanExpand="@context.Value.IsDirectory">
+                        </MudTreeViewItem>
+                    </ItemTemplate>
+                </MudTreeView>
+            </MudPaper>
+        </MudContainer>
+        <MudDivider></MudDivider>
+        <MudText>已选择：@(SelectedNode == null ? "无" : SelectedNode.FullPath)</MudText>
+        <MudDivider></MudDivider>
+        @if (IsChooseBusinessTool)
+        {
+            <MudTextField @bind-Value="ToolName" Label="工具名称" HelperText="可直接输入工具名称(如CMD),将优先使用您的输入" Variant="Variant.Outlined" />
+        }        
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">确认</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    private FileSystemNode[] FileTreeNodes { get; set; } = new FileSystemNode[0];
+    private List<TreeItemData<FileSystemNode>>? TreeItems { get; set; } = new ();
+    
+    private FileSystemNode? SelectedNode { get; set; }
+    private string ToolName;
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public bool IsChooseBusinessTool { get; set; } = true;
+    [Parameter] public string ToolAgentHostToUse { get; set; }
+
+    //void Submit() => MudDialog.Close(DialogResult.Ok(SelectedNode.FullPath));
+    void Cancel() => MudDialog.Cancel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("ChooseServerFiles OnInitializedAsync");
+        var currentUser = await DomInteropService.GetCurrentUserName();
+        var tmpTreeItems = await MainApiClient.GetFolderFiles(null, currentUser, ToolAgentHostToUse);
+        if (tmpTreeItems != null)
+        {
+            //TreeItems=(tmpTreeItems);
+            foreach (var t in tmpTreeItems)
+            {
+                try
+                {
+                    TreeItems.Add(new TreeItemData<FileSystemNode> { Value = t, Expandable = t.IsDirectory });
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+        }
+    }
+
+    protected async Task Submit()
+    {
+        if (ToolName == null || ToolName == "")
+        {
+            MudDialog.Close(DialogResult.Ok(SelectedNode.FullPath));
+        }
+        else
+        {
+            MudDialog.Close(DialogResult.Ok(ToolName));
+        }
+
+    }
+
+
+    protected async Task OnExpandedChanged(FileSystemNode e)
+    {
+        //MyCon1sole.WriteLine(e.FullPath);
+    }
+
+
+    public async Task<IReadOnlyCollection<TreeItemData<FileSystemNode>>> LoadServerData(FileSystemNode parentNode)
+    {
+        //var currentUser = await _localStorageService.GetItemAsync<string>("username");
+        var currentUser = await DomInteropService.GetCurrentUserName();
+        var ChildTreeItems = await MainApiClient.GetFolderFiles(parentNode, currentUser, ToolAgentHostToUse);
+        List<TreeItemData<FileSystemNode>>? DynamicChildTreeItems = new();
+        if (ChildTreeItems != null)
+        {
+            foreach (var t in ChildTreeItems)
+            {
+                DynamicChildTreeItems.Add(new TreeItemData<FileSystemNode> { Value = t, Expandable = t.IsDirectory });
+            }
+            return DynamicChildTreeItems;
+        }
+        return null;        
+    }
+
+}
+

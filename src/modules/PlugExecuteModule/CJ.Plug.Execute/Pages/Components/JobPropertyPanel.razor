@@ -1,0 +1,131 @@
+
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.SharedPages.Contracts
+@using Elsa.Api.Client.Resources.WorkflowInstances.Models
+@using Elsa.Studio.DomInterop.Contracts
+@using Elsa.Studio.Localization.Time.Components
+@using Elsa.Studio.Models
+@using MudBlazor
+@using Serilog
+@using System.Text.Json
+
+<MudSimpleTable Outlined="true" Striped="false" Dense="true" Elevation="0" Bordered="false">
+    <tbody>
+        @{
+            var data = HideEmptyValues
+                ? Data.Where(x => !string.IsNullOrWhiteSpace(x.Text)).ToList()
+                : Data;
+        }
+        @if (data.Any())
+        {
+            @foreach (var item in data)
+            {
+                <tr>
+                    <td style="width: 200px;">@item.Label</td>
+                    <td style="width: 50px;">
+                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" Title="Copy" OnClick="@(() => OnCopyClicked(item.Text!))" Disabled="@(string.IsNullOrWhiteSpace(item.Text))"/>
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(item.Link))
+                        {
+                            <MudLink Typo="Typo.body2" Href="@item.Link">@item.Text</MudLink>
+                        }
+                        @* else if (item.OnClick != null)
+                    {
+                        <MudLink Typo="Typo.body2" OnClick="@item.OnClick">@item.Text</MudLink>
+                    } *@
+                        else
+                        {
+                            @if (item.Label == "Created" || item.Label == "Updated" || item.Label == "Finished")
+                            {
+                                @* <span><Timestamp Value="@Convert.ToDateTime(item.Text)"></Timestamp></span> *@
+                                <span>@item.Text</span>
+                            }
+                            else
+                            {
+                                <span>@item.Text</span>
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            if (ShowNoDataAlert)
+            {
+                <MudAlert Severity="Severity.Normal" Dense="true" Variant="Variant.Text">@NoDataMessage</MudAlert>
+            }
+        }
+    </tbody>
+</MudSimpleTable>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public string? PlugDefinitionId { get; set; }
+
+    private PlugData? PlugData => PlugDataZone?.GetPlugData(PlugDefinitionId);
+
+    [Parameter]
+    public bool HideEmptyValues { get; set; } = false;
+    [Parameter]
+    public bool ShowNoDataAlert { get; set; } = true;
+    [Parameter]
+    public string NoDataMessage { get; set; } = "No data available.";
+
+    private WorkflowInstance? _workflowInstance { get; set; } = new();
+
+    [Inject] private IDomInteropService Clipboard { get; set; } = null!;
+
+    private async Task OnCopyClicked(string value)
+    {
+        await Clipboard.CopyText(value);
+    }
+
+    private DataPanelModel Data { get; set; } = new();
+
+    // private DataPanelModel Data
+    // {
+    //     get
+    //     {
+    //         if (_workflowInstance == null)
+    //             return new();
+
+    //         return new()
+    //         {
+    //             new DataPanelItem("ID", _workflowInstance.Id),
+    //             new DataPanelItem("Definition ID", _workflowInstance.DefinitionId, $"/workflows/definitions/{_workflowInstance.DefinitionId}/edit"),
+    //             new DataPanelItem("Definition version", _workflowInstance.Version.ToString()),
+    //             new DataPanelItem("Definition version ID", _workflowInstance.DefinitionVersionId),
+    //             new DataPanelItem("Correlation ID", _workflowInstance.CorrelationId),
+    //             new DataPanelItem("Status", _workflowInstance.Status.ToString()),
+    //             new DataPanelItem("Sub status", _workflowInstance.SubStatus.ToString()),
+    //             new DataPanelItem("Incidents", _workflowInstance.IncidentCount.ToString()),
+    //             new DataPanelItem("Created", (_workflowInstance.CreatedAt.ToString())),
+    //             new DataPanelItem("Updated", (_workflowInstance.UpdatedAt.ToString())),
+    //             new DataPanelItem("Finished", (_workflowInstance.FinishedAt.ToString())),
+    //         };
+    //     }
+    // }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Data.Clear();
+        Data.Add(new DataPanelItem("ID", PlugData?.PlugDefinitionId, $"/ProcessEdit/{PlugData?.PlugDefinitionId}"));
+        Data.Add(new DataPanelItem("Name", PlugData?.Name));
+        Data.Add(new DataPanelItem("Type", PlugData?.PlugType));
+        Data.Add(new DataPanelItem("TypeKey", PlugData?.PlugTypeKey));
+        Data.Add(new DataPanelItem("Creater", PlugData?.Creater));
+        Data.Add(new DataPanelItem("WorkPath", PlugData?.WorkPath));
+        Data.Add(new DataPanelItem("Category", PlugData?.Category));
+        Data.Add(new DataPanelItem("Description", PlugData?.Description));
+
+        //Log.Information($"基础属性加载完成。{JsonSerializer.Serialize(PlugData)}");
+        StateHasChanged();
+
+    }
+
+
+}

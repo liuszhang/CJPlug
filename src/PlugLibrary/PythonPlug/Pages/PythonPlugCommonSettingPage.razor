@@ -1,0 +1,319 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using PythonPlug.Services
+
+<MudStack Row AlignItems="AlignItems.Center">
+                    <MudTooltip>
+                        <ChildContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.MedicalInformation" />
+                        </ChildContent>
+                        <TooltipContent>
+                            <MudText Typo="Typo.h6">参数集成格式说明</MudText>
+                            <MudText Typo="Typo.body2">如果需要获取输入参数，输入格式为'get参数名()'.</MudText>
+                            <MudText Typo="Typo.body2">示例，如果需要获取Input1参数值，输入：'a=getInput1()'</MudText>
+                            <MudText Typo="Typo.body2">设置输出参数值：'setOutput("Output1","test")'</MudText>
+                            <MudText Typo="Typo.body2">获取输出参数值：'getOutput("Output1")'</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.Star" />
+                        </TooltipContent>
+                    </MudTooltip>
+                    <MudSwitch @bind-Value="@AutoSaveCode" Color="Color.Primary" Label="自动保存" />
+                    <MudBadge Color="@(_isDirty ? Color.Warning : Color.Success)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+                        @* <MudIconButton Icon="@Icons.Material.Outlined.Save" OnClick="@OnSaveClick" /> *@
+                        <MudButton OnClick="@OnSaveClick" Variant="Variant.Outlined" Color="Color.Primary">保存</MudButton>
+                    </MudBadge>
+                    <MudButton OnClick="GetDefaultValue" Variant="Variant.Outlined" Color="Color.Primary">重置</MudButton>
+
+                    <MudText>@Plug?.RealValuePath</MudText>
+
+                </MudStack>
+
+<MudStack Row Justify="Justify.SpaceBetween">
+                    <MudStack Style="width:100%;">
+                        <StandaloneCodeEditor @ref="_editor"
+                                              CssClass="studio-monaco-editor-large-border"
+                                              Id="my-python-editor"
+                                              ConstructionOptions="EditorConstructionOptions"
+                                              OnDidInit="EditorOnDidInit"
+                                              OnDidChangeModelContent="TextChanged" />
+                    </MudStack>
+
+                    <MudStack>
+                        <MudStack Row Style="width:168px;">
+                            <MudButton OnClick="TestPython" Variant="Variant.Outlined" Color="Color.Primary">执行测试</MudButton>
+                            <MudButton OnClick="@(()=>{pythonExeResult="";})" Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+                        </MudStack>
+                        <MudTextField T="string" Label="结果预览" ReadOnly Variant="Variant.Outlined" Text="@pythonExeResult" Lines="12" />
+                    </MudStack>
+
+                </MudStack>
+
+@code {
+    [Parameter]
+    public string? DefinitionId { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+    [Parameter]
+    public ActivityDescriptor? ActivityDescriptor { get; set; }
+
+    //模型类参数
+    private StandaloneCodeEditor _editor = null!;
+    private string editorCode = "";
+    private string pythonExeResult = "";
+    private string iniValue = "";
+    private string DefaultValue = "";
+    private bool AutoSaveCode = true;
+    private bool _isDirty = false;
+
+
+
+    [Parameter] public Plug? Plug { get; set; } = new();
+    private List<PlugVariable> TmpInputs = new List<PlugVariable>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+
+    List<PlugVariable> rootPlugVariables = new List<PlugVariable>();
+    private IBrowserFile File;
+    private string? RealFilePath;
+    private bool Loading = false;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.TopCenter,
+            BackdropClick = false,
+            FullWidth = true
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //Console.WriteLine(">>>>>>>>>>>>>>start init");
+        await MudDialog.SetOptionsAsync(diaOption);
+
+        //stlPath = null;
+        //JsRuntime.InvokeVoidAsync("updateAndReloadIframe", stlPath2);
+
+    }
+
+    private static WrappedInput? ToWrappedInput(object? value)
+    {
+        var converterOptions = new ObjectConverterOptions(serializerOptions => { serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase; });
+
+        return value.ConvertTo<WrappedInput>(converterOptions);
+    }
+
+    async Task OnCheckIsInputChanged(CellContext<PlugVariable> cellContext, bool isInput)
+    {
+        //Console.WriteLine(cellContext.Item.Name);
+        if (isInput)
+        {
+            //Console.WriteLine("设为输入");
+            cellContext.Item.IsInput = true;
+            //var tmpName = char.ToUpper(cellContext.Item.Name[0]) + cellContext.Item.Name.Substring(1);
+            var tmpName = cellContext.Item.Name;
+            foreach (var input in Plug.PlugVariables)
+            {
+                if (input.Name == tmpName)
+                {
+                    //Console.WriteLine("已有该输入");
+                    return;
+                }
+            }
+            Plug.PlugVariables.Add(new PlugVariable() { Name = tmpName, Type = "string", DefaultValue = cellContext.Item.DefaultValue });
+
+        }
+        else
+        {
+            //MyCon1sole.WriteLine("取消输入");
+            cellContext.Item.IsInput = false;
+            //var tmpName = char.ToUpper(cellContext.Item.Name[0]) + cellContext.Item.Name.Substring(1);
+            var tmpName = cellContext.Item.Name;
+            foreach (var input in Plug.PlugVariables)
+            {
+                if (input.Name == tmpName)
+                {
+                    Plug.PlugVariables.Remove(input);
+                    return;
+                }
+            }
+
+        }
+    }
+    async Task OnCheckIsOutputChanged(CellContext<PlugVariable> cellContext, bool isOutput)
+    {
+        //Console.WriteLine(cellContext.Item.Name);
+        if (isOutput)
+        {
+            //Console.WriteLine("设为输入");
+            cellContext.Item.IsOutput = true;
+            foreach (var output in Plug.PlugVariables)
+            {
+                if (output.Name == cellContext.Item.Name)
+                {
+                    //Console.WriteLine("已有该输出");
+                    return;
+                }
+            }
+            Plug.PlugVariables.Add(new PlugVariable() { Name = cellContext.Item.Name, Type = "string" });
+
+        }
+        else
+        {
+            //MyCon1sole.WriteLine("取消输入");
+            cellContext.Item.IsOutput = false;
+            foreach (var output in Plug.PlugVariables)
+            {
+                if (output.Name == cellContext.Item.Name)
+                {
+                    Plug.PlugVariables.Remove(output);
+                    return;
+                }
+            }
+
+        }
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "python",
+                Value = iniValue
+            };
+    }
+    private async void TextChanged()
+    {
+        _isDirty = true;
+        if (AutoSaveCode == true)
+        {
+            await Task.Delay(500);
+            //MyCon1sole.WriteLine("开始自动保存");
+            OnSaveClick();
+            StateHasChanged();
+            //MyCon1sole.WriteLine("自动保存完成");
+        }
+    }
+    private async Task EditorOnDidInit()
+    {
+        //MyCon1sole.WriteLine("初始化编辑器");
+        if (Plug.RealValuePath == null)
+        {
+            iniValue = @"a=1
+if a == 1:
+    print(2)";
+        }
+        else
+        {
+            //MyCon1sole.WriteLine($"testPlug.RealValuePath:{testPlug.RealValuePath}");
+            //iniValue = await FileManage.GetFileValueFromScriptPlugFile(testPlug);
+            //DefaultValue = iniValue!;
+            //MyCon1sole.WriteLine($"testPlug.RealValuePath.value:{iniValue}");
+        }
+        if (iniValue != null)
+        {
+            await _editor.SetValue(iniValue);
+        }
+
+        //MyCon1sole.WriteLine("初始化编辑器完成");
+
+    }
+
+
+    private async void TestPython()
+    {
+        var model = await _editor.GetModel();
+        editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+        //string result = await ToolAgentExecute.ExecutePythonCodeOnToolAgent(editorCode, testPlug, null);
+        //MyCon1sole.WriteLine(result);
+        //pythonExeResult += result;
+        pythonExeResult += "result";
+
+        // if (testPlug.InputData.Count != 0)
+        // {
+        //     foreach (var input in testPlug.InputData)
+        //     {
+        //         MyCon1sole.WriteLine(input.InputName);
+        //     }
+        // }
+        //var newCode = await ToolAgentExecute.EvaluatePythonCodeAsync(editorCode, testPlug);
+        // 将字符串转换为字节数组
+        //【暂时不上传文件至图站，使用代码执行的方式获取结果】
+        // string fileName = testPlug.Id + testPlug.Name + ".py";
+        // byte[] stringBytes = Encoding.UTF8.GetBytes(newCode);
+        // using Stream stream = new MemoryStream(stringBytes);
+        // var toolAgentFileName = await ToolAgentFile.UploadFileStreamToToolAgentServer(stream, fileName);
+
+        //图站执行测试
+        //pythonExeResult += await new ToolAgentConnect().ExecutePythonCodeOnToolAgent(editorCode);
+        //pythonExeResult += await ToolAgentExecute.ExecutePythonCodeOnToolAgent(newCode);
+        //MyCon1sole.WriteLine(pythonExeResult);
+        //stream.Close();
+        StateHasChanged();
+    }
+
+
+    private async void GetDefaultValue()
+    {
+        await _editor.SetValue(DefaultValue);
+        StateHasChanged();
+    }
+
+    private async void OnSaveClick()
+    {
+        //_isDirty = false;
+        if (_editor != null)
+        {
+            var model = await _editor.GetModel();
+            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+            // 将字符串转换为字节数组
+            byte[] stringBytes = Encoding.UTF8.GetBytes(editorCode);
+            using Stream stream = new MemoryStream(stringBytes);
+            //string fileName = testPlug.Id +"|"+ testPlug.Name + ".py";
+            Plug.Value = Plug.Name + ".py";
+            //Plug.WorkPath = await FileManage.GetCurrentWorkPath(Plug.Id?.ToString(), null);
+            //var filePath = await FileManage.UploadFileStreamToServerPath(stream, Plug.WorkPath, Plug.Value);
+            //Plug.RealValuePath = filePath;
+            _isDirty = false;
+            StateHasChanged();
+        }
+        //await _editor.SetValue(DefaultValue);
+        //StateHasChanged();
+    }
+
+
+
+    async Task SavePlugAndCloseDialog(Plug plug)
+    {
+        Activity.SetProperty(JsonSerializer.SerializeToNode(TmpInputs, new JsonSerializerOptions { WriteIndented = true }), "InputDatas");
+        //await PlugManage.UpdatePlug(plug.Id, plug);
+        MudDialog.Close(Activity);
+    }
+
+    public async Task ExecuteActivity(Plug plug)
+    {
+        Console.WriteLine(">>>>>>>>>>>>start to execute activity:" + JsonSerializer.Serialize(Activity));
+        //MudDialog.Close(Activity);   
+    }
+
+}

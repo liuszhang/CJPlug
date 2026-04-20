@@ -1,0 +1,130 @@
+﻿
+@using System.Text.Json
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models.EventAggregator
+
+@using CJ.Plug.Models.Services
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Resources.WorkflowInstances.Models
+@using Elsa.Api.Client.Shared.Models
+@using MudBlazor
+@using Serilog
+
+@inject ElsaApiClient ElsaApiClient
+@inject MainApiClient MainApiClient
+
+<VerticalWell ExtraPadding="6">
+
+
+    <MudTimeline>
+        @* <MudTimelineItem Color="Color.Error" TimelineAlign="TimelineAlign.Start">
+        <MudAlert Severity="Severity.Error">[测试失败数据]接口执行失败，返回数据：404.</MudAlert>
+    </MudTimelineItem> *@
+        @foreach (var j in Journals)
+        {
+            @if (j.ActivityName != null)
+            {
+                Color color = j.EventName switch
+                {
+                    "Started" => Color.Info,
+                    "Completed" => Color.Success,
+                    "Faulted" => Color.Error,
+                    _ => Color.Warning
+                };
+                string eventName = j.EventName switch
+                {
+                    "Started" => "启动",
+                    "Completed" => "完成",
+                    "Faulted" => "失败",
+                    _ => "执行中"
+                };
+                var align = j.EventName switch
+                {
+                    "Started" => TimelineAlign.Start,
+                    "Completed" => TimelineAlign.End,
+                    "Faulted" => TimelineAlign.Start,
+                    _ => TimelineAlign.End
+                };
+                <MudTimelineItem Color="@color" TimelineAlign="@align">
+                <MudText Typo="Typo.button">@j.ActivityName @eventName</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@j.Timestamp.ToLocalTime().DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudText>
+            </MudTimelineItem>
+        }        
+    }
+
+</MudTimeline>
+
+</VerticalWell>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    [Parameter]
+    public string? JobCorrelationId { get; set; }
+
+    public string? InstanceId { get; set; }
+
+    public List<WorkflowExecutionLogRecord> Journals { get; set; } = new List<WorkflowExecutionLogRecord>();
+    public List<WorkflowExecutionLogRecord> Journals1 { get; set; } = new List<WorkflowExecutionLogRecord>();
+    public List<WorkflowExecutionLogRecord> Journals2 { get; set; } = new List<WorkflowExecutionLogRecord>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(JobCorrelationId))
+        {
+            var Job = await MainApiClient.GetProcessJobByCorrelationIdAsync(JobCorrelationId);
+            InstanceId = Job.EngineInstanceId;
+            Journals2 = (await ElsaApiClient.GetJournalAsync(InstanceId)).Items.ToList();
+            //Log.Information($"获取到{InstanceId}的流程实例执行记录，数量：{Journals2.Count}");
+            if (Journals2.Count == 0)
+            {
+                Journals = JsonSerializer.Deserialize<List<WorkflowExecutionLogRecord>>(Job?.JournalData) ?? new();
+            }
+            else
+            {
+                Journals = Journals2;
+                Job.JournalData = JsonSerializer.Serialize(Journals);
+                await MainApiClient.UpdateProcessJobAsync(Job);
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // if (firstRender)
+        // {
+        //     if (!string.IsNullOrEmpty(InstanceId))
+        //     {
+        //         await GetElsaJournal();
+        //         StateHasChanged();
+        //     }
+        // }
+    }
+
+    private async Task GetJobJournal()
+    {
+        //Journals = (await ElsaApiClient.GetJournalAsync(InstanceId)).Items.ToList();
+        //Log.Information($"获取到{InstanceId}的流程实例执行记录，数量：{Journals.Count}");
+        var Job = await MainApiClient.GetProcessJobByCorrelationIdAsync(JobCorrelationId);
+        Journals1 = JsonSerializer.Deserialize<PagedListResponse<WorkflowExecutionLogRecord>>(Job?.JournalData).Items.ToList();
+        if (Journals1.Count == 0 || Journals1==null)
+        {
+            if (!string.IsNullOrEmpty(InstanceId))
+            {
+                Journals2 = (await ElsaApiClient.GetJournalAsync(InstanceId)).Items.ToList();
+                if (Journals2.Count > 0)
+                {
+                    Journals = Journals2;
+                    await MainApiClient.SyncJournalData(JobCorrelationId);
+                }
+            }            
+        }
+        else
+        {
+            Journals = Journals1;
+        }
+
+    }
+}

@@ -1,0 +1,50 @@
+﻿@using System.Text.Json
+@using CJ.Plug.SharedPages.Layout
+@using MudBlazor
+@using System.Net.Http.Json
+
+@inject HttpClient Http
+
+<MudPaper Class="pa-0" Height="100%">
+
+                    <MudExpansionPanels Style="min-width:260px;max-width:300px" MultiExpansion>
+                        <MudExpansionPanel Text="通用类" Expanded="true">
+                            <MudList T="string">
+                                @foreach (var p in Plugs)
+                                {
+                                    <MudListItem>
+                                        <GuiItem PlugTypeName="@p" />
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="其他类">
+                            无
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+
+
+
+
+</MudPaper>
+
+
+@code{
+    public string[]? Plugs=[];
+
+    protected override async Task OnInitializedAsync()
+    {
+        //var tmp = await Http.GetFromJsonAsync<string[]>("sample-data/SampleItems.json");
+        Plugs = [
+      "Label",
+      "RichText",
+  "按钮",
+  "下拉框",
+  "勾选框",
+  "表格",
+  "图片"
+    ];
+
+    }
+
+}

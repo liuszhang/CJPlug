@@ -1,0 +1,17 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+
+@code {
+    [Parameter]
+    public string JsonContent { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private Task Close() => OnClose.InvokeAsync();
+}
+
+<MudPaper Class="pa-4" Style="max-width:800px; margin:auto;">
+    <MudText Typo="Typo.h6">MCPTools ²¿Êð×Ö·û´®£¨JSON£©</MudText>
+    <MudTextField @bind-Value="JsonContent" Lines="12" ReadOnly="true" FullWidth="true" Class="mt-3" />
+</MudPaper>

@@ -1,0 +1,182 @@
+﻿@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages.SharedComponents
+@using MudBlazor
+@using Serilog
+@using System.Text.Json
+<MudStack Row>
+    <MudButton OnClick="GetValue" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">拾取关键字</MudButton>
+    <MudTextField Margin="Margin.Dense" @bind-Value="@tmpTextMapping.Keywords" T="string" Label="关键字"></MudTextField>
+</MudStack>
+<MudStack Row>
+    <MudTextField @bind-Value="tmpTextMapping.ReadSchemaValue" Margin="Margin.Dense" T="string" Label="解析表达式" HelperText="如：(key):(value)"></MudTextField>
+    <MudButton OnClick="CheckKeywords" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">测试</MudButton>
+</MudStack>
+
+
+<MudAutocomplete @bind-Value="SelectedParameter" SearchFunc="Search"
+                 CoerceText="true" CoerceValue="true"
+                 Dense Margin="Margin.Dense" Label="输出至参数" Placeholder="选择或创建参数" />
+
+<MudButton OnClick="InsertMapping" 
+Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input"
+Color="Color.Info" Size="Size.Small">插入映射</MudButton>
+
+@code {
+    [CascadingParameter]
+    private MonacoEditorWrapper _editor { get; set; } = null!;
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    //[Parameter]
+    //public Plug Plug { get; set; }
+    [Parameter]
+    public EventCallback<TextMapping> OnInsertTextMapping { get; set; }
+    [Parameter]
+    public List<PlugVariableData>? PlugVariablesInPDZ { get; set; } = new List<PlugVariableData>();
+    [Parameter]
+    public TextMapping tmpTextMapping { get; set; } = new TextMapping();    
+    private string[] decorationIds = new string[0];
+    private string SelectedParameter = "";
+    
+    public List<TextMapping> TextMappings { get; set; } = new List<TextMapping>();
+    public string? Spliter { get; set; } = null;
+
+    private async Task GetValue()
+    {
+        var range = await _editor.GetSelection();
+        var model = await _editor.GetModel();
+        var val = await model.GetValueInRange(range, EndOfLinePreference.LF);
+        //MyCon1sole.WriteLine($"value is: {val}");
+        tmpTextMapping.Keywords = val;
+        if (val.Contains(":"))
+        {
+            Spliter = ":";
+        }
+        else if(val.Contains("="))
+        {
+            Spliter = "=";
+        }
+        else if (val.Contains(" "))
+        {
+            Spliter = " ";
+        }
+        tmpTextMapping.ReadSchemaValue = $"(key){Spliter}(value)";
+        await CheckKeywords();
+    }
+
+    private async Task CheckKeywords()
+    {
+        if (string.IsNullOrEmpty(tmpTextMapping.Keywords))
+        {
+            return;
+        }
+        var _modelResult = await _editor.GetModel();
+        var range = await _modelResult.GetFullModelRange();
+        var matchs = await _modelResult.FindMatches(tmpTextMapping.Keywords, range, false, true, "", true, 100);
+        Log.Information("匹配数：" + matchs.Count);
+        if (matchs.Count > 0)
+        {
+            BlazorMonaco.Position position = new BlazorMonaco.Position();
+            position.LineNumber = matchs[0].Range.EndLineNumber;
+            position.Column = matchs[0].Range.EndColumn;
+            var newDecorations = new ModelDeltaDecoration[]
+            {
+                new ModelDeltaDecoration
+                {
+                    Range = matchs[0].Range,
+                    Options = new ModelDecorationOptions
+                    {
+                        //IsWholeLine = true,
+                        ClassName = "decorationContentClass",
+                        GlyphMarginClassName = "decorationGlyphMarginClass"
+                    }
+                }
+            };
+            await _editor.ResetDeltaDecorations();
+            decorationIds = await _editor.DeltaDecorations(null, newDecorations);
+            tmpTextMapping.Position[0] = matchs[0].Range.StartLineNumber;
+            tmpTextMapping.Position[1] = matchs[0].Range.StartColumn;
+            tmpTextMapping.Position[2] = matchs[0].Range.EndLineNumber;
+            tmpTextMapping.Position[3] = matchs[0].Range.EndColumn;
+
+            BlazorMonaco.Selection selection = new Selection();
+            selection.SelectionStartLineNumber = tmpTextMapping.Position[0] + tmpTextMapping.PositionOffset[0];
+            selection.SelectionStartColumn = tmpTextMapping.Position[1] + tmpTextMapping.PositionOffset[1];
+            selection.PositionLineNumber = tmpTextMapping.Position[2] + tmpTextMapping.PositionOffset[2];
+            selection.PositionColumn = tmpTextMapping.Position[3] + tmpTextMapping.PositionOffset[3];
+            await _editor.Focus();
+            await _editor.SetPosition(position, "");
+            await _editor.SetSelection(selection, "");
+            var offset = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine(offset);
+            //获取关键字开始和结束的绝对偏移
+            position.LineNumber = matchs[0].Range.StartLineNumber;
+            position.Column = matchs[0].Range.StartColumn;
+            var offset1 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("关键字起始：" + offset1);
+            position.LineNumber = matchs[0].Range.EndLineNumber;
+            position.Column = matchs[0].Range.EndColumn;
+            var offset2 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("关键字结束：" + offset2);
+            //获取替换起始位置相对于关键字起始位置的偏移
+            position.LineNumber = selection.SelectionStartLineNumber;
+            position.Column = selection.SelectionStartColumn;
+            var valueoffset1 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("替换区域开始：" + valueoffset1);
+            //MyCon1sole.WriteLine("相对于关键字起始：" + (valueoffset1 - offset1));
+            tmpTextMapping.StartOffset = valueoffset1 - offset1;
+            //获取替换结束位置相对于关键字起始位置的偏移
+            position.LineNumber = selection.PositionLineNumber;
+            position.Column = selection.PositionColumn;
+            var valueoffset2 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("替换区域结束：" + valueoffset2);
+            //MyCon1sole.WriteLine("相对于关键字起始：" + (valueoffset2 - offset1));
+            tmpTextMapping.EndOffset = valueoffset2 - offset1;
+        }
+        else
+        {
+            Log.Information("未能找到关键字匹配，请调整关键字重试");
+        }
+        //MyCon1sole.WriteLine("修改完成");
+        //return 1;
+
+    }
+
+    private async Task InsertValue(string value)
+    {
+        tmpTextMapping.BindingVariableName = value;
+        StateHasChanged();
+    }
+
+    private async Task InsertMapping()
+    {
+        if (string.IsNullOrEmpty(tmpTextMapping.Keywords))
+        {
+            Log.Information("未选择关键字！");
+            return;
+        }
+        tmpTextMapping.BindingVariableName = SelectedParameter;
+        tmpTextMapping.Keywords = tmpTextMapping.Keywords.Split(Spliter)[0] + Spliter;
+        tmpTextMapping.ReadSchemaMode = ReadSchemaMode.键值对;
+
+        await CheckKeywords();
+
+        if(OnInsertTextMapping.HasDelegate)
+            OnInsertTextMapping.InvokeAsync(tmpTextMapping);
+    }
+
+    private async Task<IEnumerable<string>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return PlugVariablesInPDZ.Select(v => v.Name);
+
+        return PlugVariablesInPDZ.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+
+}

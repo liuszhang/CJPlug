@@ -1,0 +1,64 @@
+﻿
+@using CJ.Plug.ApiClient.Contracts
+
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.MainPageContent.Layout
+@using CJ.Plug.Models.Contracts
+@using Elsa.Studio
+@using Elsa.Studio.Components
+@using Elsa.Studio.Contracts
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Routing
+@using Microsoft.Extensions.Options
+@using System.Reflection
+
+@inject NavigationManager NavigationManager
+@inject IEnumerable<IModule> Modules
+@inject IElsaStudioService ElsaStudioService
+
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(MainLayout).Assembly" AdditionalAssemblies="@AdditionalAssemblies">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+
+@code{
+    public IEnumerable<Assembly> AdditionalAssemblies { get; set; } = null!;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //前端初始化模块以注册路由和工具栏
+        AdditionalAssemblies = Modules.Select(x => x.GetType().Assembly).Distinct().ToList();
+        // Console.WriteLine(AdditionalAssemblies.Count());
+        // foreach (var a in AdditionalAssemblies)
+        // {
+        //     Console.WriteLine(a.FullName);
+        // }
+        foreach (var m in Modules)
+        {
+            await m.InitializeAsync();
+        }
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ElsaStudioService.LoginToElsaEngine();
+            StateHasChanged();
+        }
+    }
+}

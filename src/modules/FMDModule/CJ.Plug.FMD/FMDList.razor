@@ -1,0 +1,114 @@
+﻿@page "/FMD"
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using Radzen.Blazor
+@using Serilog
+@using Size=MudBlazor.Size
+
+
+
+
+<PageTitle>基础对象管理</PageTitle>
+
+<MudStack Row>
+
+    <MudPaper Width="400px" Elevation="2">
+        <MudTreeView Items="@TreeItems" Hover="true" @bind-SelectedValue="SelectedValue" SelectionMode="@SelectionMode">
+            <ItemTemplate Context="item">
+                <MudTreeViewItem Items="@item.Children" Icon="@item.Icon">
+                    <BodyContent>
+                        <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%">
+                            <MudText Style="justify-self: start;">@item.Text</MudText>
+                            <div style="justify-self: end;">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Medium" Color="Color.Inherit" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Medium" Color="Color.Inherit" />
+                            </div>
+                        </div>
+                    </BodyContent>
+                </MudTreeViewItem>
+            </ItemTemplate>
+        </MudTreeView>
+    </MudPaper>
+
+
+    <MudTabs Outlined="true">
+        <MudTabPanel Text="对象属性" Icon="@Icons.Material.Filled.Api" >
+            <CJ.Plug.FMD.Components.ObjectProperties></CJ.Plug.FMD.Components.ObjectProperties>
+        </MudTabPanel>
+        <MudTabPanel Text="对象映射" Icon="@Icons.Material.Filled.Build" >
+            <CJ.Plug.FMD.Components.ObjectMapping></CJ.Plug.FMD.Components.ObjectMapping>
+        </MudTabPanel>
+    </MudTabs>
+
+
+
+
+
+
+</MudStack>
+
+
+
+@code {
+    public string SelectedValue = "零部件";
+    public SelectionMode SelectionMode = SelectionMode.SingleSelection;
+
+    private List<TreeItemData<string>> TreeItems { get; set; } = [];
+
+    public class TreeItemData : TreeItemData<string>
+    {
+        public TreeItemData(string text, string icon) : base(text)
+        {
+            Text = text;
+            Icon = icon;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        TreeItems.Add(new TreeItemData("模型管理", Icons.Custom.FileFormats.FileCode)
+        {
+            Children = [
+                new TreeItemData("零部件", Icons.Custom.Brands.GitHub),
+                new TreeItemData("项目", Icons.Custom.Brands.MicrosoftVisualStudio),
+                new TreeItemData("阶段", Icons.Material.Filled.Folder),
+                new TreeItemData("任务", Icons.Custom.FileFormats.FileDocument),
+                    new TreeItemData("用户需求", Icons.Custom.Brands.MudBlazor),
+                    new TreeItemData("系统需求", Icons.Custom.FileFormats.FileDocument) {
+                        Children = [
+                            new TreeItemData("子系统需求", Icons.Material.Filled.AlternateEmail),
+                        ]
+                    },
+
+                    new TreeItemData("指标", Icons.Material.Filled.Folder),
+                ]
+        });
+        TreeItems.Add(new TreeItemData("关系管理", Icons.Custom.FileFormats.FileCode)
+        {
+            Children = [
+                    new TreeItemData("零部件-零部件", Icons.Custom.Brands.MudBlazor),
+                    new TreeItemData("需求-任务", Icons.Custom.FileFormats.FileDocument),
+                    new TreeItemData("任务-工具", Icons.Material.Filled.Folder),
+                ]
+        });
+        TreeItems.Add(new TreeItemData("枚举管理", Icons.Custom.FileFormats.FileCode)
+        {
+            Children = [
+                    new TreeItemData("阶段枚举", Icons.Custom.Brands.MudBlazor),
+                ]
+        });
+        TreeItems.Add(new TreeItemData("属性管理", Icons.Custom.FileFormats.FileCode));
+        
+    }
+}
+
+
+

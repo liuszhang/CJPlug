@@ -1,0 +1,387 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages.SharedComponents
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Workflows.Memory
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using RESTPlug.Utils
+@using Serilog
+
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+<MudStack>
+    <MudStack Row Justify="Justify.Center">
+        <MudSelect @bind-Value="@MethodData.Value" @bind-Value:after="async () => await UpdateVariableData(MethodData)" Style="width:200px !important;" Label="请求方法" Variant="Variant.Outlined" Required RequiredError="请选择一个子分类" Margin="Margin.Dense">
+            <MudSelectItem Value="@("GET")">GET</MudSelectItem>
+            <MudSelectItem Value="@("POST")">POST</MudSelectItem>
+            <MudSelectItem Value="@("PUT")">PUT</MudSelectItem>
+            <MudSelectItem Value="@("DELETE")">DELETE</MudSelectItem>
+            <MudSelectItem Value="@("HEAD")">HEAD</MudSelectItem>
+            <MudSelectItem Value="@("OPTIONS")">OPTIONS</MudSelectItem>
+            <MudSelectItem Value="@("PATCH")">PATCH</MudSelectItem>
+        </MudSelect>
+        <MudTextField @bind-Value="@UrlData.Value" @bind-Value:after="async () => await UpdateVariableData(UrlData)" FullWidth Label="请求地址" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </MudStack>
+
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Style="padding:0">
+        <MudButton StartIcon="@Icons.Material.Outlined.Add"
+        Variant="Variant.Filled"
+        OnClick="NewInput"
+        Color="Color.Primary" Class="align-self-end">添加服务参数</MudButton>
+        <MudButton OnClick="GetTestData" Variant="Variant.Outlined" Color="Color.Primary" Disabled="Processing">
+            @if (Processing)
+            {
+                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+            }
+            else
+            {
+                <div>请求测试</div>
+            }
+
+        </MudButton>
+        <MudButton OnClick="ClearTestData" Variant="Variant.Outlined" Color="Color.Primary">清空结果</MudButton>
+        @* <MudText Typo="Typo.overline">输入参数（建议名称：1.英文；2.首字母大写）</MudText> *@
+        <MudDataGrid T="PDZVariable" Items="@RequestDatas" ReadOnly="false" EditMode="MudBlazor.DataGridEditMode.Cell" Dense="true"
+        EditTrigger="@(DataGridEditTrigger.Manual)">
+            <Columns>
+                @* <PropertyColumn Property="x => x.Id" Title="序号" IsEditable="false"></PropertyColumn> *@
+                <PropertyColumn Property="x => x.Type" Title="类型">
+                    <EditTemplate>
+                        <MudSelect @bind-Value="context.Item.Type" Required Dense Margin="@Margin.Dense">
+                            <MudSelectItem Value="@("Header")">Header(请求头参数)</MudSelectItem>
+                            <MudSelectItem Value="@("Path")">Path(路径参数)</MudSelectItem>
+                            <MudSelectItem Value="@("Query")">Query(查询参数)</MudSelectItem>
+                            <MudSelectItem Value="@("Body")">Body(请求体参数)</MudSelectItem>
+                            <MudSelectItem Value="@("Form")">Form(表单参数)</MudSelectItem>
+                        </MudSelect>
+                    </EditTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x => x.Name" Title="名称"></PropertyColumn>
+                <PropertyColumn Property="x => x.Value" Title="值">
+                    <EditTemplate>
+                        <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                            @if (@context.Item.IsValueFromOtherVariable)
+                            {
+                                <MudSelect T="string" @bind-Value="@context.Item.Value" Dense Clearable>
+                                    @foreach (var p in VariablesOfPlug)
+                                    {
+                                        <MudSelectItem Value="@($"[{p.Name}]")">@p.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                            else
+                            {
+                                @if (context.Item.Type == "Body")
+                                {
+                                    <MudStack Row>
+                                        <MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small" />
+                                        @* <MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" Size="Size.Small" /> *@
+                                    </MudStack>
+                                }
+                                else
+                                {
+                                    <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                                    Value="@context.Item.Value" ValueChanged="(string? v)=>OnSettingValueChanged(context.Item,v)"></MudTextField>
+                                }
+                            }
+                            <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                            Value="@context.Item.IsValueFromOtherVariable" ValueChanged="(bool b)=>ChangedIsFromOtherValue(context.Item,b)" />
+                        </MudStack>
+                    </EditTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x => x.IsRequired" Title="必需">
+                    <EditTemplate>
+                        <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary" Label="@context.Item.IsRequired.ToString()"></MudSwitch>
+                    </EditTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x => x.DefaultValue" Title="操作">
+                    <EditTemplate>
+                        <MudStack Row>
+                            <MudButton OnClick="@(() => DeleteInput(context.Item))" Variant="Variant.Filled">
+                                <MudText Class="ms-2">删除</MudText>
+                            </MudButton>
+                        </MudStack>
+                    </EditTemplate>
+                </PropertyColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudContainer>
+
+    @* <MudStack Row AlignItems="AlignItems.Center">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary">请求测试</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+                        </MudStack> *@
+    <MudStack Row Justify="Justify.SpaceBetween">
+        @* <MudStack Style="width:100%;">
+            <StandaloneCodeEditor @ref="_editor"
+            CssClass="studio-monaco-editor-large-border"
+            Id="my-restapi-editor"
+            ConstructionOptions="EditorConstructionOptions" />
+        </MudStack> *@
+
+        <MonacoEditorWrapper @ref="_editor" Id="@("text-editor-"+PlugData.DefinitionId)"></MonacoEditorWrapper>
+
+        <MudStack Spacing="0">
+            <MudTextField TextChanged="ParseTextChanged" @bind-Value="@ParseResultString" Immediate="true" HelperText="如：result/data[0]/id" Label="解析表达式" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudStack Row Style="width:306px;">
+                <MudAutocomplete @bind-Value="@tmpOutputName" SearchFunc="Search"
+                CoerceText="true" CoerceValue="true"
+                Dense Margin="Margin.Dense" Label="输出至参数" Placeholder="选择或创建参数" />
+                @* <MudSelect @bind-Value="@tmpOutputName" Label="输出参数" Dense Margin="@Margin.Dense">
+                    @foreach (var output in VariablesOfPlug)
+                    {
+                        <MudSelectItem Value="@output.Name">@output.Name</MudSelectItem>
+                    }
+                </MudSelect> *@
+                <MudButton OnClick="BindingOutputToParseString" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">绑定输出</MudButton>
+            </MudStack>
+            <MudTextField Margin="Margin.Dense" Label="解析预览" ReadOnly Variant="Variant.Outlined" @bind-Value="@parsedString" Lines="8" />
+        </MudStack>
+    </MudStack>
+
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="align-self-start">
+        <MudStack Row AlignItems="AlignItems.Center">
+            <MudText>输出清单</MudText>
+            <MudButton StartIcon="@Icons.Material.Outlined.Add"
+                       Variant="Variant.Filled"
+                       OnClick="NewOutput"
+                       Color="Color.Primary" Class="align-self-end">添加输出</MudButton>
+        </MudStack>
+        
+        @* <MudText Typo="Typo.overline">输出参数</MudText> *@
+        <MudDataGrid T="DefaultOutputMapping" Items="@OutputData" ReadOnly="false" EditMode="MudBlazor.DataGridEditMode.Cell" Dense="true">
+            <Columns>
+                @* <PropertyColumn Property="x => x.Id" Title="序号" IsEditable="false"></PropertyColumn> *@
+                <PropertyColumn Property="x => x.OutputName" Title="名称"></PropertyColumn>
+                <PropertyColumn Property="x => x.ReadSchemaValue" Title="解析表达式" Editable="false"></PropertyColumn>
+                <PropertyColumn Property="x => x.Value" Title="输出值(仅预览)" Editable="false"></PropertyColumn>
+
+                <PropertyColumn Property="x => x.OutputName" Title="操作">
+                    <EditTemplate>
+                        <MudStack Row>
+                            <MudButton OnClick="@(() => CheckOutput(context.Item))" Size="Size.Small" Variant="Variant.Filled">查看</MudButton>
+                            <MudButton OnClick="@(() => DeleteOutput(context.Item))" Size="Size.Small" Variant="Variant.Filled">删除</MudButton>
+                        </MudStack>
+                    </EditTemplate>
+                </PropertyColumn>
+
+            </Columns>
+        </MudDataGrid>
+    </MudContainer>
+
+</MudStack>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    public PlugData? PlugData { get; set; }
+    public PlugVariableData? MethodData { get; set; } = new();
+    public PlugVariableData? UrlData { get; set; } = new();
+    public PlugVariableData? RequestHeaderData { get; set; }
+    public PlugVariableData? OutputMappingData { get; set; }
+
+
+    public List<PlugVariableData> VariablesOfPlug => PlugDataZone?.GetVariablesOfPlug(PlugDefinitionId);
+
+    //public string? Method = "GET";
+    //public string? Url = @"http://localhost:6661/api/job/getJobs";
+    //private string? RequestHeaderData { get; set; }    
+    public List<PDZVariable>? RequestDatas { get; set; } = new List<PDZVariable>();
+    //private string? OutputMappingData { get; set; }
+    public List<DefaultOutputMapping>? OutputData { get; set; } = new List<DefaultOutputMapping>();
+    private MonacoEditorWrapper _editor = null!;
+    public string? ParseResultString { get; set; }
+    private string tmpOutputName;
+    private string parsedString { get; set; }
+
+    private string requestResult = "";
+    private bool Processing = false;
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+
+        //Method = Plug.GetPlugSetting(PlugSettingKey.Method.ToString());
+        //Method = PlugDataZone?.GetVariableValue(PlugDefinitionId, PlugSettingKey.Method.ToString()) ?? Method;
+        MethodData = PlugDataZone?.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.Method.ToString()) ?? new();
+        //Url = Plug.GetPlugSetting(PlugSettingKey.Url.ToString());
+        //Url = PlugDataZone?.GetVariableValue(PlugDefinitionId, PlugSettingKey.Url.ToString()) ?? Url;
+        UrlData = PlugDataZone?.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.Url.ToString()) ?? new();
+        RequestHeaderData = PlugDataZone?.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.RequestHeaders.ToString()) ?? new();
+        //RequestHeaderData = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.RequestHeaders.ToString());
+        OutputMappingData = PlugDataZone?.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.OutputMappings.ToString()) ?? new();
+
+        try
+        {
+            RequestDatas = JsonSerializer.Deserialize<List<PDZVariable>>(RequestHeaderData.Value);
+        }
+        catch (Exception ex)
+        {
+            CLog.Error("解析请求头参数失败:" + ex.Message);
+        }
+
+        try
+        {
+            OutputData = JsonSerializer.Deserialize<List<DefaultOutputMapping>>(OutputMappingData.Value);
+        }
+        catch (Exception ex)
+        {
+            CLog.Error("解析映射数据失败:" + ex.Message);
+        }
+        StateHasChanged();
+    }
+
+    private async Task<IEnumerable<string>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return VariablesOfPlug.Select(v => v.Name);
+
+        return VariablesOfPlug.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+
+    private Task UpdatePlugSetting(string SettingKey,string SettingValue,ref string TMP)
+    {
+        TMP = SettingValue;
+        UpdatePDZVariables();
+        return Task.CompletedTask;
+    }
+
+    private void NewInput()
+    {
+        //string inputName = CommonActions.GetUniqueInputName(element);
+        RequestDatas.Add(new PDZVariable() { Type = "Header", Name = "header1" });
+        UpdatePDZVariables();
+    }
+    private async Task GetTestData()
+    {
+        Processing = true;
+        var inputs = new List<PlugVariableData>();
+        inputs.Add(new PlugVariableData { Name = SendHttpRequestPlug.InitVariableNames.Method.ToString(), Value = MethodData.Value });
+        inputs.Add(new PlugVariableData { Name = SendHttpRequestPlug.InitVariableNames.Url.ToString(), Value = UrlData.Value });
+        var executeRequest = new PlugExecutionRequest
+        {
+            PlugType = SendHttpRequestPlug.PlugKeySetting.PlugTypeName,
+            PlugTypeKey = SendHttpRequestPlug.PlugKeySetting.PlugTypeKey,
+            PDZId=PlugDataZone.PDZId,
+PlugDefinitionId=PlugDefinitionId,
+            //ExecuteMode = ExecuteMode.Standalone,
+            InputVariables = inputs
+        };
+        var result = await MainApiClient.ExecutePlugByType(executeRequest);
+        //requestResult = await result.Content.ReadAsStringAsync();
+        requestResult = result?.ResultString;
+        //CLog.Information(requestResult,PlugDataZone.PDZId);
+        _editor.SetValue(requestResult);
+        Processing = false;
+    }
+    private void ClearTestData()
+    {
+        _editor.SetValue("");
+    }
+    private async Task DeleteInput(PDZVariable input)
+    {
+        RequestDatas.Remove(input);
+        UpdatePDZVariables();
+    }
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "json",
+                Value = "{\n}"
+            };
+    }
+    private void ParseTextChanged(string? newText)
+    {
+        // Use the incoming newText so parsing happens immediately as the user types
+        ParseResultString = newText;
+        parsedString = DataParser.GetParsedResult(ParseResultString ?? string.Empty, requestResult);
+        StateHasChanged();
+    }
+
+    private async void BindingOutputToParseString()
+    {
+        foreach (var output in OutputData)
+        {
+            if (output.OutputName == tmpOutputName)
+            {
+                output.ReadSchemaValue = ParseResultString;
+                output.Value = parsedString;
+                await UpdatePDZVariables();
+                return;
+            }
+        }
+        OutputData.Add(new DefaultOutputMapping()
+            {
+                OutputName = tmpOutputName,
+                ReadSchemaValue = ParseResultString,
+                Value = parsedString
+            });
+        await UpdatePDZVariables();
+    }
+    private void NewOutput()
+    {
+        //string outputName = CommonActions.GetUniqueOutputName(element);
+        OutputData.Add(new DefaultOutputMapping() { OutputName = "outputName" });
+        UpdatePDZVariables();
+    }
+    private async Task DeleteOutput(DefaultOutputMapping output)
+    {
+        OutputData.Remove(output);
+        UpdatePDZVariables();
+    }
+
+    private async Task CheckOutput(DefaultOutputMapping output)
+    {
+        ParseResultString = output.ReadSchemaValue;
+        tmpOutputName = output.OutputName;
+    }
+
+    private async Task ChangedIsFromOtherValue(PDZVariable modelParameter, bool value)
+    {
+        modelParameter.IsValueFromOtherVariable = value;
+    }
+
+    private async Task OnSettingValueChanged(PDZVariable modelParameter, string? value)
+    {
+        modelParameter.Value = value;
+    }
+
+
+    private async Task UpdatePDZVariables()
+    {
+        RequestHeaderData.Value = JsonSerializer.Serialize(RequestDatas);
+        OutputMappingData.Value = JsonSerializer.Serialize(OutputData);
+        await UpdateVariableData(RequestHeaderData);
+        await UpdateVariableData(OutputMappingData);
+        //MethodData.Value = Method;
+        //UrlData.Value = Url;        
+    }
+
+    private async Task UpdateVariableData(PlugVariableData variableData)
+    {
+        await MainApiClient.UpdatePlugVariableData(variableData);
+        Snackbar.Add($"更新{variableData.Name}变量成功！");
+    }
+}

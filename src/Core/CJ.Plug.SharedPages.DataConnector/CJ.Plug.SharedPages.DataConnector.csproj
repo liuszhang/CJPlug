@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+	  <VersionPrefix>1.0.3</VersionPrefix>
+	  <PackageOutputPath>..\..\..\04.Nuget</PackageOutputPath>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="Z.Blazor.Diagrams" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,272 @@
+﻿@using System.Text.Json
+@using Blazored.LocalStorage
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.DeekSeekIn
+@using CJ.Plug.Models.Contracts
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.EventAggregator.Notifications
+@using CJ.Plug.Models.Services
+@using CJ.Plug.SharedPages.Contracts
+@using Elsa.Studio
+@using Elsa.Studio.Extensions
+@using MediatR
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.SignalR.Client
+@using Serilog
+@inherits LayoutComponentBase
+
+
+@inject IServiceProvider ServiceProvider
+@inject NavigationManager NavigationManager
+@inject IDeepSeekService DeepSeekService
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject IJSRuntime JsRuntime
+@inject IAppBarService AppBarService
+
+
+<script>
+    window.setupKeyboardShortcuts = (dotNetHelper) => {
+    window.addEventListener('keydown', (event) => {
+    //dotNetHelper.invokeMethodAsync('OnKeyPressed', event.key.toUpperCase());
+
+    // 示例：当按下 Ctrl + S 时触发
+    if (event.altKey && event.key != null) {
+    dotNetHelper.invokeMethodAsync('OnKeyPressed', 'Alt+'+event.key.toUpperCase());
+    }
+    // 可添加更多快捷键判断
+    });
+    };
+</script>
+
+@* Required *@
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+
+@* Needed for dialogs *@
+<MudDialogProvider />
+
+@* Needed for snackbars *@
+<MudSnackbarProvider />
+
+<RadzenComponents @rendermode="InteractiveAuto" />
+
+
+<MudLayout>
+    <MudAppBar Elevation="1" Style="background-color:rgba(89, 74, 226, 1);color:white">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        @* <MudIconButton Icon="@Icons.Material.Filled.LogoDev" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleLogger" /> *@
+        <MudSpacer />
+       
+        @foreach (var appBarItem in AppBarService.AppBarItems)
+        {
+            @appBarItem
+        }
+        <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
+    </MudAppBar>
+    <MudDrawer @bind-Open="@_open" Variant="@DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="1" Width="200px" OpenMiniOnHover="true">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">CJ.Plug</MudText>
+            @* <MudIconButton Icon="@Icons.Material.Filled.LogoDev" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleLogger" /> *@
+        </MudDrawerHeader>
+
+        <MyNavMenu />
+    </MudDrawer>
+
+    <MudDrawer @bind-Open="@showLogPanel" Width="30vw" Anchor="Anchor.End" Elevation="1" Variant="@DrawerVariant.Temporary" Overlay="false">
+        <MudDrawerHeader>
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+                <MudText Typo="Typo.h6">系统日志</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Edge="Edge.End" OnClick="@ToggleLogger" />
+            </MudStack>
+        </MudDrawerHeader>
+        <CJ.Plug.SharedPages.LogsWrapper HeightPercent="100" TabName=""></CJ.Plug.SharedPages.LogsWrapper>
+    </MudDrawer>
+
+
+    <MudMainContent Style="margin-top:0px">
+        <ErrorBoundary @ref="@_errorBoundary">
+            <ChildContent>
+                <CascadingValue Value="SetMenuNotify">
+                    @Body
+                </CascadingValue>
+                
+            </ChildContent>
+            <ErrorContent>
+                @if (context is UnauthorizedAccessException)
+                {
+                    <MudText Typo="Typo.h6">未经授权访问！请登录。</MudText>
+                }
+                else
+                {
+
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" ContentAlignment="HorizontalAlignment.Left" CloseIcon="@Icons.Material.Filled.Refresh" ShowCloseIcon="true" CloseIconClicked="(() => CloseError())">
+                        出错了！  @context.GetType().Name: @context.Message
+                    </MudAlert>
+                }
+            </ErrorContent>
+        </ErrorBoundary>
+    </MudMainContent>
+</MudLayout>
+
+
+
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+    private bool _open = true;
+    private bool showLogPanel { get; set; } = false;
+    private MudTheme? _theme = null;
+    private bool _isDarkMode = false;
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+    private string? userName { get; set; } = "";
+
+    //public EventCallback<bool>? SetMenuShow { get; set; }
+    public SetMenuNotify? SetMenuNotify { get; set; }
+
+    private void OnAppBarItemsChanged() => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        _theme = new()
+            {
+                PaletteLight = _lightPalette,
+                PaletteDark = _darkPalette,
+                LayoutProperties = new LayoutProperties(),
+                ZIndex = new ZIndex()
+                {
+                    Drawer = 9999,
+                    Popover = 2100,
+                    AppBar = 2200,//Drawer是2202
+                    Dialog = 2201,
+                    Snackbar = 2500,
+                    Tooltip = 2600,
+                },
+            };
+
+        EventCallback<bool>  SetMenuShow = EventCallback.Factory.Create<bool>(this, SetMenuStatus);
+        SetMenuNotify = new SetMenuNotify(SetMenuShow);
+
+        AppBarService.AppBarItemsChanged += OnAppBarItemsChanged;
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JsRuntime.InvokeVoidAsync("setupKeyboardShortcuts", DotNetObjectReference.Create(this));
+        }
+    }
+
+    /// <summary>
+    /// 添加键盘快捷键监听
+    /// </summary>
+    /// <param name="shortcut"></param>
+    /// <returns></returns>
+    [JSInvokable]
+    public async Task OnKeyPressed(string shortcut)
+    {
+        if (shortcut == "Alt+L")
+        {
+            //Log.Information($"快捷键{shortcut}按下");
+            ToggleLogger();
+        }
+        else if (shortcut == "Alt+M")
+        {
+            //Log.Information($"快捷键{shortcut}按下");
+            ToggleDrawer();
+        }
+    }
+
+    private void CloseError()
+    {
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    public string DarkLightModeButtonIcon => _isDarkMode switch
+    {
+        true => Icons.Material.Rounded.AutoMode,
+        false => Icons.Material.Outlined.DarkMode,
+    };
+
+    private readonly PaletteLight _lightPalette = new()
+        {
+            Black = "#110e2d",
+            AppbarText = "#424242",
+            AppbarBackground = "rgba(255,255,255,0.8)",
+            DrawerBackground = "#ffffff",
+            GrayLight = "#e8e8e8",
+            GrayLighter = "#f9f9f9",
+        };
+
+    private readonly PaletteDark _darkPalette = new()
+        {
+            Primary = "#7e6fff",
+            Surface = "#1e1e2d",
+            Background = "#1a1a27",
+            BackgroundGray = "#151521",
+            AppbarText = "#92929f",
+            AppbarBackground = "rgba(26,26,39,0.8)",
+            DrawerBackground = "#1a1a27",
+            ActionDefault = "#74718e",
+            ActionDisabled = "#9999994d",
+            ActionDisabledBackground = "#605f6d4d",
+            TextPrimary = "#b2b0bf",
+            TextSecondary = "#92929f",
+            TextDisabled = "#ffffff33",
+            DrawerIcon = "#92929f",
+            DrawerText = "#92929f",
+            GrayLight = "#2a2833",
+            GrayLighter = "#1e1e2d",
+            Info = "#4a86ff",
+            Success = "#3dcb6c",
+            Warning = "#ffb545",
+            Error = "#ff3f5f",
+            LinesDefault = "#33323e",
+            TableLines = "#33323e",
+            Divider = "#292838",
+            OverlayLight = "#1e1e2d80",
+        };
+
+
+    private void DarkModeToggle()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+
+    private void ToggleDrawer()
+    {
+        InvokeAsync(() =>
+        {
+            //Log.Information("菜单状态改变");
+            _open = !_open;
+            StateHasChanged(); // 确保在 UI 线程上触发重渲染
+        });
+        //Console.WriteLine("open is :" + _open.ToString());
+        //_open = !_open;
+        //Log.Information("OpenMenu:" + (!_open).ToString());
+    }
+
+    private async Task SetMenuStatus(bool isOpen)
+    {
+        InvokeAsync(() =>
+        {
+           // Console.WriteLine($"Menu status changed:{isOpen}");
+
+            _open = isOpen;
+            StateHasChanged(); // 确保在 UI 线程上触发重渲染
+        });
+    }
+
+    private void ToggleLogger()
+    {
+        //showLogPanel = !showLogPanel;
+        InvokeAsync(() =>
+        {
+            showLogPanel = !showLogPanel;
+            StateHasChanged(); // 确保在 UI 线程上触发重渲染
+        });
+    }
+}

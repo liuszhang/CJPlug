@@ -1,0 +1,22 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using MudBlazor
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+
+            <MudTextField FullWidth @bind-text="ToolActionItem.TargetLib" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="动作目标库"></MudTextField>
+            <MudTextField FullWidth @bind-text="ToolActionItem.TargetLibPath" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="目标库路径" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"></MudTextField>
+            <MudTextField FullWidth @bind-text="ToolActionItem.LibFunctionName" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="目标库方法"></MudTextField>
+            <MudTextField FullWidth @bind-text="ToolActionItem.FunctionParameters" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="方法执行参数"></MudTextField>
+            <MudCheckBox Dense @bind-Value="ToolActionItem.NeedToolEnvirment" Label="依赖工具环境" Color="Color.Primary"></MudCheckBox>
+            <MudCheckBox Dense @bind-Value="ToolActionItem.SupportNoWindow" Label="支持无界面执行" Color="Color.Primary"></MudCheckBox>
+
+            
+
+
+@code {
+
+    [Parameter]
+    public PlugAction? ToolActionItem { get; set; }
+}

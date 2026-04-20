@@ -1,0 +1,64 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Station
+@using System.Text.Json
+@using CJ.Plug.StationAndToolApi.Models
+
+
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+
+<MudStack>
+    <MudSwitch @bind-Value="ToolDeploySettingContent.UseDefaultToolPath" @bind-Value:after="()=> IsDirty=true" Color="Color.Primary">使用默认工具路径</MudSwitch>
+    <MudTextField Variant="Variant.Outlined" @bind-Value="ToolDeploySettingContent.SpecialToolPath" @bind-Value:after="() => IsDirty = true" 
+        ReadOnly="ToolDeploySettingContent.UseDefaultToolPath" Immediate AutoGrow></MudTextField>
+    <MudCheckBox T="bool" @bind-Value="ToolDeploySettingContent.AlwaysDownloadToStation" @bind-Value:after="() => IsDirty = true">执行时始终下载至图站</MudCheckBox>
+    <MudButton OnClick="() => SaveDeployData()" Disabled="!IsDirty" Variant="Variant.Filled" Color="Color.Primary">保存配置</MudButton>
+</MudStack>
+
+@code {
+    [Parameter]
+    public Tool? Tool { get; set; }
+    [Parameter]
+    public Station? Station { get; set; }
+    [Parameter]
+    public ToolDeploySettingModel? ToolDeploySettingContent { get; set; } = new();
+
+    private bool IsDirty { get; set; } = false;
+    private CommonRelation? relation { get; set; } = new();
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ToolDeploySettingContent!=null && ToolDeploySettingContent.UseDefaultToolPath)
+        {
+            ToolDeploySettingContent.SpecialToolPath = Tool.ToolPath;
+        }
+    }
+
+
+    private async Task SaveDeployData()
+    {
+        if (!IsDirty)
+        {
+            CLog.Information($"no config set");
+            return;
+        }
+        if (ToolDeploySettingContent.UseDefaultToolPath)
+        {
+            ToolDeploySettingContent.SpecialToolPath = String.Empty;
+        }
+        relation.RoleAId = Tool?.Id;
+        relation.RoleAName = Tool?.ToolName;
+        relation.RoleBId = Station?.Id;
+        relation.RoleBName = Station?.StationIp;
+        relation.RelationCategory = RelationCategory.ToolToStation.ToString();
+        relation.RelationSetting = JsonSerializer.Serialize(ToolDeploySettingContent);
+        CLog.Information($"relation setting:{relation.RelationSetting}");
+        //await MainApiClient.CreateOrUpdateRelationAsync(relation);
+        await MainApiClient.CreateOrUpdateRelationAsync(relation);
+        Snackbar.Add("保存配置成功！");
+        IsDirty = false;
+    }
+}

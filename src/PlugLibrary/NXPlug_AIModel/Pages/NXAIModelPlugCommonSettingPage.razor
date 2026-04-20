@@ -1,0 +1,241 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.DeekSeekIn
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.TASApiClient
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using Serilog
+
+@inject ITASApiClient MainApiClient
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject IDeepSeekService DeepSeekService
+
+
+
+<MudStack Style="width:100%;">
+    <MudText>输入命令描述</MudText>
+    <MudStack Row>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined">示例命令</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined">插入参数</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined" OnClick="TestAI">脚本预览</MudButton>
+    </MudStack>
+    <StandaloneCodeEditor CssClass="aiagent-editor"
+    Id="nxaimodel-editor"
+    @ref="_editor"
+
+    ConstructionOptions="EditorConstructionOptions" 
+    OnDidInit="EditorOnDidInit"
+    OnDidChangeModelContent="TextChanged" />
+
+    <MudText>其他配置</MudText>
+        <MudCheckBox T="bool" ValueChanged="@((bool a)=>OnValueChanged(a))">下载结果文件</MudCheckBox>   
+</MudStack>
+
+<MudOverlay Visible="visible" DarkBackground="true" ZIndex="9999">
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+        <MudPaper MinWidth="800px">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <CJ.Plug.SharedPages.Layout.VerticalWell ExtraPadding="100">
+                    <MudChat ChatPosition="ChatBubblePosition.End">
+                        <MudChatBubble>
+                            @editorCode
+                        </MudChatBubble>
+                    </MudChat>
+                    <MudChat ChatPosition="ChatBubblePosition.Start">
+                        <MudChatBubble>
+                            @Answer
+                        </MudChatBubble>
+                    </MudChat>
+
+                </CJ.Plug.SharedPages.Layout.VerticalWell>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(e => ToggleOverlay(false))">关闭</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudStack>
+</MudOverlay>
+
+@code {
+    [Parameter]
+    public string? DefinitionId { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+    [Parameter]
+    public ActivityDescriptor? ActivityDescriptor { get; set; }
+
+    private string PrePromat = "根据我一下的需求，生成针对NX的建模脚本，回答中不要包含除了建模脚本以外的信息，以下是我的需求：";
+
+    //模型类参数
+    private StandaloneCodeEditor _editor = null!;
+    private string editorCode = "";
+    private string iniValue = "";
+    private string DefaultValue = "";
+    private bool AutoSaveCode = true;
+    private bool _isDirty = false;
+    public Placement Placement { get; set; } = Placement.Top;
+
+
+
+    [Parameter] 
+    public Plug? Plug { get; set; } = new();
+    private List<PlugVariable> TmpInputs = new List<PlugVariable>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+
+    List<PlugVariable> rootPlugVariables = new List<PlugVariable>();
+    private IBrowserFile File;
+    private string? RealFilePath;
+    private bool Loading = false;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+    private PlugSettings? PlugSettings;
+
+    private bool visible = false;
+    private string? Answer { get; set; }
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.TopCenter,
+            BackdropClick = false,
+            FullWidth = true
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //Console.WriteLine(">>>>>>>>>>>>>>start init");
+        await MudDialog.SetOptionsAsync(diaOption);
+
+        //Log.Information(Plug.Value);
+        if(Plug.GetPlugSettings()?.Settings.Count==0)
+        {
+            PlugSettings = new PlugSettings();
+        }
+        else
+        {
+            PlugSettings = JsonSerializer.Deserialize<PlugSettings>(Plug.PlugSettingsJson);
+        }
+
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+            //AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "创建一个边长为100的正方体",
+                Value = iniValue,
+                Minimap=new EditorMinimapOptions(){Enabled=false }
+
+            };
+    }
+    private async void TextChanged()
+    {
+        _isDirty = true;
+        if (AutoSaveCode == true)
+        {
+            //await Task.Delay(500);
+            //MyCon1sole.WriteLine("开始自动保存");
+            await OnSaveClick();
+            //StateHasChanged();
+            //Log.Information("自动保存完成");
+        }
+    }
+    private async Task EditorOnDidInit()
+    {
+        if (Plug.Value == null)
+        {
+            iniValue = @"生成一个边长为100的正方体";
+        }
+        else
+        {
+            iniValue = Plug.Value;
+        }
+        if (iniValue != null)
+        {
+            await _editor.SetValue(iniValue);
+        }
+
+        //MyCon1sole.WriteLine("初始化编辑器完成");
+
+    }
+
+
+    private async void TestAI()
+    {
+        if (string.IsNullOrEmpty(editorCode))
+        {
+            return;
+        }
+        visible = true;
+        //var deepSeek = ServiceProvider.GetRequiredService<IDeepSeekService>();
+        await foreach (var response in DeepSeekService.Ask(PrePromat+editorCode))
+        {
+            Answer += response;
+            StateHasChanged();
+        }
+    }
+
+    public void ToggleOverlay(bool value)
+    {
+        Answer = "";
+        visible = value;
+    }
+
+    private async void GetDefaultValue()
+    {
+        await _editor.SetValue(DefaultValue);
+        StateHasChanged();
+    }
+
+    private async Task OnSaveClick()
+    {
+        //_isDirty = false;
+        if (_editor != null)
+        {
+            var model = await _editor.GetModel();
+            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+            Plug.Value = editorCode;
+            //Log.Information(Plug.Value);
+            await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+            _isDirty = false;
+            StateHasChanged();
+        }
+        //await _editor.SetValue(DefaultValue);
+        //StateHasChanged();
+    }
+
+    private async Task OnValueChanged(bool value)
+    {
+        UpdatePlugSettings();         
+    }
+    private async Task OnValueChanged2(string value)
+    {
+        UpdatePlugSettings();
+    }
+
+    private async void UpdatePlugSettings()
+    {
+        Plug.PlugSettingsJson = JsonSerializer.Serialize(PlugSettings);
+    }
+
+}

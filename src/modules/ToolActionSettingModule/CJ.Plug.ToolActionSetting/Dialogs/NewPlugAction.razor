@@ -1,0 +1,83 @@
+﻿@using System.Text.Json
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.TASApiClient
+
+@inject ITASApiClient MainApiClient
+
+
+<MudDialog Style="resize:both;">
+    <DialogContent>
+        <MudStack>
+            <MudSelect T="string" Label="目标类型" @bind-value="PlugActionItem.Category" Clearable Margin="Margin.Dense" Dense FullWidth Variant="Variant.Outlined">
+                @foreach(var c in PlugCategory.GetPlugActionCategorys())
+                {
+                    <MudSelectItem T="string" Value=@c>@c</MudSelectItem>
+                }
+                @* <MudSelectItem T="string" Value=@PlugCategorys.桌面类动作.ToString()>@PlugCategorys.桌面类动作</MudSelectItem>
+                <MudSelectItem T="string" Value=@PlugCategorys.脚本类动作.ToString()>@PlugCategorys.脚本类动作</MudSelectItem>
+                <MudSelectItem T="string" Value=@PlugCategorys.接口类动作.ToString()>@PlugCategorys.接口类动作</MudSelectItem> *@
+            </MudSelect>
+            <MudTextField FullWidth @bind-text="PlugActionItem.Name" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="动作名称"></MudTextField>
+
+            @if(PlugActionItem.Category==PlugCategorys.桌面类动作.ToString())
+            {
+                <MudTextField FullWidth @bind-text="PlugActionItem.TargetLib" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="动作目标库"></MudTextField>
+                <MudTextField FullWidth @bind-text="PlugActionItem.TargetLibPath" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="目标库路径" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"></MudTextField>
+                <MudTextField FullWidth @bind-text="PlugActionItem.LibFunctionName" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="目标库方法"></MudTextField>
+                <MudTextField FullWidth @bind-text="PlugActionItem.FunctionParameters" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="方法执行参数"></MudTextField>
+                <MudCheckBox Dense @bind-Value="PlugActionItem.NeedToolEnvirment" Label="依赖工具环境" Color="Color.Primary"></MudCheckBox>
+                <MudCheckBox Dense @bind-Value="PlugActionItem.SupportNoWindow" Label="支持无界面执行" Color="Color.Primary"></MudCheckBox>
+            }
+            @if (PlugActionItem.Category == PlugCategorys.接口类动作.ToString())
+            {
+                <MudTextField FullWidth @bind-text="PlugActionItem.TargetLibPath" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="接口地址" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"></MudTextField>
+
+            }
+
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="buttonDisabled" OnClick="Cancel">取消</MudButton>
+        <MudButton Disabled="buttonDisabled" Color="Color.Primary" OnClick="Submit">提交</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    public bool buttonDisabled { get; set; } = false;
+    public bool showDetails { get; set; } = false;
+    public string? actionName { get; set; } = "GetParameters";
+    public string? targetLib { get; set; } = "uglib.dll";
+    public string? libPath { get; set; } = @"""C:\Program Files\Siemens\NX 12.0\NXBIN\uglib.dll""";
+    public string? libAction { get; set; } = "GetParameters";
+    public string? actionParameter { get; set; } = "";
+
+    public PlugAction? PlugActionItem { get; set; } = new();
+    [Parameter]
+    public Plug? SelectedPlug { get; set; } = new();
+
+
+    private async void Submit()
+    {
+        buttonDisabled = true;
+        //Console.WriteLine(JsonSerializer.Serialize(PlugActionItem));
+        //Console.WriteLine(">>>>>>>>>start new action");
+        //PlugActionItem.ParentPlugVersion = SelectedPlug.ToolVersion;
+        //PlugActionItem.ParentPlugId = SelectedPlug.Id;
+        //PlugActionItem.ParentPlugDefinitionId = SelectedPlug.DefinitionId;
+        //PlugActionItem.IsRootPlug = false;
+        //PlugActionItem.DefinitionId = RandomLongIdentityGenerator.GenerateId();
+        var newPlugAction = await MainApiClient.CreateAndAddPlugActionToPlug(SelectedPlug, PlugActionItem,RelationTypes.新建);
+        //var newPlugAction = await MainApiClient.CreatePlugAction(PlugActionItem);
+        //这里手动创建新的插头动作而不使用EF自动创建的原因是，界面上的新建动作不会有ID，而EF会自动创建ID，导致插头动作的ID不一致
+        //SelectedPlug.PlugActions.Add(newPlugAction);
+        //SelectedPlug.PlugActions.Add(PlugActionItem);
+        //await MainApiClient.UpdatePlugAsync(SelectedPlug.Id, SelectedPlug);
+        MudDialog.Close(DialogResult.Ok(newPlugAction));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

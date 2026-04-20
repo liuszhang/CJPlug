@@ -1,0 +1,43 @@
+﻿@using MudBlazor
+@using Orientation=Radzen.Orientation
+@using Radzen.Blazor
+
+
+<MudStack Row StretchItems="StretchItems.Start">
+    <RadzenSplitter>
+        <RadzenSplitterPane Size="70%" Min="600px">
+            <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh - var(--mud-appbar-height));">
+                    <RadzenSplitterPane Size="30%" Min="200px">
+                        @ActivityPicker
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Size="70%" Min="200px">
+                        <RadzenSplitter Orientation="Orientation.Vertical">
+                            <RadzenSplitterPane Size="70%">
+                                @Designer
+                            </RadzenSplitterPane>
+                            <RadzenSplitterPane Size="30%">
+                                @Logs
+                            </RadzenSplitterPane>
+                        </RadzenSplitter>
+                    </RadzenSplitterPane>
+                </RadzenSplitter>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Size="30%" Min="375px">
+            @Parameters
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+</MudStack>
+
+@code{
+    [Parameter]
+    public RenderFragment ActivityPicker { get; set; } = default!;
+    [Parameter]
+    public RenderFragment Designer { get; set; } = default!;
+    [Parameter]
+    public RenderFragment Logs { get; set; } = default!;
+    [Parameter]
+    public RenderFragment Parameters { get; set; } = default!;
+    [Parameter]
+    public RenderFragment Content5 { get; set; } = default!;
+
+}

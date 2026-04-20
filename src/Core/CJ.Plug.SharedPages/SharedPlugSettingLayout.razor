@@ -1,0 +1,200 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using MudBlazor
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" ActivePanelIndex="2">
+    <MudTabPanel Text="基础配置">
+        <MudStack>
+            @BaseInfoContent
+            <MudTextField T="string" Margin="Margin.Dense" Label="编号" @bind-Text="@Plug.DefinitionId" ReadOnly Variant="Variant.Filled"></MudTextField>
+            <MudTextField T="string" Margin="Margin.Dense" Label="名称" @bind-Text="@Plug.Name" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField T="string" Margin="Margin.Dense" Label="描述" @bind-Text="@Plug.Description" Variant="Variant.Outlined"></MudTextField>
+        </MudStack>
+        
+
+    </MudTabPanel>
+    <MudTabPanel Text="参数配置">
+        @ParametersContent
+        <MudTable Items="@Plug.PlugVariables" Height="100%" Breakpoint="Breakpoint.Sm" Virtualize="true" FixedHeader="true">
+            <ToolBarContent>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Newspaper">新建</MudButton>
+                <MudSpacer></MudSpacer>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RestartAlt">重置参数默认值</MudButton>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>类型</MudTh>
+                <MudTh>值</MudTh>
+                <MudTh>默认值</MudTh>
+                <MudTh>I/O</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd >@context.Name</MudTd>
+                <MudTd>int</MudTd>
+                <MudTd></MudTd>
+                <MudTd>0</MudTd>
+                <MudTd>IO</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.ZoomIn">编辑</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+    </MudTabPanel>
+    <MudTabPanel Text="执行配置">
+        @ExecuteSettingContent
+        <MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+            <MudSelect Margin="Margin.Dense" Dense T="string" Label="工具版本" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents select-tool-version">
+                @foreach(var v in ToolItem.ToolVersions)
+                {
+                    <MudSelectItem T="string" Value="v">@v</MudSelectItem>
+                }
+                <MudSelectItem T="string" Value="@("1")">-</MudSelectItem>
+                <MudSelectItem T="string" Value="@("2")">11</MudSelectItem>
+                <MudSelectItem T="string" Value="@("3")">12</MudSelectItem>
+            </MudSelect>
+            <MudSelect Margin="Margin.Dense" Dense T="string" Label="选择支持的工具动作" Class="me-3" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents">
+                <MudSelectItem T="string" Value="@("1")">-</MudSelectItem>
+                <MudSelectItem T="string" Value="@("2")">导入模型</MudSelectItem>
+                <MudSelectItem T="string" Value="@("3")">配置载荷</MudSelectItem>
+                <MudSelectItem T="string" Value="@("4")">网格划分</MudSelectItem>
+                <MudSelectItem T="string" Value="@("5")">配置求解</MudSelectItem>
+                <MudSelectItem T="string" Value="@("6")">结果提取</MudSelectItem>
+                <MudSelectItem T="string" Value="@("7")">执行脚本</MudSelectItem>
+            </MudSelect>
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">添加动作</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">清空动作</MudButton>
+
+
+        </MudStack>        
+        <MudExpansionPanels MultiExpansion="true">
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.ImportExport" class="mr-3"></MudIcon>
+                        <MudText>导入模型<strong>(支持NX模型)</strong></MudText>
+                        <MudSpacer></MudSpacer>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    工作命令行：patran import {{filename}}
+                </ChildContent>
+            </MudExpansionPanel>
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Forest" class="mr-3"></MudIcon>
+                        <MudText>配置载荷</MudText>
+                        <MudSpacer></MudSpacer>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    Panel Content
+                </ChildContent>
+            </MudExpansionPanel>
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.SimCard" class="mr-3"></MudIcon>
+                        <MudText>网格划分</MudText>
+                        <MudSpacer></MudSpacer>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    Panel Content
+                </ChildContent>
+            </MudExpansionPanel>
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.ResetTv" class="mr-3"></MudIcon>
+                        <MudText>结果提取</MudText>
+                        <MudSpacer></MudSpacer>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    Panel Content
+                </ChildContent>
+            </MudExpansionPanel>
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" class="mr-3"></MudIcon>
+                        <MudText>执行脚本</MudText>
+                        <MudSpacer></MudSpacer>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    <MudStack>
+                        <MudStack Row AlignItems="AlignItems.Center">
+                            <MudTooltip>
+                                <ChildContent>
+                                    <MudIconButton Icon="@Icons.Material.Filled.MedicalInformation" />
+                                </ChildContent>
+                                <TooltipContent>
+                                    <MudText Typo="Typo.h6">参数集成格式说明</MudText>
+                                    <MudText Typo="Typo.body2">如果需要获取输入参数，输入格式为'get参数名()'.</MudText>
+                                    <MudText Typo="Typo.body2">示例，如果需要获取Input1参数值，输入：'a=getInput1()'</MudText>
+                                    <MudText Typo="Typo.body2">设置输出参数值：'setOutput("Output1","test")'</MudText>
+                                    <MudText Typo="Typo.body2">获取输出参数值：'getOutput("Output1")'</MudText>
+                                    <MudIcon Icon="@Icons.Material.Filled.Star" />
+                                </TooltipContent>
+                            </MudTooltip>
+                            <MudSwitch T="string" Color="Color.Primary" Label="自动保存" />
+                            <MudBadge Color="@(Color.Warning)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+                                @* <MudIconButton Icon="@Icons.Material.Outlined.Save" OnClick="@OnSaveClick" /> *@
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary">保存</MudButton>
+                            </MudBadge>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary">重置</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary">导入</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary">导出</MudButton>
+                        </MudStack>
+
+                        <MudStack Row Justify="Justify.SpaceBetween">
+                            <MudStack Style="width:100%;">
+                                <StandaloneCodeEditor CssClass="studio-monaco-editor-large-border"
+                                Id="my-python-editor"
+                                ConstructionOptions="EditorConstructionOptions" />
+                            </MudStack>
+
+                            <MudStack>
+                                <MudStack Row Style="width:168px;">
+                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">执行测试</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+                                </MudStack>
+                                <MudTextField T="string" Label="结果预览" ReadOnly Variant="Variant.Outlined" Lines="12" />
+                            </MudStack>
+
+                        </MudStack>
+
+
+                    </MudStack>
+
+                </ChildContent>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    [Parameter]
+    public RenderFragment? BaseInfoContent { get; set; }
+    [Parameter]
+    public RenderFragment? ParametersContent { get; set; }
+    [Parameter]
+    public RenderFragment? ExecuteSettingContent { get; set; }
+
+    [Parameter]
+    public Plug? ToolItem { get; set; } = new();
+    [Parameter]
+    public Plug? Plug { get; set; } = new();
+}

@@ -1,0 +1,660 @@
+﻿@using System.Text.Json.Nodes
+@using CJ.Plug_Aspire.Models.Plug
+@using CJ.Plug_Aspire.Models.Station
+@using CJ.Plug_Aspire.SharedPages
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Extensions
+@using Elsa.Workflows.Activities
+@using Elsa.Workflows.Contracts
+@using Elsa.Workflows.Management
+@using Elsa.Workflows.Memory
+@using Elsa.Workflows.Options
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using NX.Services
+@using Size=MudBlazor.Size
+@using static NXPlug
+
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+
+
+<MudDialog Style="resize:both">
+    <DialogContent>
+        <MudStack>
+            @* <h3>@DefinitionId</h3> *@
+            @* <MudBlazor.MudText>
+                @Activity.ToString()
+            </MudBlazor.MudText> *@
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudFileUpload T="IBrowserFile" FilesChanged="@((f)=>CheckLocalFile(f))">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary">选择模型文件</MudButton>
+                    </ActivatorContent>
+                </MudFileUpload>
+                <MudButton OnClick="@(()=>GetParameters(Plug))" Variant="Variant.Outlined" Color="Color.Primary">加载模型参数</MudButton>
+                <MudButton OnClick="@(()=>SetParameters(Plug))" Disabled="@(Plug?.RealValuePath==null)" Variant="Variant.Outlined" Color="Color.Primary">刷新模型参数</MudButton>
+                <MudButton OnClick="@(()=>DownloadFile(Plug))" Variant="Variant.Outlined" Color="Color.Primary">下载模型</MudButton>
+                <MudButton OnClick="@(()=>ReloadFile())" Variant="Variant.Outlined" Color="Color.Primary">重置模型</MudButton>
+                <MudButton OnClick="@(()=>ShowStlFile(Plug))" Variant="Variant.Outlined" Color="Color.Primary">模型预览</MudButton>
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="0">
+                    <MudText>当前模型：@Plug?.Value</MudText>
+                    <MudText>（@Plug?.RealValuePath）</MudText>
+                </MudStack>
+
+            </MudStack>
+            <MudDivider></MudDivider>
+            <MudStack Row>
+                <MudContainer Style="max-height: 505px; overflow-y: scroll">
+                    <MudStack Style="width: 550px; height: 505px;">
+                        @if (Loading)
+                        {
+                            <MudProgressCircular Indeterminate="true"></MudProgressCircular>
+                        }
+                        else
+                        {
+                            <MudDataGrid T="PlugVariable" Items="@TmpInputs" Filterable="false" SortMode="SortMode.None" Height="250px" 
+                            Hover
+                            ColumnResizeMode="ResizeMode.Column" ReadOnly="@_readOnly" EditMode="@(_isCellEditMode ? DataGridEditMode.Cell : DataGridEditMode.Form)"
+                            StartedEditingItem="@StartedEditingItem" CanceledEditingItem="@CanceledEditingItem" CommittedItemChanges="@CommittedItemChanges"
+                            Bordered="true" Dense="true" EditTrigger="@(_editTriggerRowClick ? DataGridEditTrigger.OnRowClick : DataGridEditTrigger.Manual)">
+                                <Columns>                                    
+                                    <PropertyColumn Property="x => x.Name" Title="属性名" Editable="false"/>
+                                    <PropertyColumn Property="x => x.DefultValue" Title="当前值" Editable="false"/>
+                                    <PropertyColumn Property="x => x.Value" Title="设定值" CellStyleFunc="@_cellStyleFunc">
+                                        <EditTemplate>
+                                            <MudTextField @bind-Value="@context.Item.Value" Margin="Margin.Dense" Variant="Variant.Filled"></MudTextField>
+                                        </EditTemplate>
+                                    </PropertyColumn>
+                                    <PropertyColumn Property="x => x.Name" Title="参数绑定">
+                                        <EditTemplate>
+                                            <MudStack Style="min-width:120px">
+                                                <MudCheckBox T="bool" Value="@context.Item.IsInput" ValueChanged="@(state=>OnCheckIsInputChanged(context,state))" Dense Label="设为输入" Size="Size.Small" Color="Color.Primary"></MudCheckBox>
+                                                <MudCheckBox T="bool" Value="@context.Item.IsOutput" ValueChanged="@(state=>OnCheckIsOutputChanged(context,state))" Dense Label="设为输出" Size="Size.Small" Color="Color.Primary"></MudCheckBox>
+                                            </MudStack>                                            
+                                        </EditTemplate>
+                                    </PropertyColumn>
+                                </Columns>
+                            </MudDataGrid>
+
+                        }
+                        <ParametersData SelectedActivity="ActivityDescriptor"></ParametersData>
+
+                    </MudStack>
+                </MudContainer>
+                <MudStack>
+                    @if (showProgress)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+                    }
+
+                    <MudPaper Width="550" Height="455px">
+                        @* <iframe id="myIframe" style="width:550px;height:455px;" src="stlloader_base.html?stlPath=@stlPath" frameborder="0">
+                        </iframe> *@
+                        @if (!string.IsNullOrEmpty(stlPath))
+                        {
+                            <iframe id="myIframe" style="width:550px;height:455px;" src="_content/NX/stlloader_base.html?stlPath=@stlPath" frameborder="0">
+                            </iframe>
+                        }
+                        else
+                        {
+                            <iframe id="myIframe" style="width:550px;height:455px;" src="_content/NX/stlloader_base.html?stlPath=@stlPath2" frameborder="0">
+                            </iframe>
+                        }
+
+                    </MudPaper>
+                </MudStack>
+            </MudStack> 
+        </MudStack>
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(()=>ExecuteActivity(Plug))">执行</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(()=>SavePlugAndCloseDialog(Plug))">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public string? DefinitionId { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+    [Parameter]
+    public ActivityDescriptor? ActivityDescriptor { get; set; }
+
+    //[Inject] private IWorkflowDefinitionService WorkflowDefinitionService { get; set; } = default!;
+    //[Inject] private IWorkflowRunner workflowRunner { get; set; } = default!;
+
+
+
+
+    string stlPath = "pr2_head_pan.stl";
+    //string stlPath = "./stl/123.stl";
+    string objPath = "./models/obj/male02/male02.obj";
+    string stlPath2 = "pr2_head_pan.stl";
+
+    [Parameter] public Plug? Plug { get; set; } = new();
+    private List<PlugVariable> TmpInputs = new List<PlugVariable>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    List<PlugVariable> rootPlugVariables = new List<PlugVariable>();
+    private IBrowserFile File;
+    private string RealFilePath;
+    private bool Loading = false;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+    //状态机：
+    // 0 无模型资源；1 已选择临时模型；2 已加载临时模型（已经上传至图站）；
+    // 3 插头模型不为空但未加载（上传至图站）；4 已经加载插头模型；
+    // 5 模型已轻量化处理且最新；6 模型已更新但未轻量化处理
+    public int StatusMachine = 0;
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.TopCenter,
+            BackdropClick = false
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //Console.WriteLine(">>>>>>>>>>>>>>start init");
+        MudDialog.SetOptions(diaOption);
+        if (Plug != null)
+        {
+            rootPlugVariables = new List<PlugVariable>(Plug.PlugVariables!);            
+        }
+
+        foreach (var t in ActivityDescriptor?.Inputs)
+        {
+            //Console.WriteLine(JsonSerializer.Serialize(t));
+            //Console.WriteLine($"{t.TypeName}-{t.Name}-{t.Category}");
+            var inputName = t.Name.Camelize();
+            var value = Activity.GetProperty(inputName);
+            var wrappedInput = t.IsWrapped ? ToWrappedInput(value) : default;
+            var input = t.IsWrapped ? wrappedInput : (object?)value;
+            //Console.WriteLine($"{t.TypeName}-{t.Name}-{wrappedInput.Expression.Value}");
+            if (t.Name=="InputDatas")
+            {
+                if (string.IsNullOrEmpty(wrappedInput?.Expression?.Value?.ToString()))
+                {
+                    return;
+                }
+                // 配置 JsonSerializerOptions 以忽略大小写
+                var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+                var inputDatas = JsonSerializer.Deserialize<List<PlugVariable>?>(wrappedInput?.Expression?.Value?.ToString(),options);
+                foreach (var i in inputDatas)
+                {
+                    Console.WriteLine(JsonSerializer.Serialize(i));
+                    TmpInputs.Add(i);
+                }
+            }
+        }
+
+
+        //stlPath = null;
+        //JsRuntime.InvokeVoidAsync("updateAndReloadIframe", stlPath2);
+
+    }
+
+    private static WrappedInput? ToWrappedInput(object? value)
+    {
+        var converterOptions = new ObjectConverterOptions(serializerOptions => { serializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase; });
+
+        return value.ConvertTo<WrappedInput>(converterOptions);
+    }
+
+    async Task OnCheckIsInputChanged(CellContext<PlugVariable> cellContext, bool isInput)
+    {
+        //Console.WriteLine(cellContext.Item.Name);
+        if (isInput)
+        {
+            //Console.WriteLine("设为输入");
+            cellContext.Item.IsInput = true;
+            //var tmpName = char.ToUpper(cellContext.Item.Name[0]) + cellContext.Item.Name.Substring(1);
+            var tmpName = cellContext.Item.Name;
+            foreach (var input in Plug.PlugVariables)
+            {
+                if (input.Name == tmpName)
+                {
+                    //Console.WriteLine("已有该输入");
+                    return;
+                }
+            }
+            Plug.PlugVariables.Add(new PlugVariable() { Name = tmpName, Type = "string", DefultValue = cellContext.Item.DefultValue });
+
+        }
+        else
+        {
+            //MyCon1sole.WriteLine("取消输入");
+            cellContext.Item.IsInput = false;
+            //var tmpName = char.ToUpper(cellContext.Item.Name[0]) + cellContext.Item.Name.Substring(1);
+            var tmpName = cellContext.Item.Name;
+            foreach (var input in Plug.PlugVariables)
+            {
+                if (input.Name == tmpName)
+                {
+                    Plug.PlugVariables.Remove(input);
+                    return;
+                }
+            }
+
+        }
+    }
+    async Task OnCheckIsOutputChanged(CellContext<PlugVariable> cellContext, bool isOutput)
+    {
+        //Console.WriteLine(cellContext.Item.Name);
+        if (isOutput)
+        {
+            //Console.WriteLine("设为输入");
+            cellContext.Item.IsOutput = true;
+            foreach (var output in Plug.PlugVariables)
+            {
+                if (output.Name == cellContext.Item.Name)
+                {
+                    //Console.WriteLine("已有该输出");
+                    return;
+                }
+            }
+            Plug.PlugVariables.Add(new PlugVariable() { Name = cellContext.Item.Name, Type = "string" });
+
+        }
+        else
+        {
+            //MyCon1sole.WriteLine("取消输入");
+            cellContext.Item.IsOutput = false;
+            foreach (var output in Plug.PlugVariables)
+            {
+                if (output.Name == cellContext.Item.Name)
+                {
+                    Plug.PlugVariables.Remove(output);
+                    return;
+                }
+            }
+
+        }
+    }
+
+
+    private Func<PlugVariable, string> _cellStyleFunc => x =>
+    {
+        string style = "";
+        if (x.Value != null && x.Value != x.DefultValue)
+            style += "background-color:#8CED8C";
+        return style;
+    };
+
+    // events
+    void StartedEditingItem(PlugVariable item)
+    {
+        Console.Write($"Event = StartedEditingItem, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+
+    void CanceledEditingItem(PlugVariable item)
+    {
+        Console.Write($"Event = CanceledEditingItem, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+
+    void CommittedItemChanges(PlugVariable item)
+    {
+        Console.Write($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+    }
+
+    async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        Console.WriteLine("checked file name:"+browserFile.Name);
+        //File = browserFile;
+        if (browserFile != null)
+        {
+            try 
+            {
+                File = browserFile;
+                Plug.Value = browserFile.Name;
+                Plug.RealValuePath = null;
+                Activity.SetProperty(browserFile.Name, "TestText");
+                //Plug.WorkPath = await FileManage.GetCurrentWorkPath(Plug.Id?.ToString(), null);
+                var fileStream = browserFile.OpenReadStream(200 * 1024 * 1024);
+                // using (var memoryStream = new MemoryStream())
+                // {
+                //     await browserFile.OpenReadStream().CopyToAsync(memoryStream);
+                //     memoryStream.Seek(0, SeekOrigin.Begin);
+
+                //     Plug.RealValuePath = await MainApiClient.UploadFile(memoryStream, "test666", browserFile.Name);
+                // }
+                Plug.RealValuePath = await MainApiClient.UploadFile(fileStream, DefinitionId+"//"+Activity.GetId(), browserFile.Name);
+                Console.WriteLine("-------------Plug.RealValuePath is:" + Plug.RealValuePath);
+                //browserFile = null;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+
+            //Plug.RealValuePath = await FileManage.SavePlugFileToFileServer(fileStream,Plug);
+            //Plug.RealValuePath = await FileManage.UploadFileStreamToServerPath(fileStream, Plug.WorkPath, Plug.Value);
+        }
+
+    }
+
+
+    async Task GetParameters(Plug plug)
+    {
+        var tmpNXInput = new PlugVariable { Name = "p0", DefultValue = "1", Value = null, IsInput = false };
+        TmpInputs.Add(tmpNXInput);
+        if (File == null && plug.RealValuePath == null)
+        {
+            Console.WriteLine("no model!");
+            return;
+        }
+        if (plug.RealValuePath != null)
+        {
+            Console.WriteLine("begin get parameters");
+            Loading = true;
+            await ProcessGetParameters();
+            Loading = false;
+            StateHasChanged();
+            return;
+        }
+
+
+        //上传模型到服务器
+        // if (File != null && plug.RealValuePath == null)
+        // {
+        //     Console.WriteLine("加载上传的新模型信息");
+        //     Loading = true;
+        //     //上传文件
+        //     var realFilePath = await FileManage.UploadFileToFileServer(File);
+        //     //Console.WriteLine(realFilePath);
+        //     plug.RealValuePath = realFilePath;
+        //     plug.Value = File.Name;
+        //     StatusMachine = 2;
+        //     await ProcessGetParameters();
+        //     Loading = false;
+        //     StateHasChanged();
+        //     return;
+        // }
+    }
+    async Task<string[]?> ProcessGetParameters()
+    {
+        var newRequest = new StationExecutionRequest();
+        newRequest.ToolName = "NX";
+        newRequest.ToolVersion = "12.0";
+        newRequest.RequestCommand = "GetParameters";
+        newRequest.InputVariables = new List<StationExectionVariable>()
+        {
+            new StationExectionVariable(){Name="FileName",Value="123.prt"},
+            new StationExectionVariable(){ProcessDefinitionId=DefinitionId,ActivityDefinitionId=Activity.GetId(),Name="P1",Value="100" },
+            new StationExectionVariable(){ProcessDefinitionId=DefinitionId,ActivityDefinitionId=Activity.GetId(),Name="P2",Value="200" }
+        };
+        var result = await MainApiClient.ExecuteToolCommand(newRequest);
+        //var tmp = await result.Content.ReadAsStringAsync();
+        Console.WriteLine("77" + result);
+        return null;
+        //调用图站接口，获取参数信息
+        //using Stream stream = await FileManage.GetFileStreamFromServerFile(Plug.RealValuePath);
+        //var parameters = await ToolAgentConnect.GetNXModelParameters(stream, File.Name);
+        //var parameters = await _NXExecuteAction.GetNXModelParameters(stream, Plug.Value);
+        // if (String.IsNullOrEmpty(parameters))
+        // {
+        //     Console.WriteLine("模型无参数");
+        //     Snackbar.Add("获取的模型参数为空，请检查模型数据");
+        //     Loading = false;
+        //     StateHasChanged();
+        //     return null;
+        // }
+        // //Console.WriteLine("获取的参数值："+parameters);
+        // parameters = parameters.Trim().TrimStart('"').TrimEnd('"');
+        // //Console.WriteLine(parameters);
+        // parameters = parameters.Trim(' ');
+        // //Console.WriteLine("获取到的参数信息："+parameters);
+        // string[] paras = parameters.Split(' ');
+        //Plug.PlugVariables = new List<PlugVariable>();
+        // TmpInputs = new List<PlugVariable>();
+
+        // //Console.WriteLine(inputs);
+        // foreach (var i in paras)
+        // {
+        //     var tmpNXInput = new PlugVariable { Name = i.Split('=')[0], DefultValue = i.Split('=')[1], Value = null, IsInput = false };
+        //     var Name = i.Split('=')[0];
+        //     //var tmpName = char.ToUpper(Name[0]) + Name.Substring(1);
+        //     var tmpName = Name;
+        //     if (Plug.PlugVariables != null && Plug.PlugVariables.Count != 0)
+        //     {
+        //         foreach (var PlugVariable in Plug.PlugVariables)
+        //         {
+        //             if (PlugVariable.Name == tmpName)
+        //             {
+        //                 tmpNXInput.IsInput = true;
+        //             }
+        //         }
+        //     }
+        //     if (Plug.PlugVariables != null && Plug.PlugVariables.Count != 0)
+        //     {
+        //         foreach (var plugOutput in Plug.PlugVariables)
+        //         {
+        //             if (plugOutput.Name == Name)
+        //             {
+        //                 tmpNXInput.IsOutput = true;
+        //             }
+        //         }
+        //     }
+        //     TmpInputs.Add(tmpNXInput);
+        //     //Console.WriteLine(i);
+        //     //Plug.PlugVariables.Add(new PlugVariable { Name = i.Split('=')[0], DefultValue = i.Split('=')[1] });
+
+        // }
+        // return paras;
+    }
+
+
+    async void SetParameters(Plug plug)
+    {
+        string oldParameters = "";
+        string newParameters = "";
+        foreach (var input in TmpInputs)
+        {
+            oldParameters += input.Name + "=" + input.DefultValue + ",";
+            if (input.Value == null)
+            {
+                //input.Value = input.DefultValue;
+                newParameters += input.Name + "=" + input.DefultValue + ",";
+            }
+            else
+            {
+                newParameters += input.Name + "=" + input.Value + ",";
+            }
+
+        }
+        if (oldParameters == newParameters)
+        {
+            Console.WriteLine("参数无变化");
+            Snackbar.Add("参数无变化");
+            return;
+        }
+        newParameters = newParameters.TrimEnd(',');
+        //Console.WriteLine(oldParameters);
+        //Console.WriteLine(newParameters);
+
+        //上传模型到服务器
+
+        //Console.WriteLine("新的参数值："+newParameters);
+        //plug.PlugVariables.Clear();
+        Loading = true;
+        //上传文件
+        //using Stream stream = await FileManage.GetFileStreamFromServerFile(plug.RealValuePath);
+        //调用图站接口，设置参数信息
+        //var newFileStream = await _NXExecuteAction.SetNXModelParameters(stream, plug.Value, newParameters);        
+        //Console.WriteLine(parameters);
+
+        //设置参数后只是更新了模型，需要重新获取模型参数并展示
+        // if (newFileStream == null)
+        // {
+        //     Console.WriteLine("获取新的NX文件失败");
+        //     Loading = false;
+        //     StateHasChanged();
+        //     return;
+        // }
+        // //File = null;
+        // //获取到新的NX文件流后重新上传到文件服务器
+        // newFileStream.Position = 0;
+        // //var newFileName = await FileManage.UploadFileStreamToFileServer(newFileStream, plug.Value);
+        // //var newFileName = await FileManage.SavePlugFileToFileServer(newFileStream, plug);
+        // plug.WorkPath = await FileManage.GetCurrentWorkPath(plug.Id?.ToString(), null);
+        // var newFileName = await FileManage.UploadFileStreamToServerPath(newFileStream, plug.WorkPath, plug.Value);
+        // newFileStream.Dispose();
+        // if (string.IsNullOrEmpty(newFileName))
+        // {
+        //     Console.WriteLine("新的NX文件上传文件服务器失败");
+        //     Loading = false;
+        //     StateHasChanged();
+        //     return;
+        // }
+        // plug.RealValuePath = newFileName;
+
+        // await GetParameters(plug);
+        // //Console.WriteLine("获取新参数成功");
+        // await ShowStlFile(plug);
+        // //Console.WriteLine("获取新STL成功");
+
+        // Loading = false;
+        // StateHasChanged();
+    }
+
+
+    async void DownloadFile(Plug plug)
+    {
+        if (plug.RealValuePath == null)
+        {
+            Snackbar.Add("无文件");
+            return;
+        }
+        //using var stream = await FileManage.GetFileStreamFromServerFile(plug.RealValuePath);
+        //调用Elsa框架成熟的文件下载服务
+        //await Files.DownloadFileFromStreamAsync(plug.Value, stream);
+    }
+
+    async void ReloadFile()
+    {
+        //stlPath = "/tmpFiles/pr2_head_pan.stl";
+        Plug.PlugVariables = rootPlugVariables;
+        //SetParameters(Plug);
+        StateHasChanged();
+        //await JsRuntime.InvokeVoidAsync("updateAndReloadIframe");
+    }
+
+    async Task ShowStlFile(Plug plug)
+    {
+        showProgress = true;
+        if (File == null && plug.RealValuePath == null)
+        {
+            Console.WriteLine("无模型信息");
+            return;
+        }
+        //1将NX文件导出为STL文件
+        // using Stream stream = await FileManage.GetFileStreamFromServerFile(plug.RealValuePath);
+        // var stlFileStream = await _NXExecuteAction.ExportNXFileToStl(stream, plug.Value);
+        // if (stlFileStream == null)
+        // {
+        //     Console.WriteLine("导出失败");
+        //     return;
+        // }
+        // //Console.WriteLine(stlFileStream.Length.ToString());
+        // //2保存STL文件到文件服务器
+        // string tmpStlName = Path.ChangeExtension(plug.Value, "stl");
+        // var StlTagName = plug.Id + "|" + tmpStlName;
+        // //Console.WriteLine(stlPath);
+        // //var result = await FileManage.UploadFileStreamToFileServer(stlFileStream, StlTagName);
+        // var result = await FileManage.UploadFileStreamToServerPath(stlFileStream, plug.WorkPath, tmpStlName);
+        // //3将文件服务器上的STL复制到应用程序根目录相应位置
+        // stlFileStream.Position = 0;
+        // var result2 = await FileManage.UploadFileStreamToWebServer(stlFileStream, tmpStlName);
+        // stlFileStream.Dispose();
+        // //4加载复制后的模型
+        // //Console.WriteLine("stl路径：" + result2);
+        // //这里需要刷新一下参数以强制告诉界面需要重载
+        // stlPath = "";
+        // StateHasChanged();
+        // stlPath = result2;
+        // showProgress = false;
+        // StateHasChanged();
+
+        //使用StateHasChanged()的razor更新机制可以自动重载iframe内容，无需通过js进行重载
+        //await JsRuntime.InvokeVoidAsync("updateAndReloadIframe", result2);
+    }
+
+
+    async Task SavePlugAndCloseDialog(Plug plug)
+    {
+        Activity.SetProperty(JsonSerializer.SerializeToNode(TmpInputs, new JsonSerializerOptions { WriteIndented = true }), "InputDatas");
+        //await PlugManage.UpdatePlug(plug.Id, plug);
+        MudDialog.Close(Activity);
+    }
+
+    public async Task ExecuteActivity(Plug plug)
+    {
+        Console.WriteLine(">>>>>>>>>>>>start to execute activity:"+JsonSerializer.Serialize(Activity));
+        //MudDialog.Close(Activity);
+        
+        //Console.WriteLine(">>>>>>>>>>start execute flow:" + Activity.GetId());
+        var testText = new Variable<string>("666");
+        var inputs = new Variable<List<PlugVariable>>(TmpInputs);
+        var outputs = new Variable<List<PlugVariable>>(TmpInputs);
+        await new NXPlugExecute("666888", TmpInputs, TmpInputs).Execute();
+
+        // var nxActivity = new NXActivity(testText, inputs, outputs);
+        // var workflow = new Workflow
+        //     {
+        //         Root = nxActivity
+        //     };
+        // // 创建服务提供者
+        // var serviceCollection = new ServiceCollection();
+        // // Add Elsa services.
+        // serviceCollection.AddElsa();
+        // //serviceCollection.AddElsa(options => options.AddActivitiesFromCurrentAssembly());
+        // var serviceProvider = serviceCollection.BuildServiceProvider();
+        // var workflowRunner = serviceProvider.GetRequiredService<IWorkflowRunner>();
+
+        // // Get a serializer to deserialize the workflow.
+        // // var serializer = serviceProvider.GetRequiredService<IActivitySerializer>();
+        // // var workflow = serializer.Deserialize<Workflow>(Activity.ToString());
+        // //Console.WriteLine(">>>>>>>>>>start execute flow:" + JsonSerializer.Serialize(nxActivity));
+        // RunWorkflowOptions? options = new RunWorkflowOptions()
+        //     {
+        //         Input = new Dictionary<string, object>
+        //         {
+        //             { "TestText", "Hello, World!666" }
+        //         }
+        //     };
+        // try
+        // {
+        //     await workflowRunner.RunAsync(workflow, options);
+
+        // }
+        // catch (Exception ex)
+        // {
+        //     Console.WriteLine(ex.Message);
+        // }
+    }
+
+}

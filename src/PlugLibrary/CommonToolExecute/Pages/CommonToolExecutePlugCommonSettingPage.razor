@@ -1,0 +1,346 @@
+﻿@using BlazorMonaco
+@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.Job
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.SharedComponents
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using MudExtensions
+@using Serilog
+@using MudBlazor.Extensions
+
+@inject IDomInteropService DomInteropService
+@inject MainApiClient MainApiClient
+@inject IToolExecuteService ToolExecuteService
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+<MudStack Row AlignItems="AlignItems.Center">
+    @if (Loading)
+    {
+        <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Small"></MudProgressCircular>
+    }
+    else
+    {
+        <MudSelect T="Tool" @bind-Value="SelectedTool" ToStringFunc="@converter" Label="选择工具" Clearable Placeholder="选择一个工具" Dense Variant="Variant.Outlined">
+            @foreach (var t in Tools)
+            {
+                <MudSelectItem Value="t">
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        @* <MudIcon Icon="@Icons.Material.Filled.PanToolAlt" Color="Color.Primary"></MudIcon> *@
+                        <MudText>@($"{@t.ToolName}({@t.ToolVersion})")</MudText>
+                    </MudStack>
+                </MudSelectItem>
+            }
+        </MudSelect>
+        @if (SelectedTool != null)
+        {
+            <MudTextField @bind-Value="@SelectedTool.ToolType" Margin="Margin.Dense" Label="工具类型" ReadOnly Variant="Variant.Filled"></MudTextField>
+
+        }
+
+    }
+</MudStack>
+
+<MudDivider/>
+
+<MudStack>
+
+
+
+<MudDataGrid T="ToolCommandVariable" Items="ToolCommandVariables" Dense ReadOnly="Loading"
+EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">配置工具命令变量</MudText>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x=>x.VariableName" Title="参数名称" Editable="false" />
+        <PropertyColumn Property="x => x.VariableValue" Title="设定值">
+            <EditTemplate>
+                <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    @if (@context.Item.IsFromPlugVariable)
+                    {
+                        <MudSelect T="string" @bind-Value="@context.Item.VariableValue" Dense Clearable>
+                            @foreach (var p in PlugVariablesInPDZ)
+                            {
+                                <MudSelectItem Value="@($"[{p.Name}]")">@p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                        Value="@context.Item.VariableValue" ValueChanged="(string? v)=>OnSettingValueChanged(context.Item,v)"></MudTextField>
+                    }
+                    <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                    Value="@context.Item.IsFromPlugVariable" ValueChanged="(bool b)=>ChangedIsFromOtherValue(context.Item,b)" />
+                </MudStack>
+            </EditTemplate>
+        </PropertyColumn>
+    </Columns>
+
+</MudDataGrid>
+
+<MudButton OnClick="TestExecute" Disabled="Loading" Variant="Variant.Filled" Color="Color.Primary">执行测试</MudButton>
+<MudTextField @bind-Value="JobResultString" Lines="3" AutoGrow Variant="Variant.Outlined" ReadOnly></MudTextField>
+</MudStack>
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    public PlugData? PlugData { get; set; }
+
+    private List<PDZVariable>? PlugVariablesInPDZ = new List<PDZVariable>();
+    private Tool? _selectedTool=new CJ.Plug.Models.Station.Tool();
+    private Tool? SelectedTool 
+    { 
+        get => _selectedTool ?? new CJ.Plug.Models.Station.Tool();
+        set
+        {
+            if (_selectedTool == value) return; // 避免不必要的更新
+
+            _selectedTool = value;
+            var tmpTool = new ToolVariable
+                {
+                    ToolId = value?.Id,
+                    ToolName = value?.ToolName,
+                    ToolVersion = value?.ToolVersion
+                };
+            PlugDataZone?.SetVariableValue(PlugData?.PlugDefinitionId, InitVariableNames.Tool.ToString(), JsonSerializer.Serialize(tmpTool));
+
+            _ToolCommandVariables?.Clear(); // 清空现有变量
+
+            if (value == null)
+            {
+                ToolVariablesFromSelectedTool = new List<BaseVariable>();
+                return;
+            }
+
+            // 使用局部变量而不是属性，避免递归
+            ToolVariablesFromSelectedTool = value.GetVariablesFromToolCommand() ?? new List<BaseVariable>();
+
+            foreach (var variable in ToolVariablesFromSelectedTool)
+            {
+                _ToolCommandVariables?.Add(new ToolCommandVariable
+                    {
+                        VariableName = variable.Name,
+                    });
+            }
+        }
+    }
+
+    Func<Tool, string> converter = p => $"{p?.ToolName}({p?.ToolVersion})";
+
+
+    private bool Loading { get; set; } = true;
+    private List<Tool> Tools { get; set; } = new List<Tool>();
+    private IEnumerable<BaseVariable> ToolVariablesFromSelectedTool { get; set; } = new List<BaseVariable>();
+    private List<ToolCommandVariable>? _ToolCommandVariables;
+    private List<ToolCommandVariable>? ToolCommandVariables
+    {
+        get => _ToolCommandVariables;
+        set
+        {
+            _ToolCommandVariables = value;
+            // if (_ToolCommandVariables != null)
+            // {
+            //     PlugDataZone?.SetVariableValue(Plug?.DefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(value));
+            // }
+        }
+    }
+
+    private PDZVariable? ToolCommandVariableData { get; set; }
+    private PDZVariable? Tool { get; set; }
+
+    private string? TmpJobCorrelationId { get; set; } = null;
+    private string? JobResultString { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            PlugVariablesInPDZ = PlugDataZone?.PDZVariables?.Where(x => x.PlugDefinitionId == PlugData?.PlugDefinitionId).ToList() ?? new();
+            PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+
+            Tool = PlugVariablesInPDZ.Where(v => v.Name == InitVariableNames.Tool.ToString()).FirstOrDefault();
+            var tmpTool = JsonSerializer.Deserialize<ToolVariable>(Tool?.Value);
+            //Log.Information(tmpTool?.ToolId?.ToString());
+            SelectedTool = await MainApiClient.GetToolByIdAsync(tmpTool.ToolId);
+
+            ToolCommandVariableData = PlugVariablesInPDZ?.Where(v => v.Name == InitVariableNames.ToolCommandVariable.ToString()).FirstOrDefault();
+            //Log.Information(ToolCommandVariableData.Value);
+            ToolCommandVariables = ToolCommandVariableData?.Value != null
+                ? JsonSerializer.Deserialize<List<ToolCommandVariable>>(ToolCommandVariableData?.Value) ?? new List<ToolCommandVariable>()
+                : new List<ToolCommandVariable>();
+        }
+        catch (Exception ex)
+        {
+            CLog.Error(ex.Message);
+            ToolCommandVariables = new List<ToolCommandVariable>();
+            SelectedTool = null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Tools = await MainApiClient.GetAllToolsAsync();
+            Loading = false;
+            Console.WriteLine("load tools done");
+
+            HubConnectionManagerService._hubConnection.On("JobStatusUpdated", async (string? jobCorrelationId) =>
+            {
+                if (jobCorrelationId == null) return;
+                if (TmpJobCorrelationId == null || TmpJobCorrelationId != jobCorrelationId) return;
+                //Log.Information($"{jobCorrelationId} status is updated!");
+                await OnReceiveJobStatus();                
+            });
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task InsertMapping(ToolCommandVariable ToolCommandVariable)
+    {     
+        //await CheckKeywords();
+        ToolCommandVariables.Add(ToolCommandVariable);
+        PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
+        //如果有新增的参数，则添加到变量列表
+        //PlugDataZone.SetVariableValue(Plug.DefinitionId, ToolCommandVariable.OutputName, PlugDataZone.GetVariableValue(Plug.DefinitionId, ToolCommandVariable.OutputName));
+        StateHasChanged();
+    }
+
+    private async Task DeleteMapping(ToolCommandVariable ToolCommandVariable)
+    {
+        ToolCommandVariables.Remove(ToolCommandVariable);
+        ToolCommandVariableData.Value = JsonSerializer.Serialize(ToolCommandVariables);
+        //Plug.SetPlugSetting(PlugSettingKey.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
+    }
+
+
+    private async Task ChangedIsFromOtherValue(ToolCommandVariable modelParameter, bool value)
+    {
+        modelParameter.IsFromPlugVariable = value;
+        PlugDataZone.SetVariableValue(PlugData?.PlugDefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
+    }
+
+    private async Task OnSettingValueChanged(ToolCommandVariable modelParameter, string? value)
+    {
+        modelParameter.VariableValue = value;
+        PlugDataZone?.SetVariableValue(PlugData?.PlugDefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
+    }
+
+
+
+    private async Task TestExecute()
+    {        
+        var executeRequest = GenerateRequest();
+        if (executeRequest == null)
+        {
+            CLog.Information("生成执行请求失败");
+            return;
+        }
+        Loading = true;
+        await SubmitToolExecute(executeRequest);
+    }
+
+    private PlugExecutionRequest? GenerateRequest()
+    {
+        if (SelectedTool == null)
+        {
+            Log.Information("请先选择一个工具");
+            return null;
+        }
+        var inputs = new List<PlugVariableData>();
+
+        if (ToolCommandVariables != null && ToolCommandVariables.Count > 0)
+        {
+            foreach (var toolCommandVariable in ToolCommandVariables)
+            {
+                var tmpValue = toolCommandVariable.VariableValue;
+                if (toolCommandVariable.IsFromPlugVariable)
+                {
+                    tmpValue = PlugDataZone.GetVariableValue(PlugData.PlugDefinitionId, toolCommandVariable.VariableValue?.TrimStart('[')?.TrimEnd(']'));
+                }
+
+                inputs.Add(new PlugVariableData
+                {
+                    Name = toolCommandVariable.VariableName,
+                    Value = tmpValue,
+                });
+            }
+        }
+
+        var executeRequest = new PlugExecutionRequest
+        {
+            ToolName = SelectedTool.ToolName,
+            ToolVersion = SelectedTool.ToolVersion,
+            //ExecuteMode = ExecuteMode.Standalone,
+            InputVariables = inputs,
+            // ExecuteResultData = new ExecuteResultData
+            // {
+            //     Ids = new ExecuteIdsBundle
+            //     {
+            //         PlugDefinitionId = Plug?.DefinitionId,
+            //     },
+            // },
+        };
+        return executeRequest;
+    }
+
+    private async Task SubmitToolExecute(PlugExecutionRequest executeRequest)
+    {
+        try
+        {
+            var result = await ToolExecuteService.ExecuteToolAsync(executeRequest);
+            TmpJobCorrelationId = result.Ids.ToolJobCorrelationId;
+            CLog.Information($"已提交，监控作业: {TmpJobCorrelationId}",PlugDataZone?.PDZId);
+
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"提交失败: {ex.Message}");
+        }
+    }
+
+    private async Task OnReceiveJobStatus()
+    {
+        var resultData = await MainApiClient.GetToolJobResultByCorrelationIdAsync(TmpJobCorrelationId);
+        if (resultData == null)
+        {
+            CLog.Error("获取结果数据为空");
+            return;
+        }
+        Log.Information($"执行完成: {resultData.ResultString}");
+
+        // 使用InvokeAsync确保在UI线程上更新状态
+        await InvokeAsync(() =>
+        {
+            JobResultString = resultData.ResultString;
+            Loading = false;
+            StateHasChanged();
+        });
+
+        // JobResultString = resultData.ResultString;
+        // Loading = false;
+        // StateHasChanged();
+    }
+}

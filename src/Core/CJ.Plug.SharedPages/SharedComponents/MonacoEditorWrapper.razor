@@ -1,0 +1,107 @@
+﻿@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.LogModels
+@using MudBlazor
+@using Serilog
+@using Microsoft.JSInterop
+<MudStack Style="width:100%">
+
+    <StandaloneCodeEditor CssClass="studio-monaco-editor-large-border"
+    Id="@Id"
+    @ref="_editor"
+    ConstructionOptions="EditorConstructionOptions" 
+    OnDidInit="AddAction"
+    OnDidChangeModelContent="TextChanged" />
+
+</MudStack>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+    [Parameter]
+    public string? Language { get; set; } = "json";
+    [Parameter]
+    public string? InitValue { get; set; } = "";
+    [Parameter]
+    public EventCallback OnDidChangeModelContent { get; set; }
+
+    public StandaloneCodeEditor _editor { get; set; } = null!;
+
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = Language,
+                Value = InitValue
+            };
+    }
+
+    private async Task AddAction()
+    {
+        var actionDescriptor = new ActionDescriptor
+            {
+                Id = "testAction",
+                Label = "插入流程参数",
+                ContextMenuGroupId = "navigation",
+                ContextMenuOrder = 1.5f,
+                Run = (editor) =>
+                {
+                    Log.Information("Ctrl+B : Editor action is triggered.");
+                }
+            };
+
+        // Retry adding action a few times if the Monaco editor instance is not yet available on the JS side.
+        const int maxAttempts = 5;
+        var delay = 300;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                await _editor.AddAction(actionDescriptor);
+                return;
+            }
+            catch (JSException jsEx)
+            {
+                // If it's the last attempt, log a warning; otherwise wait and retry.
+                if (attempt == maxAttempts)
+                {
+                    CLog.Warning($"Failed to add Monaco editor action after {maxAttempts} attempts: {jsEx.Message}");
+                    return;
+                }
+
+                CLog.Information($"Monaco editor not ready (attempt {attempt}/{maxAttempts}), retrying in {delay}ms: {jsEx.Message}");
+                await Task.Delay(delay);
+                // exponential backoff
+                delay = Math.Min(delay * 2, 2000);
+            }
+            catch (Exception ex)
+            {
+                // Unexpected exception, log and stop retrying.
+                CLog.Warning($"Unexpected error while adding Monaco editor action: {ex.Message}");
+                return;
+            }
+        }
+    }
+
+    private async Task TextChanged()
+    {
+        await OnDidChangeModelContent.InvokeAsync();
+    }
+
+
+
+    //包装编辑器自带动作
+    public async Task SetValue(string newValue) => await _editor.SetValue(newValue);
+    public async Task<Selection> GetSelection() => await _editor.GetSelection(); 
+    public async Task SetSelection(Selection selection, string source) => await _editor.SetSelection(selection, source);
+    public async Task<TextModel> GetModel() => await _editor.GetModel();
+    public async Task ResetDeltaDecorations() => await _editor.ResetDeltaDecorations();
+    public async Task<string[]> DeltaDecorations(string[] oldDecorationIds, ModelDeltaDecoration[] newDecorations) => await _editor.DeltaDecorations(oldDecorationIds, newDecorations);
+    public async Task Focus() => await _editor.Focus();
+    public async Task SetPosition(BlazorMonaco.Position position, string source) => await _editor.SetPosition(position, source);
+
+}

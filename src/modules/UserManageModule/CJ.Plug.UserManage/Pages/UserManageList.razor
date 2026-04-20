@@ -1,0 +1,235 @@
+﻿@page "/UserManageList"
+
+@using CJ.Plug.Models.Shared
+@using MudBlazor
+@using System.Globalization
+@using System.Linq
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+<PageTitle>用户管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+
+    <MudStack Row AlignItems="AlignItems.Center">
+        <MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="用户操作" Color="Color.Default" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft">
+            <MudMenuItem OnClick="@DeleteSelectedUsers">删除</MudMenuItem>
+            <MudMenuItem OnClick="@ExportSelectedUsers">导出</MudMenuItem>
+        </MudMenu>
+
+        <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateUser">创建用户</MudButton>
+        <MudButton OnClick="async()=>await dataGrid.ReloadServerData()" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+    </MudStack>
+
+    <MudSpacer />
+
+    <MudDataGrid @ref="dataGrid"
+                 T="User"
+                 ServerData="LoadData"
+                 Dense="true"
+                 Hover="true"
+                 Elevation="0"
+                 SortMode="SortMode.Single"
+                 RowStyle="cursor: default;"
+                 MultiSelection="true"
+                 SelectedItems="SelectedUsers"
+                 SelectOnRowClick="false"
+                 Class="users-table">
+
+        <ToolBarContent>
+            <MudTextField T="string"
+                          @bind-Value="searchString"
+                          Margin="Margin.Dense"
+                          Placeholder="可搜索：用户名、邮箱、角色"
+                          Variant="Variant.Outlined"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
+                          Adornment="Adornment.End"
+                          Clearable="true"
+                          DebounceInterval="500"
+                          Immediate="true"
+                          Class="me-3" />
+
+            @* <MudSelect T="string" Label="角色筛选" Margin="Margin.Dense" Dense Variant="Variant.Outlined" Clearable="true" Class="me-3">
+                <MudSelectItem Value="@string.Empty">全部</MudSelectItem>
+                @foreach (var r in Roles)
+                {
+                    <MudSelectItem Value="@r">@r</MudSelectItem>
+                }
+            </MudSelect> *@
+
+            <MudSelect T="bool?" Label="激活" Margin="Margin.Dense" Dense Variant="Variant.Outlined" Clearable="true" Class="me-3">
+                <MudSelectItem T="bool?" Value="@(default(bool?))">全部</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@(true)">已激活</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@(false)">已禁用</MudSelectItem>
+            </MudSelect>
+        </ToolBarContent>
+
+        <Columns>
+            <SelectColumn T="User" />
+
+            <TemplateColumn Title="用户名" Sortable="true">
+                <CellTemplate>
+                    <MudText>@context.Item.UserName</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+
+            <PropertyColumn Property="x => x.Email" Title="邮箱" />
+
+            @* <TemplateColumn Title="角色" Sortable="true">
+                <CellTemplate>
+                    @context.Item.Role
+                </CellTemplate>
+            </TemplateColumn> *@
+
+            @* <TemplateColumn Title="状态">
+                <CellTemplate>
+                    <MudChip Color="@(context.Item.IsActive ? Color.Success : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                        @(context.Item.IsActive ? "启用" : "禁用")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn> *@
+
+            <TemplateColumn Title="创建时间" Sortable="true">
+                <CellTemplate>
+                    @context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Style="text-align:right" Title="操作">
+                <CellTemplate>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(()=>EditUser(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>DeleteUser(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>ResetPassword(context.Item))" Icon="@Icons.Material.Outlined.LockReset">重置密码</MudMenuItem>
+                    </MudMenu>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+
+        <NoRecordsContent>
+            <MudText>没有用户数据</MudText>
+        </NoRecordsContent>
+
+        <LoadingContent>
+            <MudText>加载中...</MudText>
+        </LoadingContent>
+
+        <PagerContent>
+            <MudDataGridPager RowsPerPageString="每页展示条数" />
+        </PagerContent>
+    </MudDataGrid>
+
+</MudContainer>
+
+@code {
+    // 保留并重用页面中原有的注释/字段样式（遵循保留注释的规则）
+    public string? searchString { get; set; }
+
+    private MudDataGrid<User> dataGrid;
+    public HashSet<User> SelectedUsers { get; set; } = new HashSet<User>();
+
+    // 临时内存数据。实际请使用后端API替换加载逻辑（若已有用户API，可直接调用 Http.GetFromJsonAsync）
+    private List<User> AllUsers { get; set; } = new List<User>()
+    {
+        new User { Id = 1, UserName = "admin", Email = "admin@example.com"},
+        new User { Id = 2, UserName = "alice", Email = "alice@example.com"},
+        new User { Id = 3, UserName = "bob", Email = "bob@example.com"}
+    };
+
+    //private IEnumerable<string> Roles => AllUsers.Select(u => u.Role).Distinct().OrderBy(r => r);
+
+    // 简化排序：只根据 SortBy 选择字段，默认升序；避免依赖未在当前 MudBlazor 版本中可用的 Direction/SortDirection 属性
+    private async Task<GridData<User>> LoadData(GridState<User> state, CancellationToken token)
+    {
+        //var query = AllUsers.AsQueryable();
+        var query = await MainApiClient.GetAllUsersAsync();
+
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            var s = searchString.Trim();
+            query = query.Where(u =>
+                (u.UserName != null && u.UserName.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (u.Email != null && u.Email.Contains(s, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        var sortDef = state.SortDefinitions?.FirstOrDefault();
+        if (sortDef != null)
+        {
+            if (sortDef.SortBy == nameof(User.CreatedAt))
+            {
+                query = query.OrderBy(u => u.CreatedAt);
+            }
+            else if (sortDef.SortBy == nameof(User.UserName))
+            {
+                query = query.OrderBy(u => u.UserName);
+            }
+        }
+        else
+        {
+            // 默认按创建时间降序显示
+            query = query.OrderByDescending(u => u.CreatedAt);
+        }
+
+        var total = query.Count();
+        var items = query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+
+        await Task.CompletedTask;
+        return new GridData<User> { TotalItems = total, Items = items };
+    }
+
+    private void CreateUser()
+    {
+        Snackbar.Add("创建用户（请实现实际跳转或弹窗）", Severity.Info);
+    }
+
+    private void EditUser(User user)
+    {
+        Snackbar.Add($"编辑用户：{user.UserName}", Severity.Info);
+    }
+
+    private async Task DeleteUser(User user)
+    {
+        if (user != null)
+        {
+            AllUsers.RemoveAll(u => u.Id == user.Id);
+            await dataGrid.ReloadServerData();
+            Snackbar.Add($"已删除用户：{user.UserName}", Severity.Success);
+        }
+    }
+
+    private async Task DeleteSelectedUsers()
+    {
+        foreach (var u in SelectedUsers.ToList())
+        {
+            AllUsers.RemoveAll(x => x.Id == u.Id);
+        }
+        SelectedUsers.Clear();
+        await dataGrid.ReloadServerData();
+        Snackbar.Add("已删除所选用户", Severity.Success);
+    }
+
+    private void ExportSelectedUsers()
+    {
+        Snackbar.Add("导出所选用户（请实现导出逻辑）", Severity.Info);
+    }
+
+    private void ResetPassword(User user)
+    {
+        Snackbar.Add($"已为 {user.UserName} 触发重置密码（请实现后端调用）", Severity.Success);
+    }
+
+    // 简单 DTO：页面内定义，避免引入未知外部类型
+    public class UserDto
+    {
+        public int Id { get; set; }
+        public string? UserName { get; set; }
+        public string? Email { get; set; }
+        public string? Role { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    }
+}}

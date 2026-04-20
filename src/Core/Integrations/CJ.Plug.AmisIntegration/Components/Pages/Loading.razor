@@ -1,0 +1,249 @@
+@page "/Loading"
+<PageTitle>多loading</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            type = "page",
+            body = new object[]
+            {
+                new
+                {
+                    type = "button",
+                    label = "dialog内带 loading",
+                    actionType = "dialog",
+                    level = "primary",
+                    dialog = new
+                    {
+                        size = "lg",
+                        title = "提示",
+                        body = new
+                        {
+                            type = "service",
+                            api = "/api/mock/Sample/Sample?orderBy=id&orderDir=desc&perPage=10&waitSeconds=10",
+                            loadingConfig = new
+                            {
+                                show = true,
+                                root = "[role=dialog-body]"
+                            },
+                            body = new
+                            {
+                                type = "page",
+                                initApi = "/api/mock/Sample/Sample?orderBy=id&orderDir=desc&perPage=10&waitSeconds=10",
+                                body = new object[]
+                                {
+                                    new
+                                    {
+                                        loading = false,
+                                        type = "nav",
+                                        stacked = true,
+                                        className = "w-md",
+                                        draggable = true,
+                                        saveOrderApi = "/api/mock/Sample/Sample/SaveOrder",
+                                        source = "/api/mock/Sample/Sample?orderBy=id&orderDir=desc&perPage=10&waitSeconds=30",
+                                        itemActions = new object[]
+                                        {
+                                            new
+                                            {
+                                                type = "icon",
+                                                icon = "cloud",
+                                                visibleOn = "this.to === '?cat=1'"
+                                            },
+                                            new
+                                            {
+                                                type = "dropdown-button",
+                                                level = "link",
+                                                icon = "fa fa-ellipsis-h",
+                                                hideCaret = true,
+                                                buttons = new object[]
+                                                {
+                                                    new
+                                                    {
+                                                        type = "button",
+                                                        label = "编辑"
+                                                    },
+                                                    new
+                                                    {
+                                                        type = "button",
+                                                        label = "删除"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    new
+                                    {
+                                        type = "button",
+                                        label = "OpenDialog",
+                                        actionType = "drawer",
+                                        reload = "thepage",
+                                        drawer = new
+                                        {
+                                            body = new
+                                            {
+                                                type = "form",
+                                                controls = new object[]
+                                                {
+                                                    new
+                                                    {
+                                                        type = "text",
+                                                        name = "a",
+                                                        value = "3"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    new
+                                    {
+                                        type = "page",
+                                        body = new
+                                        {
+                                            type = "crud",
+                                            syncLocation = false,
+                                            api = "/api/mock/Sample/Sample?waitSeconds=30",
+                                            headerToolbar = new string[] { "bulkActions" },
+                                            bulkActions = new object[]
+                                            {
+                                                new
+                                                {
+                                                    label = "批量删除",
+                                                    actionType = "ajax",
+                                                    api = "delete:/api/mock/Sample/Sample/${ids|raw}?waitSeconds=30",
+                                                    confirmText = "确定要批量删除?"
+                                                },
+                                                new
+                                                {
+                                                    label = "批量修改",
+                                                    actionType = "dialog",
+                                                    dialog = new
+                                                    {
+                                                        title = "批量编辑",
+                                                        body = new
+                                                        {
+                                                            type = "form",
+                                                            api = "/api/mock/Sample/Sample/BulkUpdate?waitSeconds=30",
+                                                            body = new object[]
+                                                            {
+                                                                new
+                                                                {
+                                                                    type = "hidden",
+                                                                    name = "ids"
+                                                                },
+                                                                new
+                                                                {
+                                                                    type = "input-text",
+                                                                    name = "engine",
+                                                                    label = "Engine"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            columns = new object[]
+                                            {
+                                                new
+                                                {
+                                                    name = "id",
+                                                    label = "ID"
+                                                },
+                                                new
+                                                {
+                                                    name = "engine",
+                                                    label = "Rendering engine"
+                                                },
+                                                new
+                                                {
+                                                    name = "browser",
+                                                    label = "Browser"
+                                                },
+                                                new
+                                                {
+                                                    name = "platform",
+                                                    label = "Platform(s)"
+                                                },
+                                                new
+                                                {
+                                                    name = "version",
+                                                    label = "Engine version"
+                                                },
+                                                new
+                                                {
+                                                    name = "grade",
+                                                    label = "CSS grade"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    new
+                                    {
+                                        type = "page",
+                                        body = new
+                                        {
+                                            type = "crud",
+                                            api = "/api/mock/Sample/Sample?orderBy=id&orderDir=desc&waitSeconds=30",
+                                            syncLocation = false,
+                                            columns = new object[]
+                                            {
+                                                new
+                                                {
+                                                    name = "id",
+                                                    label = "ID"
+                                                },
+                                                new
+                                                {
+                                                    name = "engine",
+                                                    label = "Rendering engine"
+                                                },
+                                                new
+                                                {
+                                                    name = "browser",
+                                                    label = "Browser"
+                                                },
+                                                new
+                                                {
+                                                    type = "operation",
+                                                    label = "操作",
+                                                    buttons = new object[]
+                                                    {
+                                                        new
+                                                        {
+                                                            label = "删除",
+                                                            type = "button",
+                                                            actionType = "ajax",
+                                                            level = "danger",
+                                                            confirmText = "确认要删除？",
+                                                            api = "delete:/api/mock/Sample/Sample/${id}?waitSeconds=30"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                new
+                {
+                    type = "service",
+                    api = "/api/mock/Sample/Sample?orderBy=id&orderDir=desc&perPage=10&waitSeconds=10",
+                    loadingConfig = new
+                    {
+                        show = true,
+                        root = "body"
+                    }
+                }
+            }
+        };
+
+        return data;
+    }
+
+}

@@ -1,0 +1,116 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using Serilog
+@using Elsa.Studio.DomInterop.Contracts
+@using static System.Net.WebRequestMethods
+
+@inject MainApiClient MainApiClient
+@inject IFiles Files
+@inject ISnackbar Snackbar
+
+@* <MudText>@EditorContext.PlugDataZone.PDZId</MudText> *@
+<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+
+    @* <MudText Typo="Typo.body2">@fileName</MudText> *@
+    @* <MudLink OnClick="DownloadFile">@fileName</MudLink> *@
+    @if (!string.IsNullOrEmpty(fileName))
+    {
+        <MudTooltip Text="点击下载文件">
+            @* <MudChipSet T="string" AllClosable="@true" > *@
+            <MudChip T="string" OnClick="DownloadFile" OnClose="DeleteFile" CloseIcon="@Icons.Material.Filled.Delete"
+                    Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                    @fileName
+                </MudChip>
+            @* </MudChipSet> *@
+        </MudTooltip>
+    }
+    
+
+    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFile">
+        <CustomContent>
+            <MudIconButton OnClick="@context.OpenFilePickerAsync" Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small" Color="Color.Primary"></MudIconButton>
+        </CustomContent>
+        <SelectedTemplate></SelectedTemplate>
+    </MudFileUpload>
+</MudStack>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private string? fileName;
+    private string? fileId;
+    private BaseVariable? Variable => EditorContext.Variable;
+
+    private PlugData? PlugData { get; set; }
+    private PlugVariableData? PlugVariableData { get; set; }
+    //private Plug? Plug => EditorContext.Plug;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        PlugData = EditorContext.PlugDataZone?.PlugDatas?.FirstOrDefault(p => p.PlugDefinitionId == EditorContext.PlugDefinitionId);
+        PlugVariableData = EditorContext.PlugDataZone?.PlugVariableDatas?.FirstOrDefault(p => p.Id == Variable?.Id);
+
+        fileName = Variable?.Value?.Split(':').First();
+        fileId = Variable?.Value?.Split(':').Last();
+    }
+
+
+    private async Task UploadFile(IBrowserFile browserFile)
+    {
+        if (browserFile != null)
+        {
+            try
+            {
+                //CLog.Information(PlugData?.WorkPath, EditorContext.PlugDataZone.PDZId);
+                //CLog.Information($"参数信息：{PlugVariableData?.PlugDataZoneId}", EditorContext.PlugDataZone.PDZId);
+                if(PlugData == null)
+                {
+                    CLog.Warning("PlugData is null.插头定义暂不支持设置参数默认值。");
+					Snackbar.Add("插头定义暂不支持设置参数默认值。", Severity.Error);
+                    return;
+				}
+
+                (string? RealValuePath, fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+                PlugVariableData.Value = browserFile.Name + ":" + fileId;
+                PlugVariableData.Type = VariableTypeEnum.File.ToString();
+
+                fileName = browserFile.Name;
+                //fileId = fileId;
+
+                await MainApiClient.UpdatePlugVariableData(PlugVariableData);
+                //await MainApiClient.CreateOrUpdatePDZ(EditorContext.PlugDataZone);
+            }
+            catch (Exception ex)
+            {
+                CLog.Information(ex.Message);
+                CLog.Information(ex.StackTrace);
+            }
+        }
+    }
+
+
+    private async Task DownloadFile()
+    {        
+        using var stream = await MainApiClient.DownloadFileByFileId(fileId);
+        if (stream != null)
+        {
+            await Files.DownloadFileFromStreamAsync(fileName, stream);
+        }
+    }
+
+    private async Task DeleteFile()
+    {
+        Variable.Value = "";
+        fileName = null;
+        PlugVariableData.Value = "";
+        PlugVariableData.DisplayValue = "";
+        await MainApiClient.UpdatePlugVariableData(PlugVariableData);
+    }
+
+}

@@ -1,0 +1,715 @@
+﻿using CJ.Plug.FileManageApi.Contracts;
+using CJ.Plug.Models.Extensions;
+using CJ.Plug.Models.LogModels;
+
+using CJ.Plug.Models.Shared;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Claims;
+
+namespace CJ.Plug.FileManageApi.Services
+{
+    public class FileManageService : IFileManageService
+    {
+        private readonly MainDbContext _dbContext;
+
+        public FileManageService(MainDbContext dbContext)
+        {
+            _dbContext = dbContext;
+            _dbContext.Database.EnsureCreatedAsync();
+        }
+
+        /// <summary>
+        /// 上传文件数据至服务器指定路径,不创建文件信息，用于临时使用，如可视化文件等
+        /// </summary>
+        /// <param name="FileStream"></param>
+        /// <param name="plug"></param>
+        /// <returns></returns>
+        public async Task<string?> UploadFileStreamToServerPath(Stream? FileStream, string? uploadPath, string? fileName)
+        {
+            try
+            {
+                //Log.Information(uploadPath);
+                //Log.Information(fileName);
+                //Log.Information(FileStream.Length.ToString());
+                // 构建完整的文件路径
+                var filePathInfo = new FileInfo(Path.Combine(GlobalData.MainWebFileServer, uploadPath, fileName));
+                string filePath = filePathInfo.FullName;
+                // 确保文件的上级目录存在，如果不存在则创建
+                if (!filePathInfo.Directory.Exists)
+                {
+                    filePathInfo.Directory.Create();
+                }
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    //Console.WriteLine("1");
+                    await FileStream.CopyToAsync(stream);
+                    //Console.WriteLine("2");
+                }
+                return "/webFiles/" + uploadPath + "/" + filePathInfo.Name;
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.Information($"An error1(UploadFileStreamToServerPath) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error1(UploadFileStreamToServerPath) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // 处理其他类型的异常
+                Log.Information($"An error2(UploadFileStreamToServerPath) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error2(UploadFileStreamToServerPath) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+        }
+
+
+        //通过文件ID获取文件并复制到WEB服务器路径中
+        public async Task<string?> UploadFileToWebServer(PlugVariableData? fileData)
+        {
+            try
+            {
+                var fileId = fileData?.Value?.GetFileIdFromFileVariable();
+                var fileName = fileData?.Value?.GetFileNameFromFileVariable();
+                if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(fileName))
+                {
+                    CLog.Error("FileId or FileName is null or empty.");
+                    return null;
+                }
+                // 构建完整的文件路径
+                var filePathInfo = new FileInfo(Path.Combine(GlobalData.MainWebFileServer, fileId + "-" + fileName));
+                string filePath = filePathInfo.FullName;
+                // 确保文件的上级目录存在，如果不存在则创建
+                if (!filePathInfo.Directory.Exists)
+                {
+                    filePathInfo.Directory.Create();
+                }
+                var file = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FileId == fileId);
+                if (file == null)
+                {
+                    Log.Information($"File with ID {fileId} not found.");
+                    return null;
+                }
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    //Console.WriteLine("1");
+                    await System.IO.File.OpenRead(file.FilePath).CopyToAsync(stream);
+                    //Console.WriteLine("2");
+                }
+                return "/webFiles/" + fileId + "-" + fileName;
+            }
+            catch (HttpRequestException ex)
+            {
+                CLog.Information($"An error1(UploadFileToWebServer) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error1(UploadFileToWebServer) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // 处理其他类型的异常
+                CLog.Information($"An error2(UploadFileToWebServer) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error2(UploadFileToWebServer) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 上传文件数据至服务器
+        /// </summary>
+        /// <param name="FileStream"></param>
+        /// <param name="plug"></param>
+        /// <returns></returns>
+        public async Task<string?> UploadFileRequestToServer(FileUploadRequest? fur)
+        {
+            try
+            {
+                // 构建完整的文件路径
+                var filePathInfo = new FileInfo(Path.Combine(GlobalData.MainFileServerPathRoot, fur.UploadPath, fur.FileName));
+                string filePath = filePathInfo.FullName;
+                //Log.Information("API2---the full path:" + filePath);
+                //System.IO.File.Delete(filePath);
+                // 确保文件的上级目录存在，如果不存在则创建
+                if (!filePathInfo.Directory.Exists)
+                {
+                    filePathInfo.Directory.Create();
+                }
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await fur.FileStream?.OpenReadStream()?.CopyToAsync(stream);
+                }
+
+                var fileInfo = new FileInformation
+                {
+                    FileId = fur.FileId,
+                    FilePath = filePath,
+                    FileName = fur.FileName,
+                    FileUploadPath = fur.UploadPath,
+                    FileUploadType = fur.FileUploadType,
+                    FileUploader = fur.FileCreator,
+                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+                await CreateFileInformation(fileInfo);
+
+                return filePath;
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.Information($"An error1(UploadFileRequestToServer) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error1(UploadFileRequestToServer) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // 处理其他类型的异常
+                Log.Information($"An error2(UploadFileRequestToServer) occurred while fetching data: {ex.Message}");
+                Console.WriteLine($"An error2(UploadFileRequestToServer) occurred while fetching data: {ex.Message}");
+                return null;
+            }
+        }
+
+
+        /// <summary>
+        /// 获取服务器上指定路径的文件列表
+        /// </summary>
+        /// <param name="rootPath"></param>
+        /// <returns></returns>
+        public async Task<FileSystemNode?> GetFolderFiles(string? rootPath)
+        {
+            if (rootPath == null)
+            {
+                rootPath = GlobalData.MainFileServerPathRoot;
+            }
+            if (rootPath == "all")
+            {
+                //Console.WriteLine(rootPath);
+                DriveInfo[] allDrives = DriveInfo.GetDrives();
+                //Console.WriteLine("驱动器列表:");
+                // 获取本地主机名
+                string hostName = Dns.GetHostName();
+                // 获取主机名对应的IP地址列表
+                IPAddress[] addresses = Dns.GetHostEntry(hostName).AddressList;
+
+                // 遍历IP地址列表，找到第一个IPv4地址
+                IPAddress ipv4 = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+                var root = new FileSystemNode("all", "服务端地址：" + ipv4.ToString(), true);
+                //var subItems = Directory.GetFileSystemEntries(rootPath);
+                //foreach (var subItem in subItems)
+                //{
+                //    var item = new FileSystemItem(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                //    root.Children.Add(item);
+                //}
+
+                foreach (DriveInfo d in allDrives)
+                {
+                    //Console.WriteLine($"名称: {d.Name}");
+                    //Console.WriteLine($"卷标: {d.VolumeLabel}");
+                    //Console.WriteLine($"类型: {d.DriveType}");
+                    //Console.WriteLine($"总大小: {d.TotalSize / 1024 / 1024} MB");
+                    //Console.WriteLine($"可用空间: {d.AvailableFreeSpace / 1024 / 1024} MB");
+                    //Console.WriteLine("-----------------------------");
+                    var driverItem = new FileSystemNode(d.Name, d.Name, Directory.Exists(d.Name));
+                    var subItems = Directory.GetFileSystemEntries(d.Name);
+                    //Console.WriteLine(subItems);
+                    foreach (var subItem in subItems)
+                    {
+                        var item = new FileSystemNode(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                        //Console.WriteLine(subItem);
+                        driverItem.Children.Add(item);
+                    }
+                    //var item = new FileSystemItem(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                    root.Children.Add(driverItem);
+
+                }
+                return root;
+            }
+
+            //请求体是相对路径，需要拼接上服务器的根路径
+            rootPath = Path.Combine(GlobalData.MainFileServerPathRoot, rootPath);
+            try
+            {
+                if (!Directory.Exists(rootPath)) Directory.CreateDirectory(rootPath);
+                var rootNode = new FileSystemNode(rootPath, rootPath, true);
+                var subItems = Directory.GetFileSystemEntries(rootPath);
+                foreach (var subItem in subItems)
+                {
+                    var item = new FileSystemNode(
+                        Path.GetRelativePath(GlobalData.MainFileServerPathRoot, subItem),   //返回相对路径
+                        Path.GetFileName(subItem),
+                        Directory.Exists(subItem));
+                    item.FolderDisplayName = Path.GetFileName(subItem);
+                    rootNode.Children.Add(item);
+                }
+                return rootNode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 创建上传文件的信息数据
+        /// </summary>
+        /// <param name="fileInformation"></param>
+        /// <returns></returns>
+        public async Task CreateFileInformation(FileInformation fileInformation)
+        {
+            try
+            {
+                _dbContext.Set<FileInformation>().Add(fileInformation);
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Information($"An error occurred while fetching data: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 通过文件ID下载文件
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <returns></returns>
+        public async Task<IResult> DownloadFileByFileId(string fileId)
+        {
+            try
+            {
+                var fileInformation = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FileId == fileId);
+                if (fileInformation == null)
+                {
+                    Log.Information("File not found");
+                    return Results.NotFound();
+                }
+                var filePath = fileInformation.FilePath;
+                var fileName = fileInformation.FileName;
+                //Log.Information(filePath);
+                //Log.Information(fileName);
+                var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                if (fileStream == null)
+                {
+                    return Results.NotFound();
+                }
+                return Results.File(fileStream, "application/octet-stream", fileName);
+            }
+            catch (Exception ex)
+            {
+                Log.Information($"An error occurred while fetching downlaod file data: {ex.Message}");
+                return Results.InternalServerError();
+            }
+        }
+
+        /// <summary>
+        /// 获取所有的文件信息
+        /// </summary>
+        /// <returns></returns>
+        public async Task<List<FileInformation>?> GetAllFileInformations()
+        {
+            try
+            {
+                var fileInformations = await _dbContext.Set<FileInformation>().ToListAsync();
+                foreach (var fileInformation in fileInformations)
+                {
+                    Console.WriteLine(fileInformation.FileName);
+                }
+                return fileInformations;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while fetching data: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 获取指定文件ID的文件信息
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <returns></returns>
+        public async Task<FileInformation?> GetFileInformationById(string fileId)
+        {
+            try
+            {
+                var fileInformation = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FileId == fileId);
+                return fileInformation;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while fetching data: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 获取文本文件内容
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<IResult> GetFileContent(string filePath)
+        {
+            //Log.Information($"{filePath}");
+            var fileInfo = new FileInfo(filePath.Trim('"'));
+            //Log.Information($"{fileInfo.FullName}");
+            if (!System.IO.File.Exists(fileInfo.FullName))
+            {
+                return Results.NotFound("文件未找到");
+            }
+            var fileStream = new FileStream(fileInfo.FullName, FileMode.Open, FileAccess.Read);
+            return Results.Stream(fileStream, "text/plain");
+        }
+
+        /// <summary>
+        /// 通过文件ID获取文本文件内容
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public async Task<IResult> GetFileContentByFileId(string fileId)
+        {
+            var file = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FileId == fileId);
+            if (file == null)
+            {
+                return Results.NotFound();
+            }
+            var fileInfo = new FileInfo(file?.FilePath?.Trim('"'));
+            //Log.Information($"{fileInfo.FullName}");
+            if (!System.IO.File.Exists(fileInfo.FullName))
+            {
+                return Results.NotFound("文件未找到");
+            }
+            var fileStream = new FileStream(fileInfo.FullName, FileMode.Open, FileAccess.Read);
+            return Results.Stream(fileStream, "text/plain");
+        }
+
+
+        /// <summary>
+        /// 通过文件ID获取文件流
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <returns></returns>
+        public async Task<IResult> GetFileStreamByFileId(string fileId)
+        {
+            // 输入验证
+            if (string.IsNullOrEmpty(fileId))
+            {
+                return Results.BadRequest("文件ID不能为空");
+            }
+
+            try
+            {
+                // 查询文件信息
+                var file = await _dbContext.Set<FileInformation>()
+                    .FirstOrDefaultAsync(f => f.FileId == fileId);
+
+                if (file == null)
+                {
+                    return Results.NotFound($"未找到ID为{fileId}的文件记录");
+                }
+
+                // 处理文件路径（移除可能的引号）
+                string filePath = file.FilePath?.Trim('"');
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    return Results.BadRequest("文件路径为空");
+                }
+
+                var fileInfo = new FileInfo(filePath);
+
+                // 检查文件是否存在
+                if (!fileInfo.Exists)
+                {
+                    return Results.NotFound($"文件 {filePath} 不存在");
+                }
+
+                // 创建文件流（使用using确保资源释放）
+                using var fileStream = new FileStream(
+                    fileInfo.FullName,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read); // 允许其他进程读取文件
+
+                // 设置响应头
+                var contentType = GetContentType(fileInfo.Extension);
+                return Results.Stream(
+                    fileStream,
+                    contentType,
+                    fileInfo.Name); // 包含文件名以便客户端使用
+            }
+            catch (Exception ex)
+            {
+                // 记录详细错误日志
+                CLog.Error("获取文件流时发生错误");
+                return Results.StatusCode(500);
+            }
+        }
+
+        /// <summary>
+        /// 获取文件扩展名对应的MIME类型
+        /// </summary>
+        private string GetContentType(string fileExtension)
+        {
+            // 简单的MIME类型映射，实际应用中可使用更完整的映射表
+            return fileExtension switch
+            {
+                ".txt" => "text/plain",
+                ".csv" => "text/csv",
+                ".json" => "application/json",
+                ".xml" => "application/xml",
+                _ => "application/octet-stream"
+            };
+        }
+
+
+
+
+        public async Task<FileSystemNode?> GetPlugWorkpathFiles(string? plugDefinitionId)
+        {
+            if (plugDefinitionId == "all")
+            {
+                //Console.WriteLine(rootPath);
+                DriveInfo[] allDrives = DriveInfo.GetDrives();
+                //Console.WriteLine("驱动器列表:");
+                // 获取本地主机名
+                string hostName = Dns.GetHostName();
+                // 获取主机名对应的IP地址列表
+                IPAddress[] addresses = Dns.GetHostEntry(hostName).AddressList;
+
+                // 遍历IP地址列表，找到第一个IPv4地址
+                IPAddress ipv4 = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+                var root = new FileSystemNode("all", "服务端地址：" + ipv4.ToString(), true);
+                //var subItems = Directory.GetFileSystemEntries(rootPath);
+                //foreach (var subItem in subItems)
+                //{
+                //    var item = new FileSystemItem(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                //    root.Children.Add(item);
+                //}
+
+                foreach (DriveInfo d in allDrives)
+                {
+                    //Console.WriteLine($"名称: {d.Name}");
+                    //Console.WriteLine($"卷标: {d.VolumeLabel}");
+                    //Console.WriteLine($"类型: {d.DriveType}");
+                    //Console.WriteLine($"总大小: {d.TotalSize / 1024 / 1024} MB");
+                    //Console.WriteLine($"可用空间: {d.AvailableFreeSpace / 1024 / 1024} MB");
+                    //Console.WriteLine("-----------------------------");
+                    var driverItem = new FileSystemNode(d.Name, d.Name, Directory.Exists(d.Name));
+                    var subItems = Directory.GetFileSystemEntries(d.Name);
+                    //Console.WriteLine(subItems);
+                    foreach (var subItem in subItems)
+                    {
+                        var item = new FileSystemNode(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                        //Console.WriteLine(subItem);
+                        driverItem.Children.Add(item);
+                    }
+                    //var item = new FileSystemItem(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                    root.Children.Add(driverItem);
+
+                }
+                return root;
+            }
+
+            var plug = await _dbContext.Set<Plug.Models.Plug.Plug>().FirstOrDefaultAsync(p => p.DefinitionId == plugDefinitionId);
+            if (plug == null)
+            {
+                Log.Information($"Plug with DefinitionId {plugDefinitionId} not found.");
+                return null;
+            }
+            //请求体是相对路径，需要拼接上服务器的根路径
+            var rootFolder = Path.Combine(GlobalData.MainFileServerPathRoot, plug.WorkPath);
+            try
+            {
+                if (!Directory.Exists(rootFolder)) Directory.CreateDirectory(rootFolder);
+                var root = new FileSystemNode(rootFolder, rootFolder, true);
+                var subItems = Directory.GetFileSystemEntries(rootFolder);
+                foreach (var subItem in subItems)
+                {
+                    var item = new FileSystemNode(
+                        Path.GetRelativePath(GlobalData.MainFileServerPathRoot, subItem),   //返回相对路径
+                        Path.GetFileName(subItem),
+                        Directory.Exists(subItem));
+                    item.FolderDisplayName = Path.GetFileName(subItem);
+                    root.Children.Add(item);
+                }
+                return root;
+            }
+            catch (Exception ex)
+            {
+                Log.Information(ex.Message);
+                Log.Information(ex.StackTrace);
+                return null;
+            }
+        }
+
+
+
+        public async Task<IActionResult> UploadChunk(FileUploadRequest? request)
+        {
+            Console.WriteLine("-------1010101------");
+            if (request == null)
+                return new BadRequestResult();
+
+            try
+            {
+                // 解析请求参数
+                var fileName = request.FileName;
+                var offset = request.Offset;
+                var chunkSize = request.ChunkSize;
+                var fileId = request.FileId;
+
+                if (string.IsNullOrEmpty(fileName))
+                    return new BadRequestResult();
+
+                // 获取文件流
+                var fileContent = request.FileStream;
+                if (fileContent == null)
+                    return new BadRequestResult();
+                // 构建临时文件路径
+                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{fileName}.temp");
+
+                // 以追加模式打开文件流，写入当前块
+                using (var fileStream = new FileStream(tempFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 8192, true))
+                {
+                    fileStream.Seek(offset, SeekOrigin.Begin);
+                    await using var contentStream = fileContent.OpenReadStream();
+                    await contentStream.CopyToAsync(fileStream);
+                }
+
+                return new OkResult();
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message);
+                return new StatusCodeResult(500);
+            }
+        }
+
+        public async Task<IActionResult> CompleteUpload(FileUploadRequest? request)
+        {
+            //Log.Information("接收到文件上传完成提醒");
+            //Console.WriteLine("接收到文件上传完成提醒");
+            if (request == null)
+            {
+                CLog.Error("请求内容为空，无法完成上传");
+                return new BadRequestResult();
+            }
+
+            try
+            {
+                // 解析请求参数
+                var fileName = request.FileName;
+                var fileId = request.FileId;
+                Log.Information($"收到文件上传完成信息: {fileName}, FileId: {fileId}");
+                if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(fileId))
+                    return new BadRequestResult();
+
+                // 临时文件路径和最终文件路径
+                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{fileName}.temp");
+                var finalFilePath = Path.Combine(GlobalData.MainFileServerPathRoot, request.UploadPath, request.FileName);
+
+                // 检查临时文件是否存在
+                if (!File.Exists(tempFilePath))
+                    return new NotFoundResult();
+
+                var directory = Path.GetDirectoryName(finalFilePath);
+                if (directory != null && !Directory.Exists(directory))
+                {
+                    // 确保最终文件的目录存在
+                    Directory.CreateDirectory(directory);
+                }
+
+                // 重命名临时文件为最终文件名
+                File.Move(tempFilePath, finalFilePath, true);
+
+                // 这里可以添加文件合并后的处理逻辑，如记录文件信息到数据库
+                Log.Information($"文件 {finalFilePath} 上传完成");
+
+                var fileInfo = new FileInformation
+                {
+                    FileId = request.FileId,
+                    FilePath = finalFilePath,
+                    FileName = request.FileName,
+                    FileUploadPath = request.UploadPath,
+                    FileUploadType = request.FileUploadType,
+                    FileUploader = request.FileCreator,
+                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+                await CreateFileInformation(fileInfo);
+
+                //return new OkObjectResult(finalFilePath);            
+                // 手动创建ContentResult
+                return new ContentResult
+                {
+                    Content = finalFilePath,
+                    ContentType = "text/plain",
+                    StatusCode = 200
+                };
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message + "完成文件上传时发生错误");
+                return new StatusCodeResult(500);
+            }
+        }
+
+        // 辅助方法：从表单中获取值
+        private async Task<string> GetFormValue(MultipartFormDataContent form, string key)
+        {
+            var content = form.FirstOrDefault(x => x.Headers.ContentDisposition?.Name?.Trim('"') == key);
+            if (content == null)
+                return string.Empty;
+
+            return await content.ReadAsStringAsync();
+        }
+
+        /// <summary>
+        /// 根据PlugDataZone和PlugDefinitionId删除指定文件，主要用于处理临时文件，如可视化文件等
+        /// </summary>
+        /// <param name="plugDataZone"></param>
+        /// <param name="PlugDefinitionId"></param>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<FileInformation?> DeleteFile(FileDeleteRequest fileDeleteRequest)
+        {
+            string FilePath = fileDeleteRequest.FilePath;
+            //string? PlugDefinitionId = fileDeleteRequest.PlugDefinitionId;
+            string fileName= fileDeleteRequest.FileName;
+            //var PlugDataZone= await _dbContext.Set<PlugDataZone>().FirstOrDefaultAsync(p => p.PDZId == plugDataZoneId);
+            //var PDZWorkPath = PlugDataZone?.PDZWorkPath;
+            var filePath = Path.Combine(GlobalData.MainFileServerPathRoot, FilePath, fileName);
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    //以下代码并不能获取到文件信息，后续再处理
+                    var fileInformation = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FilePath == filePath);
+                    if (fileInformation != null)
+                    {
+                        _dbContext.Set<FileInformation>().Remove(fileInformation);
+                        await _dbContext.SaveChangesAsync();
+                        return fileInformation;
+                    }
+                    return null;
+                }
+                else
+                {
+                    CLog.Warning($"File {filePath} not found for deletion.");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"An error occurred while deleting file: {ex.Message}");
+                return null;
+            }
+        }
+    }
+}

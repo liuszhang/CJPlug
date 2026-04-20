@@ -1,0 +1,192 @@
+﻿
+@using CJ.Plug.Models.Station
+@using CJ.Plug.StationAndTool.Dialogs
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using MudBlazor
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject IJSRuntime JsRuntime
+@inject IDialogService DialogService
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject MainApiClient MainApiClient
+
+
+<PageTitle>图站状态监控</PageTitle>
+
+
+
+<MudStack Justify="Justify.FlexStart">
+    <MudStack Row AlignItems="AlignItems.Center">        
+        <MudButton OnClick="GetStationStatus" Variant="Variant.Filled" Color="Color.Primary">刷新图站状态</MudButton>
+        @* <MudButton OnClick="SetToolAgentToUse" Variant="Variant.Filled">指定运行图站</MudButton> *@        
+        <MudCheckBox @bind-Value="@ShowAllToolAgents" @bind-Value:after="StateHasChanged" Color="Color.Tertiary">显示所有图站</MudCheckBox>
+        <MudSpacer></MudSpacer>
+        <MudText>当前分配的图站：@ToolAgentToUse</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearUserSetToolAgent">重置</MudButton>
+    </MudStack>
+    @if (Loading)
+    {
+        <MudProgressLinear Indeterminate Color="Color.Primary"></MudProgressLinear>
+
+    }
+
+    <MudDataGrid Items="@StationsToShow" Filterable="false" SortMode="@SortMode.None" Groupable="false" Hover NoRecordsContent="NoRecordsContent">
+        <Columns>
+            <TemplateColumn Title="收藏">
+                <CellTemplate>
+                    <MudCheckBox @bind-Value="IpStarted" Color="Color.Warning" CheckedIcon="@Icons.Material.Filled.Star" UncheckedIcon="@Icons.Material.Filled.StarOutline"></MudCheckBox>
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.Id" Title="编号"/>
+            <TemplateColumn Title="图站地址">
+                <CellTemplate>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudAvatar Color="@(context.Item.IsStarted?Color.Success:Color.Default)" Size="Size.Small">@(context.Item.IsStarted?"On":"Off")</MudAvatar>
+                        <MudText>@context.Item.StationIp</MudText>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.StationCategory" Title="图站类型" />
+            <PropertyColumn Property="x => x.StationBasePath" Title="文件存放基础路径" />
+            <TemplateColumn CellClass="d-flex justify-end">
+                <CellTemplate>
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+                        @* <MudDivider Vertical="true" Class="mx-2" /> *@
+                        <MudButton OnClick="() => ConfigTools(context.Item)" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">图站工具配置</MudButton>
+
+                        <MudButton OnClick="()=>SetToolAgentToUse(context.Item.StationIp)" Size="@Size.Small" Variant="@Variant.Outlined" Color="@Color.Primary">使用此图站</MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+
+
+
+</MudStack>
+
+
+
+@code{
+    [Parameter]
+    public EventCallback OnGetStationStatus { get; set; }
+    [Parameter]
+    public List<Station>? AllStations { get; set; } = new();
+    [Parameter]
+    public List<Station>? OnlineStations { get; set; } = new();
+
+    private List<Station>? StationsToShow {
+        get
+        {
+            return ShowAllToolAgents ? AllStations : OnlineStations;
+        }
+    }
+
+
+    private bool Loading = true;
+    public string TextValue { get; set; } = "";
+    public string ToolAgentToUse { get; set; } = "";
+    public string? tmpToolAgentToUse { get; set; }
+    public IReadOnlyCollection<string> SelectedValues = [];
+    private bool IpStarted = false;
+    private bool ShowAllToolAgents = true;
+    private List<string>? stationStatus { get; set; } = new();
+    //public HashSet<string> HashTextValues2 { get; set; } = new HashSet<string>();
+    private RenderFragment NoRecordsContent=new RenderFragment(builder =>
+    {
+        builder.AddContent(0, "无连接到的图站，请稍后再试");
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {           
+            // HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+            //   {
+            //       //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
+            //       // 将新日志添加到本地列表并触发UI更新
+            //       InvokeAsync(async () =>
+            //       {
+            //           Console.WriteLine(ip);
+            //           await ProcessStationList(ip);
+            //           StateHasChanged();
+            //       });
+            //   });
+            // await GetStationStatus();
+
+            //AllStations = await MainApiClient.GetAllStationsAsync() ?? new List<Station>();
+            //AllStations?.Clear();
+            // Console.WriteLine($"loading done{AllStations.Count}");
+            // Loading = false;
+            // StateHasChanged();
+        }
+
+        //await TestHub();
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AllStations != null && AllStations.Count > 0)
+        {
+            Loading = false;
+            //StationsToShow = ShowAllToolAgents? AllStations : OnlineStations;
+        }
+    }
+
+    private async Task ProcessStationList(string ip)
+    {
+        foreach(var station in AllStations!)
+        {
+            if (station.StationIp == ip)
+            {
+                station.IsStarted = true;
+                if (!stationStatus!.Contains(ip))
+                {
+                    stationStatus.Add(ip);
+                }
+            }
+            else
+            {
+                station.IsStarted = false;
+            }
+        }
+    }
+
+    private async Task GetStationStatus()
+    {
+        await OnGetStationStatus.InvokeAsync();
+        // AllStations = await MainApiClient.GetAllStationsAsync() ?? new List<Station>();
+        // await HubConnectionManagerService.ConnectAsync();
+        // await HubConnectionManagerService.InvokeAsync<string>("TellMeStatus", null);
+    }
+
+
+    async Task SetToolAgentToUse(string ip)
+    {
+        if (ip != null)
+        {
+            // await ToolAgentStatus.SetToolAgentToUse(ip);
+            // _HttpHostIp.ToolAgentHostIp = ip;
+            ToolAgentToUse = ip;
+        }
+        else
+        {
+            //ToolAgentToUse = await ToolAgentConnect.GetToolAgentToUse();
+        }
+        StateHasChanged();
+    }
+
+    async Task ClearUserSetToolAgent()
+    {
+        ToolAgentToUse = "";
+    }
+
+    async Task ConfigTools(Station? station)
+    {
+        var parameters = new DialogParameters<ToolConfigDialog> { { x => x.Station, station } };
+        var dialog = await DialogService.ShowAsync<ToolConfigDialog>(null, parameters);
+    }
+
+}

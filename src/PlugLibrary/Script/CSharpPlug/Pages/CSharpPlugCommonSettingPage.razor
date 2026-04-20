@@ -1,0 +1,70 @@
+﻿@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages.SharedComponents
+@using CSharpPlug.Services
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using Serilog
+
+
+<MonacoEditorWrapper @ref="editor" Id="@PlugDefinitionId" Language="csharp" InitValue="@initValue"></MonacoEditorWrapper>
+
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudButton Disabled="Processing" OnClick="TestCode" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RunCircle">
+        @if (Processing)
+        {
+            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2">测试</MudText>
+        }
+        
+        </MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"><MudText Typo="Typo.body2">重置</MudText></MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"><MudText Typo="Typo.body2">保存</MudText></MudButton>
+</MudStack>
+<MudTextField Lines="3" @bind-Value="codeResult" Variant="Variant.Outlined" Label="结果预览"></MudTextField>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; } = "test-csharp-plug";
+
+    private MonacoEditorWrapper? editor { get; set; }
+    private bool Processing { get; set; } = false;
+
+    private string? initValue = "int a = 10; int b = 20; return a + b;";
+    private string? codeResult = "";
+
+    private async Task TestCode()
+    {
+        Processing = true;
+        if (editor != null)
+        {
+            //var code = initValue;
+            var references = new[]
+            {
+                "System.Runtime.dll",          // 基础库
+                //"path/to/your/sdk.dll"         // 自定义 SDK
+            };
+            var model = await editor.GetModel();
+            var code = await model.GetValue(EndOfLinePreference.CRLF, default);
+            //Log.Information($"执行代码：{code}");
+            codeResult = await CodeRunner.RunCSharpCodeAsync(code, references);
+        }
+        Processing = false;
+    }
+
+}

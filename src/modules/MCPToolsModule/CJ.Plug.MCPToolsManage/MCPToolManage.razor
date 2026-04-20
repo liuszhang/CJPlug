@@ -1,0 +1,144 @@
+﻿@page "/MCPToolManage"
+
+@using CJ.Plug.Models.MCPTools
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using Radzen.Blazor
+@using Serilog
+@using Size=MudBlazor.Size
+@inject IDialogService DialogService
+@using Microsoft.AspNetCore.Components
+@using System.Threading.Tasks
+
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+
+
+
+<PageTitle>MCPTool管理</PageTitle>
+
+<MudDataGrid Items="mcpTools" T="MCPTool">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">MCPTool 列表</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Refresh">刷新</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenDeployGuide" Class="ms-2">配置指南</MudButton>
+        @* <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenDeployGuide" Class="ms-2">发布为Skill</MudButton> *@
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x=>x.Name" Title="工具名称" />
+        <PropertyColumn Property="x => x.Description" Title="工具描述" />
+        @* <PropertyColumn Property="x => x.SourcePlugId" Title="源插头ID" /> *@
+        <TemplateColumn Title="源插头ID">
+            <CellTemplate>
+                @if (!string.IsNullOrEmpty(context.Item.SourcePlugId))
+                {
+                    <MudLink Href="@($"/ProcessEdit/{context?.Item?.SourcePlugId}")" Target="_blank">
+                        @context.Item.SourcePlugId
+                    </MudLink>
+                }
+
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Author" Title="发布人" />
+        <PropertyColumn Property="x=>x.CreatedAt" Title="发布时间"/>
+        <TemplateColumn Title="是否启用">
+            <CellTemplate>
+                <MudSwitch T="bool" Value="@context.Item.IsEnabled" Color="Color.Primary" ValueChanged="(e) => UpdateTool(context.Item, e)" />
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作">
+            <CellTemplate>
+                <MudButton OnClick="()=>DeleteTool(context.Item.Id)" Variant="Variant.Outlined" Color="Color.Error">删除</MudButton>
+            </CellTemplate>
+        </TemplateColumn>
+        @* <PropertyColumn Property="x => x.PublishTime" Title="发布时间" />
+        <PropertyColumn Property="x => x.Publisher" Title="发布人" /> *@
+            
+            
+    </Columns>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2">未找到任何MCPTool。</MudText>
+    </NoRecordsContent>
+</MudDataGrid>
+
+
+
+@code {
+    private List<MCPTool>? mcpTools = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        LoadSampleData();
+        return base.OnInitializedAsync();
+    }
+
+    private async Task LoadSampleData()
+    {
+        var result = await MainApiClient.GetAllMCPToolsAsync();
+        mcpTools = result?.ToList();
+    }
+
+    private void Refresh()
+    {
+        // For now just reload sample data. Replace with API refresh logic.
+        LoadSampleData();
+    }
+
+    private async Task DeleteTool(int id)
+    {
+        await MainApiClient.DeleteMCPToolAsync(id);
+        
+        // Implement delete logic here.
+        // For now, just log a message.
+        Snackbar.Add("DeleteTool clicked.");
+        LoadSampleData();
+    }
+
+    private async Task UpdateTool(MCPTool tool,bool isEnable)
+    {
+        tool.IsEnabled = isEnable;
+        await MainApiClient.UpdateMCPToolAsync(tool);
+        Snackbar.Add($"MCPTool '{tool.Name}' 已更新。", Severity.Success);
+    }
+
+    private async Task OpenDeployGuide()
+    {
+        
+        // Assign a fixed JSON string directly instead of serializing `sample`.
+        var json = @"{
+  ""mcpServers"": {
+    ""cj-mcpserver"": {
+      ""type"": ""streamableHttp"",
+      ""url"": ""http://localhost:3001""
+    }
+  }
+}";
+
+        var parameters = new DialogParameters { { "JsonContent", json } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<DeployGuideDialog>("配置指南", parameters, options);
+        //return Task.CompletedTask;
+    }
+
+    // private class MCPToolDto
+    // {
+    //     public string Name { get; set; } = string.Empty;
+    //     public string Description { get; set; } = string.Empty;
+    //     public DateTime PublishTime { get; set; }
+    //     public string Publisher { get; set; } = string.Empty;
+    //     public bool IsEnabled { get; set; }
+    // }
+}
+
+
+

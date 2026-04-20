@@ -1,0 +1,69 @@
+@page "/Event/Prevent/Form"
+<PageTitle>阻止组件默认行为</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            type = "page",
+            body = new
+            {
+                type = "form",
+                api = "/api/mock/Form/SaveForm",
+                title = "登录",
+                body = new object[]
+                {
+                    new
+                    {
+                        type = "alert",
+                        body = "阻止表单提交后的默认提示。",
+                        level = "info",
+                        className = "mb-1"
+                    },
+                    new
+                    {
+                        type = "input-text",
+                        name = "name",
+                        label = "姓名"
+                    },
+                    new
+                    {
+                        type = "input-email",
+                        name = "email",
+                        label = "邮箱"
+                    }
+                },
+                onEvent = new
+                {
+                    submitFail = new
+                    {
+                        actions = new object[]
+                        {
+                            new
+                            {
+                                actionType = "drawer",
+                                drawer = new
+                                {
+                                    title = "请求失败",
+                                    body = new
+                                    {
+                                        type = "alert",
+                                        level = "warning",
+                                        icon = "fa fa-cloud",
+                                        body = "请求失败，若给您造成不便，敬请谅解。"
+                                    }
+                                },
+                                preventDefault = true
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        return data;
+    }
+
+}

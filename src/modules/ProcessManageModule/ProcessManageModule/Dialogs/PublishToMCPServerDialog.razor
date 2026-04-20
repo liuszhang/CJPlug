@@ -1,0 +1,65 @@
+﻿@using System.Net.Http.Json
+@using System.Text
+@using System.Text.Json
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.MCPTools
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Shared
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+@inject ILocalStorageService _localStorageService
+
+<MudDialog>
+    <DialogContent>    
+        <MudTextField @bind-Value="@element.Name" Label="发布名称" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="@element.Description" Label="描述" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3"/>
+
+        @* <MudTextField @bind-Value="@element.Creater" Label="创建人" Variant="Variant.Outlined" Margin="Margin.Dense" ReadOnly/> *@
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@((e) => NewMCPTool())">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code{
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    MCPTool element = new MCPTool { Name = "EXE执行程序", Type = "桌面类" };
+    [Parameter] public Plug Plug { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        element.Name = Plug.Name;
+        element.Description = Plug.Description;        
+        //element.Status = Plug.Status;
+        return base.OnInitializedAsync();
+    }
+
+    private async void NewMCPTool()
+    {
+        element.SourcePlugId = Plug.DefinitionId;
+        element.CreatedAt = DateTime.UtcNow;
+        element.Author = Plug.Creater;
+        var result = await MainApiClient.CreateMCPToolAsync(element);
+        if (result == null)
+        {
+            Snackbar.Add("发布MCP Tool失败！", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"发布{result?.Name}为MCP Tool成功！", Severity.Success);
+
+        MudDialog.Close();
+    }
+
+
+}

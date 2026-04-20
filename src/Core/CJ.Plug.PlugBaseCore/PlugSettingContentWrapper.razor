@@ -1,0 +1,10 @@
+﻿
+@ChildContent
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; } // 接收要渲染的内容
+
+    [Parameter]
+    public EventCallback<PlugDataZone>? PDZUpdated { get; set; } // 接收要传递的 Action
+}

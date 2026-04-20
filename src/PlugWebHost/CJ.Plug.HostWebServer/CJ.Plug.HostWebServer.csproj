@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <!-- Disable build-time compression of static web assets to avoid MSB4018 DiscoverPrecompressedAssets duplicate-key errors -->
+    <DisableBuildCompression>true</DisableBuildCompression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CodeBeam.MudBlazor.Extensions" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />    
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
+    <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
+    <ProjectReference Include="..\CJ.Plug.MainPageContent\CJ.Plug.MainPageContent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="wwwroot\app.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="wwwroot\defultplug1.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

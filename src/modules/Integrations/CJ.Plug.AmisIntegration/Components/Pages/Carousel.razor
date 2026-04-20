@@ -1,0 +1,119 @@
+
+<PageTitle>轮播图</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+      var data=  new
+        {
+            type = "page",
+            title = "轮播图",
+            data = new
+            {
+                carousel0 = new object[]
+                {
+                    "/photo/1314a2a3d3f6_062dbd8.jpg",
+                    "/photo/4f3cb4202335_c2a17b0.jpg",
+                    "/photo/552b175ef11d_ac6e583.jpg"
+                },
+                carousel1 = new object[]
+                {
+                    new
+                    {
+                        html = "<div style=\"width: 100%; height: 300px; background: #e3e3e3; text-align: center; line-height: 300px;\">carousel data in form</div>"
+                    },
+                    new
+                    {
+                        image = "/photo/1314a2a3d3f6_062dbd8.jpg"
+                    },
+                    new
+                    {
+                        image = "/photo/4f3cb4202335_c2a17b0.jpg"
+                    }
+                }
+            },
+            body = new object[]
+            {
+                new
+                {
+                    type = "grid",
+                    columns = new object[]
+                    {
+                        new
+                        {
+                            type = "panel",
+                            title = "直接页面配置",
+                            body = new
+                            {
+                                type = "carousel",
+                                controlsTheme = "light",
+                                height = "300",
+                                options = new object[]
+                                {
+                                    new
+                                    {
+                                        image = "/photo/552b175ef11d_ac6e583.jpg"
+                                    },
+                                    new
+                                    {
+                                        html = "<div style=\"width: 100%; height: 300px; background: #e3e3e3; text-align: center; line-height: 300px;\">carousel data</div>"
+                                    },
+                                    new
+                                    {
+                                        image = "/photo/4f3cb4202335_c2a17b0.jpg"
+                                    }
+                                }
+                            }
+                        },
+                        new
+                        {
+                            type = "panel",
+                            title = "使用itemSchema配置",
+                            body = new
+                            {
+                                type = "carousel",
+                                name = "carousel0",
+                                controlsTheme = "dark",
+                                height = "300",
+                                itemSchema = new
+                                {
+                                    type = "tpl",
+                                    tpl = "<div style=\"height: 100%; background-image: url(<%=data.item%>); background-position: center center; background-size: cover;\"></div>"
+                                }
+                            }
+                        }
+                    }
+                },
+                new
+                {
+                    type = "grid",
+                    columns = new object[]
+                    {
+                        new
+                        {
+                            type = "form",
+                            title = "表单内展示",
+                            sm = 6,
+                            body = new object[]
+                            {
+                                new
+                                {
+                                    type = "carousel",
+                                    controlsTheme = "dark",
+                                    name = "carousel1",
+                                    label = "carousel",
+                                    animation = "slide",
+                                    height = "300"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        return data;
+    }
+
+}

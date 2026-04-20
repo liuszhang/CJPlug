@@ -1,0 +1,131 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Serilog
+
+@inject MainApiClient MainApiClient
+
+<MudDataGrid T="ModelParameter" Items="@ModelParameters" Filterable="false" SortMode="SortMode.None" Height="250px"
+    Hover FixedHeader ReadOnly="false"
+    ColumnResizeMode="ResizeMode.Column" EditMode="@DataGridEditMode.Cell"
+    Bordered="true" Dense="true">
+    <Columns>
+        <PropertyColumn Property="x => x.Name" Title="属性名" Editable="false" />
+        <PropertyColumn Property="x => x.Value" Title="当前值" Editable="false" />
+        <PropertyColumn Property="x => x.SettingValue" Title="设定值" CellStyleFunc="@_cellStyleFunc">
+            <EditTemplate>
+                <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    @if (@context.Item.IsValueFromOtherVariable)
+                    {
+                        <MudSelect T="string" Value="@context.Item.SettingValue" ValueChanged="(string? v) => OnSettingValueChanged(context.Item, v)" Dense Clearable>
+                            @foreach (var p in VariablesOfPlug)
+                            {
+                                <MudSelectItem Value="@($"{p.Name}")">@p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                        Value="@context.Item.SettingValue" ValueChanged="(string? v)=>OnSettingValueChanged(context.Item,v)"></MudTextField>
+                    }
+                    <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                    Value="@context.Item.IsValueFromOtherVariable" ValueChanged="(bool b)=>ChangedIsFromOtherValue(context.Item,b)" />
+                </MudStack>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.OutToVariable" Title="输出至">
+            <EditTemplate>
+                <MudSelect T="string" Value="@context.Item.OutToVariable" ValueChanged="(string? o) => ChangedOutToVariableValue(context.Item, o)" Dense Clearable>
+                    @foreach (var p in VariablesOfPlug)
+                    {
+                        <MudSelectItem Value="@($"{p.Name}")">@p.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+    </Columns>
+</MudDataGrid>
+
+
+
+
+
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+    [CascadingParameter]
+    public EventCallback<PlugVariableData> PlugVariableDataUpdated { get; set; }
+
+
+    public List<PlugVariableData> VariablesOfPlug => EditorContext?.PlugDataZone?.GetVariablesOfPlug(EditorContext?.PlugDefinitionId);
+
+    private List<ModelParameter> ModelParameters = new();
+
+    private Func<ModelParameter, string> _cellStyleFunc => x =>
+    {
+        string style = "";
+        if (!string.IsNullOrEmpty(x.SettingValue) && x.SettingValue != x.Value)
+            style += "background-color:#8CED8C";
+        return style;
+    };
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Console.WriteLine("first after render");
+            try
+            {
+                ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(EditorContext.Variable.Value);
+            }
+            catch (Exception ex)
+            {
+                Log.Information(ex.Message);
+            }
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Console.WriteLine("parameters set");
+        // try
+        // {
+        //     dataList = JsonSerializer.Deserialize<List<ModelParameter>?>(EditorContext.Variable.Value);
+        // }
+        // catch (Exception ex)
+        // {
+        //     Log.Information(ex.Message);
+        // }
+        // StateHasChanged();
+    }
+
+    private async Task ChangedIsFromOtherValue(ModelParameter modelParameter,bool value)
+    {
+        modelParameter.IsValueFromOtherVariable = value;
+        EditorContext.PlugDataZone.SetVariableValue(EditorContext.PlugDefinitionId,EditorContext.Variable.Name, JsonSerializer.Serialize(ModelParameters));
+    }
+    private async Task ChangedOutToVariableValue(ModelParameter modelParameter, string? value)
+    {
+        modelParameter.OutToVariable = value;
+        EditorContext.PlugDataZone.SetVariableValue(EditorContext.PlugDefinitionId, EditorContext.Variable.Name, JsonSerializer.Serialize(ModelParameters));
+    }
+
+    private async Task OnSettingValueChanged(ModelParameter modelParameter, string? value)
+    {
+        modelParameter.SettingValue = value;
+        //EditorContext.PlugDataZone.SetVariableValue(EditorContext.PlugDefinitionId, EditorContext.Variable.Name, JsonSerializer.Serialize(ModelParameters));
+        var variableData = EditorContext.PlugDataZone.PlugVariableDatas
+        .Where(v => v.PlugDefinitionId == EditorContext.PlugDefinitionId && v.Name == EditorContext.Variable.Name)
+        .FirstOrDefault();
+        variableData.Value = JsonSerializer.Serialize(ModelParameters);
+        await MainApiClient.UpdatePlugVariableData(variableData);
+        CLog.Information("参数更新成功", EditorContext.PlugDataZone.PDZId);
+        await PlugVariableDataUpdated.InvokeAsync(variableData);
+    }
+}

@@ -1,0 +1,25 @@
+﻿2.	迁移所需的前置准备
+•	安装/确认工具与包：
+•	全局工具：dotnet-ef（若未安装：dotnet tool install --global dotnet-ef）。
+•	在包含 MainDbContext 的项目（即 UserRole.cs）添加 Microsoft.EntityFrameworkCore.Design 包（若还没）：
+dotnet add src/Core/CJ.Plug.Models package Microsoft.EntityFrameworkCore.Design
+•	确保 Microsoft.EntityFrameworkCore.Sqlite 或相应 provider 已在项目中（已有 Microsoft.EntityFrameworkCore，若需要显式 provider 包可加）。
+•	确保所有模块（实现 IModuleDbConfig 的项目）已被编译并把它们的 DLL 放在 startup 项目的运行/输出目录，或者通过设置项目引用使得构建输出包含这些 dll。设计时工厂会在启动项目的输出目录查找 DLL。
+3.	创建迁移与应用迁移（常用命令）
+•	先构建解决方案（确保模块 dll 存在）： dotnet build
+•	添加迁移（在解决方案根运行，指定迁移所在项目与启动项目）： 
+dotnet ef migrations add mcptooladdenable --project src/Core/CJ.Plug.Models --startup-project src/PlugApiServer/CJ.Plug.ApiServer -o Migrations/MainDb 
+说明：
+•	--project 指含 DbContext 的项目（生成迁移文件）。
+•	--startup-project 指运行时/启动项目（设计时工厂会在其输出目录查找模块 dll），通常是 Program.cs。
+•	-o 指定迁移文件输出目录（相对于 --project）。
+•	如有多个 DbContext 可加 --context MainDbContext。
+•	应用迁移到数据库： 
+dotnet ef database update --project src/Core/CJ.Plug.Models --startup-project src/PlugApiServer/CJ.Plug.ApiServer
+•	若需要为后续更改生成新迁移，重复 migrations add（使用不同名字），然后 database update。
+4.	在运行时自动应用迁移（可选） 在 Program.cs 启动后自动应用未应用的迁移（生产环境需谨慎）——示例代码（可根据需要加入到 var app = builder.Build(); 之后）：
+using (var scope = app.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<MainDbContext>(); db.Database.Migrate(); }
+5.	常见问题与注意事项
+•	如果迁移文件中缺少某些模块表，通常是因为设计时没有加载到该模块的 IModuleDbConfig 实例：确认模块已被编译且 DLL 可被 MainDbContextFactory 在 startup 项目输出目录找到，或将模块项目添加为 startup 项目的项目引用以确保复制。
+•	连接字符串的相对路径 Data Source=../../main.db 是相对于运行时工作目录（通常为 bin/Debug/net10.0 下的启动项目输出），发布/运行环境可能需要改成绝对路径或配置化（appsettings）。
+•	如果你更希望把迁移文件放在某个模块/中心项目以外的位置，使用 -o 指定目录并确认后续 database update 使用相同 --project/--startup-project。

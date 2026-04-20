@@ -1,0 +1,222 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using Radzen.Blazor
+
+@inject IJSRuntime JSRuntime
+
+
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+        .selected > td {
+            color: white !important;
+        }
+
+            .selected > td .mud-input {
+                color: white !important;
+            }
+</style>
+<RadzenSplitter>
+    <RadzenSplitterPane Size="20%" Min="100px">
+        <MudStack Spacing="1">
+            <MudSelect Label="上下文" T="string" Dense Margin="Margin.Dense" Variant="Variant.Outlined"></MudSelect>
+            <MudSelect Label="类型" T="string" Dense Margin="Margin.Dense" Variant="Variant.Outlined"></MudSelect>
+            <MudTextField Label="编号" T="string" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField Label="名称" T="string" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+            <MudSelect Label="状态" T="string" Dense Margin="Margin.Dense" Variant="Variant.Outlined"></MudSelect>
+            <MudSelect Label="版本" T="string" Dense Margin="Margin.Dense" Variant="Variant.Outlined"></MudSelect>
+            <MudSelect Label="创建人" T="string" Dense Margin="Margin.Dense" Variant="Variant.Outlined"></MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary">查询</MudButton>
+        </MudStack>
+    </RadzenSplitterPane>
+    <RadzenSplitterPane Size="80%" Min="100px">
+        <MudStack AlignItems="AlignItems.Start">
+            <MudTable T="MCItem" Items="@Elements.Take(4)" Dense Hover="true" Breakpoint="Breakpoint.Sm" @ref="mudTable"
+                      RowClass="cursor-pointer" RowClassFunc="@SelectedRowClassFunc" OnRowClick="RowClickEvent">
+                <HeaderContent>
+                    <MudTh>编号</MudTh>
+                    <MudTh>名称</MudTh>
+                    <MudTh>类型</MudTh>
+                    <MudTh>状态</MudTh>
+                    <MudTh>版本</MudTh>
+                    <MudTh>上下文</MudTh>
+                    <MudTh>创建者</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nr">@context.id</MudTd>
+                    <MudTd DataLabel="Sign">@context.name</MudTd>
+                    <MudTd DataLabel="Name">@context.type</MudTd>
+                    <MudTd DataLabel="Position">@context.status</MudTd>
+                    <MudTd DataLabel="Molar mass">@context.version</MudTd>
+                    <MudTd DataLabel="Molar mass">@context.context</MudTd>
+                    <MudTd DataLabel="Molar mass">@context.creator</MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudDivider />
+            <RadzenSplitter>
+                <RadzenSplitterPane Size="50%" Min="100px">
+
+                    <MudTable T="MCItemVariable" Items="@ElementVariables" Hover="true" Dense Breakpoint="Breakpoint.Sm" @ref="mudTable2"
+                              RowClass="cursor-pointer" MultiSelection>
+                        <ToolBarContent>
+                            <MudButton Size="Size.Medium" StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary">添加至列表</MudButton>
+
+                            <MudTextField T="string" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" Placeholder="关键字搜索" Margin="Margin.Dense"></MudTextField>
+
+                        </ToolBarContent>
+
+                        <HeaderContent>
+                            <MudTh>属性名</MudTh>
+                            <MudTh>类型</MudTh>
+                            <MudTh>属性值</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Nr">@context.name</MudTd>
+                            <MudTd DataLabel="Sign">@context.type</MudTd>
+                            <MudTd DataLabel="Name">@context.value</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="50%" Min="100px">
+                    <MudDataGrid T="MCItemVariable" Items="@ElementVariables.Take(4)" ReadOnly="false" EditMode="@(MudBlazor.DataGridEditMode.Cell)" MultiSelection
+                                 Bordered="true" Dense="true" SortMode="SortMode.None" ColumnResizeMode="ResizeMode.Column" LoadingProgressColor="Color.Primary">
+                        <ToolBarContent>
+                            <MudButtonGroup Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Newspaper">移除</MudButton>
+
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh">刷新</MudButton>
+
+                                <MudMenu Dense Size="Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+                                    <MudMenuItem>导入</MudMenuItem>
+                                    <MudMenuItem>导出</MudMenuItem>
+                                </MudMenu>
+                            </MudButtonGroup>
+
+                        </ToolBarContent>
+                        <Columns>
+                            <SelectColumn T="MCItemVariable" />
+                            <PropertyColumn Property="x => x.name" Title="属性名称" Editable="false"/>
+                            <PropertyColumn Property="x => x.value" Title="属性值" Editable="false"/>
+                            <PropertyColumn Property="x => x.bindingTo" Title="绑定至参数">
+                                <EditTemplate>
+                                    <MudSelect @bind-Value="context.Item.bindingTo" Margin="@Margin.Dense">
+                                        <MudSelectItem T="string" Value="@("p1")"></MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("p2")"></MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("p3")"></MudSelectItem>
+                                    </MudSelect>
+                                </EditTemplate>
+                            </PropertyColumn>
+                        </Columns>
+                    </MudDataGrid>
+
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+
+
+        </MudStack>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+@code {
+    private Plug Plug;
+    private int selectedRowNumber = -1;
+    private MudTable<MCItem> mudTable;
+    private MudTable<MCItemVariable> mudTable2;
+    private List<string> clickedEvents = new();
+    private IEnumerable<MCItem> Elements = new List<MCItem>()
+    {
+        new MCItem() { id="PRT2401581-1404",name="主机备份分系统",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" },
+        new MCItem() { id="PRT2401556-0608",name="产品外机设备",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" },
+        new MCItem() { id="PRT2401782-5054",name="电源系统",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" }
+    };
+    private IEnumerable<MCItemVariable> ElementVariables = new List<MCItemVariable>()
+    {
+        new MCItemVariable() { name = "编号", type = "字符串", value = "PRT2401556-0401"},
+        new MCItemVariable() { name = "名称", type = "字符串", value = "产品外机设备" },
+        new MCItemVariable() { name = "版本", type = "字符串", value = "B.3" },
+        new MCItemVariable() { name = "状态", type = "字符串", value = "拟制中" },
+        new MCItemVariable() { name = "长度", type = "字符串", value = "121CM" },
+        new MCItemVariable() { name = "重量", type = "字符串", value = "47kg" },
+        new MCItemVariable() { name = "材料", type = "字符串", value = "不锈钢3A59-AM" },
+        new MCItemVariable() { name = "最大功率", type = "字符串", value = "1200W" }
+    };
+
+
+
+    private void RowClickEvent(TableRowClickEventArgs<MCItem> tableRowClickEventArgs)
+    {
+        clickedEvents.Add("Row has been clicked");
+    }
+
+    private string SelectedRowClassFunc(MCItem element, int rowNumber)
+    {
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            clickedEvents.Add("Selected Row: None");
+            return string.Empty;
+        }
+        else if (mudTable.SelectedItem != null && mudTable.SelectedItem.Equals(element))
+        {
+            selectedRowNumber = rowNumber;
+            clickedEvents.Add($"Selected Row: {rowNumber}");
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    private string SelectedVariableRowClassFunc(MCItemVariable element, int rowNumber)
+    {
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            clickedEvents.Add("Selected Row: None");
+            return string.Empty;
+        }
+        else if (mudTable2.SelectedItem != null && mudTable2.SelectedItem.Equals(element))
+        {
+            selectedRowNumber = rowNumber;
+            clickedEvents.Add($"Selected Row: {rowNumber}");
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    public class MCItem
+    {
+        public string id;
+        public string name;
+        public string type;
+        public string status;
+        public string version;
+        public string context;
+        public string creator;
+    }
+    public class MCItemVariable
+    {
+        public string name;
+        public string type;
+        public string value;
+        public string bindingTo;
+    }
+}
+
+

@@ -1,0 +1,175 @@
+﻿@using System.Text.Json
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.LogModels
+
+@using CJ.Plug.Models.Shared
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
+@using Serilog
+@using MudBlazor
+@using Serilog
+
+
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+<MudTable Items="_itemsToShow" Height="100%" Dense Virtualize="true" FixedHeader="true">
+    <ColGroup>
+        <col style="width: 70px;" />
+        <col style="width: 116px;" />
+        <col style="width: 80px;" />
+        <col />
+        @* <col style="width: 50px;" /> *@
+    </ColGroup>
+    <HeaderContent>
+        <MudTh>类型</MudTh>
+        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<LogModel, object>(x=>x.Date)">时间</MudTableSortLabel></MudTh>
+        <MudTh>来源</MudTh>
+        <MudTh>内容</MudTh>
+        @* <MudTh></MudTh> *@
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>            
+            <MudIcon Size="Size.Small" Icon="@GetIcon(context.Type).Value.Icon" Color="@GetIcon(context.Type).Value.Color" />
+        </MudTd>
+        <MudTd>@context.Date</MudTd>
+        <MudTd>@context.Author</MudTd>
+        <MudTd Style="white-space: normal; word-wrap: break-word; max-width:180px;">
+            @context.Description
+        </MudTd>
+        @* <MudTd Style="text-align:center">
+            <MudMenu Dense Size="Size.Small" Icon="@Icons.Material.Filled.MoreVert">
+                <MudMenuItem Icon="@Icons.Material.Outlined.ZoomIn">复制</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Delete">高亮</MudMenuItem>
+            </MudMenu>
+        </MudTd> *@
+    </RowTemplate>
+</MudTable>
+
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    [Parameter]
+    public List<LogModel> _items { get; set; } = new List<LogModel>();
+    public List<LogModel> _itemsToShow { get; set; } = new List<LogModel>();
+    [Parameter]
+    public bool ShowInfo { get; set; } = true;
+    [Parameter]
+    public bool ShowWarning { get; set; } = true;
+    [Parameter]
+    public bool ShowError { get; set; } = true;
+
+    private bool IsRegister1 = false;
+    private bool IsRegister2 = false;
+    private string? Receiver = null;
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        //InitHubEventListen();
+        if (PlugDataZone != null)
+        {
+            Receiver = PlugDataZone.PDZId;
+        }
+        else
+        {
+            Receiver = "";
+        }
+
+        _itemsToShow.Clear();
+        foreach (var logModel in _items)
+        {
+            GetLogToShow(logModel);
+        }
+        //Console.WriteLine("OnParametersSetAsync");
+        //StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _items.Clear();
+            foreach (var l in GlobalLogCollector.GetLogMessages())
+            {
+                var logModel = JsonSerializer.Deserialize<LogModel>(l);
+                _items.Insert(0, logModel);
+                GetLogToShow(logModel);
+            }
+
+            // if (!string.IsNullOrEmpty(PDZId))
+            // {
+            //     InitHubEventListen(PDZId);
+            // }
+            InitHubEventListen();
+
+
+            Console.WriteLine("OnAfterRenderAsync1");
+
+        }
+        //Console.WriteLine("OnAfterRenderAsync N");
+    }
+
+    private void GetLogToShow(LogModel logModel)
+    {
+        if (ShowInfo && logModel.Type == "Information")
+        {
+            _itemsToShow.Insert(0, logModel);
+        }
+        if (ShowWarning && logModel.Type == "Warning")
+        {
+            _itemsToShow.Insert(0, logModel);
+        }
+        if (ShowError && logModel.Type == "Error")
+        {
+            _itemsToShow.Insert(0, logModel);
+        }
+    }
+
+    private (string Icon,Color Color)? GetIcon(string logLevel)
+    {
+        if (logLevel == "Information") return (Icons.Material.Filled.Info,Color.Success);
+        if (logLevel == "Warning") return (Icons.Material.Filled.Warning, Color.Warning);
+        if (logLevel == "Error") return (Icons.Material.Filled.Error, Color.Error);
+        StateHasChanged();
+        return null;
+    }
+
+
+
+    private void InitHubEventListen()
+    {
+        var eventName = LogTypeEnum.CommonLog.ToString();
+        //Console.WriteLine($"Start Hub Listen Event:{eventName}");
+        HubConnectionManagerService._hubConnection.On<string, string>(eventName,
+        (receiver, message) =>
+           {
+               if (string.IsNullOrEmpty(Receiver))
+               {
+                   var logModel = JsonSerializer.Deserialize<LogModel>(message);
+                   // 将新日志添加到本地列表并触发UI更新
+                   InvokeAsync(async () =>
+                   {
+                       _items.Insert(0, logModel);
+                       GetLogToShow(logModel);
+                       StateHasChanged();
+                   });
+               }
+               else if (receiver==Receiver)
+               {
+                   var logModel = JsonSerializer.Deserialize<LogModel>(message);
+                   // 将新日志添加到本地列表并触发UI更新
+                   InvokeAsync(async () =>
+                   {
+                       _items.Insert(0, logModel);
+                       GetLogToShow(logModel);
+                       StateHasChanged();
+                   });
+               }
+           });        
+    }
+}

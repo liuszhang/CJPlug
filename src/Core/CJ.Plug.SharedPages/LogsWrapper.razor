@@ -1,0 +1,104 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
+@using Serilog
+@using MudBlazor
+@using Serilog
+
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+
+
+
+<MudTabs Style="height:100%" Elevation="2" ApplyEffectsToContainer="true" MinimumTabWidth="166px">
+    <MudTabPanel>
+        <TabContent>
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudText>@TabName</MudText>
+                <MudBadge Content="100" Visible="false" Overlap="true" Origin="Origin.TopCenter">
+                    <MudToggleIconButton Size="Size.Small"
+                    Icon="@Icons.Material.Filled.Info"
+                    Color="@Color.Success"
+                    @bind-Toggled="@(hideInfo)"
+                    ToggledIcon="@Icons.Material.Filled.Info"
+                    ToggledColor="@Color.Dark" />
+                </MudBadge>
+                <MudBadge Content="12" Visible="false" Overlap="true" Origin="Origin.TopCenter">
+                    <MudToggleIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Warning"
+                    Color="@Color.Warning"
+                    @bind-Toggled="@hideWarning"
+                    ToggledIcon="@Icons.Material.Filled.Warning"
+                    ToggledColor="@Color.Dark" />
+                </MudBadge>
+                <MudBadge Content="1" Visible="false" Overlap="true" Origin="Origin.TopCenter">
+                    <MudToggleIconButton Size="Size.Small" Icon="@Icons.Material.Filled.BugReport"
+                    Color="@Color.Error"
+                    @bind-Toggled="@hideError"
+                    ToggledIcon="@Icons.Material.Filled.BugReport"
+                    ToggledColor="@Color.Dark" />
+                </MudBadge>
+
+
+
+                <MudTooltip Text="清空日志">
+                    <MudIconButton OnClick="ClearLogs" Size="Size.Small" Icon="@Icons.Material.Filled.Delete"></MudIconButton>
+                </MudTooltip>
+
+
+                @* <MudSpacer />
+                <MudTextField T="string" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="搜索日志内容" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"></MudTextField>
+ *@
+            </MudStack>
+        </TabContent>
+        <ChildContent>
+            <VerticalPercentWell SplitterPanelPercent="HeightPercent">
+                <ExecuteLogs _items="_items" ShowInfo="@(!hideInfo)" ShowWarning="@(!hideWarning)" ShowError="@(!hideError)"></ExecuteLogs>
+            </VerticalPercentWell>
+        </ChildContent>
+    </MudTabPanel>
+</MudTabs>
+
+
+
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public double HeightPercent { get; set; } = 70.00;
+    [Parameter]
+    public string? TabName { get; set; } = "日志";
+
+    private bool hideInfo { get; set; } = false;
+    private bool hideWarning { get; set; } = false;
+    private bool hideError { get; set; } = false;
+
+    private List<LogModel> _items = new List<LogModel>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // if (string.IsNullOrEmpty(TabName))
+        // {
+        //     TabName = $"全局日志";
+        // }
+    }
+
+    private async Task ClearLogs()
+    {
+        GlobalLogCollector.ClearLogs();
+        _items.Clear();
+        //Log.Information($"{PlugDataZone?.PDZId}:--------------------");
+        // Log.ForContext("RecId", PlugDataZone?.PDZId).ForContext("LogType", LogTypeEnum.Log.ToString())
+        // .Information($"{PlugDataZone?.PDZId}:--------------------");
+        CLog.Information($"----------新年快乐发大财！----------",PlugDataZone?.PDZId);
+        //Log.Information<PlugDataZone,PlugData>("test", PlugDataZone,null);
+    }
+}

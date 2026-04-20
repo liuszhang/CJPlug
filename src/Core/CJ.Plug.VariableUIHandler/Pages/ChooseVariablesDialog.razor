@@ -1,0 +1,116 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.VariableUIHandler.Models
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using MudBlazor
+@using Radzen.Blazor
+@using Serilog
+@using System.Text.Json.Nodes
+
+@inject MainApiClient MainApiClient
+
+<MudDialog Class="stack-resize" Style="height:800px">
+    <DialogContent>
+
+        @if (string.IsNullOrEmpty(WorkflowDefinitionId))
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <RadzenSplitter>
+                <RadzenSplitterPane Size="20%" Min="100px">
+                    <MudTreeView T="string" @bind-SelectedValue="SelectedPlugDefinitionId">
+                        <MudTreeViewItem Value='@rootPlug?.DefinitionId' Text="@rootPlug?.Name"
+                        Expanded Icon="@Icons.Custom.Uncategorized.Folder" IconExpanded="@Icons.Custom.Uncategorized.FolderOpen" IconColor="Color.Info"
+                        ExpandButtonIcon="@Icons.Material.Filled.ArrowRight" ExpandButtonIconColor="Color.Primary">
+                            @foreach (var plug in PlugDatas)
+                            {
+                                <MudTreeViewItem Value="@plug.PlugDefinitionId" Text="@plug.Name" Icon="@Icons.Material.Filled.Info" IconColor="Color.Tertiary" />
+                            }
+                        </MudTreeViewItem>
+                    </MudTreeView>
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="80%" Min="100px">
+                    <PDZVariablesDataReadOnly EditorContext="EditorContext" SelectedPlugDefinitionId="@SelectedPlugDefinitionId" SelectedVariableChanged="SelectedChanged"></PDZVariablesDataReadOnly>
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+        }
+
+
+        @*         <ChooseVariablesContent WorkflowDefinitionId="@WorkflowDefinitionId" SelectedVariableChanged="SelectedChanged"></ChooseVariablesContent>
+ *@    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Disabled="@(string.IsNullOrEmpty(SelectedVariable?.Name))" Color="Color.Primary" OnClick="Submit">确认</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public DisplayInputEditorContext? EditorContext { get; set; }
+    // [Parameter]
+    // public Plug? Plug { get; set; } = new();
+    // [Parameter]
+    // public WorkflowDefinition? WorkflowDefinition { get; set; }
+    [Parameter]
+    public string? WorkflowDefinitionId { get; set; }
+
+    public PlugVariableData? SelectedVariable { get; set; } = new();
+    private Plug? SelectedPlug { get; set; } = new Plug();
+    private string? SelectedPlugDefinitionId { get; set; }
+    private Plug? rootPlug = new Plug();
+    private List<JsonObject> Activities = new List<JsonObject>();
+    private List<Plug> plugs = new List<Plug>();
+    private List<PlugData> PlugDatas = new List<PlugData>();
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.Center,
+            BackdropClick = false,
+            FullWidth = true
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await MudDialog.SetOptionsAsync(diaOption);
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        WorkflowDefinitionId = EditorContext?.PlugDataZone?.PlugDefinitionId;
+        Console.WriteLine("WorkflowDefinitionId:" + WorkflowDefinitionId);
+        Console.WriteLine("PDZId:" + EditorContext.PlugDataZone.PDZId);
+        rootPlug = await MainApiClient.GetPlugByDefinitionIdAsync(WorkflowDefinitionId);
+
+        PlugDatas = EditorContext.PlugDataZone.GetPlugDefinitonIdsInPDZ();
+        // foreach (var id in PlugIds)
+        // {
+        //     var plug = await MainApiClient.GetPlugByDefinitionIdAsync(id.PlugDefinitionId);
+        //     plugs.Add(plug);
+        // }
+    }
+
+
+    private async void Submit()
+    {
+
+        Console.WriteLine(">>>>>>>>>selected variable:"+SelectedVariable?.Name);            
+        MudDialog.Close(SelectedVariable);
+    }
+
+    private async Task SelectedChanged(PlugVariableData? value)
+    {
+        Console.WriteLine($"SelectedChanged: {value?.Name}");
+        SelectedVariable = value;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

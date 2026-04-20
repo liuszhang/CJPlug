@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CJ.Plug-Aspire.Models\CJ.Plug.Models.csproj" />
+    <ProjectReference Include="..\..\CJ.Plug-Aspire.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
+  </ItemGroup>
+
+</Project>

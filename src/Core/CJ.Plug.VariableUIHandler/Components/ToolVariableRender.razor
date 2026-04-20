@@ -1,0 +1,42 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using Serilog
+@using System.Text.Json
+
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0">
+
+    <MudText Typo="Typo.body2">@toolName</MudText>
+
+</MudStack>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private string? toolName;
+    private BaseVariable? Variable => EditorContext.Variable;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(Variable?.Value))
+        {
+            try
+            {
+                var tool = JsonSerializer.Deserialize<Tool>(Variable?.Value);
+                toolName = $"{tool.ToolName}({tool.ToolVersion})";
+            }
+            catch (Exception ex)
+            {
+                CLog.Error("Error deserializing tool variable: {VariableName}", Variable?.Name);
+            }
+        }        
+    }
+}

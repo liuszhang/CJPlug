@@ -1,0 +1,195 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.EventAggregator
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.DataConnector
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Enums
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.JSInterop
+@using MudBlazor
+@using Serilog
+
+
+@inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+
+<style>
+    .x6-edge-tool-vertex-path{
+    stroke: red !important;
+    stroke-width: 1 !important;
+    }
+    marker[id^="marker-"] path {
+    stroke: red !important; /* 匹配所有以 marker-v9- 开头的 ID */
+    fill:red !important;
+    }
+    /* 通过data-shape和类名组合选择器 */
+    g[data-shape="elsa-edge"].x6-edge path:nth-child(2) {
+    stroke: red !important;
+    }
+
+</style>
+
+<script>
+    // 用于获取点击位置的元素信息
+    window.getClickedElementInfo = function (x, y) {
+    // 根据坐标获取被点击的元素
+    const element = document.elementFromPoint(x, y);
+    if (!element) return null; // 元素不存在时返回 null
+
+    // 如果点击的是 path 元素，查找其父级 g 标签的 id
+    if (element.tagName.toString() === 'path') {
+    // 逐级向上查找父元素中的 g 标签
+    let parent = element.parentNode;
+    while (parent) {
+    // 找到 g 标签且有 id 时返回
+    if (parent.tagName.toString() === 'g' && parent.id) {
+    return parent.id;
+    }
+    // 继续向上查找父级的父级
+    parent = parent.parentNode;
+    }
+    // 如果没找到带 id 的 g 标签，返回提示信息或 null
+    return 'path-no-g-id';
+    }
+
+    // 非 path 元素，直接返回标签名（保持原逻辑）
+    return element.tagName.toString();
+    };
+</script>
+
+
+<div class=@(IsChildDesigner ? "child-diagram-designer" : "flowchart-diagram-designer" )
+draggable="false"
+@ondragstart:preventDefault
+@ondragstart:stopPropagation
+@ondragover="@OnDragOver" 
+@ondragover:preventDefault 
+@ondragover:stopPropagation
+@ondblclick="@OnConnectLineDoubleClick"
+@ondrop="@OnDrop" 
+@ondrop:stopPropagation>
+
+    <DataConnector></DataConnector>
+</div>
+
+@code {
+    //[CascadingParameter]
+    private MyDragDropManager DragDropManager { get; set; } = new();
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    //如果是子插头，则通过活动传递插头信息到流程图
+    [CascadingParameter]
+    public JsonObject Activity { get; set; } = default!;
+    [Parameter] 
+    public bool IsReadOnly { get; set; }
+    [Parameter]
+    public EventCallback CanvasSelected { get; set; }
+    //如果是普通流程图，通过Plug传递插头信息到流程图
+    [Parameter]
+    public Plug? Plug { get; set; } = default!;
+    [Parameter]
+    public EventCallback<PlugDataZone> PDZChanged { get; set; }
+    [Parameter]
+    public JsonObject? Flowchart { get; set; } = default!;
+    [Parameter]
+    public bool IsChildDesigner { get; set; } = false;
+    private string? DefinitionId => IsChildDesigner ? Activity.GetId() : Plug?.DefinitionId; 
+
+    private JsonObject? SelectedActivity { get; set; }
+    public string? SelectedActivityId { get; private set; }
+
+
+    private async Task OnDragOver(DragEventArgs e)
+    {
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        Log.Information($"droped!({Plug?.Name})");
+        if (IsReadOnly)
+        {
+            return;
+        }    
+        try
+        {
+            var Payload = await DomInteropService.GetDragPayload();
+            DragDropManager.Payload = JsonSerializer.Deserialize<ActivityDescriptor>(Payload?.ToString());
+        }
+        catch (Exception ex)
+        {
+            Log.Information(ex.Message);
+            Log.Information("别啥都往里拖");
+            return;
+        }
+        Console.WriteLine(">>>>>>>>>>>>drop in is a:" + DragDropManager?.Payload);
+        var x = e.PageX;
+        var y = e.PageY;
+        if (DragDropManager.Payload is ActivityDescriptor activityDescriptor)
+        {
+            Console.WriteLine(">>>>>>>>>>start add activity");
+            //添加并创建新插头
+            //await AddNewActivityAsync(activityDescriptor, x, y);
+            //更新整个流程
+            //await SaveAsync();
+
+            await DomInteropService.SetDragPayload(null);
+            DragDropManager.Payload = null;
+            return;
+        }
+        DragDropManager.Payload = null;
+        Log.Information("别啥都往里拖");
+        //await AddNewActivityAsync(activityDescriptor, x, y);
+    }
+
+    private async Task OnActivitySelected(JsonObject activity)
+    {
+        //Console.WriteLine("selected activity is:" + activity);
+        //SelectActivity(activity);
+        SelectedActivity = activity;
+        SelectedActivityId = activity.GetId();
+        //StatusReporter.PlugSelected(SelectedActivityId);
+        //await ActivitySelected.InvokeAsync(activity);
+    }
+
+    private async Task OnCanvasSelected()
+    {
+        if (IsChildDesigner)
+        {
+            return;
+        }
+        //StatusReporter.PlugSelected(Plug.DefinitionId);
+        // if (CanvasSelected.HasDelegate)
+        //     await CanvasSelected.InvokeAsync();
+    }
+
+
+    private async Task OnConnectLineDoubleClick(MouseEventArgs args)
+    {
+        // 注意：Blazor 的事件参数不直接提供 target，需通过其他方式获取
+        // 方案1：通过 JS 互操作获取实际点击元素（推荐）
+        var elementInfo = await JSRuntime.InvokeAsync<string>(
+            "getClickedElementInfo",
+            args.ClientX,  // 点击位置 X 坐标
+            args.ClientY   // 点击位置 Y 坐标
+        );
+
+        // 输出元素信息
+        Log.Information($"双击元素标签：{elementInfo}");
+    }
+}

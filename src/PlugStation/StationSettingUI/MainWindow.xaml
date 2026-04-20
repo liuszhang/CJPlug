@@ -1,0 +1,33 @@
+﻿<Window x:Class="StationSettingUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:StationSettingUI" 
+        xmlns:components="clr-namespace:StationSettingUI.Components"
+        mc:Ignorable="d"
+        Title="图站管理工具" Height="450" Width="800" RenderTransformOrigin="0.5,0.5">
+    <Window.RenderTransform>
+        <TransformGroup>
+            <ScaleTransform/>
+            <SkewTransform/>
+            <RotateTransform/>
+            <TranslateTransform X="0" Y="0"/>
+        </TransformGroup>
+    </Window.RenderTransform>
+    <Grid>
+        <TabControl>            
+            <TabItem Header="服务配置">
+                <Grid Background="#FFE5E5E5">
+                    <components:ServiceSetting></components:ServiceSetting>
+                </Grid>
+            </TabItem>
+            <TabItem Header="工具注册">
+                <Grid Background="#FFE5E5E5">
+                    <components:ToolRegistration></components:ToolRegistration>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+    </Grid>
+</Window>

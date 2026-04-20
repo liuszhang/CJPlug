@@ -1,0 +1,24 @@
+﻿
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages.FileExplorer
+@using MudBlazor
+
+
+<MudDialog Class="stack-resize" Style="width:1066px;height:720px;">
+    <TitleContent>
+        @* <MudText Typo="Typo.h6">工作目录（@Plug.WorkPath）</MudText> *@
+        <MudText Typo="Typo.h6">工作目录</MudText>
+    </TitleContent>
+    <DialogContent>
+        <WorkPathFileExplorer PlugDataZone="PlugDataZone"></WorkPathFileExplorer>
+    </DialogContent>
+    <DialogActions>
+        @* <MudButton>取消</MudButton>
+        <MudButton Color="Color.Primary">提交</MudButton> *@
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+}

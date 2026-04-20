@@ -1,0 +1,141 @@
+﻿@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.EventAggregator
+
+@using CJ.Plug.Models.Services
+@using CJ.Plug.PlugBaseCore.Components
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.DataConnector
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using EventAggregator.Blazor
+@using Humanizer
+@using MediatR
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using Radzen.Blazor
+@using Serilog
+@using Size=MudBlazor.Size
+
+@inject ISnackbar Snackbar
+@inject IPDZApiClient MainApiClient
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
+@inject IEnumerable<IPlugActionSettingContent> PlugActionSettingContent
+@inject IDialogService DialogService
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+<MudDialog Class="stack-resize" Style="height:880px;width:1500px;">
+            <DialogContent>
+                <DataConnector></DataConnector>
+            </DialogContent>
+            <DialogActions>
+        <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">清空映射</MudButton>
+        <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">同名映射</MudButton>
+                <MudButton Disabled="Processing" OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">关闭</MudButton>
+                @* <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlug(Plug))">应用</MudButton>
+                <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlugAndCloseDialog(Plug))">
+                    @if (Processing)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>        
+                    }
+                    else
+                    {
+                        <MudText>确定</MudText>
+                    }
+                </MudButton> *@
+            </DialogActions>
+
+        </MudDialog>
+
+
+@code {
+    [Parameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+    [Parameter] 
+    public Plug? Plug { get; set; } = new();
+    [Parameter]
+    public EventCallback<JsonObject> OnSave { get; set; }
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    public EventCallback<PlugDataZone> PDZUpdated { get; set; }
+
+
+
+    private bool Processing = false;
+
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            Position = DialogPosition.Center,
+            BackdropClick = false,
+            FullWidth=true            
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        MudDialog.SetOptionsAsync(diaOption);
+    }
+
+    async Task SavePlugAndCloseDialog(Plug plug)
+    {
+        Processing = true;
+        //Activity.SetName(plug.Name);
+        foreach (var v in plug.PlugVariables)
+        {
+            Activity.SetProperty(JsonSerializer.SerializeToNode(v.Value, new JsonSerializerOptions { WriteIndented = true }), v.Name);
+        }
+        Activity.SetDisplayText(plug.Name);
+        await SavePlug(plug);
+        Console.WriteLine($"the new activity is:{Activity}");
+
+        MudDialog.Close(Activity);
+    }
+
+    async Task SavePlug(Plug plug)
+    {
+        Processing = true;
+        //Console.WriteLine($"prepare to update plug:{JsonSerializer.Serialize(plug.PlugVariables)}");
+        //更新插头的json数据，用于流程图显示
+        foreach (var v in plug.PlugVariables)
+        {
+            Activity.SetProperty(JsonSerializer.SerializeToNode(v.Value, new JsonSerializerOptions { WriteIndented = true }), v.Name);
+        }
+        Activity.SetDisplayText(plug.Name);
+        Activity.SetName(plug.Name);
+        plug.ActivityJsonData = Activity.ToString();
+
+        //更新插头基本信息
+        //await MainApiClient.UpdatePlugAsync(plug.Id, plug);
+        //更新插头执行动作关系表
+        //await MainApiClient.SetExecutePlugActionsToPlug(plug, PlugActionsToExecute);
+
+        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+        StatusReporter.PDZUpdated(PlugDataZone.PDZId);
+        StatusReporter.PlugUpdated(plug.DefinitionId);
+
+        Processing = false;
+    }
+}

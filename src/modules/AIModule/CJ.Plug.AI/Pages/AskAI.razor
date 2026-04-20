@@ -1,0 +1,239 @@
+﻿@using CJ.Plug.AIChat.Components.Pages.Chat
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.DeekSeekIn
+@using CJ.Plug.SharedPages.Contracts
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using MudX
+@using Radzen.Blazor
+
+
+@inject IDeepSeekService DeepSeekService
+
+<MudTextField @bind-Value="@Question" Immediate
+              Placeholder="智能命令" Margin="Margin.Dense" Variant="Variant.Outlined"
+              Adornment="Adornment.End"
+              AdornmentIcon="@Icons.Material.Filled.PlayArrow"
+              AdornmentColor="Color.Secondary"
+              Disabled="@visible"
+              OnKeyDown="OnTextFieldKeyPressed"
+              OnAdornmentClick="() => OpenAndAnswer(Question)"></MudTextField>
+
+<MudOverlay Visible="visible" DarkBackground="true" ZIndex="9999">
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+        <MudPaper MaxWidth="60%" MaxHeight="80vh" MinWidth="1200px">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <CJ.Plug.SharedPages.Layout.VerticalWell ExtraPadding="100">
+                    @* <MudXChat ChatPosition="ChatBubblePosition.End">
+                        <MudXChatBubble>
+                            @Question
+                        </MudXChatBubble>
+                    </MudXChat>
+                    <MudXChat ChatPosition="ChatBubblePosition.Start">
+                        <MudXChatBubble>
+                            @Answer
+                        </MudXChatBubble>
+                    </MudXChat> *@
+
+                @*     <RadzenAIChat @ref="basicChat" 
+                Title="AI Assistant" 
+                Placeholder="Ask me anything..."
+                Style="height: 500px;"
+                /> *@
+
+                    <RadzenChat @ref="basicChat"
+                                Title="智能命令"
+                                CurrentUserId="user1"
+                                Users="@users"
+                                ShowUsers="false"
+                                Messages="@messages"
+                                MessagesChanged="@OnMessagesChanged"
+                                Placeholder="咨询或命令执行..."
+                                Style="height: 500px;width:1150px;"
+                                ShowTypingIndicator="true"
+                                MessageAdded="@OnMessageAdded"
+                                MessageSent="@OnMessageSent"
+                                ChatCleared="@OnChatCleared"
+                                TypingChanged="@OnTypingChanged" />
+
+                    @* <Chat></Chat> *@
+
+
+                </CJ.Plug.SharedPages.Layout.VerticalWell>
+                <MudStack Row AlignItems="AlignItems.Center">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(e => ToggleOverlay(false))">关闭</MudButton>
+                @* <MudCheckBox @bind-Value="UseOllama">使用本地模型</MudCheckBox> *@
+                <MudText Typo="Typo.body2">切换模型：</MudText>
+                <MudSelect @bind-Value="UseModel" Style="width:200px">
+                        <MudSelectItem Value="@("Ollama")">Ollama</MudSelectItem>
+                        <MudSelectItem Value="@("OpenRouter")">OpenRouter</MudSelectItem>
+                </MudSelect>
+                
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudStack>
+</MudOverlay>
+
+
+
+@code{
+    private string? Question { get; set; }
+    private string? Answer { get; set; }
+    private bool visible = false;
+    //RadzenAIChat basicChat;
+    RadzenChat basicChat;
+    private List<ChatUser> users = new();
+    private List<ChatMessage> messages = new();
+    ChatMessage TmpMessage = new ChatMessage();
+    private bool UseOllama = false;
+    private string UseModel { get; set; } = "OpenRouter";
+
+
+    protected override void OnInitialized()
+    {
+        // Initialize users
+        users.AddRange(new[]
+        {
+            new ChatUser { Id = "user1", Name = "ME", Color = "#1976d2" },
+            new ChatUser { Id = "user2", Name = "AI", Color = "#388e3c" },
+            //new ChatUser { Id = "user3", Name = "Bob Johnson", Color = "#f57c00" }
+        });
+
+        // Add some sample messages
+        messages.AddRange(new[]
+        {
+            new ChatMessage { Content = "wake up!", UserId = "user1", Timestamp = DateTime.Now.AddMinutes(-30) },
+            //new ChatMessage { Content = "Thanks John! Looking forward to working together.", UserId = "user2", Timestamp = DateTime.Now.AddMinutes(-29) },
+            //new ChatMessage { Content = Answer, UserId = "user3", Timestamp = DateTime.Now.AddMinutes(-28) }
+        });
+        // TmpMessage.UserId = "user2";
+        // TmpMessage.Timestamp = DateTime.Now.AddMinutes(-27);
+        //messages.Add(TmpMessage);
+    }
+
+    void OnMessageAdded(ChatMessage message)
+    {
+        var participant = users.FirstOrDefault(p => p.Id == message.UserId);
+        var participantName = participant?.Name ?? "Unknown";
+    }
+
+    async void OnMessageSent(ChatMessage message)
+    {
+        //console.Log($"Message sent: {message.Content}", AlertStyle.Info);
+        await TestDeepSeek(message.Content);
+    }
+
+    void OnMessagesChanged(IEnumerable<ChatMessage> newMessages)
+    {
+        messages = newMessages.ToList();
+        StateHasChanged();
+    }
+
+    void OnChatCleared()
+    {
+        //console.Log("Chat cleared", AlertStyle.Warning);
+    }
+
+    async Task SimulateJaneTyping()
+    {
+        if (basicChat == null)
+        {
+            return;
+        }
+
+        await basicChat.SetUserTyping("user2", true);
+        await Task.Delay(1500);
+        await basicChat.SetUserTyping("user2", false);
+    }
+
+    void OnTypingChanged(ChatTypingEventArgs args)
+    {
+        // In a real app you would broadcast this via SignalR to other clients.
+        //console.Log($"TypingChanged: {args.UserId} => {args.IsTyping}", AlertStyle.Info);
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //Console.WriteLine("Load Ai AppBar Item DONE");
+            //StateHasChanged();
+        }
+    }
+
+    private async Task OnTextFieldKeyPressed(KeyboardEventArgs args)
+    {
+        //Console.WriteLine(args.Key);
+        if (args.Key == "Enter")
+        {
+            await OpenAndAnswer(Question);
+        }
+    }
+
+    private async Task OpenAndAnswer(string? Question)
+    {
+        if (string.IsNullOrEmpty(Question))
+        {
+            return;
+        }
+        visible = true;
+        messages.AddRange(new[]
+        {
+            new ChatMessage { Content = Question, UserId = "user1", Timestamp = DateTime.Now.AddMinutes(-29) }
+        });
+        await TestDeepSeek(Question);
+    }
+
+    private async Task TestDeepSeek(string? Question)
+    {
+        var TmpMessage = new ChatMessage { Content = "", UserId = "user2", Timestamp = DateTime.Now.AddMinutes(-28) };
+        //TmpMessage.UserId = "user2";
+        //TmpMessage.Timestamp = DateTime.Now.AddMinutes(-27);
+        messages.Add(TmpMessage);
+        StateHasChanged();
+        //var deepSeek = ServiceProvider.GetRequiredService<IDeepSeekService>();
+        Answer += "AI:";
+        //TmpMessage.UserId = "user2";
+
+        if (UseModel=="Ollama")
+        {
+            //本地Ollama
+            await foreach (var response in DeepSeekService.AskWithTool(Question))
+            {
+                //Console.WriteLine(response);
+                Answer += response;
+                TmpMessage.Content += response;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            //免费的OpenRouter
+            await foreach (var response in DeepSeekService.StreamReasoningFromContentAsync(Question))
+            {
+                //Console.WriteLine(response);
+                Answer += response;
+                TmpMessage.Content += response;
+                StateHasChanged();
+            }
+        }
+
+        
+        
+
+        Answer += "\n以上。";
+        messages.AddRange(new[]
+        {
+            new ChatMessage { Content = "以上。👋", UserId = "user2", Timestamp = DateTime.Now.AddMinutes(-26) }
+        });
+        StateHasChanged();
+    }
+
+    public void ToggleOverlay(bool value)
+    {
+        Answer = "";
+        visible = value;
+    }
+}

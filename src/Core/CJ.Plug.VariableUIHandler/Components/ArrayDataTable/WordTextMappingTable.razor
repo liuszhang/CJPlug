@@ -1,0 +1,42 @@
+﻿
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Serilog
+<MudTable Items="@dataList" Hover="true" Striped="true" Dense>
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>绑定书签</MudTh>
+        <MudTh>内容</MudTh>                   
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@($"{@EditorContext.Variable.Type}[{@dataList.IndexOf(context)}]")</MudTd>
+        <MudTd>@context.BMName</MudTd>
+        <MudTd>@context.InputSchema</MudTd>
+        @* <MudTd>@String.Join(',', context.PositionOffset)</MudTd> *@
+
+    </RowTemplate>
+</MudTable>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private List<WordTextMapping> dataList = new();
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            dataList = JsonSerializer.Deserialize<List<WordTextMapping>?>(EditorContext.Variable.Value);
+            //Log.Information(JsonSerializer.Serialize(dataList));
+        }
+        catch (Exception ex)
+        {
+            Log.Information(ex.Message);
+        }
+        StateHasChanged();
+    }
+}

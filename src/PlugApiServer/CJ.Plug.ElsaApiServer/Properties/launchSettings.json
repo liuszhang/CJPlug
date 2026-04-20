@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "CJ.Plug.ElsaApiServer": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:7655;http://localhost:7656"
+    }
+  }
+}

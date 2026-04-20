@@ -1,0 +1,143 @@
+﻿@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.VariableUIHandler.Contracts
+@using CJ.Plug.VariableUIHandler.Models
+@using CJ.Plug.VariableUIHandler.Pages
+@using MudBlazor
+
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IVariableUIService VariableUIService
+@inject IPDZApiClient MainApiClient
+
+
+@if (BaseVariable.IsValueFromOtherVariable)
+{
+    <MudChipSet T="string" AllClosable="@true" OnClose="()=>OnChipClosed(BaseVariable)">
+        <MudTooltip Text="@($"参数来源：{BaseVariable.DisplayValue}")">
+            <MudChip Value="@BaseVariable.SourceValueVariableName" />
+        </MudTooltip>
+    </MudChipSet>
+}
+else
+{
+    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="0">        
+        @ChildContent
+        @if (VariableTypeShowBinding.GetTypeShowBinding(BaseVariable.Type))
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.EmojiSymbols" Size="Size.Small" Color="Color.Primary" OnClick="()=>BindingVariable(BaseVariable)" />
+        }
+
+    </MudStack>
+
+}
+
+
+@code {
+    [CascadingParameter]
+    private PlugDataZone? PlugDataZone { get; set; }
+    public DisplayInputEditorContext? EditorContext { get; set; } = new();
+
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+    [Parameter]
+    public BaseVariable? BaseVariable { get; set; }
+    [Parameter]
+    public bool IsDefaultValue { get; set; } = false;
+
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        EditorContext = new DisplayInputEditorContext
+            {
+            //Plug = Plug,
+                PlugDefinitionId = PlugDefinitionId,
+                Variable = BaseVariable,
+                PlugDataZone = PlugDataZone,
+            };
+        var handler = VariableUIService.GetHandler(BaseVariable.Type);
+        ChildContent = await handler.DisplayInputEditor(EditorContext);        
+    }
+
+
+    private async void OnChipClosed(BaseVariable PlugVariable)
+    {
+        var dataFlowData = PlugDataZone?.DataFlowDatas?.Where(d =>
+        d.SourceVariableId == PlugVariable.SourceValueVariableId &&
+        d.TargetVariableId == PlugVariable.Id).FirstOrDefault();
+
+        PlugVariable.Value = "";
+        PlugVariable.DisplayValue = "";
+        PlugVariable.IsValueFromOtherVariable = false;
+        PlugVariable.SourceValueVariableId = null;
+        PlugVariable.SourceValueVariableName = null;
+
+        //删除一条数据流
+        if (dataFlowData != null)
+        {
+            await MainApiClient.DeleteDataFlowData(dataFlowData.Id);
+            PlugDataZone?.DataFlowDatas?.Remove(dataFlowData);
+        }
+        
+        var newPlugVariable = (PlugVariableData)PlugVariable;
+        newPlugVariable.PlugDefinitionId = PlugDefinitionId;
+        await MainApiClient.UpdatePlugVariableData(newPlugVariable);
+        
+    }
+
+
+    async Task BindingVariable(BaseVariable? Variable)
+    {
+        Console.WriteLine(">>>>>>>>>start choose varibles");
+        var parameters = new DialogParameters<ChooseVariablesDialog>{
+            //{x=>x.Plug,EditorContext.Plug},
+            {x=>x.EditorContext,EditorContext},
+        };
+        var dialog = await DialogService.ShowAsync<ChooseVariablesDialog>("选择流程参数", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var SelectedVariable = (PlugVariableData)result.Data;
+            Console.WriteLine("choosed variable:" + SelectedVariable?.Name);
+            var sourcePlug = PlugDataZone.PlugDatas.FirstOrDefault(p => p.PlugDefinitionId == SelectedVariable?.PlugDefinitionId);
+            Variable.DisplayValue = $"{sourcePlug?.Name}({SelectedVariable?.PlugDefinitionId}):{SelectedVariable?.Name}";
+            //这里不要赋值给Value,执行时再获取
+            //Variable.Value = SelectedVariable?.Name;
+            Variable.Value = null;
+            //这里不要赋值ID，不然会导致PDZ复制后不好处理
+            Variable.SourceValueVariableId = SelectedVariable?.Id;
+            Variable.SourceValueVariableName = SelectedVariable?.Name;
+            Variable.SourceValuePlugDefinitionId = SelectedVariable?.PlugDefinitionId;
+            Variable.IsValueFromOtherVariable = true;
+            var newPlugVariable = (PlugVariableData)Variable;
+            newPlugVariable.PlugDefinitionId = PlugDefinitionId;
+            await MainApiClient.UpdatePlugVariableData(newPlugVariable);
+
+            var dataFlowData = new DataFlowData()
+                {
+                    PlugDataZoneId = PlugDataZone.Id,
+                    SourceVariableId = SelectedVariable.Id,
+                    SourceVariableName = SelectedVariable.Name,
+                    SourcePlugDefinitionId = SelectedVariable.PlugDefinitionId,
+                    TargetVariableId = Variable.Id,
+                    TargetVariableName = Variable.Name,
+                    TargetPlugDefinitionId = PlugDefinitionId,
+                };
+            dataFlowData.PortLinkData = dataFlowData.GeneratePortLinkData();
+            await MainApiClient.CreateDataFlowData(dataFlowData);
+            PlugDataZone?.DataFlowDatas?.Add(dataFlowData);
+            //StatusReporter.PDZUpdated(PlugDataZone.PDZId);
+            //PlugDataZone.GenerateDataFlowData();
+            //await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+        }
+
+
+        StateHasChanged();
+    }
+
+}

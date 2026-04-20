@@ -1,0 +1,192 @@
+﻿@using System.Text.Json
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Extensions
+@using MudExtensions
+@using Serilog
+
+
+@inject IDialogService DialogService
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+
+<MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0">
+    <MudTabPanel Text="属性">
+        <VerticalPercentWell SplitterPanelPercent="HeightPercent">
+
+
+
+            @if (string.IsNullOrEmpty(SelectedPlugDefinitionId))
+            {
+                <MudAlert Severity="Severity.Error">请选择一个组件</MudAlert>
+            }
+            else
+            {
+                <MudStack Style="height:100%;">
+                    @* <MudText>已选对象：@SelectedPlug.Name</MudText> *@
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudTextField @bind-Value="SelectedPlugData.Id" ReadOnly Margin="Margin.Dense" Label="编号" Variant="Variant.Filled"></MudTextField>
+                        <MudTextField @bind-Value="SelectedPlugData.PlugDefinitionId" ReadOnly Margin="Margin.Dense" Label="定义编号" Variant="Variant.Filled"></MudTextField>
+                        @if (SelectedPlugDefinitionId!=PlugDataZone?.PlugDefinitionId)
+                        {
+                            <MudTooltip Text="直接启动插头">
+                                <MudLoadingButton @bind-Loading="_loading" 
+                                ButtonVariant="ButtonVariant.IconButton" 
+                                Size="Size.Medium"
+                                OnClick="ExecutePlug"
+                                                  Icon="@Icons.Material.Filled.PlayArrow"
+                                                  Variant="Variant.Filled"
+                                                  Color="Color.Tertiary">启动</MudLoadingButton>
+
+                                @* <MudIconButton OnClick="ExecutePlug" 
+                                    Icon="@Icons.Material.Filled.PlayArrow" 
+                                Variant="Variant.Filled" 
+                                Color="Color.Tertiary">直接启动</MudIconButton> *@
+                            
+                            </MudTooltip>
+                        }                        
+                    </MudStack>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudTextField @bind-Value="SelectedPlugData.Name" @bind-Value:after="UpdatePlugData" Margin="Margin.Dense" Label="名称" Variant="Variant.Outlined"></MudTextField>
+                        @if (SelectedPlugDefinitionId != PlugDataZone?.PlugDefinitionId)
+                        {
+                            <MudCheckBox Value="AsTriggerPlug" ValueChanged="(bool a) => ChooseAsTrigger(a)" Label="起始活动" Color="Color.Primary"></MudCheckBox>
+                        }
+                    </MudStack>
+                    <MudTextField Value="SelectedPlugData?.Description" ValueChanged="(string e)=>HandleDescriptionChanged(e)" AutoGrow Lines="3" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined"></MudTextField>
+                </MudStack>
+            }
+
+        </VerticalPercentWell>
+
+
+    </MudTabPanel>
+</MudTabs>
+
+
+
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public string? SelectedPlugDefinitionId { get; set; }
+    [Parameter]
+    public double HeightPercent { get; set; } = 30.00;
+
+    private bool _loading = false;
+
+    private bool AsTriggerPlug { get; set; } = false;
+    private PlugData? SelectedPlugData { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        //_items = new List<ProcessVariable>();
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(SelectedPlugDefinitionId))
+        {
+            SelectedPlugData = PlugDataZone?.PlugDatas?
+                .FirstOrDefault(x => x.PlugDefinitionId == SelectedPlugDefinitionId) ?? new();
+            if (PlugDataZone?.TriggerPlugDefinitionId == SelectedPlugDefinitionId)
+            {
+                AsTriggerPlug = true;
+            }
+            else
+            {
+                AsTriggerPlug = false;
+            }
+        }
+    }
+
+    async void HandleIntervalElapsed(string debouncedText)
+    {
+        //Console.WriteLine(debouncedText);
+        //Console.WriteLine(Process.Description);
+        //await WorkflowApiClient.UpdateProcessAsync(Process.Id, Process);
+        //await WorkflowApiClient.UpdatePlugAsync(SelectedPlug.Id, SelectedPlug);
+        Snackbar.Add("属性已更新");
+    }
+
+    private async Task HandlePlugNameChanged()
+    {
+        await UpdatePlugData();
+        Snackbar.Add("名称已更新");
+        // if (SelectedPlugData != null)
+        // {
+        //     //SelectedPlugData.Name = name;
+        //     await UpdatePlugData();
+        //     Snackbar.Add("名称已更新");
+        // }
+    }
+
+    private async Task HandleDescriptionChanged(string Description)
+    {
+        if (SelectedPlugData != null)
+        {
+            SelectedPlugData.Description = Description;
+            await MainApiClient.UpdatePlugData(SelectedPlugData);
+            //await UpdatePlugData();
+            Log.Information("描述已更新");
+        }
+    }
+
+    private async Task ChooseAsTrigger(bool a)
+    {
+        if (a)
+        {
+            CLog.Information($"设置启动插头为：{SelectedPlugDefinitionId}",PlugDataZone?.PDZId);
+            PlugDataZone.TriggerPlugDefinitionId = SelectedPlugDefinitionId;
+        }
+        else
+        {
+            CLog.Information($"设置启动插头为空", PlugDataZone?.PDZId);
+            PlugDataZone.TriggerPlugDefinitionId = null;
+        }
+
+        AsTriggerPlug = a;
+
+        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+    }
+
+    private async Task UpdatePlugData()
+    {
+        await MainApiClient.UpdatePlugData(SelectedPlugData);
+        //await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+        //await MainApiClient.UpdatePlugData(SelectedPlugData);
+        //StatusReporter.PlugUpdated(SelectedPlugDefinitionId);
+    }
+
+
+    private async Task ExecutePlug()
+    {
+        try
+        {
+            _loading = true;
+            var status = new PlugStatus();
+            status.Blocked = true;
+            StatusReporter.ReportPlugStatus(SelectedPlugDefinitionId, status, PlugDataZone.PDZId);
+            var request = new PlugExecutionRequest();
+            request.ExecuteResultData.Ids.PlugDefinitionId = SelectedPlugDefinitionId;
+            request.ExecuteResultData.Ids.PDZId = PlugDataZone.PDZId;
+            request.PlugType = SelectedPlugData?.PlugType;
+            request.ExecuteMode = ExecuteMode.Plug;
+            await MainApiClient.ExecutePlug(request);
+            _loading = false;
+        }
+        catch (Exception ex)
+        {
+            CLog.Error(ex.Message);
+            return;
+        }
+    }
+
+}

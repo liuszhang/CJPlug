@@ -1,0 +1,363 @@
+﻿@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages.SharedComponents
+@using DllLoaderPlug.Services
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using MudExtensions
+@using Radzen.Blazor
+@using Serilog
+@using System.Reflection
+@using System.Linq
+@using System.IO
+@using System
+
+<MudStack Row AlignItems="AlignItems.Center">
+    
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">导入脚本</MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">导出脚本</MudButton>
+    <MudButton OnClick="TestExecuteSelectedMethodAsync" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RunCircle">测试调用</MudButton>
+</MudStack>
+
+<RadzenSplitter >
+    <RadzenSplitterPane Size="60%">
+        <MonacoEditorWrapper @ref="editor" Id="@PlugDefinitionId" Language="csharp" InitValue="@initValue"></MonacoEditorWrapper>
+        <MudTextField Lines="12" @bind-Value="codeResult" Variant="Variant.Outlined" ReadOnly Label="结果预览"></MudTextField>
+    </RadzenSplitterPane>
+    <RadzenSplitterPane Size="600px" MinSize="200px" Style="border-left:1px solid #ccc;">
+        <MudTabs>
+            <MudTabPanel Text="目标DLL">
+                <MudButton OnClick="LoadDllAsync" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">解析Dll</MudButton>
+                <InputFile OnChange="OnDllFileChange" />
+                <MudList T="string" Dense Style="width:100%;max-height:600px;overflow:auto;">
+                    <MudListItem>加载的Dll方法列表：</MudListItem>
+                    @foreach (var method in loadedMethods)
+                    {
+                        <MudListItem OnClick="@(() => SelectMethod(method))" Class="@(selectedMethod == method ? "mud-list-item-active" : null)">@method.Name</MudListItem>
+                    }
+                </MudList>
+            </MudTabPanel>
+            <MudTabPanel Text="依赖库列表">
+
+            </MudTabPanel>
+        </MudTabs>
+        
+    </RadzenSplitterPane>
+    
+</RadzenSplitter>
+
+
+
+
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; } = "test-csharp-plug";
+
+    [Inject]
+    private IDllMethodCacheService MethodCache { get; set; } = null!;
+    [Inject]
+    private IDllInvokerService DllInvoker { get; set; } = null!;
+
+    private MonacoEditorWrapper? editor { get; set; }
+
+    private string? initValue = "int a = 10; int b = 20; return a + b;";
+    private string? codeResult = "";
+    private DllLoaderPlug.Services.MethodDescriptor? selectedMethod;
+
+    // Use a scoped per-user cache service to store loaded methods so component re-instantiation
+    // doesn't cause transient UI flash. This avoids static cross-user sharing in Blazor Server.
+    private List<DllLoaderPlug.Services.MethodDescriptor> loadedMethods => MethodCache.GetMethods();
+
+    // 不在渲染周期自动加载 DLL，避免重复/重入。用户通过按钮显式触发加载。
+    private bool isLoading = false;
+
+    private async Task LoadDllAsync()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        // ensure UI shows loading state asap
+        Console.WriteLine("DllLoaderPlugPage: Start LoadDllAsync");
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            // loadedMethods = await DllMethodReader.DllReader(null);
+            // foreach (var method in loadedMethods)
+            // {
+            //     codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+            // }
+            // initValue = codeResult;
+
+            var task = DllMethodReader.DllReader(null);
+            var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(15)));
+            if (completed == task)
+            {
+                var methods = await task; //already completed
+                // only replace existing list when we actually found methods; avoid replacing with an empty collection which causes UI to 'flash' empty
+                if (methods != null && methods.Count > 0)
+                {
+                    MethodCache.SetMethods(methods);
+                }
+
+                Console.WriteLine($"DllLoaderPlugPage: reader returned {methods?.Count ?? 0} methods");
+                // refresh result preview from current loadedMethods
+                codeResult = string.Empty;
+                foreach (var method in loadedMethods)
+                {
+                    codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+                }
+                initValue = codeResult;
+                if (loadedMethods == null || loadedMethods.Count == 0)
+                {
+                    codeResult = "未解析到任何托管类型。请使用“选择文件”上传一个 .NET 程序集（DLL），以便进行解析与测试执行。";
+                }
+                await InvokeAsync(StateHasChanged);
+                Console.WriteLine($"DllLoaderPlugPage: loadedMethods.Count = {loadedMethods.Count}");
+            }
+            else
+            {
+                Console.WriteLine("加载 DLL 超时，可能正在被另一个进程读取或文件过大。请稍后重试。");
+                // keep previously loadedMethods instead of clearing, to avoid flashing empty list
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"加载 DLL 方法失败：{ex.Message}");
+            // on error do not aggressively clear previous results so UI won't flash empty
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("DllLoaderPlugPage: OnInitialized");
+        //If there are cached methods from a previous instance, ensure UI reflects them immediately
+        // if (loadedMethods != null && loadedMethods.Count > 0)
+        // {
+        //     codeResult = string.Empty;
+        //     foreach (var method in loadedMethods)
+        //     {
+        //         codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+        //     }
+        //     initValue = codeResult;
+        // }
+    }
+
+
+    // protected override void OnInitialized()
+    // {
+    //     Console.WriteLine("DllLoaderPlugPage: OnInitialized");
+    //     If there are cached methods from a previous instance, ensure UI reflects them immediately
+    //     if (loadedMethods != null && loadedMethods.Count > 0)
+    //     {
+    //         codeResult = string.Empty;
+    //         foreach (var method in loadedMethods)
+    //         {
+    //             codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+    //         }
+    //         initValue = codeResult;
+    //     }
+
+    //     base.OnInitialized();
+    // }
+
+    // protected override async Task OnParametersSetAsync()
+    // {
+    //     Console.WriteLine("DllLoaderPlugPage: OnParametersSetAsync");
+    //     await base.OnParametersSetAsync();
+    // }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Console.WriteLine($"DllLoaderPlugPage: OnAfterRenderAsync firstRender={firstRender}, loadedMethods.Count={loadedMethods?.Count}");
+
+        // if (firstRender)
+        // {
+        //     if (loadedMethods != null && loadedMethods.Count > 0)
+        //     {
+        //         codeResult = string.Empty;
+        //         foreach (var method in loadedMethods)
+        //         {
+        //             codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+        //         }
+        //         initValue = codeResult;
+        //     }
+        // }
+
+        //await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public void Dispose()
+    {
+        Console.WriteLine("DllLoaderPlugPage: Dispose");
+    }
+
+    private void SelectMethod(DllLoaderPlug.Services.MethodDescriptor method)
+    {
+        selectedMethod = method;
+        // generate a simple C# snippet that calls the selected method (best-effort)
+        if (selectedMethod != null)
+        {
+            var paramList = string.Join(", ", selectedMethod.Parameters.Select(p => p?.Name ?? "arg"));
+            var callTarget = selectedMethod.IsStatic ? selectedMethod.DeclaringType : ($"new {selectedMethod.DeclaringType}()");
+
+            if (!string.IsNullOrEmpty(selectedMethod.ReturnType) && selectedMethod.ReturnType == "native export")
+            {
+                // For native exports, provide P/Invoke template guidance
+                initValue = $"// 本方法来自本地 DLL 导出 (native export)\n" +
+                            $"// 示例 P/Invoke 模板：\n" +
+                            $"[System.Runtime.InteropServices.DllImport(\"{selectedMethod.SourcePath ?? "your.dll"}\", EntryPoint=\"{selectedMethod.Name}\")]\n" +
+                            $"public static extern int {selectedMethod.Name}();\n\n// 然后直接调用：\nvar r = {selectedMethod.Name}();\nreturn r;";
+            }
+            else
+            {
+                initValue = $"// 调用: {selectedMethod.DeclaringType}.{selectedMethod.Name}({paramList})\n" +
+                            "// TODO: 填充参数值\n" +
+                            (selectedMethod.IsStatic ? "var result = " : "var instance = ") +
+                            $"{callTarget}.{selectedMethod.Name}({paramList});\nreturn result;";
+            }
+            editor?.SetValue(initValue);
+        }
+    }
+
+    private async Task TestExecuteSelectedMethodAsync()
+    {
+        // generate preview
+        if (selectedMethod == null)
+        {
+            codeResult = "未选择方法";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        SelectMethod(selectedMethod);
+
+        try
+        {
+            if (!string.IsNullOrEmpty(selectedMethod.ReturnType) && selectedMethod.ReturnType == "native export")
+            {
+                if (editor != null)
+                {
+                    var model = await editor.GetModel();
+                    var pinvokeSource = await model.GetValue(EndOfLinePreference.CRLF, default);
+                    var invokeResult = await DllInvoker.InvokeNativeAsync(selectedMethod, pinvokeSource);
+                    if (invokeResult.Success)
+                        codeResult = invokeResult.Result == null ? "(null)" : invokeResult.Result.ToString();
+                    else
+                        codeResult = invokeResult.ErrorMessage ?? "未知错误";
+                }
+                else
+                {
+                    codeResult = "编辑器不可用，无法读取 P/Invoke 模板";
+                }
+            }
+            else
+            {
+                // Use the invoker service which can dynamically load the assembly and invoke
+                var invokeResult = await DllInvoker.InvokeAsync(selectedMethod);
+                if (invokeResult.Success)
+                {
+                    codeResult = invokeResult.Result == null ? "(null)" : invokeResult.Result.ToString();
+                }
+                else
+                {
+                    codeResult = invokeResult.ErrorMessage ?? "未知错误";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"执行失败: {ex.Message}";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task TestCode()
+    {
+        if (editor != null)
+        {
+            //var code = initValue;
+            var references = new[]
+            {
+                "System.Runtime.dll",          // 基础库
+                //"path/to/your/sdk.dll"         // 自定义 SDK
+            };
+            var model = await editor.GetModel();
+            var code = await model.GetValue(EndOfLinePreference.CRLF, default);
+            //Log.Information($"执行代码：{code}");
+            codeResult = "测试成功";
+        }
+    }
+
+    private async Task OnDllFileChange(InputFileChangeEventArgs e)
+    {
+        Console.WriteLine("DllLoaderPlugPage: OnDllFileChange");
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            var fileName = Path.GetFileName(file.Name);
+            var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + "_" + fileName);
+            await using (var fs = System.IO.File.Create(tempPath))
+            await using (var stream = file.OpenReadStream(long.MaxValue))
+            {
+                await stream.CopyToAsync(fs);
+            }
+
+            // Use the uploaded file path to read methods
+            var task = DllMethodReader.DllReader(tempPath);
+            var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(15)));
+            if (completed == task)
+            {
+                var methods = await task;
+                if (methods != null && methods.Count > 0)
+                {
+                    // ensure SourcePath is set for each method (DllMethodReader should set it, but double-check)
+                    foreach (var m in methods)
+                    {
+                        if (string.IsNullOrEmpty(m.SourcePath)) m.SourcePath = tempPath;
+                    }
+                    MethodCache.SetMethods(methods);
+                }
+
+                codeResult = string.Empty;
+                foreach (var method in loadedMethods)
+                {
+                    codeResult += $"方法：{method.Name}，返回类型：{method.ReturnType}\n";
+                }
+                initValue = codeResult;
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                codeResult = "上传并解析 DLL 超时";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"上传并解析 DLL 失败：{ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+}

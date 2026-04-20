@@ -1,0 +1,215 @@
+﻿@page "/RoleManageList"
+
+@using MudBlazor
+@using System.Globalization
+@using System.Linq
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>角色管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False">
+
+    <MudStack Row AlignItems="AlignItems.Center">
+        <MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="角色操作" Color="Color.Default" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft">
+            <MudMenuItem OnClick="@DeleteSelectedRoles">删除</MudMenuItem>
+            <MudMenuItem OnClick="@ExportSelectedRoles">导出</MudMenuItem>
+        </MudMenu>
+
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateRole">创建角色</MudButton>
+        <MudButton OnClick="async()=>await dataGrid.ReloadServerData()" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+    </MudStack>
+
+
+@code {
+    private MudDataGrid<RoleDto> dataGrid;
+    public HashSet<RoleDto> SelectedRoles { get; set; } = new HashSet<RoleDto>();
+    public string? searchString { get; set; }
+
+    // 示例数据：替换为后端 API 调用
+    private List<RoleDto> AllRoles { get; set; } = new List<RoleDto>()
+    {
+        new RoleDto { Id = 1, Name = "管理员", Description = "系统管理权限", Permissions = "*", IsSystem = true, CreatedAt = DateTimeOffset.Now.AddYears(-1) },
+        new RoleDto { Id = 2, Name = "运维", Description = "运维相关权限", Permissions = "Job:View,Job:Manage", IsSystem = false, CreatedAt = DateTimeOffset.Now.AddMonths(-6) },
+        new RoleDto { Id = 3, Name = "普通用户", Description = "普通使用者", Permissions = "Job:View", IsSystem = false, CreatedAt = DateTimeOffset.Now.AddMonths(-2) }
+    };
+
+    private async Task<GridData<RoleDto>> LoadData(GridState<RoleDto> state, CancellationToken token)
+    {
+        var query = AllRoles.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            var s = searchString.Trim();
+            query = query.Where(r =>
+                (!string.IsNullOrEmpty(r.Name) && r.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(r.Description) && r.Description.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(r.Permissions) && r.Permissions.Contains(s, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        var sortDef = state.SortDefinitions?.FirstOrDefault();
+        if (sortDef != null)
+        {
+            if (sortDef.SortBy == nameof(RoleDto.Name))
+                query = query.OrderBy(r => r.Name);
+            else if (sortDef.SortBy == nameof(RoleDto.CreatedAt))
+                query = query.OrderBy(r => r.CreatedAt);
+        }
+        else
+        {
+            query = query.OrderByDescending(r => r.CreatedAt);
+        }
+
+        var total = query.Count();
+        var items = query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        await Task.CompletedTask;
+        return new GridData<RoleDto> { TotalItems = total, Items = items };
+    }
+
+    private void CreateRole()
+    {
+        // placeholder: open dialog to create role
+        var newId = (AllRoles.Count == 0) ? 1 : AllRoles.Max(x => x.Id) + 1;
+        AllRoles.Insert(0, new RoleDto { Id = newId, Name = $"新角色{newId}", Description = "请编辑描述", Permissions = "", IsSystem = false, CreatedAt = DateTimeOffset.Now });
+        _ = dataGrid.ReloadServerData();
+        Snackbar.Add("已创建新角色（请实现编辑弹窗）", Severity.Success);
+    }
+
+    private void EditRole(RoleDto role)
+    {
+        Snackbar.Add($"编辑角色：{role.Name}（请实现打开编辑对话框）", Severity.Info);
+    }
+
+    private async Task DeleteRole(RoleDto role)
+    {
+        if (role == null)
+            return;
+        AllRoles.RemoveAll(r => r.Id == role.Id);
+        await dataGrid.ReloadServerData();
+        Snackbar.Add($"已删除角色：{role.Name}", Severity.Success);
+    }
+
+    private async Task DeleteSelectedRoles()
+    {
+        foreach (var r in SelectedRoles.ToList())
+            AllRoles.RemoveAll(x => x.Id == r.Id);
+        SelectedRoles.Clear();
+        await dataGrid.ReloadServerData();
+        Snackbar.Add("已删除所选角色", Severity.Success);
+    }
+
+    private void ExportSelectedRoles()
+    {
+        Snackbar.Add("导出所选角色（请实现导出逻辑）", Severity.Info);
+    }
+
+    private void CloneRole(RoleDto role)
+    {
+        if (role == null) return;
+        var newId = (AllRoles.Count == 0) ? 1 : AllRoles.Max(x => x.Id) + 1;
+        var clone = new RoleDto { Id = newId, Name = role.Name + " - 复制", Description = role.Description, Permissions = role.Permissions, IsSystem = false, CreatedAt = DateTimeOffset.Now };
+        AllRoles.Insert(0, clone);
+        _ = dataGrid.ReloadServerData();
+        Snackbar.Add($"已复制角色：{role.Name}", Severity.Success);
+    }
+
+    public class RoleDto
+    {
+        public int Id { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Permissions { get; set; }
+        public bool IsSystem { get; set; }
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    }
+}
+    <MudDataGrid @ref="dataGrid"
+                 T="RoleDto"
+                 ServerData="LoadData"
+                 Dense="true"
+                 Hover="true"
+                 Elevation="0"
+                 SortMode="SortMode.Single"
+                 RowStyle="cursor: default;"
+                 MultiSelection="true"
+                 SelectedItems="SelectedRoles"
+                 SelectOnRowClick="false"
+                 Class="roles-table">
+
+        <ToolBarContent>
+            <MudTextField T="string"
+                          @bind-Value="searchString"
+                          Margin="Margin.Dense"
+                          Placeholder="可搜索：角色名、描述、权限"
+                          Variant="Variant.Outlined"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
+                          Adornment="Adornment.End"
+                          Clearable="true"
+                          DebounceInterval="500"
+                          Immediate="true"
+                          Class="me-3" />
+        </ToolBarContent>
+
+        <Columns>
+            <SelectColumn T="RoleDto" />
+
+            <TemplateColumn Title="角色名" Sortable="true">
+                <CellTemplate>
+                    <MudText>@context.Item.Name</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Title="描述">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">@context.Item.Description</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Title="权限">
+                <CellTemplate>
+                    <MudText Typo="Typo.caption">@context.Item.Permissions</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Title="系统角色">
+                <CellTemplate>
+                    <MudChip Color="@(context.Item.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                        @(context.Item.IsSystem ? "是" : "否")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Title="创建时间" Sortable="true">
+                <CellTemplate>
+                    @context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                </CellTemplate>
+            </TemplateColumn>
+
+            <TemplateColumn Style="text-align:right" Title="操作">
+                <CellTemplate>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                        <MudMenuItem OnClick="@(()=>EditRole(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>DeleteRole(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>CloneRole(context.Item))" Icon="@Icons.Material.Outlined.ContentCopy">复制</MudMenuItem>
+                    </MudMenu>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+
+        <NoRecordsContent>
+            <MudText>没有角色数据</MudText>
+        </NoRecordsContent>
+
+        <LoadingContent>
+            <MudText>加载中...</MudText>
+        </LoadingContent>
+
+        <PagerContent>
+            <MudDataGridPager RowsPerPageString="每页展示条数" />
+        </PagerContent>
+    </MudDataGrid>
+
+</MudContainer>

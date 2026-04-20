@@ -1,0 +1,54 @@
+@page "/Linkpage/FormSubmit"
+<PageTitle>表单提交后显示结果</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            type = "page",
+            title = "表单提交后显示结果",
+            body = new
+            {
+                type = "form",
+                api = "/api/mock/Form/SaveForm",
+                title = "查询用户 ID",
+                body = new object[]
+                {
+                    new
+                    {
+                        type = "input-group",
+                        name = "input-group",
+                        body = new object[]
+                        {
+                            new
+                            {
+                                type = "input-text",
+                                name = "name",
+                                label = "姓名"
+                            },
+                            new
+                            {
+                                type = "submit",
+                                label = "查询",
+                                level = "primary"
+                            }
+                        }
+                    },
+                    new
+                    {
+                        type = "static",
+                        name = "id",
+                        visibleOn = "typeof data.id !== 'undefined'",
+                        label = "返回 ID"
+                    }
+                },
+                actions = new object[] { }
+            }
+        };
+        return data;
+    }
+
+}

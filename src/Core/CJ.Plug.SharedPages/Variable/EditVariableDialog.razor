@@ -1,0 +1,77 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+<MudDialog>
+    <DialogContent>
+
+        <MudStack>
+            <MudField Margin="Margin.Dense" Label="Id" HelperText="The ID of the variable." Variant="Variant.Outlined">@PlugVariableData.Id</MudField>
+            <MudTextField Label="参数名称" @bind-Value="PlugVariableData.Name" Required ReadOnly="PlugVariableData.IsInitVariable"
+                          HelperText="The name of the variable." Variant="Variant.Outlined" 
+                          Validation="(string name) => ValidateName(name)" />
+            <MudSelect @bind-Value="PlugVariableData.Type" Variant="Variant.Outlined" Label="参数类型"
+                       Required ReadOnly="PlugVariableData.IsInitVariable" RequiredError="You must select a type"
+                       Margin="@Margin.Dense" ToStringFunc="@(t=>VariableTypeConverter.GetTypeDisplayName(t))">
+                @foreach (var t in Enum.GetNames(typeof(VariableTypeEnum)))
+                {
+                    if (VariableTypeBrowsable.GetTypeBrowsable(t))
+                    {
+                        <MudSelectItem T="string" Value="@t">@VariableTypeConverter.GetTypeDisplayName(t)</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            <MudField Variant="Variant.Outlined" Label="数组" HelperText="Check this option if the variable holds an array of the selected type.">
+                <MudCheckBox T="bool" @bind-Value="PlugVariableData.IsArray" ReadOnly="PlugVariableData.IsInitVariable" Label="此参数为数组"></MudCheckBox>
+            </MudField>
+
+            @* <MudTextField Label="value" @bind-Value="PDZVariable.Value" HelperText="A value." Variant="Variant.Outlined" /> *@
+            <MudTextField Label="默认值" @bind-Value="PlugVariableData.DefaultValue" HelperText="是否需要待商榷'" Variant="Variant.Outlined" />
+        </MudStack>
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="OnCancelClicked">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="OnSubmitClicked">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    [Parameter]
+    public PlugVariableData? PlugVariableData { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        PlugVariableData = PlugVariableData ?? new PlugVariableData();
+    }
+
+    private Task OnCancelClicked()
+    {
+        MudDialog.Cancel();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnSubmitClicked()
+    {
+        MudDialog.Close(PlugVariableData);
+    }
+
+    private static string ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Name is required";
+        }
+
+        if (name == "invalid")
+        {
+            return "Name must not be 'invalid'";
+        }
+
+        return null;
+    }
+}

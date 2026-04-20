@@ -1,0 +1,134 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.SharedPages.PlugSettingPages
+@using MudBlazor
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+<MudPaper>    
+    <MudStack AlignItems="AlignItems.Stretch" Spacing="0">
+
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+            <h3>"@PlugActionItem?.Name" (@PlugActionItem?.Id)</h3>
+            <MudSpacer></MudSpacer>
+            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" />
+            <MudTooltip Text="命令脚本预览">
+                <MudIconButton OnClick="PreviewAction" Size="Size.Small" Icon="@Icons.Material.Filled.Preview" />
+            </MudTooltip>
+
+            <MudIconButton OnClick="DeletePlugActionItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" aria-label="delete" />
+        </MudStack>
+        @if(showDetails)
+        {
+            <MudSelect T="string" Label="目标类型" @bind-value="PlugActionItem.Category" Clearable Margin="Margin.Dense" Dense FullWidth Variant="Variant.Outlined">
+                @foreach (var c in PlugCategory.GetPlugActionCategorys())
+                {
+                    <MudSelectItem T="string" Value=@c>@c</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField FullWidth @bind-text="PlugActionItem.Name" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="动作名称"></MudTextField>
+            @if (PlugActionItem.Category == PlugCategorys.桌面类动作.ToString())
+            {
+                // 桌面类动作配置内容
+                <ActionEXESettingContent Plug="SelectedPlug" PlugActionItem="@PlugActionItem"></ActionEXESettingContent>
+
+            }
+            @if (PlugActionItem.Category == "DLL")
+            {
+                // 桌面类动作配置内容
+                <ActionDLLSettingContent ToolActionItem="@PlugActionItem"></ActionDLLSettingContent>
+            }
+            
+
+            <MudStack Spacing="2">
+                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>
+                <MudDivider />
+                <MudCollapse Expanded="_expanded">
+                    <MudTextField @bind-Value="PlugActionItem.PlugTypeKey" Label="唯一标识符" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+                </MudCollapse>
+                
+            </MudStack>
+
+            <MudButton OnClick="SavePlugActionItem" Disabled="buttonDisabled" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small">保存</MudButton>
+        }
+        else
+        {
+            <h6>"@PlugActionItem?.TargetLib" "@PlugActionItem?.LibFunctionName"</h6>
+        }
+
+    </MudStack>
+</MudPaper>
+
+
+@code {
+    public bool showDetails { get; set; } = false;
+    public string? actionName { get; set; } = "GetParameters";
+    public string? targetLib { get; set; } = "uglib.dll";
+    public string? libPath { get; set; } = @"""C:\Program Files\Siemens\NX 12.0\NXBIN\uglib.dll""";
+    public string? libAction { get; set; } = "GetParameters";
+    public string? actionParameter { get; set; } = "";
+    bool _expanded = false;
+
+    private bool buttonDisabled { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<string> OnDelete { get; set; }
+    [Parameter]
+    public PlugAction? PlugActionItem { get; set; }
+    [Parameter]
+    public Plug? SelectedPlug { get; set; } = new();
+
+    private async Task ShowDetails()
+    {
+        showDetails = !showDetails;
+        //StateHasChanged();
+    }
+    private async Task DeletePlugActionItem()
+    {
+        Console.WriteLine(PlugActionItem?.Id.ToString());
+        await OnDelete.InvokeAsync();
+    }
+    private async Task SavePlugActionItem()
+    {
+        buttonDisabled = true;
+        PlugActionItem.ExecutingString = await GetExecuteString(SelectedPlug, PlugActionItem);
+        await MainApiClient.UpdatePlugActionAsync(PlugActionItem);
+        //await MainApiClient.UpdatePlugAsync(PlugActionItem.Id, PlugActionItem);
+        showDetails = false;
+        buttonDisabled = false;
+        StateHasChanged();
+    }
+
+    private async Task PreviewAction()
+    {
+        var es = await GetExecuteString(SelectedPlug, PlugActionItem);
+        PlugActionItem.ExecutingString = es;
+        await MainApiClient.UpdatePlugAsync(SelectedPlug.Id, SelectedPlug);
+        Snackbar.Configuration.PreventDuplicates = true;
+        Snackbar.Configuration.VisibleStateDuration = 10000;
+        Snackbar.Add(es, Severity.Info);
+    }
+
+
+    public async Task<string?> GetExecuteString(Plug toolItem, PlugAction toolActionItem)
+    {
+        var executeString = toolItem.ToolVersionPath ?? toolItem.Name;
+        executeString += " ";
+        executeString += toolActionItem.TargetLibPath ?? toolActionItem.TargetLib;
+        executeString += " ";
+        executeString += toolActionItem.LibFunctionName;
+        executeString += " ";
+        executeString += toolActionItem.FunctionParameters;
+        foreach (var v in toolActionItem.PlugVariables)
+        {
+            if (v.IsInput)
+            {
+                executeString += " ";
+                executeString += v.Value ?? v.DefaultValue;
+            }
+        }
+        Console.WriteLine($"{executeString}");
+        return executeString;
+
+    }
+}

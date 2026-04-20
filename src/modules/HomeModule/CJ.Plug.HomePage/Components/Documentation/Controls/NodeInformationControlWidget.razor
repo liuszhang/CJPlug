@@ -1,0 +1,21 @@
+﻿@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Models.Base;
+@using CJ.Plug.HomePage.Models.Controls
+
+<div style="background-color: #eee; width: @(Node.Size!.Width)px; padding: 5px;">
+    <div>Width: @Node.Size.Width</div>
+    <div>Height: @Node.Size.Height</div>
+    <div>Ports: @Node.Ports.Count</div>
+    <div>Links: @(Node.Links.Count + Node.PortLinks.Count())</div>
+</div>
+
+@code
+{
+    [Parameter]
+    public NodeInformationControl Control { get; set; } = null!;
+
+    [Parameter]
+    public Model Model { get; set; } = null!;
+
+    public NodeModel Node => (Model as NodeModel)!;
+}

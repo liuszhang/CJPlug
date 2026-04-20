@@ -1,0 +1,186 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.SharedComponents
+@using CJ.Plug.VariableUIHandler.Models
+@using CJ.Plug.VariableUIHandler.Pages
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using Radzen
+@using Radzen.Blazor
+@using Variant=MudBlazor.Variant
+@inject ExampleJsInterop ExampleJsInterop
+@inject IJSRuntime JsRuntime
+@inject IDialogService DialogService
+@inject IDomInteropService DomInteropService
+@inject IPDZApiClient MainApiClient
+
+
+<link href="_content/ExcelPlug/hst/handsontable.min.css" rel="stylesheet" />
+<link href="_content/ExcelPlug/hst/ht-theme-main.min.css" rel="stylesheet" />
+<script type="text/javascript" src="_content/ExcelPlug/hst/handsontable.full.min.js"></script>
+@* <script type="text/javascript" src="~/hst/handsontable.full.min.js"></script> *@
+
+<script>
+
+    //import Handsontable from 'handsontable';
+
+    window.InitHandsonTable = (elementId) => {
+
+    console.log(elementId);
+    const container = document.getElementById(elementId);
+
+    if (!container) {
+    console.error("未找到元素:", elementId);
+    return;
+    }
+
+    // 确保 Handsontable 已加载（添加检查）
+    if (typeof Handsontable === 'undefined') {
+    console.error("Handsontable 库未加载");
+    //return;
+    }
+
+    new Handsontable(container, {
+    data: [
+    { company: "Tagcat", country: "United Kingdom", rating: 4.4 },
+    { company: "Zoomzone", country: "Japan", rating: 4.5 },
+    { company: "Meeveo", country: "United States", rating: 4.6 },
+    ],
+    columns: [
+    { data: "company", title: "Company", width: 100 },
+    { data: "country", title: "Country", width: 170, type: "dropdown", source: ["United Kingdom", "Japan", "United States"] },
+    { data: "rating", title: "Rating", width: 100, type: "numeric" },
+    ],
+    rowHeaders: true,
+    navigableHeaders: true,
+    tabNavigation: true,
+    multiColumnSorting: true,
+    headerClassName: "htLeft",
+    licenseKey: "non-commercial-and-evaluation",
+    });
+    };
+</script>
+
+<div id="handsontable-grid" class="ht-theme-main-dark-auto"></div>
+
+
+<MudButton Size="Size.Small"
+Variant="Variant.Outlined"
+Color="Color.Primary"
+StartIcon="@Icons.Material.Filled.LockReset">导入文件</MudButton>
+
+<MudButton Size="Size.Small"
+           Variant="Variant.Outlined"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.LockReset">导入系统文件</MudButton>
+
+<MudButton Size="Size.Small"
+           Variant="Variant.Outlined"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+
+<MudButton Size="Size.Small"
+           Variant="Variant.Outlined"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.LockReset"
+           OnClick="@(() => ExampleJsInterop.ExportDataset(JsonRows))">导出文件</MudButton>
+
+<MudButton Size="Size.Small" Disabled="Processing"
+Variant="Variant.Outlined"
+Color="Color.Primary"
+StartIcon="@Icons.Material.Filled.VapingRooms"
+OnClick="BindingVariable">绑定参数</MudButton>
+
+<MudButton Size="Size.Small"
+Variant="Variant.Outlined"
+Color="Color.Primary"
+StartIcon="@Icons.Material.Filled.Abc"
+OnClick="InsertFormula">插入公式</MudButton>
+
+
+<iframe @oncontextmenu:preventDefault src="_content/ExcelPlug/testHandsonTable.html" style="height:350px;border:dashed;"></iframe>
+
+<MudText>已配置映射清单</MudText>
+<RadzenDataGrid Data="@data" EmptyText="无参数映射配置">
+    <Columns>
+        <RadzenDataGridColumn Property="@nameof(Plug.Id)" Title="序号" Width="50px" TextAlign="TextAlign.Center" />
+        <RadzenDataGridColumn Property="@nameof(Plug.Name)" Title="参数名称" />
+        <RadzenDataGridColumn Property="@nameof(Plug.ToolVersion)" Title="单元格" />
+        <RadzenDataGridColumn Property="@nameof(Plug.Description)" Title="写入/读取" />
+        <RadzenDataGridColumn Property="@nameof(Plug.Creater)" Title="操作" />
+    </Columns>
+</RadzenDataGrid>
+
+
+
+@code {
+    [Parameter]
+    public Plug Plug { get; set; } = new();
+
+    private bool Processing { get; set; } = false;
+
+    List<Plug> data = new List<Plug>();
+
+    private JsonObject JsonRows = new JsonObject
+        {
+            ["name"] = "John Doe",
+            ["age"] = 30,
+            ["city"] = "New York"
+        };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 动态加载 Handsontable JS
+            //await LoadScriptAsync("_content/ExcelPlug/hst/handsontable.full.min.js");
+            //await ExampleJsInterop.InitializeAsync("spreadsheet-container");
+            //await ExampleJsInterop.InitHandsonTableAsync("handsontable-grid");
+            //await JsRuntime.InvokeVoidAsync("InitHandsonTable", "handsontable-grid");
+
+            // 延迟 100ms，确保 JavaScript 已执行
+            // await Task.Delay(100);
+
+            // try
+            // {
+            //     await JsRuntime.InvokeVoidAsync("InitHandsonTable", "handsontable-grid");
+            //     Console.WriteLine("调用 InitHandsonTable 成功");
+            // }
+            // catch (JSException ex)
+            // {
+            //     Console.WriteLine($"JS 调用错误: {ex.Message}");
+            // }
+        }
+    }
+
+
+    async Task BindingVariable()
+    {
+        Processing = true;
+        Console.WriteLine(">>>>>>>>>start choose varibles");
+        var PDZId = await DomInteropService.GetPDZId();
+        var PDZ = await MainApiClient.GetPDZByPDZIdAsync(PDZId);
+        var EditorContext = new DisplayInputEditorContext
+        {
+            PlugDataZone = PDZ,
+        };
+        var parameters = new DialogParameters<ChooseVariablesDialog>{
+            //x=>x.,Plug},
+            {x=>x.EditorContext,EditorContext},
+        };
+        var dialog = await DialogService.ShowAsync<ChooseVariablesDialog>("选择流程参数",parameters);
+        var result = await dialog.Result;
+        Processing = false;
+    }
+
+    async Task InsertFormula()
+    {
+        var dialog = await DialogService.ShowAsync<FormulaEditor>("插入公式");
+        var result = await dialog.Result;
+    }
+
+}
+

@@ -1,0 +1,113 @@
+@using CJ.Plug.Models.MCPTools
+@using MudBlazor
+
+<MudPaper Class="p-2">
+    <MudTabs Rounded="true" Centered="false">
+        <MudTabPanel Text="基础信息">
+            @* Markdown display component *@
+            <SimpleMarkdown Markdown="@markdownContent" />
+        </MudTabPanel>
+        <MudTabPanel Text="文件列表">
+            <MudList T="string">
+                <MudListSubheader>
+                    包含文件和文件夹：
+                </MudListSubheader>
+
+                @RenderNodes(sampleNodes)
+
+            </MudList>
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private string markdownContent = @"
+---
+name: code-reviewer
+description: Review code for security issues and best practices. Use when user asks for code review.
+---
+
+# Code Review Skill
+
+## Instructions
+1. 检查常见安全漏洞（SQL 注入、XSS、命令注入等）
+2. 评估性能问题和代码异味
+3. 检查代码风格一致性
+4. 给出具体的改进建议和代码示例
+
+## Output Format
+每个问题按以下格式输出：
+- **Severity**: Critical / High / Medium / Low
+- **Location**: 文件名:行号
+- **Issue**: 问题描述
+- **Fix**: 修复建议
+
+## Examples
+输入: ""Review this Python function for security issues""
+输出: 按格式给出安全审查报告
+";
+
+    private List<FileNode>? sampleNodes = new List<FileNode>
+    {
+        new FileNode("skill-root", true, new List<FileNode>
+        {
+            new FileNode("README.md", false),
+            new FileNode("icon.png", false),
+            new FileNode("src", true, new List<FileNode>
+            {
+                new FileNode("Skill.cs", false),
+                new FileNode("Helpers", true, new List<FileNode>
+                {
+                    new FileNode("Formatter.cs", false),
+                    new FileNode("Parser.cs", false),
+                }),
+                new FileNode("Resources", true, new List<FileNode>
+                {
+                    new FileNode("strings.en.json", false),
+                    new FileNode("strings.zh.json", false),
+                })
+            }),
+            new FileNode("deploy", true, new List<FileNode>
+            {
+                new FileNode("skill.md", false),
+                new FileNode("config.json", false)
+            })
+        })
+    };
+
+    private class FileNode
+    {
+        public FileNode(string name, bool isDirectory, List<FileNode>? children = null)
+        {
+            Name = name;
+            IsDirectory = isDirectory;
+            Children = children ?? new List<FileNode>();
+        }
+
+        public string Name { get; set; }
+        public bool IsDirectory { get; set; }
+        public List<FileNode>? Children { get; set; }
+    }
+
+    // Render nodes using MudBlazor components
+    RenderFragment<List<FileNode>> RenderNodes => nodes => @<div>
+        @if (nodes != null)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.IsDirectory)
+                {
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Folder" IconColor="Color.Warning" Text="@node.Name" Expanded>
+                        <NestedList>
+                            @RenderNodes(node.Children)
+                        </NestedList>
+                    </MudListItem>
+                }
+                else
+                {
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.InsertDriveFile" Text="@node.Name" />
+                }
+            }
+        }
+    </div>;
+}

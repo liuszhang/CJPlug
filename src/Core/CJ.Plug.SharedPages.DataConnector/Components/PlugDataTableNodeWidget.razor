@@ -1,0 +1,37 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@using CJ.Plug.SharedPages.DataConnector.Models
+@using MudBlazor
+
+
+
+
+<MudPaper Width="200px">
+    <MudList T="string" Dense Gutters=false>
+        <MudListSubheader>
+            @Node?.PlugName
+        </MudListSubheader>
+        <MudDivider />
+        @foreach(var v in Node?.PlugVariables)
+        {
+
+            <MudListItem Style="padding-left:0px;padding-right:0px;" Dense="true">
+                <PlugVariableItemWidget @key="v" Node="Node" Variable="v"></PlugVariableItemWidget>
+            </MudListItem>
+        }
+    </MudList>
+</MudPaper>
+
+@* @foreach (var port in Node.Ports)
+{    
+    // In case you have any ports to show
+    //重要说明：始终负责渲染端口
+    <PortRenderer @key = "port" Port = "port" />
+} *@
+
+
+
+@code {
+    // This gets filled by the library
+    [Parameter] public PlugDataTableNodeModel Node { get; set; } = null!;
+}

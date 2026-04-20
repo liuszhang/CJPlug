@@ -1,0 +1,158 @@
+﻿@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models.Job
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityExecutions.Models
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using System.Net.Http.Json
+@using Radzen
+@using Radzen.Blazor
+@using System.Text.Json.Nodes
+@using Serilog
+
+@inject IElsaStudioService ElsaStudioService
+@inject ElsaApiClient ElsaApiClient
+
+<VerticalWell ExtraPadding="6">
+
+<MudStack>
+
+    <MudDataGrid @ref="dataGrid" T="PlugExecutionRecordSummary" Items="ExecutionRecords" Dense Hover="true" SelectOnRowClick="true"
+    Filterable="false" SortMode="SortMode.None" ColumnResizeMode="ResizeMode.Column">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">执行记录(@SelectedActivity?.GetName())</MudText>
+            <MudSpacer />
+            <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="筛选" Adornment="Adornment.Start"
+            AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.StartedAt.ToLocalTime()" Title="开始">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">@context.Item.StartedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm:ss")</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.CompletedAt" Title="结束">
+                <CellTemplate>
+                    @if (context.Item.CompletedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.Item.CompletedAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm:ss")</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">进行中</MudText>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.CompletedAt" Title="时长" >
+                <CellTemplate>
+                    @(context.Item.CompletedAt != null ? (context.Item.CompletedAt - context.Item.StartedAt).Value.ToString(@"hh\:mm\:ss\.fff") : "")
+                    </CellTemplate>
+            </PropertyColumn>
+              
+            <PropertyColumn Property="x => x.Status" Title="状态" />
+            @* <PropertyColumn Property="x => x.WorkflowInstanceId" Title="作业号" /> *@
+        </Columns>
+        @* <PagerContent>
+            <MudDataGridPager T="ActivityExecutionRecordSummary" />
+        </PagerContent> *@
+    </MudDataGrid>
+
+        <MudDataGrid @ref="dataGrid2" T="PlugVariableData" Items="PDZVariables" Filterable="false" SortMode="SortMode.None" ShowColumnOptions="false">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">执行数据</MudText>
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="参数名" />
+            <PropertyColumn Property="x => x.Value" Title="参数值" />
+            @* <PropertyColumn Property="x => x.Type" Title="参数类型" /> *@
+            <TemplateColumn Title="类型">
+                <CellTemplate>
+                    <MudChip Color="Color.Info" Size="Size.Small">@context.Item.Type</MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="操作">
+                <CellTemplate>
+                    <MudStack Row>
+                        <MudButton Color="Color.Primary" Size="Size.Small">查看</MudButton>
+                        <MudButton Color="Color.Primary" Size="Size.Small">下载</MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+
+</MudStack>
+
+</VerticalWell>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public JsonObject? SelectedActivity { get; set; }
+    [Parameter]
+    public string? InstanceId { get; set; }
+
+
+    private List<PlugVariableData> PDZVariables = new List<PlugVariableData>();
+    private List<PlugExecutionRecordSummary>? ExecutionRecords { get; set; }
+
+    #nullable enable
+    private bool _rightClick = true;
+    //private MudMenu _contextMenu = null!;
+    MudDataGrid<PlugExecutionRecordSummary> dataGrid = default!;
+    MudDataGrid<PlugVariableData> dataGrid2 = default!;
+    string searchString = null;
+
+
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(InstanceId))
+        {
+            //Log.Information("准备获取执行数据");
+            if (SelectedActivity == null)
+            {
+                SelectedActivity=PlugDataZone?.GetFlowchartData(PlugDataZone.PlugDefinitionId);
+            }
+            PDZVariables = PlugDataZone?.GetVariablesOfPlug(SelectedActivity?.GetId())??new();
+            var executions = await ElsaApiClient.ListExecutionSummariesAsync(InstanceId, SelectedActivity?.GetNodeId(), null);
+            ExecutionRecords = executions.Items.ToList();
+
+            StateHasChanged();
+        }
+    }
+
+
+
+
+    /// <summary>
+    /// Here we simulate getting the paged, filtered and ordered data from the server
+    /// </summary>
+    private async Task<GridData<PlugExecutionRecordSummary>> ServerReload(GridState<PlugExecutionRecordSummary> state)
+    {
+        if (!string.IsNullOrEmpty(SelectedActivity?.GetNodeId()) && !string.IsNullOrEmpty(InstanceId))
+        {
+            //ExecutionRecords = await ElsaStudioService.GetActivityExecutionRecords(InstanceId, SelectedActivity?.GetId());
+            var executions = await ElsaApiClient.ListExecutionSummariesAsync(InstanceId, SelectedActivity?.GetNodeId(),null);
+            ExecutionRecords = executions.Items.ToList();
+        }
+        else
+        {
+            ExecutionRecords = new List<PlugExecutionRecordSummary>();
+        }
+        return new GridData<PlugExecutionRecordSummary>
+            {
+                TotalItems = ExecutionRecords.Count,
+                Items = ExecutionRecords
+            };
+    }
+
+    private async Task OnSearch(string text)
+    {
+        searchString = text;
+        //return dataGrid.ReloadServerData();
+    }
+}

@@ -1,0 +1,557 @@
+﻿@using System.Text.Json.Nodes
+@using Blazored.LocalStorage
+@using CJ.Plug.FileManageApiClient
+@using CJ.Plug.JobManageApiClient
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.Job
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages
+@using CJ.Plug.TASApiClient
+@using CJ.Plug.VariableUIHandler.Contracts
+@using CJ.Plug.VariableUIHandler.Models
+@using Elsa.Studio.DomInterop.Contracts
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using Serilog
+@using CJ.Plug.Models.Extensions
+@using Size=MudBlazor.Size
+
+
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+@inject IJobManageApiClient JobManageApiClient
+@inject IFileManageApiClient FileManageApiClient
+@inject IExecuteApiClient ExecuteApiClient
+@inject IFiles Files
+@inject IVariableUIService VariableUIService
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+
+
+<MudStack>
+    @* <h3>@DefinitionId</h3> *@
+    @* <MudBlazor.MudText>
+                @Activity.ToString()
+            </MudBlazor.MudText> *@
+    @* <MudStack Row AlignItems="AlignItems.Center">
+        <MudFileUpload Disabled="Loading" T="IBrowserFile" FilesChanged="@((f)=>CheckLocalFile(f))">
+            <CustomContent>
+                <MudButton OnClick="@context.OpenFilePickerAsync" Variant="Variant.Outlined" Color="Color.Primary">选择模型文件</MudButton>
+            </CustomContent>
+            <SelectedTemplate />
+        </MudFileUpload>
+        <MudButton OnClick="@(() => GetParameters())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">加载模型参数</MudButton>
+        <MudButton OnClick="@(() => SetParameters())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">刷新模型参数</MudButton>
+        <MudButton OnClick="@(() => DownloadFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">下载模型</MudButton>
+        <MudButton OnClick="@(()=>ReloadFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">重置模型</MudButton>
+        <MudButton OnClick="@(() => ShowStlFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">模型预览</MudButton>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="0">
+            <MudText>当前模型：@NXFileData?.Value</MudText>
+        </MudStack>
+    </MudStack> *@
+    <MudGrid Justify="@Justify.FlexStart"
+             Spacing="1" Style="margin-top:5px;margin-left:5px">
+        <MudItem>
+            <MudFileUpload Disabled="Loading" T="IBrowserFile" FilesChanged="@((f) => CheckLocalFile(f))">
+                <CustomContent>
+                    <MudButton OnClick="@context.OpenFilePickerAsync" Variant="Variant.Outlined" Color="Color.Primary">选择模型文件</MudButton>
+                </CustomContent>
+                <SelectedTemplate />
+            </MudFileUpload>
+        </MudItem>
+        <MudItem>
+            <MudButton OnClick="@(() => GetParameters())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">加载模型参数</MudButton>
+        </MudItem>
+        <MudItem><MudButton OnClick="@(() => SetParameters())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">刷新模型参数</MudButton></MudItem>
+        <MudItem><MudButton OnClick="@(() => DownloadFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">下载模型</MudButton></MudItem>
+        <MudItem><MudButton OnClick="@(() => ReloadFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">重置模型</MudButton></MudItem>
+        <MudItem><MudButton OnClick="@(() => ShowStlFile())" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">模型预览</MudButton></MudItem>
+        <MudItem><MudText Align="Align.Center">当前模型：@NXFileData?.Value</MudText></MudItem>
+    </MudGrid>
+    <MudDivider></MudDivider>
+    <MudStack Row>
+        <MudContainer Style="overflow-y: scroll">
+            <MudStack Style="width: 100%; height: 100%;">
+                @if (Loading)
+                {
+                    <MudProgressCircular Indeterminate="true"></MudProgressCircular>
+                }
+                else
+                {
+                    <CascadingValue Value="PlugVariableDataUpdated">
+                        @ArrayChildContent
+                    </CascadingValue>
+
+                }
+                <PDZVariableDataGrid TabTitle="" HeightPercent="100"></PDZVariableDataGrid>
+                @* <PlugVariableDataGrid Plug="Plug"></PlugVariableDataGrid> *@
+
+            </MudStack>
+        </MudContainer>
+        <MudStack>
+            @if (showProgress)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+            }
+
+            <MudPaper MinWidth="555" MinHeight="460px">
+                @* <iframe id="myIframe" style="width:550px;height:455px;" src="stlloader_base.html?stlPath=@stlPath" frameborder="0">
+                        </iframe> *@
+                @if (!string.IsNullOrEmpty(stlPath))
+                {
+                    <iframe id="myIframe" style="width:545px;height:450px;" src="_content/NXPlug/stlloader_base.html?stlPath=@stlPath" frameborder="0">
+                    </iframe>
+                }
+                else
+                {
+                    <iframe id="myIframe" style="width:545px;height:450px;" src="_content/NXPlug/stlloader_base.html?stlPath=@stlPath2" frameborder="0">
+                    </iframe>
+                }
+
+            </MudPaper>
+        </MudStack>
+    </MudStack>
+</MudStack>
+
+
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }    
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    public PlugData? PlugData { get; set; } = new();
+    public PlugVariableData? NXFileData { get; set; } = new();
+    public PlugVariableData? StlFileData { get; set; } = new();
+
+    public EventCallback<PlugVariableData> PlugVariableDataUpdated { get; set; }
+    public RenderFragment? ArrayChildContent { get; set; }
+
+    private PlugSettings? PlugSettings { get; set; }
+
+    string? FileRealPath { get; set; }
+    string stlPath = "pr2_head_pan.stl";
+    //string stlPath = "./stl/123.stl";
+    string objPath = "./models/obj/male02/male02.obj";
+    string stlPath2 = "pr2_head_pan.stl";
+
+    private List<ModelParameter>? ModelParameters = new List<ModelParameter>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    //保存一份原始参数，用于重置操作
+    string rootPlugVariables;
+    private IBrowserFile? File;
+    private string RealFilePath;
+    private bool Loading = false;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+    //状态机：
+    // 0 无模型资源；1 已选择临时模型；2 已加载临时模型（已经上传至图站）；
+    // 3 插头模型不为空但未加载（上传至图站）；4 已经加载插头模型；
+    // 5 模型已轻量化处理且最新；6 模型已更新但未轻量化处理
+    public int StatusMachine = 0;
+
+    private string? TmpJobCorrelationId { get; set; } = null;
+    private string? JobResultString { get; set; } = null;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        PlugVariableDataUpdated = EventCallback.Factory.Create<PlugVariableData>(this, OnPlugVariableDataUpdated);
+        //await ProcessGetParameters(PlugSettings.GetSetting(PlugGlobalEnum.NXGetParameters.ModelParametersKey));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            PlugData = PlugDataZone?.PlugDatas?.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId);
+            NXFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == InitVariableNames.NXFile.ToString()).FirstOrDefault();
+            StlFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == InitVariableNames.StlFile.ToString()).FirstOrDefault();
+            if (!string.IsNullOrEmpty(PlugDataZone?.GetVariableValue(PlugData?.PlugDefinitionId, InitVariableNames.ModelParameters.ToString())))
+            {
+                ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(PlugDataZone?.GetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ModelParameters.ToString()));
+            }
+            rootPlugVariables = JsonSerializer.Serialize(PlugDataZone.GetVariablesOfPlug(PlugDefinitionId));
+
+        }
+        await GetModelParametersTable();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            HubConnectionManagerService._hubConnection.On(LogTypeEnum.JobStatusUpdated.ToString(), 
+                async (string? jobCorrelationId) =>
+                {
+                    if (jobCorrelationId == null) return;
+                    if (TmpJobCorrelationId == null || TmpJobCorrelationId != jobCorrelationId) return;
+                    //Log.Information($"{jobCorrelationId} status is updated!");
+                    await OnReceiveJobStatus();
+                });
+            await WebShowStlFile();
+        }
+    }
+    private async Task OnReceiveJobStatus()
+    {
+        var resultData = await JobManageApiClient.GetToolJobResultByCorrelationIdAsync(TmpJobCorrelationId);
+        if (resultData == null)
+        {
+            CLog.Error("获取结果数据为空");
+            return;
+        }
+        Log.Information($"执行完成: {resultData.ResultString}");
+
+        // 使用InvokeAsync确保在UI线程上更新状态
+        await InvokeAsync(async () =>
+        {
+            if (TmpJobCorrelationId.StartsWith("GetParameters"))
+            {
+                await OnGetParametersDone(resultData.ResultString);
+            }
+            else if (TmpJobCorrelationId.StartsWith("SetParameters"))
+            {
+                await OnSetParametersDone(resultData.ResultString);
+            }
+            else if (TmpJobCorrelationId.StartsWith("ToStl"))
+            {
+                await OnToStlDone();
+            }
+            Loading = false;
+            StateHasChanged();
+        });
+    }
+
+    private async Task GetModelParametersTable()
+    {
+        var editorContext = new DisplayInputEditorContext
+            {
+            //Plug = Plug,
+                PlugDefinitionId=PlugData?.PlugDefinitionId,
+                Variable = PlugDataZone?.PlugVariableDatas?.Where(p=>p.PlugDefinitionId==PlugDefinitionId).FirstOrDefault(p => p.Name == InitVariableNames.ModelParameters.ToString()),
+                PlugDataZone = PlugDataZone,
+            //OnValueChanged = OnValueChanged,
+            };
+        var handler = VariableUIService.GetHandler(VariableTypeEnum.ModelParameters.ToString());
+        ArrayChildContent = handler.GetArrayChildContent(editorContext);
+    }
+
+
+    private async Task OnPlugVariableDataUpdated(PlugVariableData plugVariableData)
+    {
+        ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(plugVariableData.Value);
+        //StateHasChanged();
+        //PlugDataZone.PlugVariableDatas.;
+    }
+
+
+    async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        //Console.WriteLine("checked file name:" + browserFile.Name);
+        //File = browserFile;
+        if (browserFile != null)
+        {
+            try
+            {
+                File = browserFile;
+                PlugData.Value = browserFile.Name;
+                FileRealPath = null;
+                string? fileId;
+                //(FileRealPath,fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+                var ModelVariable = PlugDataZone?.PlugVariableDatas?.Where(p => p.PlugDefinitionId == PlugDefinitionId).FirstOrDefault(p => p.Name == InitVariableNames.NXFile.ToString());
+                (FileRealPath, fileId) = await FileManageApiClient.UploadFileToVariable(browserFile.OpenReadStream(maxAllowedSize: 512000000), browserFile.Name, ModelVariable);
+
+                CLog.Information("FileRealPath is:" + FileRealPath);
+                //Plug.SetPlugSetting(PlugSettingKey.FileId.ToString(), fileId);
+                //Plug.SetVariableValue(InitVariableNames.NXFile.ToString(), browserFile.Name + ":" + fileId);
+                PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.NXFile.ToString(), browserFile.Name + ":" + fileId);
+
+                //browserFile = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Information(ex.Message);
+            }
+        }
+
+    }
+
+
+    async Task GetParameters()
+    {
+        if (string.IsNullOrEmpty(NXFileData?.Value))
+        {
+            Console.WriteLine("no model!");
+            return;
+        }
+
+        Console.WriteLine("begin get parameters");
+        Loading = true;
+        TmpJobCorrelationId = "GetParameters" + RandomLongIdentityGenerator.GenerateId();
+        var inputs = new List<PlugVariableData>();
+        var fileData = JsonSerializer.Deserialize<PlugVariableData>(JsonSerializer.Serialize(NXFileData));
+        fileData.Name = PlugGlobalEnum.NXGetParameters.Variables.ModelFilePath;
+        fileData.Type = VariableTypeEnum.File.ToString();
+        fileData.IsInput = true;
+        inputs.Add(fileData);
+        var executeRequest = new PlugExecutionRequest
+            {                 
+                PlugType = PlugGlobalEnum.NXGetParameters.TypeName,
+            //ExecuteMode=ExecuteMode.Standalone,
+                InputVariables = inputs,
+                ExecuteResultData=new ExecuteResultData
+                {
+                    Ids=new ExecuteIdsBundle
+                    {
+                        ToolJobCorrelationId = TmpJobCorrelationId
+                    }
+                }
+            };
+        //使用动作执行的模式进行获取参数
+        await ExecuteApiClient.ExecutePlugByType(executeRequest);
+        //把改过的参数名改回来
+
+    }
+    async Task OnGetParametersDone(string? parameterString)
+    {
+        var paraString = parameterString;
+        if (string.IsNullOrEmpty(paraString))
+        {
+            Log.Information("模型参数获取失败");
+            Loading = false;
+            StateHasChanged();
+            return;
+        }
+        ModelParameters = ToolIntegrationUtils.ProcessGetParameters(paraString,ModelParameters);
+        PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ModelParameters.ToString(), JsonSerializer.Serialize(ModelParameters));
+
+        //强制刷新一下表格
+        ArrayChildContent = null;
+        StateHasChanged();
+        await GetModelParametersTable();
+        StateHasChanged();
+
+        stlPath = "";
+        StateHasChanged();
+        await ShowStlFile();
+
+        Loading = false;
+        return;
+    }
+
+    async Task SetParameters()
+    {
+        var newParameters = ToolIntegrationUtils.ProcessSetParameters(ModelParameters,PlugDefinitionId,PlugDataZone);
+        if (string.IsNullOrEmpty(newParameters))
+        {
+            Log.Information("参数无需刷新");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(NXFileData?.Value))
+        {
+            Console.WriteLine("no model!");
+            return;
+        }
+
+        Loading = true;
+        TmpJobCorrelationId = "SetParameters" + RandomLongIdentityGenerator.GenerateId();
+
+        var inputs = new List<PlugVariableData>();
+        var fileData = JsonSerializer.Deserialize<PlugVariableData>(JsonSerializer.Serialize(NXFileData));
+        fileData.Name = PlugGlobalEnum.NXSetParameters.Variables.ModelFilePath;
+        fileData.Type = VariableTypeEnum.File.ToString();
+        fileData.IsInput = true;
+        fileData.IsOutput = true;
+        inputs.Add(fileData);
+        inputs.Add(new PlugVariableData { Name = PlugGlobalEnum.NXSetParameters.Variables.NewParameterString, Value = newParameters });
+        var toolCommandRequest = new PlugExecutionRequest
+            {
+                PlugType = PlugGlobalEnum.NXSetParameters.TypeName,
+            //SpecifiedStationIp = stationIp.StationIp,
+            //ExecuteMode = ExecuteMode.Standalone,
+                InputVariables = inputs,
+                ExecuteResultData = new ExecuteResultData
+                {
+                    Ids = new ExecuteIdsBundle
+                    {
+                        ToolJobCorrelationId = TmpJobCorrelationId
+                    }
+                }
+
+            };
+        //使用动作执行的模式进行获取参数
+        await ExecuteApiClient.ExecutePlugByType(toolCommandRequest);
+    }
+    async Task OnSetParametersDone(string? parameterString)
+    {
+        if (string.IsNullOrEmpty(parameterString?.Trim()))
+        {
+            Log.Information("模型参数设置失败");
+            Loading = false;
+            StateHasChanged();
+            return;
+        }
+        CLog.Information("完成设置NX模型参数：" + parameterString,PlugDataZone.PDZId);
+        //更新了参数后，需要重新获取模型数据
+        NXFileData = await MainApiClient.GetPlugVariableDataById(NXFileData.Id);
+        //Log.Information("NEW NXFileData Value is:" + NXFileData?.Value);
+        //StateHasChanged();
+        await GetParameters();
+
+        //Loading = false;
+
+
+        //stlPath = "";
+        //StateHasChanged();
+
+        //await ShowStlFile();
+
+        // StateHasChanged();
+
+        // Loading = false;
+        return;
+    }
+
+
+    async Task ShowStlFile()
+    {
+        showProgress = true;
+        if (string.IsNullOrEmpty(NXFileData?.Value))
+        {
+            Console.WriteLine("no model!");
+            return;
+        }
+        TmpJobCorrelationId = "ToStl" + RandomLongIdentityGenerator.GenerateId();
+        var inputs = new List<PlugVariableData>();
+        var fileData = JsonSerializer.Deserialize<PlugVariableData>(JsonSerializer.Serialize(NXFileData));
+        fileData.Name = PlugGlobalEnum.NXToStl.Variables.ModelFilePath;
+        fileData.Type = VariableTypeEnum.File.ToString();
+        fileData.IsInput = true;
+        var stlPath = Path.Combine( 
+            GlobalData.StationFileRootPath,
+            RandomLongIdentityGenerator.GenerateId()+"-"+
+            fileData?.Value?.GetFileNameFromFileVariable().Replace(".prt", ".stl"));
+        var stlData = JsonSerializer.Deserialize<PlugVariableData>(JsonSerializer.Serialize(StlFileData));
+        stlData.Name = PlugGlobalEnum.NXToStl.Variables.StlFilePath;
+        stlData.Type = VariableTypeEnum.File.ToString();
+        stlData.Value = stlPath;
+        stlData.IsInput = false;
+        stlData.IsOutput = true;
+        inputs.Add(fileData);
+        inputs.Add(stlData);
+
+        var toolCommandRequest = new PlugExecutionRequest
+            {
+                PlugType = PlugGlobalEnum.NXToStl.TypeName,
+            //ExecuteMode = ExecuteMode.Standalone,
+                InputVariables = inputs,
+                ExecuteResultData = new ExecuteResultData
+                {
+                    Ids = new ExecuteIdsBundle
+                    {
+                        ToolJobCorrelationId = TmpJobCorrelationId
+                    }
+                }
+            };
+        //使用动作执行的模式进行
+        await ExecuteApiClient.ExecutePlugByType(toolCommandRequest);
+
+
+        //使用StateHasChanged()的razor更新机制可以自动重载iframe内容，无需通过js进行重载
+        //await JsRuntime.InvokeVoidAsync("updateAndReloadIframe", result2);
+    }
+    async Task OnToStlDone()
+    {
+        //StatusReporter.PDZUpdated(PlugDataZone.PDZId);
+        Log.Information("模型转换为STL完成,开始将文件放入WEB SERVER用于展示");
+
+        await InvokeAsync(async() =>
+        {
+            StlFileData = await MainApiClient.GetPlugVariableDataById(StlFileData.Id);
+            PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.StlFile.ToString(), StlFileData?.Value);
+            StateHasChanged();
+        });
+        //更新新的STL文件数据
+        await WebShowStlFile();
+
+        Loading = false;
+    }
+    async Task WebShowStlFile()
+    {
+        if (string.IsNullOrEmpty(StlFileData?.Value))
+        {
+            showProgress = false;
+            return;
+        }
+        showProgress = true;
+        //将转好的STL文件放到前端文件夹，用于前端控件展示
+        var newStlPath = await MainApiClient.UploadFileToWebServer(StlFileData);
+        //CLog.Information(newStlPath,PlugDataZone.PDZId);
+
+        await InvokeAsync(() =>
+        {
+            //这里需要刷新一下参数以强制告诉界面需要重载
+            stlPath = "";
+            StateHasChanged();
+            //更新stlPath
+            stlPath = newStlPath?.Trim('"');
+            showProgress = false;
+            StateHasChanged();
+        });
+        
+        return;
+    }
+
+
+    async void DownloadFile()
+    {
+        if (string.IsNullOrEmpty(NXFileData?.Value))
+        {
+            Snackbar.Add("无文件");
+            return;
+        }
+        var FileId = NXFileData.Value.GetFileIdFromFileVariable();
+        var FileName = NXFileData.Value.GetFileNameFromFileVariable();
+        Log.Information($"DownloadFile By Id:{FileId}");
+        using var stream = await MainApiClient.DownloadFileByFileId(FileId);
+        if (stream != null)
+        {
+            //Log.Information("Begin DownloadFileByFileId On Web");
+            //调用Elsa框架成熟的文件下载服务
+            //await Files.DownloadFileFromStreamAsync(plug.Value, stream);
+            //await ElsaDomToolService.DownloadFileFromStreamAsync(fileName, stream);
+            await Files.DownloadFileFromStreamAsync(FileName, stream);
+            //await IDomInteropService.DownloadFileFromStreamAsync(fileName, stream);
+        }
+
+    }
+
+    async void ReloadFile()
+    {
+        //stlPath = "/tmpFiles/pr2_head_pan.stl";
+        //PlugData.PlugVariables = rootPlugVariables;
+        //SetParameters(Plug);
+        StateHasChanged();
+        //await JsRuntime.InvokeVoidAsync("updateAndReloadIframe");
+    }
+
+}

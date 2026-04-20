@@ -1,0 +1,532 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Services
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.EventAggregator.Notifications
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.TASApiClient
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Enums
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Studio.Workflows.Designer.Components
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.UI.Args
+@using Elsa.Studio.Workflows.UI.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.SignalR.Client
+@using Serilog
+@using ThrottleDebounce
+
+
+@inject IPDZApiClient PDZApiClient
+@inject ITASApiClient TASApiClient
+@inject IDomInteropService DomInteropService
+@inject IActivityRegistry ActivityRegistry
+@inject IEnumerable<IPlugSettingDialogShow> PlugSettingDialogShow
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+<div 
+class="flowchart-diagram-designer"
+draggable="false"
+@ondragstart:preventDefault
+@ondragstart:stopPropagation
+@ondragover="@OnDragOver" 
+@ondragover:preventDefault 
+@ondragover:stopPropagation 
+@ondrop="@OnDrop" 
+@ondrop:stopPropagation>
+
+    <FlowchartDesigner @ref="Designer" IsReadOnly="IsReadOnly"
+    Flowchart="@Flowchart"
+    ActivitySelected="@OnActivitySelected"
+    ActivityEmbeddedPortSelected="ActivityEmbeddedPortSelected"
+    CanvasSelected="@OnCanvasSelected"
+    GraphUpdated="@OnGraphUpdated"
+    ActivityStats="ActivityStats"
+    ActivityDoubleClick="@OnActivityDoubleClick" />
+
+
+
+</div>
+
+@code {
+    //[CascadingParameter]
+    private MyDragDropManager DragDropManager { get; set; } = new();
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? ProcessDefinitionId { get; set; }
+
+
+    [CascadingParameter]
+    public ActivitySelectedNotify? ActivitySelectedNotify { get; set; }
+    [CascadingParameter]
+    public SetDataGridShowNotify? SetDataGridShowNotify { get; set; }
+    [CascadingParameter]
+    public SetMenuNotify? SetMenuNotify { get; set; }
+    //如果是子插头，则通过活动传递插头信息到流程图
+    [CascadingParameter]
+    public JsonObject Activity { get; set; } = default!;
+    [Parameter] 
+    public bool IsReadOnly { get; set; }
+    [Parameter] 
+    public EventCallback<ActivityEmbeddedPortSelectedArgs> ActivityEmbeddedPortSelected { get; set; }
+    [Parameter]
+    public EventCallback CanvasSelected { get; set; }
+    //如果是普通流程图，通过Plug传递插头信息到流程图
+    // [Parameter]
+    // public Plug? Plug { get; set; } = default!;
+    [Parameter]
+    public IDictionary<string, ActivityStats>? ActivityStats { get; set; }
+    [Parameter]
+    public JsonObject? Flowchart { get; set; } = default!;
+    [Parameter]
+    public EventCallback<bool> OnSave { get; set; }
+    // [Parameter]
+    // public bool IsChildDesigner { get; set; } = false;
+    //private string? DefinitionId => IsChildDesigner ? Activity.GetId() : Plug?.DefinitionId;
+
+
+    private FlowchartDesigner Designer { get; set; } = default!;    
+
+    private JsonObject? SelectedActivity { get; set; }
+    public string? SelectedActivityId { get; private set; }
+    //private ActivityDescriptor? ActivityDescriptor { get; set; }
+    private RateLimitedFunc<Task> _rateLimitedSaveChangesAsync;
+
+
+    public async Task ZoomToFitAsync() => await Designer.ZoomToFitAsync();
+    public async Task CenterContentAsync() => await Designer.CenterContentAsync();
+    public async Task AutoLayoutAsync() => await Designer.AutoLayoutAsync(Flowchart, ActivityStats);
+    public async Task LoadActivityAsync(JsonObject root) => await Designer.LoadFlowchartAsync(root, ActivityStats);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 关键：用 InvokeAsync 包装防抖回调，确保在 UI 线程执行
+        _rateLimitedSaveChangesAsync = Debouncer.Debounce(
+            async () => await InvokeAsync(SaveAsync), // 切换到 UI 线程后调用 SaveAsync
+            TimeSpan.FromMilliseconds(500)
+        );
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ActivityStats != null && Designer!=null)
+        {
+            //Log.Information($"更新插头状态");
+            foreach (var acs in ActivityStats.ToArray())
+            {
+                await Designer.UpdateActivityStatsAsync(acs.Key, acs.Value);
+            }
+        }
+        //await Designer.LoadFlowchartAsync(Flowchart, ActivityStats);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await Designer.LoadFlowchartAsync(Flowchart, ActivityStats);
+                await Designer.CenterContentAsync();
+                //Log.Information("加载流程图数据完成。");
+                //StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Log.Information(ex.Message);
+                Log.Information(ex.StackTrace);
+            }
+
+
+            SetHubListener();
+            //await ZoomToFitAsync();
+            await CenterContentAsync();
+
+            //await GlobalEventBus.SetDataGridCollapsed(false);
+            SetDataGridShowNotify?.Invoke(false);
+            //await AutoLayoutAsync();
+        }
+    }
+
+    private async Task OnDragOver(DragEventArgs e)
+    {
+        // var Payload = await DomInteropService.GetDragPayload();
+        // if (Payload == null)
+        // {
+        //     Log.Information($"{DefinitionId}move");
+        //     e.DataTransfer.DropEffect = "move";
+        //     return;
+        // }
+
+
+        // try
+        // {
+        //     DragDropManager.Payload = JsonSerializer.Deserialize<ActivityDescriptor>(Payload?.ToString());
+        // }
+        // catch (Exception ex)
+        // {
+        //     Log.Information(ex.Message);
+        //     Log.Information($"{DefinitionId}move");
+        //     e.DataTransfer.DropEffect = "none";
+        //     return;
+        // }
+
+
+        //Console.WriteLine("drag is a：" + DragDropManager?.Payload);
+        // if (DragDropManager?.Payload is not ActivityDescriptor activityDescriptor)
+        // {
+        //     e.DataTransfer.DropEffect = "none";
+        //     return;
+        // }
+        // Log.Information($"{DefinitionId}move");
+        // e.DataTransfer.DropEffect = "none";
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        //Log.Information($"droped!({Plug?.Name})");
+        if (IsReadOnly)
+        {
+            return;
+        }    
+        try
+        {
+            var Payload = await DomInteropService.GetDragPayload();
+            DragDropManager.Payload = JsonSerializer.Deserialize<ActivityDescriptor>(Payload?.ToString());
+        }
+        catch (Exception ex)
+        {
+            Log.Information(ex.Message);
+            Log.Information("别啥都往里拖");
+            return;
+        }
+        Console.WriteLine(">>>>>>>>>>>>drop in is a:" + DragDropManager?.Payload);
+        var x = e.PageX;
+        var y = e.PageY;
+        if (DragDropManager.Payload is ActivityDescriptor activityDescriptor)
+        {
+            Console.WriteLine(">>>>>>>>>>start add activity");
+            //添加并创建新插头
+            await AddNewActivityAsync(activityDescriptor, x, y);
+            //更新整个流程，无需更新，画面更新后会自动保存
+            //await SaveAsync();
+
+            await DomInteropService.SetDragPayload(null);
+            DragDropManager.Payload = null;
+            return;
+        }
+        DragDropManager.Payload = null;
+        Log.Information("别啥都往里拖");
+    }
+
+    private async Task OnActivitySelected(JsonObject activity)
+    {
+        //Console.WriteLine("selected activity is:" + activity);
+        //SelectActivity(activity);
+        SelectedActivity = activity;
+        SelectedActivityId = activity.GetId();
+        //StatusReporter.PlugSelected(SelectedActivityId);
+        //await GlobalEventBus.SetSelectedPlug(activity);
+        ActivitySelectedNotify?.Invoke(activity);
+        //await ActivitySelected.InvokeAsync(activity);
+    }
+
+    private async Task OnCanvasSelected()
+    {
+        // if (IsChildDesigner)
+        // {
+        //     return;
+        // }
+        //StatusReporter.PlugSelected(Plug.DefinitionId);
+        //await GlobalEventBus.SetSelectedPlug(Plug.ToActivityJson());
+        //await GlobalEventBus.SetSelectedPlug(PlugDataZone.GetFlowchartData(ProcessDefinitionId));
+        ActivitySelectedNotify?.Invoke(PlugDataZone.GetFlowchartData(ProcessDefinitionId));
+        // if (CanvasSelected.HasDelegate)
+        //     await CanvasSelected.InvokeAsync();
+    }
+
+    int i = 0;
+    private async Task OnGraphUpdated()
+    {
+        await OnSave.InvokeAsync(true);
+        Console.WriteLine("OnGraphUpdated" + i);
+        i++;
+        await _rateLimitedSaveChangesAsync.Invoke();
+        //CLog.Information($"流程图数据保存成功{i}",PlugDataZone?.PDZId);
+        //await SaveAsync();
+
+    }
+
+    public async Task SaveAsync()
+    {
+        var root = await Designer.ReadFlowchartAsync();
+        var newFlowchartData = PlugDataZone?.SetFlowchartData(ProcessDefinitionId, root);
+        await PDZApiClient.UpdateFlowchartData(newFlowchartData);
+
+        //var oldActivityIds = PlugDataZone?.GetFlowchartData(ProcessDefinitionId)?.GetActivities().Select(a=>a.GetId()).ToList();
+        var oldActivityIds = PlugDataZone?.PlugDatas?.Select(a=>a.PlugDefinitionId).ToList();
+        //保存流程图数据
+        //Log.Information("更新流程图数据成功");
+        //对比流程图和插头列表，进行插头的删除
+        var newActivityIds = root.GetActivities().Select(a => a.GetId()).ToList();
+        foreach (var activityId in oldActivityIds)
+        {
+            if (!newActivityIds.Contains(activityId) && activityId != ProcessDefinitionId)  //这里需要注意不要把流程图本身删除了，所以需要排除掉ProcessDefinitionId
+            {
+                //await MainApiClient.DeletePlugByDefinitionId(activity);
+                CLog.Warning($"删除插头:{activityId}",PlugDataZone?.PDZId);
+
+                PlugDataZone.PlugDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头数据
+                PlugDataZone.PlugVariableDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头参数数据
+                PlugDataZone.PlugStatusDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头状态数据
+                PlugDataZone.ActionDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头动作数据
+                PlugDataZone.ActionVariableDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头动作参数数据
+                PlugDataZone.FlowchartDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头流程图数据
+                PlugDataZone.DataFlowDatas.RemoveAll(x => x.SourcePlugDefinitionId == activityId || x.TargetPlugDefinitionId == activityId);   //删除相关数据流数据
+
+                //保存插头数据，由于要更新太多，就直接使用PDZ更新了
+                PlugDataZone = await PDZApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+                //只有在有删除操作时才选择画布
+                await OnCanvasSelected();
+
+            }
+        }
+        //await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+        await OnSave.InvokeAsync(false);
+    }
+
+    private async Task AddNewActivityAsync(ActivityDescriptor activityDescriptor, double x, double y)
+    {
+        //Console.WriteLine(">>>>>>>>>>start add activity2");
+
+        var activities = Flowchart.GetActivities().ToList();
+        var newActivityId = RandomLongIdentityGenerator.GenerateId();
+
+        var newActivity = new JsonObject(new Dictionary<string, JsonNode?>
+            {
+                ["id"] = newActivityId,
+                ["nodeId"] = $"{Flowchart.GetNodeId()}:{newActivityId}",
+                ["definitionId"] = newActivityId,
+                ["PlugDefinitionId"] = newActivityId,
+                ["name"] = ElsaNameGenerator.GenerateNextActivityName(activities, activityDescriptor),
+            //["type"] = (activityDescriptor.Description.Contains("CommonCorePlugActivity") ? "CJ.CommonCorePlugActivity" : activityDescriptor.TypeName),
+            //["type"] = (activityDescriptor.IsContainer) ? "Elsa.Flowchart" : activityDescriptor.TypeName,
+                ["type"] = activityDescriptor.TypeName,
+            //["displayType"] = activityDescriptor.TypeName,
+            //["version"] = activityDescriptor.Version
+                ["version"] = activityDescriptor.Version,
+                ["isContainer"]=activityDescriptor.IsContainer
+            //["workflowDefinitionId"] = WorkflowDefinition.DefinitionId
+            });
+
+        newActivity.SetDesignerMetadata(new ActivityDesignerMetadata
+            {
+                Position = new Elsa.Api.Client.Shared.Models.Position(x, y)
+            });
+
+
+        // Copy constructor values from the activity descriptor.
+        foreach (var property in activityDescriptor.ConstructionProperties)
+        {
+            var valueNode = JsonSerializer.SerializeToNode(property.Value);
+            var propertyName = property.Key.Camelize();
+            newActivity.SetProperty(valueNode, propertyName);
+        }
+
+        // If the activity is a trigger, and it's the first trigger on the flowchart, set the trigger property to true.
+        if (activityDescriptor.Kind == ActivityKind.Trigger && activities.All(activity => activity.GetCanStartWorkflow() != true))
+            newActivity.SetCanStartWorkflow(true);
+
+        //newActivity.SetCanStartWorkflow(true);
+        newActivity.SetDisplayText(newActivity.GetName());
+        //newActivity.SetProperty(newActivityId, "PlugDefinitionId");
+        //newActivity.SetProperty(newActivityId, "definitionId");
+        newActivity.Remove("workflowDefinitionId");
+        newActivity.Remove("workflowDefinitionVersionId");
+        //newActivity.GetIsWorkflowDefinitionActivity();
+        //需要把版本设置为1，否则会报错，elsa默认创建的活动版本必须从1开始（存疑）
+        //newActivity.SetProperty(1, "version");
+
+        // if (activityDescriptor.IsContainer)
+        // {
+        //     //var id = RandomLongIdentityGenerator.GenerateId();
+        //     newActivity.SetProperty(
+        //         new JsonObject(new Dictionary<string, JsonNode?>
+        //             {
+        //                 ["id"] = newActivityId + "body",
+        //                 ["definitionId"] = newActivityId + "body",
+        //                 ["type"] = "Elsa.Flowchart",
+        //                 ["name"] = newActivity.GetName() + "-body"
+        //             }),
+        //         "body");
+
+        //     PlugDataZone.PDZVariables.Add(new PDZVariable()
+        //         {
+        //             PlugDefinitionId = newActivityId,
+        //             Name = newActivity.GetName() + "-子流程图",
+        //             Tag = PDZVariableTagEnum.FlowchartTag.ToString(),
+        //             Value = new JsonObject(new Dictionary<string, JsonNode?>
+        //             {
+        //                 ["id"] = newActivityId + "body",
+        //                 ["definitionId"] = newActivityId + "body",
+        //                 ["type"] = "Elsa.Flowchart",
+        //                 ["name"] = newActivity.GetName() + "-body"
+        //             }).ToJsonString(),
+        //         });
+        // }
+
+
+        Console.WriteLine(">>>>>>>>>>prepare to add activity:" + JsonSerializer.Serialize(newActivity));
+
+        //接下来需要添加同步保存为系统的PLUG插头的接口调用,也可以考虑在打开配置窗口时再创建插头
+        //插头数据来源于原始插头，但是有些插头是引擎自带的，也需要能够兼容参数数据
+        var newPlug = newActivity.ToPlug();
+        newPlug.ParentPlugDefinitionId = ProcessDefinitionId;
+        newPlug.Creater = await DomInteropService.GetCurrentUserName();
+        newPlug.CreateType = PlugCreateTypeEnum.InstancePlug.ToString();
+        newPlug.IsContainerPlug = activityDescriptor.IsContainer;
+        //将引擎自带活动的参数添加到新建的插头中
+        foreach (var t in activityDescriptor?.Inputs)
+        {
+            var inputName = t.Name.Camelize();
+            var valueNode = JsonSerializer.SerializeToNode(t.DefaultValue);
+
+            PlugDataZone.PlugVariableDatas.Add(new PlugVariableData()
+            {
+                PlugDefinitionId = newPlug.DefinitionId,
+                Name = inputName,
+                DisplayName = t.DisplayName,
+                Type = t.TypeName,
+                Description = t.Description,
+                Value = valueNode?.ToString(),
+                DefaultValue = valueNode?.ToString(),
+                IsInitVariable = true,
+                IsBrowsable = t.IsBrowsable,
+            });
+
+        }
+        //如果是通过平台根活动创建的插头，则需要从根活动中获取插头参数信息放入PDZ中
+        var rootPlug = await TASApiClient.GetRootPlugByTypeNameAsync(newActivity.GetTypeName());
+        if (rootPlug != null)
+        {
+            //Log.Information($"获取根插头成功：{rootPlug.DefinitionId}({rootPlug.Id})");
+            //newPlug = rootPlug.DeepCopy();//如果原始插头存在，可以考虑这种方式
+            newPlug.PlugTypeKey = rootPlug?.PlugTypeKey;
+            newPlug.PlugSettingsJson = rootPlug?.PlugSettingsJson;
+            newPlug.Category = rootPlug?.Category;
+            newPlug.OnlyExecuteAction = rootPlug.OnlyExecuteAction;
+            newPlug.ToolId = rootPlug.ToolId;
+            newPlug.ToolName = rootPlug.ToolName;
+            newPlug.ToolVersion = rootPlug.ToolVersion;
+            newPlug.ToolDisplayName = rootPlug.ToolDisplayName;
+            newPlug.ToolCommandLineShema = rootPlug.ToolCommandLineShema;
+
+            foreach (var p in rootPlug.PlugVariables)
+            {
+                PlugDataZone.PlugVariableDatas.Add(new PlugVariableData()
+                    {
+                        PlugDefinitionId = newPlug.DefinitionId,
+                        Name = p.Name,
+                        Value = p.Value,
+                        DefaultValue = p.DefaultValue,
+                        Type = p.Type,
+                        IsInitVariable = p.IsInitVariable,
+                        IsBrowsable = p.IsBrowsable,
+                        IsArray = p.IsArray,
+                    });
+            }
+        }
+        //将新建的插头以参数数据的形式添加到PDZ中
+        var newPlugData = new PlugData()
+            {
+            //PlugDataZoneId = PlugDataZone.Id,
+                PlugDefinitionId = newActivityId,
+                ParentPlugDefinitionId = ProcessDefinitionId,
+                Name = newActivity.GetName(),
+                PlugType = newActivity.GetTypeName(),
+                PlugTypeKey = rootPlug?.PlugTypeKey,
+                WorkPath=Path.Combine(PlugDataZone.PDZWorkPath,newActivityId),
+                PlugPosition = $"{x} {y}",//记录插头坐标值，用于绘制数据流等功能
+            };
+        PlugDataZone.PlugDatas.Add(newPlugData);
+        try
+        {
+            await Designer.AddActivityAsync(newActivity);
+
+            //这里也要更新插头数据、插头参数数据，所以直接使用PDZ更新
+            PlugDataZone=await PDZApiClient.CreateOrUpdatePDZ(PlugDataZone);
+            //CLog.Information($"创建插头成功，插头ID：{newPlugData?.PlugDefinitionId}", PlugDataZone.PDZId);
+
+            await OnActivitySelected(newActivity);
+        }
+        catch (Exception ex)
+        {
+            CLog.Information(ex.Message);
+            CLog.Information(ex.StackTrace);
+        }
+    }
+
+    private async Task OnActivityDoubleClick(JsonObject activity)
+    {
+        try
+        {
+            foreach (var s in PlugSettingDialogShow)
+            {
+                var newActivity = await s.ShowPlugSettingDialog(new(activity, PlugDataZone, SetMenuNotify));
+
+                if (newActivity != null)
+                {
+                    //需要更新一下引擎活动，以兼容引擎自带的活动组件，后期可以取消
+                    //Console.WriteLine("start update activity:" + newActivity);
+                    //await Designer.UpdateActivityAsync(activity.GetId(), newActivity);
+                }
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+
+    }
+
+
+    public void SetHubListener()
+    {
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.PlugUpdated.ToString());
+        //通过长连接添加插头更新监听
+        HubConnectionManagerService._hubConnection.On<string>(LogTypeEnum.PlugUpdated.ToString(), 
+        (PlugDefiniitonId) =>
+           {
+               Console.WriteLine($"PlugDefiniitonId:{PlugDefiniitonId}");
+               InvokeAsync(async () =>
+               {                   
+                   var UpdatedActivity = await PDZApiClient.GetPlugDataByDefinitionId(PlugDefiniitonId);
+                   var activity = Flowchart?.GetActivities().Where(a => a.GetId() == PlugDefiniitonId).FirstOrDefault();
+                   //Log.Information($"原始组件名称：{activity?.GetName()}（{PlugDefiniitonId}）");
+                   activity?.SetName(UpdatedActivity?.Name);
+                   activity?.SetDisplayText(UpdatedActivity?.Name);
+                   activity?.SetDescription(UpdatedActivity?.Description);
+                   //Log.Information($"更新活动名称：{activity?.GetName()}({activity.ToJsonString()})");
+                   await Designer.UpdateActivityAsync(PlugDefiniitonId, activity);                   
+               });
+           });
+    }
+
+}

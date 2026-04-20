@@ -1,0 +1,454 @@
+﻿@using BlazorMonaco
+@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.PlugBaseCore.Models
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.SharedComponents
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using MudExtensions
+@using Serilog
+@using MudBlazor.Extensions
+@using TextReaderPlug.Pages.Components
+@using CJ.Plug.Models.Extensions
+
+@inject IDomInteropService DomInteropService
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">导入本地文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">导入系统文件</MudButton>
+    <MudButton OnClick="GetFileContent" Disabled="Processing" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileOpen">读取文件内容</MudButton>
+    <MudTooltip Text="AI解析">
+        <MudIconButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Icon="@Icons.Material.Filled.Android">AI解析</MudIconButton>
+    </MudTooltip>
+
+</MudStack>
+<MudDivider Style="margin:5px;"/>
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudText>文件内容(@FileRealPath)</MudText>
+    @* <MudToggleGroup T="string" @bind-Value="@ReadType" SelectionMode="SelectionMode.SingleSelection" Outlined Delimiters Size="@Size.Small" Color="@Color.Primary" CheckMark Style="width: 30rem">
+        <MudToggleItem Value="@("关键字定位")" />
+        <MudToggleItem Value="@("键值对定位")" />
+        <MudToggleItem Value="@("表格定位")" />
+    </MudToggleGroup> *@
+</MudStack>
+
+<MudStack Row Justify="Justify.SpaceBetween">
+
+    @* <MudStack Style="width:100%">
+
+        <StandaloneCodeEditor CssClass="studio-monaco-editor-large-border"
+        Id="my-text-editor"
+        @ref="_editor"
+        ConstructionOptions="EditorConstructionOptions" />
+
+    </MudStack> *@
+    <MonacoEditorWrapper @ref="_editor" Id="@("text-editor-"+PlugDefinitionId)"></MonacoEditorWrapper>
+
+    <CascadingValue Value="_editor">
+
+        
+
+        <MudStack Justify="Justify.FlexStart" AlignItems="AlignItems.Stretch" Style="min-width:280px">
+
+            <MudSelect Margin="Margin.Dense" Dense @bind-Value="@ReadType" Variant="Variant.Filled">
+                <MudSelectItem Value="@ReadSchemaMode.关键字">@ReadSchemaMode.关键字.ToString()</MudSelectItem>
+                <MudSelectItem Value="@ReadSchemaMode.键值对">@ReadSchemaMode.键值对.ToString()</MudSelectItem>
+                <MudSelectItem Value="@ReadSchemaMode.表格">@ReadSchemaMode.表格.ToString()</MudSelectItem>
+            </MudSelect>
+            @if (ReadType == ReadSchemaMode.关键字)
+            {
+                <KeyWordsReader 
+                tmpTextMapping="tmpTextMapping"
+                PlugVariablesInPDZ="PlugVariablesInPDZ"
+                GetValue="GetValue" 
+                CheckKeywords="CheckKeywords" 
+                OnInsertTextMapping="InsertMapping"></KeyWordsReader>
+            }
+            else if (ReadType == ReadSchemaMode.键值对)
+            {
+                <KeyValueReader 
+                tmpTextMapping="tmpTextMapping"
+                PlugVariablesInPDZ="PlugVariablesInPDZ"
+                OnInsertTextMapping="InsertMapping"></KeyValueReader>
+
+            }
+            else if (ReadType == ReadSchemaMode.表格)
+            {
+                <TableReader tmpTextMapping="tmpTextMapping"
+                             PlugVariablesInPDZ="PlugVariablesInPDZ"
+                             OnInsertTextMapping="InsertMapping"></TableReader>
+            }
+
+        </MudStack>
+
+    </CascadingValue>
+
+
+</MudStack>
+
+
+<MudDataGrid T="TextMapping" Items="TextMappings" Dense ReadOnly="false"
+EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">已配置关键字映射清单</MudText>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x=>x.Id" Title="序号" Editable="false" />
+        <PropertyColumn Property="x=>x.BindingVariableName" Title="参数名称" Editable="false" />
+        <PropertyColumn Property="x=>x.Keywords" Title="关键字" />
+        <PropertyColumn Property="x=>x.ReadSchemaMode" Title="识别模式">
+            <EditTemplate>
+                <MudSelect Margin="Margin.Dense" Dense @bind-Value="context.Item.ReadSchemaMode">
+                    <MudSelectItem Value="@ReadSchemaMode.关键字">@ReadSchemaMode.关键字.ToString()</MudSelectItem>
+                    <MudSelectItem Value="@ReadSchemaMode.键值对">@ReadSchemaMode.键值对.ToString()</MudSelectItem>
+                    <MudSelectItem Value="@ReadSchemaMode.表格">@ReadSchemaMode.表格.ToString()</MudSelectItem>
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x=>x.ReadSchemaValue" Title="识别值" />
+        @* <PropertyColumn Property="x=>(String.Join(',', x.Position))" Title="关键字区域" IsEditable="false" /> *@
+        @* <PropertyColumn Property="x=>(String.Join(',', x.PositionOffset))" Title="区域偏移量" /> *@
+        <PropertyColumn Property="x => x.EndOffset" Title="操作">
+            <EditTemplate>
+                <MudStack Row Justify="Justify.FlexStart" Style="width:100%;">
+                    <MudButton Size="Size.Small" OnClick="@(() => CheckMapping(context.Item))" Variant="Variant.Filled">查看</MudButton>
+                    <MudIconButton Size="Size.Small" OnClick="@(() => DeleteMapping(context.Item))" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"></MudIconButton>
+
+                </MudStack>
+            </EditTemplate>
+        </PropertyColumn>
+    </Columns>
+
+</MudDataGrid>
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    public string? PlugDefinitionId { get; set; }
+    private List<PlugVariableData>? PlugVariablesInPDZ = new List<PlugVariableData>();
+    public PlugData? PlugData { get; set; }
+    string FileRealPath { get; set; }
+    string? FileId { get; set; }
+    string? FileContent { get; set; } = string.Empty;
+
+    private ReadSchemaMode ReadType { get; set; } = ReadSchemaMode.关键字;
+    IEnumerable<string>? SelectedColHeads { get; set; } = new List<string>();
+    private bool Processing = false;
+    private MonacoEditorWrapper _editor = null!;
+    TextMapping tmpTextMapping { get; set; } = new TextMapping();
+    private string[] decorationIds = new string[0];
+    private Selection EditorSelection = new Selection();
+    private string SelectedParameter = "";
+
+    private PlugVariableData? TextMappingVariable { get; set; }
+    public List<TextMapping> TextMappings { get; set; } = new List<TextMapping>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (SettingContext != null)
+        {
+            PlugDefinitionId = SettingContext.PlugDefinitionId;
+            PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        FileId = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString()).GetFileIdFromFileVariable();
+        FileContent = await MainApiClient.GetFileContentByFileId(FileId);
+        PlugVariablesInPDZ = PlugDataZone?.PlugVariableDatas?.Where(x => x.PlugDefinitionId == PlugDefinitionId).ToList() ?? new();
+        TextMappingVariable = PlugVariablesInPDZ?.Where(v => v.Name == InitVariableNames.TextMapping.ToString()).FirstOrDefault();
+        var value = TextMappingVariable?.Value;
+        try
+        {
+            TextMappings = JsonSerializer.Deserialize<List<TextMapping>?>(value);
+        }
+        catch (Exception ex)
+        {
+            TextMappings = new List<TextMapping>();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(500); // 等待渲染完成
+            await GetFileContent();
+        }
+    }
+
+    private async Task UploadFiles(IBrowserFile browserFile)
+    {        
+        //TODO upload the files to the server
+        if (browserFile != null)
+        {
+            try
+            {                
+                (FileRealPath,var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+                //Plug.SetVariableValue(InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + fileId);
+                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + fileId);
+
+                //Log.Information("Plug.RealValuePath is:" + Plug.RealValuePath);
+                //browserFile = null;
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message);
+                CLog.Error(ex.StackTrace);
+            }
+        }
+    }
+
+
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "json",
+                Value = ""
+            };
+    }
+
+
+    private async Task GetFileContent()
+    {
+        Processing = true;
+        FileId = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString()).GetFileIdFromFileVariable();
+        if (string.IsNullOrEmpty(FileId))
+        {
+            Processing = false;
+            return;
+        }
+        FileContent = await MainApiClient.GetFileContentByFileId(FileId);
+        await _editor.SetValue(FileContent);
+        
+        //await AddAction();
+        Processing = false;
+    }
+
+    private async Task GetValue()
+    {
+        var range = await _editor.GetSelection();
+        var model = await _editor.GetModel();
+        var val = await model.GetValueInRange(range, EndOfLinePreference.LF);
+        //MyCon1sole.WriteLine($"value is: {val}");
+        tmpTextMapping.Keywords = val;
+
+        await CheckKeywords();
+    }
+
+    private async Task CheckKeywords()
+    {
+        if (string.IsNullOrEmpty(tmpTextMapping.Keywords))
+        {
+            return;
+        }
+        var _modelResult = await _editor.GetModel();
+        var range = await _modelResult.GetFullModelRange();
+        var matchs = await _modelResult.FindMatches(tmpTextMapping.Keywords, range, false, true, "", true, 100);
+        Log.Information("匹配数：" + matchs.Count);
+        if (matchs.Count > 0)
+        {
+            BlazorMonaco.Position position = new BlazorMonaco.Position();
+            position.LineNumber = matchs[0].Range.EndLineNumber;
+            position.Column = matchs[0].Range.EndColumn;
+            var newDecorations = new ModelDeltaDecoration[]
+            {
+                new ModelDeltaDecoration
+                {
+                    Range = matchs[0].Range,
+                    Options = new ModelDecorationOptions
+                    {
+                        //IsWholeLine = true,
+                        ClassName = "decorationContentClass",
+                        GlyphMarginClassName = "decorationGlyphMarginClass"
+                    }
+                }
+            };
+            await _editor.ResetDeltaDecorations();
+            decorationIds = await _editor.DeltaDecorations(null, newDecorations);
+            tmpTextMapping.Position[0] = matchs[0].Range.StartLineNumber;
+            tmpTextMapping.Position[1] = matchs[0].Range.StartColumn;
+            tmpTextMapping.Position[2] = matchs[0].Range.EndLineNumber;
+            tmpTextMapping.Position[3] = matchs[0].Range.EndColumn;
+
+            BlazorMonaco.Selection selection = new Selection();
+            selection.SelectionStartLineNumber = tmpTextMapping.Position[0] + tmpTextMapping.PositionOffset[0];
+            selection.SelectionStartColumn = tmpTextMapping.Position[1] + tmpTextMapping.PositionOffset[1];
+            selection.PositionLineNumber = tmpTextMapping.Position[2] + tmpTextMapping.PositionOffset[2];
+            selection.PositionColumn = tmpTextMapping.Position[3] + tmpTextMapping.PositionOffset[3];
+            await _editor.Focus();
+            await _editor.SetPosition(position, "");
+            await _editor.SetSelection(selection, "");
+            var offset = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine(offset);
+            //获取关键字开始和结束的绝对偏移
+            position.LineNumber = matchs[0].Range.StartLineNumber;
+            position.Column = matchs[0].Range.StartColumn;
+            var offset1 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("关键字起始：" + offset1);
+            position.LineNumber = matchs[0].Range.EndLineNumber;
+            position.Column = matchs[0].Range.EndColumn;
+            var offset2 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("关键字结束：" + offset2);
+            //获取替换起始位置相对于关键字起始位置的偏移
+            position.LineNumber = selection.SelectionStartLineNumber;
+            position.Column = selection.SelectionStartColumn;
+            var valueoffset1 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("替换区域开始：" + valueoffset1);
+            //MyCon1sole.WriteLine("相对于关键字起始：" + (valueoffset1 - offset1));
+            tmpTextMapping.StartOffset = valueoffset1 - offset1;
+            //获取替换结束位置相对于关键字起始位置的偏移
+            position.LineNumber = selection.PositionLineNumber;
+            position.Column = selection.PositionColumn;
+            var valueoffset2 = await _modelResult.GetOffsetAt(position);
+            //MyCon1sole.WriteLine("替换区域结束：" + valueoffset2);
+            //MyCon1sole.WriteLine("相对于关键字起始：" + (valueoffset2 - offset1));
+            tmpTextMapping.EndOffset = valueoffset2 - offset1;
+        }
+        else
+        {
+            Log.Information("未能找到关键字匹配，请调整关键字重试");
+        }
+        //MyCon1sole.WriteLine("修改完成");
+        //return 1;
+
+    }
+
+    private async Task GetNewSelection(int offset, int index)
+    {
+        tmpTextMapping.PositionOffset[index] = offset;
+        EditorSelection.SelectionStartLineNumber = tmpTextMapping.Position[0] + tmpTextMapping.PositionOffset[0];
+        EditorSelection.SelectionStartColumn = tmpTextMapping.Position[1] + tmpTextMapping.PositionOffset[1];
+        EditorSelection.PositionLineNumber = tmpTextMapping.Position[2] + tmpTextMapping.PositionOffset[2];
+        EditorSelection.PositionColumn = tmpTextMapping.Position[3] + tmpTextMapping.PositionOffset[3];
+
+        await _editor.SetSelection(EditorSelection, "");
+
+        //StateHasChanged();
+    }
+
+    private async Task InsertMapping(TextMapping textMapping)
+    {     
+        //await CheckKeywords();
+        TextMappings.Add(textMapping);
+        PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+        //如果有新增的参数，则添加到变量列表
+        PlugDataZone.SetVariableValue(PlugDefinitionId, textMapping.BindingVariableName, PlugDataZone.GetVariableValue(PlugDefinitionId, textMapping.BindingVariableName));
+        StateHasChanged();
+    }
+
+    private async Task InsertValue(string value)
+    {
+        SelectedParameter = value;
+        StateHasChanged();
+        // var oprations = new List<IdentifiedSingleEditOperation>();
+        // var selections = new List<Selection>();
+
+        // var opration = new IdentifiedSingleEditOperation();
+        // opration.Range = EditorSelection;
+        // opration.Text = $"{{{{{value}}}}}";
+
+        // oprations.Add(opration);
+        // selections.Add(EditorSelection);
+
+        // var success = await _editor.ExecuteEdits("ttttt", oprations, selections);
+
+        //var _modelResult = await _editor.GetModel();
+        // MyCon1sole.WriteLine(1);
+        // //MyCon1sole.WriteLine(_modelResult);
+        // MyCon1sole.WriteLine(await _modelResult.GetLineCount());
+        // MyCon1sole.WriteLine(_modelResult.Uri);
+        // var range =await _modelResult.GetFullModelRange();
+        // MyCon1sole.WriteLine(2);
+        // var matchs = await _modelResult.FindMatches($"{{{value}}}", range, false, true, "", true, 10);
+        // MyCon1sole.WriteLine(3);
+        // if (matchs.Count > 0)
+        // {
+        //     MyCon1sole.WriteLine(matchs[0].Matches[0]);
+        //     BlazorMonaco.Position position=new BlazorMonaco.Position();
+        //     position.LineNumber = matchs[0].Range.StartLineNumber;
+        //     position.Column = matchs[0].Range.StartColumn;
+        //     await _editor.SetPosition(position,"");
+        //     await _editor.Focus();
+        // }
+
+        // MyCon1sole.WriteLine("修改完成");
+    }
+
+    private async Task DeleteMapping(TextMapping textMapping)
+    {
+        TextMappings.Remove(textMapping);
+        TextMappingVariable.Value = JsonSerializer.Serialize(TextMappings);
+        //Plug.SetPlugSetting(PlugSettingKey.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+    }
+    private async Task CheckMapping(TextMapping mapping)
+    {
+        //Log.Information(JsonSerializer.Serialize(mapping));
+        //var json = System.Text.Json.JsonSerializer.Serialize(mapping);
+        //tmpTextMapping = mapping;
+        //tmpTextMapping.Id = null;
+        // tmpTextMapping.Keywords=mapping.Keywords;
+        // tmpTextMapping.PositionOffset=mapping.PositionOffset;
+        // tmpTextMapping.Position = mapping.Position;
+        // tmpTextMapping.InputName = mapping.InputName;
+        ReadType = mapping.ReadSchemaMode;
+        tmpTextMapping = mapping;
+        //StateHasChanged();
+        await CheckKeywords();
+    }
+
+
+
+
+
+    // private async Task AddAction()
+    // {
+    //     var actionDescriptor = new ActionDescriptor
+    //         {
+    //             Id = "testAction",
+    //             Label = "插入流程参数",
+    //             ContextMenuGroupId = "navigation",
+    //             ContextMenuOrder = 1.5f,
+    //             Run = (editor) =>
+    //             {
+    //                 Log.Information("Ctrl+B : Editor action is triggered.");
+    //             }
+    //         };
+    //     await _editor.AddAction(actionDescriptor);
+    // }
+
+
+
+
+
+
+    
+}

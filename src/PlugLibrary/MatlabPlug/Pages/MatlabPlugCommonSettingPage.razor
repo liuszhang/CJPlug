@@ -1,0 +1,153 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using Radzen.Blazor
+
+@inject IJSRuntime JSRuntime
+
+
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+
+        .selected > td {
+            color: white !important;
+        }
+
+            .selected > td .mud-input {
+                color: white !important;
+            }
+</style>
+<MudStack>
+
+    <MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">导入.m文件</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">新建.m文件</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowForward">执行</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Clear">清空日志</MudButton>
+        <MudSpacer></MudSpacer>
+        <MudCheckBox T="bool" Value="true" Color="Color.Success">运行时显示Matlab窗口</MudCheckBox>
+        <MudCheckBox T="bool" Value="true" Color="Color.Success">运行结束退出Matlab</MudCheckBox>
+    </MudStack>
+    <MudText>脚本内容(WorkPath/test.m)</MudText>
+    <MudStack Row Style="width:100%;height:220px" StretchItems="StretchItems.Start">
+        <StandaloneCodeEditor CssClass="studio-monaco-editor-large-border"
+                              Id="my-matlab-editor"
+                              ConstructionOptions="EditorConstructionOptions" />
+        <MudTextField T="string" ReadOnly Style="width:200px" Label="执行日志" Variant="Variant.Outlined" Text="1" Lines="9" />
+    </MudStack>
+
+
+</MudStack>
+
+@code {
+    private Plug Plug;
+    private int selectedRowNumber = -1;
+    private MudTable<MCItem> mudTable;
+    private MudTable<MCItemVariable> mudTable2;
+    private List<string> clickedEvents = new();
+    private IEnumerable<MCItem> Elements = new List<MCItem>()
+    {
+        new MCItem() { id="PRT2401581-1404",name="主机备份分系统",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" },
+        new MCItem() { id="PRT2401556-0608",name="产品外机设备",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" },
+        new MCItem() { id="PRT2401782-5054",name="电源系统",type="零部件",status="拟制中",version="A.5",context="T05A型产品库",creator="张三(zhangsan)" }
+    };
+    private IEnumerable<MCItemVariable> ElementVariables = new List<MCItemVariable>()
+    {
+        new MCItemVariable() { name = "编号", type = "字符串", value = "PRT2401556-0401"},
+        new MCItemVariable() { name = "名称", type = "字符串", value = "产品外机设备" },
+        new MCItemVariable() { name = "版本", type = "字符串", value = "B.3" },
+        new MCItemVariable() { name = "状态", type = "字符串", value = "拟制中" },
+        new MCItemVariable() { name = "长度", type = "字符串", value = "121CM" },
+        new MCItemVariable() { name = "重量", type = "字符串", value = "47kg" },
+        new MCItemVariable() { name = "材料", type = "字符串", value = "不锈钢3A59-AM" },
+        new MCItemVariable() { name = "最大功率", type = "字符串", value = "1200W" }
+    };
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        //MyCon1sole.WriteLine("编辑器开始构造");
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "python",
+                Value = "p0=1\np1=2\np2=3"
+            };
+    }
+
+    private void RowClickEvent(TableRowClickEventArgs<MCItem> tableRowClickEventArgs)
+    {
+        clickedEvents.Add("Row has been clicked");
+    }
+
+    private string SelectedRowClassFunc(MCItem element, int rowNumber)
+    {
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            clickedEvents.Add("Selected Row: None");
+            return string.Empty;
+        }
+        else if (mudTable.SelectedItem != null && mudTable.SelectedItem.Equals(element))
+        {
+            selectedRowNumber = rowNumber;
+            clickedEvents.Add($"Selected Row: {rowNumber}");
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    private string SelectedVariableRowClassFunc(MCItemVariable element, int rowNumber)
+    {
+        if (selectedRowNumber == rowNumber)
+        {
+            selectedRowNumber = -1;
+            clickedEvents.Add("Selected Row: None");
+            return string.Empty;
+        }
+        else if (mudTable2.SelectedItem != null && mudTable2.SelectedItem.Equals(element))
+        {
+            selectedRowNumber = rowNumber;
+            clickedEvents.Add($"Selected Row: {rowNumber}");
+            return "selected";
+        }
+        else
+        {
+            return string.Empty;
+        }
+    }
+
+    public class MCItem
+    {
+        public string id;
+        public string name;
+        public string type;
+        public string status;
+        public string version;
+        public string context;
+        public string creator;
+    }
+    public class MCItemVariable
+    {
+        public string name;
+        public string type;
+        public string value;
+        public string bindingTo;
+    }
+}
+
+

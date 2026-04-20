@@ -1,0 +1,156 @@
+﻿@using Blazor.Diagrams
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Core
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Geometry
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Models.Base
+@using Blazor.Diagrams.Core.Options
+@using Blazor.Diagrams.Core.PathGenerators
+@using Blazor.Diagrams.Core.Routers
+@using Blazor.Diagrams.Options
+@using CJ.Plug.Models
+@using CJ.Plug.Models.Shared
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Point=Blazor.Diagrams.Core.Geometry.Point
+
+
+
+@inject IDialogService DialogService
+
+@if (IsReadOnly)
+{
+    <div class="diagram-container" ondragover="event.preventDefault();" @ondragover:preventDefault @oncontextmenu:preventDefault>
+
+        <CascadingValue Value="MyDiagram" IsFixed="true">
+            <DiagramCanvas Class="diagram-designer"></DiagramCanvas>
+        </CascadingValue>
+
+    </div>
+}
+else
+{
+    <div class="diagram-container" ondragover="event.preventDefault();" @ondragover:preventDefault @ondrop="OnDrop" @oncontextmenu:preventDefault>
+
+        <CascadingValue Value="MyDiagram" IsFixed="true">
+            <DiagramCanvas Class="diagram-designer"></DiagramCanvas>
+        </CascadingValue>
+
+    </div>
+}
+
+
+@code {
+    [CascadingParameter]
+    private MyDragDropManager _draggedType { get; set; }
+
+    private BlazorDiagram MyDiagram { get; set; } = null!;
+    public class MyLinkModel : LinkModel
+    {
+        public MyLinkModel(PortModel sourcePort, PortModel targetPort) : base(sourcePort, targetPort)
+        {
+        }
+
+        public MyLinkModel(Blazor.Diagrams.Core.Anchors.Anchor source, Blazor.Diagrams.Core.Anchors.Anchor target) : base(source, target)
+        {
+            TargetMarker = LinkMarker.Arrow;
+            Color = "blue";
+        }
+
+        //public LinkMarker? TargetMarker { get; set; } = LinkMarker.Arrow;
+        //public string? Color { get; set; } = "blue";
+
+    }
+
+    [Parameter]
+    public bool IsReadOnly { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+
+            // var options = new BlazorDiagramOptions
+            //     {
+            //         AllowMultiSelection = true,
+            //         Zoom =
+            //     {
+            //         Enabled = false,
+            //     },
+            //         Links =
+            //     {
+            //         DefaultRouter = new NormalRouter(),
+            //         DefaultPathGenerator = new SmoothPathGenerator()
+            //     },
+            //     };
+
+
+            MyDiagram = new BlazorDiagram();
+            MyDiagram.Options.Links.DefaultColor = "blue";
+            MyDiagram.Links.Added += (BaseLinkModel lm) => lm.TargetMarker = LinkMarker.Arrow;
+
+
+            MyDiagram.PointerDoubleClick += (m, e) =>
+            {
+                Console.WriteLine(m?.GetType().Name);
+                //events.Add($"MouseDoubleClick, Type={m?.GetType().Name}, ModelId={m?.Id}");
+                //StateHasChanged();
+                if (m?.GetType().Name == "NodeModel")
+                {
+                    // var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+
+                    // DialogService.ShowAsync<Ansys>("Ansys组件", options);
+                }
+
+            };
+
+
+
+            var firstNode = MyDiagram.Nodes.Add(new NodeModel(position: new Blazor.Diagrams.Core.Geometry.Point(150, 50))
+                {
+                    Title = "Ansys求解"
+                });
+            var secondNode = MyDiagram.Nodes.Add(new NodeModel(position: new Point(300, 100))
+                {
+                    Title = "结果提取"
+                });
+            var Node3 = MyDiagram.Nodes.Add(new NodeModel(position: new Point(500, 200))
+                {
+                    Title = "Matlab"
+                });
+
+            var left1Port = firstNode.AddPort(PortAlignment.Right);
+            var leftPort = secondNode.AddPort(PortAlignment.Left);
+            var rightPort = secondNode.AddPort(PortAlignment.Right);
+            var Port3 = Node3.AddPort(PortAlignment.Left);
+            var Port4 = Node3.AddPort(PortAlignment.Right);
+
+            // The connection point will be the intersection of
+            // a line going from the target to the center of the source
+            //var sourceAnchor = new ShapeIntersectionAnchor(firstNode);
+            var sourceAnchor = new SinglePortAnchor(left1Port);
+            // The connection point will be the port's position
+            var targetAnchor = new SinglePortAnchor(leftPort);
+            var link = MyDiagram.Links.Add(new LinkModel(sourceAnchor, targetAnchor));
+
+        }
+    }
+
+
+    private void OnDrop(DragEventArgs e)
+    {
+        //Console.WriteLine("拖进去的是个："+_draggedType.Payload);
+        if (string.IsNullOrEmpty(_draggedType.Payload?.ToString())) // Unkown item
+            return;
+
+        var position = MyDiagram.GetRelativeMousePoint(e.ClientX, e.ClientY);
+        var node = new NodeModel(position);
+        node.AddPort(PortAlignment.Left);
+        node.AddPort(PortAlignment.Right);
+        var a = (ActivityDescriptor)_draggedType.Payload;
+        node.Title = a.Name;
+        MyDiagram.Nodes.Add(node);
+        //_draggedType = "";
+    }
+}

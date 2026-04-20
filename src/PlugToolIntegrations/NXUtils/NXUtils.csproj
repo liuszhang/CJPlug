@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net4.8</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+	<LangVersion>10.0</LangVersion>
+	  <UseWPF>true</UseWPF>
+	  <UserSecretsId>dfd7215d-54cf-4802-a2e6-eddd360a761a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="NXOpen">
+      <HintPath>C:\Program Files\Siemens\NX 12.0\NXBIN\managed\NXOpen.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NXOpen.Guide">
+      <HintPath>C:\Program Files\Siemens\NX 12.0\NXBIN\managed\NXOpen.Guide.dll</HintPath>
+    </Reference>
+    <Reference Include="NXOpen.UF">
+      <HintPath>C:\Program Files\Siemens\NX 12.0\NXBIN\managed\NXOpen.UF.dll</HintPath>
+    </Reference>
+    <Reference Include="NXOpen.Utilities">
+      <HintPath>C:\Program Files\Siemens\NX 12.0\NXBIN\managed\NXOpen.Utilities.dll</HintPath>
+    </Reference>
+    <Reference Include="NXOpenUI">
+      <HintPath>C:\Program Files\Siemens\NX 12.0\NXBIN\managed\NXOpenUI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

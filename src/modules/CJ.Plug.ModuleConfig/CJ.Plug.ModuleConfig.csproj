@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIModule\CJ.Plug.AI\CJ.Plug.AI.csproj" />
+    <ProjectReference Include="..\FileManageModule\CJ.Plug.FileManage\CJ.Plug.FileManage.csproj" />
+    <ProjectReference Include="..\FMDModule\CJ.Plug.FMD\CJ.Plug.FMD.csproj" />
+    <ProjectReference Include="..\HomeModule\CJ.Plug.HomePage\CJ.Plug.HomePage.csproj" />
+    <ProjectReference Include="..\JobManageModule\CJ.Plug.JobManage\CJ.Plug.JobManage.csproj" />
+    <ProjectReference Include="..\LoginModule\CJ.Plug.Login\CJ.Plug.Login.csproj" />
+    <ProjectReference Include="..\MCPToolsModule\CJ.Plug.MCPToolsManage\CJ.Plug.MCPToolsManage.csproj" />
+    <ProjectReference Include="..\PDZManageModule\CJ.Plug.PlugDataZone\CJ.Plug.PlugDataZone.csproj" />
+    <ProjectReference Include="..\PlugExecuteModule\CJ.Plug.Execute\CJ.Plug.Execute.csproj" />
+    <ProjectReference Include="..\PlugMarketModule\CJ.Plug.PlugMarket\CJ.Plug.PlugMarket.csproj" />
+    <ProjectReference Include="..\ProcessEditModule\CJ.Plug.ProcessEdit\CJ.Plug.ProcessEdit.csproj" />
+    <ProjectReference Include="..\ProcessManageModule\ProcessManageModule\CJ.Plug.ProcessManage.csproj" />
+    <ProjectReference Include="..\ProcessToExternalModule\CJ.Plug.ToExternal\CJ.Plug.ToExternal.csproj" />
+    <ProjectReference Include="..\RelationManageModule\CJ.Plug.Relation\CJ.Plug.Relation.csproj" />
+    <ProjectReference Include="..\SkillsModule\CJ.Plug.SkillsManage\CJ.Plug.SkillsManage.csproj" />
+    <ProjectReference Include="..\StationAndToolModule\CJ.Plug.StationAndTool\CJ.Plug.StationAndTool.csproj" />
+    <ProjectReference Include="..\ToolActionSettingModule\CJ.Plug.ToolActionSetting\CJ.Plug.ToolActionSetting.csproj" />
+    <ProjectReference Include="..\UnitTestModule\CJ.Plug.UnitTest\CJ.Plug.UnitTest.csproj" />
+    <ProjectReference Include="..\UserManageModule\CJ.Plug.UserManage\CJ.Plug.UserManage.csproj" />
+  </ItemGroup>
+
+</Project>

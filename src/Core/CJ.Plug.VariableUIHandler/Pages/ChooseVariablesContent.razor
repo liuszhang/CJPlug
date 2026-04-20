@@ -1,0 +1,75 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Radzen.Blazor
+@using System.Text.Json.Nodes
+
+@inject MainApiClient MainApiClient
+
+@if (string.IsNullOrEmpty(WorkflowDefinitionId))
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <RadzenSplitter>
+        <RadzenSplitterPane Size="20%" Min="100px">
+            <MudTreeView T="Plug" @bind-SelectedValue="SelectedPlug">
+                <MudTreeViewItem Value='@rootPlug' Text="@rootPlug?.Name"
+                                 Expanded Icon="@Icons.Custom.Uncategorized.Folder" IconExpanded="@Icons.Custom.Uncategorized.FolderOpen" IconColor="Color.Info"
+                                 ExpandButtonIcon="@Icons.Material.Filled.ArrowRight" ExpandButtonIconColor="Color.Primary">
+                    @foreach (var plug in plugs)
+                    {
+                        <MudTreeViewItem Value="@plug" Text="@plug.Name" Icon="@Icons.Material.Filled.Info" IconColor="Color.Tertiary" />
+                    }
+                </MudTreeViewItem>
+            </MudTreeView>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Size="80%" Min="100px">
+            <PDZVariablesDataReadOnly SelectedPlug="SelectedPlug" SelectedVariableChanged="SelectedChanged"></PDZVariablesDataReadOnly>
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+}
+
+@code {
+
+    //public WorkflowDefinition? WorkflowDefinition { get; set; }
+    [Parameter]
+    public string? WorkflowDefinitionId { get; set; }
+    [Parameter]
+    public EventCallback<PlugVariableData> SelectedVariableChanged { get; set; }
+
+
+    private Plug? rootPlug = new Plug();
+    private List<JsonObject> Activities = new List<JsonObject>();
+    private List<Plug> plugs = new List<Plug>();
+
+    private Plug? SelectedPlug { get; set; } = new Plug();
+    //private List<TreeItemData<Plug>> TreeItems { get; set; } = new();
+
+    override protected async Task OnParametersSetAsync()
+    {
+        // 获取流程及其子活动
+        //WorkflowDefinition = await ElsaEngineService.FindWorkflowDefinitionByDefinitionId(WorkflowDefinitionId);
+        rootPlug = await MainApiClient.GetPlugByDefinitionIdAsync(WorkflowDefinitionId);
+        Activities = rootPlug.ToActivityJson().GetActivities()?.ToList();
+
+        plugs.Clear();
+        foreach (var activity in Activities)
+        {
+            Console.WriteLine(">>>>>>>>>activity:" + activity.GetId());
+            var plug = await MainApiClient.GetPlugByDefinitionIdAsync(activity.GetId());
+            plugs.Add(plug);
+        }
+        StateHasChanged();
+    }
+
+    private async Task SelectedChanged(PlugVariableData value)
+    {
+        Console.WriteLine(">>>>>>>>>222selected variable:" + value.Name);
+        await SelectedVariableChanged.InvokeAsync(value);
+    }
+}

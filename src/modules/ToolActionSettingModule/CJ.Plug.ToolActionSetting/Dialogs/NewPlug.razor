@@ -1,0 +1,207 @@
+﻿@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.PlugSettingPages
+@using CJ.Plug.SharedPages.Variable
+@using CJ.Plug.StationAndToolApiClient
+@using CJ.Plug.TASApiClient
+@using CJ.Plug.VariableUIHandler.Components
+@using CJ.Plug.VariableUIHandler.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Microsoft.JSInterop
+@using Serilog
+
+@inject MainApiClient MainApiClient
+@inject ITASApiClient TASApiClient
+@inject IStationAndToolApiClient StationAndToolApiClient
+@inject IJSRuntime JsRuntime
+@inject IDialogService DialogService
+@inject IElsaDomToolService ElsaDomToolService
+@inject IDomInteropService DomInteropService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack>
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="@Plug.Name" Margin="Margin.Dense" Label="插头名称" Variant="Variant.Outlined"></MudTextField>
+                @* <MudTextField @bind-Value="@Type" Margin="Margin.Dense" Label="类型" Variant="Variant.Outlined"></MudTextField> *@
+                <MudTooltip Text="系统插头只有管理员能够创建，创建后所有人可见">
+                    <MudSwitch T="bool" Label="是否系统插头" Size="Size.Small" Color="Color.Primary"></MudSwitch>
+                </MudTooltip>
+            </MudStack>
+            <MudTextField @bind-Value="@Plug.Type" Margin="Margin.Dense" Label="插头类型（插头唯一，建议不使用中文）" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField @bind-Value="@Plug.Description" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined"></MudTextField>
+
+            @if (Loading)
+            {
+                <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Small"></MudProgressCircular>
+            }
+            else
+            {
+                <MudSelect T="Tool" Value="SelectedTool" ValueChanged="(Tool t)=>SelectedValuesChanged(t)" Label="选择工具" Clearable Placeholder="选择一个工具" Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+                    @foreach (var t in Tools)
+                    {
+                        <MudSelectItem Value="t">
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.PanToolAlt" Color="Color.Primary"></MudIcon>
+                                <MudText>@($"{@t.ToolName}({@t.ToolVersion})")</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @if (SelectedTool!=null)
+            {
+                <MudTextField @bind-Value="@SelectedTool.ToolType" Margin="Margin.Dense" Label="插头类型(由工具决定)" ReadOnly Variant="Variant.Filled"></MudTextField>
+
+                @foreach(var variable in ToolVariablesFromSelectedTool)
+                {
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        @if (variable.Type == VariableTypeEnum.File.ToString())
+                        {
+                            <MudText>@($"设置变量：{variable.Name}默认值：")</MudText>
+                            <FileUpload EditorContext="new DisplayInputEditorContext
+                            {
+                                Variable = variable,
+                             }"/>
+                        }
+                        else
+                        {
+                            <MudTextField T="string" Margin="Margin.Dense" Label="@($"设置变量：{variable.Name}默认值")" @bind-Value="@variable.DefaultValue" Variant="Variant.Outlined"></MudTextField>
+                        }
+                        <MudSelect @bind-Value="variable.Type" Label="参数类型" Required Margin="@Margin.Dense" ToStringFunc="@(t => VariableTypeConverter.GetTypeDisplayName(t))">
+                            <MudSelectItem T="string" Value="@VariableTypeEnum.String.ToString()">@VariableTypeConverter.GetTypeDisplayName(VariableTypeEnum.String.ToString())</MudSelectItem>
+                            <MudSelectItem T="string" Value="@VariableTypeEnum.File.ToString()">@VariableTypeConverter.GetTypeDisplayName(VariableTypeEnum.File.ToString())</MudSelectItem>
+                        </MudSelect>
+                        @if (variable.Type == VariableTypeEnum.File.ToString())
+                        {
+                            <MudTooltip Text="如果参数类型设置为文件，调用工具时将自动处理为文件路径；如果勾选参数为输出，则工具执行完成后将自动把文件更新至参数中">
+                                <MudCheckBox Dense T="bool" @bind-Value="@variable.IsInput" Color="Color.Primary">输入</MudCheckBox>
+                            </MudTooltip>
+                            <MudTooltip Text="如果参数类型设置为文件，调用工具时将自动处理为文件路径；如果勾选参数为输出，则工具执行完成后将自动把文件更新至参数中">
+                                <MudCheckBox Dense T="bool" @bind-Value="@variable.IsOutput" Color="Color.Primary">输出</MudCheckBox>
+                            </MudTooltip>
+                        }
+                        
+                        
+                        @* <MudCheckBox Dense T="bool" Value="true" ReadOnly Color="Color.Primary">创建插头参数</MudCheckBox> *@
+                    </MudStack>
+                }
+
+
+
+                @* @if (SelectedTool.ToolType.Contains("桌面类"))
+                {
+                    <StationPlugSettingContent Plug="Plug" ShowSaveButton="false"></StationPlugSettingContent>
+                } *@
+
+            }
+
+
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Disabled="SubmitDisabled" Color="Color.Primary" OnClick="Submit">提交</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+
+
+    private bool Loading = true;
+    private bool SubmitDisabled = false;
+    //private string? Name { get; set; }
+    //private string? Type { get; set; }
+    //private string? Description { get; set; }
+
+    private Plug? Plug { get; set; } = new();
+    private List<Tool> Tools { get; set; } = new List<Tool>();
+    private Tool? SelectedTool { get; set; }
+    // private class VariableCreateModel
+    // {
+    //     public string VariableName { get; set; } = string.Empty;
+    //     public string VariableValue { get; set; } = string.Empty;
+    //     public bool IsCreatePlugParameter { get; set; } = true;
+    // }
+    private IEnumerable<BaseVariable>? ToolVariablesFromSelectedTool { get; set; } = new List<BaseVariable>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //PlugSettings = Plug.GetPlugSettings();
+        //ToolPath = PlugSettings.GetSetting(ExePlugSettingKey.ToolPath.ToString());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Tools = await StationAndToolApiClient.GetAllToolsAsync();
+            Loading = false;
+            Console.WriteLine("load tools done");
+            StateHasChanged();
+            //MyCon1sole.WriteLine("完成初始化2");
+        }
+    }
+
+    private async Task SavePlugData()
+    {
+        Plug.Type = Plug.Type ?? Plug.Name;
+        Plug.ToolId = SelectedTool?.Id;
+        Plug.ToolName = SelectedTool == null ? null : SelectedTool?.ToolName;
+        Plug.ToolVersion = SelectedTool == null ? null : SelectedTool?.ToolVersion;
+        Plug.ToolDisplayName = SelectedTool?.Id == null ? null : $"{SelectedTool?.ToolName}({SelectedTool?.ToolVersion})";
+        Plug.ToolCommandLineShema = SelectedTool?.CommandParameter;
+        Plug.Category = SelectedTool?.ToolType;
+        Plug.Creater = await DomInteropService.GetCurrentUserName();
+        //Plug.IsRootPlug = true;
+        //Plug.IsCustomeToolPlug = true;
+        Plug.CreateType = PlugCreateTypeEnum.RootPlug.ToString();
+        Plug.DefinitionId = RandomLongIdentityGenerator.GenerateId();
+        foreach(var variable in ToolVariablesFromSelectedTool)
+        {
+            Plug.PlugVariables.Add(new PlugVariable
+            {
+                Name = variable.Name.TrimStart('[').TrimEnd(']'),
+                DefaultValue = variable.DefaultValue,
+                IsInitVariable = true,
+                Type = variable.Type,
+                IsInput = variable.IsInput,
+                IsOutput = variable.IsOutput,
+            });
+        }
+    }
+
+    private async Task SelectedValuesChanged(Tool tool)
+    {
+        SelectedTool = tool;
+        ToolVariablesFromSelectedTool = SelectedTool?.GetVariablesFromToolCommand() ?? new List<BaseVariable>();
+    }
+
+    private async void Submit()
+    {        
+        SubmitDisabled = true;
+        //Console.WriteLine(">>>>>>>>>start new workflow");   
+        await SavePlugData();
+        await TASApiClient.CreateNewPlug(Plug);
+        Console.WriteLine($"succuse create plug:{Plug.Name}");
+        MudDialog.Close(DialogResult.Ok(Plug));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

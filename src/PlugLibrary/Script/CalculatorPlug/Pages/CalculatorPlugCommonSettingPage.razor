@@ -1,0 +1,182 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.DeekSeekIn
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.PlugBaseCore.Models
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+
+@inject IDeepSeekService DeepSeekService
+@inject IJSRuntime JS
+
+<MudStack>
+    <MudText>计算器</MudText>
+    <MudStack Row>
+        <MudTextField @bind-Value="@DescriptionString" Style="min-width:300px;" Lines="6" AutoGrow Label="公式" Variant="Variant.Outlined"></MudTextField>
+        <MudButton OnClick="AIGenerateLatex" Variant="Variant.Outlined">AI生成</MudButton>
+        <MudText>@LatexContent</MudText>
+    </MudStack>
+
+<!-- Scientific calculator UI -->
+<MudPaper Class="mt-4 pa-4" Elevation="1">
+    <MudText Typo="Typo.h6">科学计算器</MudText>
+    <MudStack Class="mt-2">
+        <MudTextField ReadOnly="true" Value="@CalcDisplay" Label="表达式" Variant="Variant.Outlined"></MudTextField>
+        <MudTextField ReadOnly="true" Value="@CalcResult" Label="结果" Variant="Variant.Filled"></MudTextField>
+
+        <MudGrid Class="mt-2" GutterSize="2">
+            @foreach (var row in CalcButtons)
+            {
+                <MudItem xs="12">
+                    <MudGrid GutterSize="1">
+                        @foreach (var btn in row)
+                        {
+                            <MudItem xs="2">
+                                <MudButton Variant="Variant.Outlined" OnClick="() => OnCalcButton(btn.Value)">@btn.Label</MudButton>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudItem>
+            }
+            <MudItem xs="12" Class="mt-2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="EvaluateCalc">=</MudButton>
+                <MudButton Color="Color.Secondary" Variant="Variant.Outlined" OnClick="ClearCalc" Class="ml-2">C</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="BackspaceCalc" Class="ml-2">⌫</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudStack>
+</MudPaper>
+    
+
+</MudStack>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    public string? PlugDefinitionId { get; set; }
+
+    private string? ProfString1 { get; set; } = "将以下描述转为latex公式字符：";
+    private string? ProfString2 { get; set; } = "，只需要给出最终结果，不要思考过程，不要输出过程文字。";
+    private string? DescriptionString { get; set; } = "根号16加6";
+    private string? LatexContent { get; set; }
+
+
+    private async Task AIGenerateLatex()
+    {
+        var prompt = $"{ProfString1}{DescriptionString}{ProfString2} /no_think";
+        // 初始化StringBuilder用于高效拼接
+        var stringBuilder = new StringBuilder();
+        // 可选：控制更新频率的计数器
+        int updateThreshold = 2; // 每积累5个字符更新一次（可调整）
+        int currentLength = 0;
+
+        try
+        {
+            await foreach (var response in DeepSeekService.Ask(prompt))
+            {
+                if (!string.IsNullOrEmpty(response))
+                {
+                    stringBuilder.Append(response);
+                    currentLength += response.Length;
+
+                    // 达到阈值或最后一次更新时刷新UI
+                    if (currentLength >= updateThreshold ||
+                        // 可根据实际响应特征判断是否为最后一段（如特定结束标记）
+                        response.EndsWith("\n"))
+                    {
+                        LatexContent = stringBuilder.ToString();
+                        StateHasChanged();
+                        currentLength = 0; // 重置计数器
+                    }
+                }
+            }
+            // 确保最终内容完全更新到UI
+            LatexContent = stringBuilder.ToString();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // 处理异常（如网络错误）
+            LatexContent = $"获取内容失败：{ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    // --- Scientific calculator state and handlers ---
+    private string CalcDisplay { get; set; } = string.Empty;
+    private string CalcResult { get; set; } = string.Empty;
+
+    private record CalcButton(string Label, string Value);
+
+    private List<List<CalcButton>> CalcButtons { get; set; } = new()
+    {
+        new() { new("7","7"), new("8","8"), new("9","9"), new("/","/"), new("sqrt","sqrt("), new("pi","Math.PI") },
+        new() { new("4","4"), new("5","5"), new("6","6"), new("*","*"), new("^","^"), new("e","Math.E") },
+        new() { new("1","1"), new("2","2"), new("3","3"), new("-","-"), new("(","("), new(")",")") },
+        new() { new("0","0"), new(".","."), new(",","."), new("+","+"), new("sin","sin("), new("cos","cos(") },
+        new() { new("tan","tan("), new("ln","ln("), new("log","log("), new("abs","abs("), new("pi","Math.PI"), new("e","Math.E") }
+    };
+
+    private void OnCalcButton(string value)
+    {
+        CalcDisplay += value;
+    }
+
+    private async Task EvaluateCalc()
+    {
+        if (string.IsNullOrWhiteSpace(CalcDisplay))
+            return;
+
+        // Prepare JS-friendly expression
+        var expr = CalcDisplay.Replace("^", "**");
+
+        // Map function names to Math.*
+        expr = expr.Replace("sin(", "Math.sin(")
+                   .Replace("cos(", "Math.cos(")
+                   .Replace("tan(", "Math.tan(")
+                   .Replace("sqrt(", "Math.sqrt(")
+                   .Replace("ln(", "Math.log(")
+                   .Replace("log(", "Math.log10(")
+                   .Replace("abs(", "Math.abs(");
+
+        try
+        {
+            var result = await JS.InvokeAsync<object>("eval", expr);
+            CalcResult = result?.ToString() ?? string.Empty;
+        }
+        catch (JSException jsEx)
+        {
+            CalcResult = $"JS Error: {jsEx.Message}";
+        }
+        catch (Exception ex)
+        {
+            CalcResult = $"Error: {ex.Message}";
+        }
+    }
+
+    private void ClearCalc()
+    {
+        CalcDisplay = string.Empty;
+        CalcResult = string.Empty;
+    }
+
+    private void BackspaceCalc()
+    {
+        if (!string.IsNullOrEmpty(CalcDisplay))
+            CalcDisplay = CalcDisplay.Substring(0, CalcDisplay.Length - 1);
+    }
+
+
+}

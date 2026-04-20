@@ -1,0 +1,31 @@
+﻿@using CJ.Plug.GUIDesigner.Models
+@using MudBlazor
+<MudTabs>
+    <MudTabPanel Text="属性">
+        @ItemPropertiesContent
+    </MudTabPanel>
+    <MudTabPanel Text="事件">
+
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    [Parameter]
+    public BaseGuiItemModel? SelectedNode { get; set; }
+
+    private RenderFragment? ItemPropertiesContent { get; set; }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var handler = SelectedNode?.GuiItemService;
+        if (handler != null)
+        {
+            ItemPropertiesContent =await handler.GetItemPropertySettingContent();
+        }
+        else
+        {
+            ItemPropertiesContent = null;
+        }
+    }
+}

@@ -1,0 +1,66 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Size=MudBlazor.Size
+
+
+@* @SelectedPlug.Name *@
+<MudDataGrid T="PlugVariableData" Items="@EditorContext?.PlugDataZone.GetVariablesOfPlug(SelectedPlugDefinitionId)" ReadOnly="true"
+SortMode="SortMode.None" Height="100%" SelectedItemChanged="SelectVariable"
+Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgressColor="Color.Primary">
+    <ToolBarContent>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh">刷新</MudButton>
+    </ToolBarContent>
+    <Columns>
+        <SelectColumn T="PlugVariableData" />
+        <PropertyColumn Property="x => x.Name" Title="名称" />
+        <PropertyColumn Property="x => x.Type" Title="类型" />            
+        @* <PropertyColumn Property="x => x.Value" Title="值" Required="false" >
+            
+        </PropertyColumn> *@
+        <TemplateColumn>
+            <CellTemplate>
+                <MudTextField T="string" ReadOnly Style="max-width:300px" Size="@Size.Small" Text="@context.Item.Value" Lines="1" AutoGrow></MudTextField>
+            </CellTemplate>
+        </TemplateColumn>
+            
+        @* <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Required="false" /> *@
+        <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出"/>            
+    </Columns>
+</MudDataGrid>
+
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext? EditorContext { get; set; }
+
+    // [Parameter]
+    // public Plug? SelectedPlug { get; set; } = new();
+    [Parameter]
+    public string? SelectedPlugDefinitionId { get; set; }
+
+    [Parameter]
+    public EventCallback<PlugVariableData> SelectedVariableChanged { get; set; }
+
+    //private List<PDZVariable> variables = new List<PDZVariable>();
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // foreach (var p in EditorContext.PlugDataZone.PDZVariables)
+        // {
+        //     Console.WriteLine(p.Name);
+        // }
+
+        // Console.WriteLine("---->>>>"+SelectedPlug?.Name);
+        StateHasChanged();
+    }
+
+    private async Task SelectVariable(PlugVariableData PDZVariable)
+    {
+        Console.WriteLine(">>>>>>>>>selected variable:" + JsonSerializer.Serialize(PDZVariable));
+        await SelectedVariableChanged.InvokeAsync(PDZVariable);
+    }
+}

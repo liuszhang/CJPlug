@@ -1,0 +1,352 @@
+﻿@page "/process/{PlugDefinitionId}/execute/{JobDefinitionId?}"
+
+
+<PageTitle>@($"流程执行")</PageTitle>
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Contracts
+
+@using CJ.Plug.ElsaIntegration.Pages
+@using CJ.Plug.Execute.Pages.Components
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.Job
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Studio
+@using Elsa.Studio.Login.Contracts
+@using Elsa.Studio.Login.Services
+@using Elsa.Studio.Workflows.Components.WorkflowInstanceViewer.Components
+@using Elsa.Studio.Workflows.Designer.Components
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.Domain.Models
+@using Elsa.Studio.Workflows.UI.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
+
+@using Orientation=Radzen.Orientation
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Radzen
+@using Radzen.Blazor
+@using Serilog
+@using System.Timers
+
+@layout BasicLayout
+
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject MainApiClient MainApiClient
+@inject IElsaStudioService ElsaStudioService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IDomInteropService DomInteropService
+@inject ElsaApiClient ElsaApiClient
+
+
+
+<style>
+    .custom-gradient {
+    background-image: linear-gradient(to right top, #051937, #004d7a, #008793, #00bf72, #a8eb12);
+    color: white !important;
+    }
+
+    .custom-striped {
+    background: repeating-linear-gradient( 45deg, #606dbc, #606dbc 10px, #465298 10px, #465298 20px );
+    color: white !important;
+    }
+</style>
+
+<CascadingValue Value="PlugDataZone">
+    <CascadingValue Value="PlugDefinitionId">
+
+
+        <MudStack Row StretchItems="StretchItems.Start">
+            <RadzenSplitter>
+                <RadzenSplitterPane Size="70%" Min="600px">
+
+                    <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh);">
+                        <RadzenSplitterPane Size="30%" Min="200px">
+                            <MudTabs @ref="tabs" MinimumTabWidth="88" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0">                        
+                                @if (!string.IsNullOrEmpty(JobDefinitionId))
+                                {
+                                    <MudTabPanel Text="执行历程" ID="@("JobJournal")">
+                                        <JobJournal JobCorrelationId="@PlugDataZone?.PDZId"></JobJournal>
+                                    </MudTabPanel>
+                                }
+
+                                <MudTabPanel Text="基础配置" ID="@("JobBasicInfo")">
+                                    <VerticalWell ExtraPadding="6">
+                                        <JobBasicInfo></JobBasicInfo>
+
+                                        <MudButton Disabled="Processing" OnClick="Start" FullWidth Variant="MudBlazor.Variant.Outlined">
+                                            @if (Processing)
+                                            {
+                                                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" />
+                                                <MudText Class="ms-2">执行中</MudText>
+                                            }
+                                            else
+                                            {
+                                                if (string.IsNullOrEmpty(JobDefinitionId))
+                                                {
+                                                    <MudText>启动</MudText>
+                                                }
+                                                else
+                                                {
+                                                    <MudText>重新启动</MudText>
+                                                }
+                                            }
+                                        </MudButton>
+
+                                    </VerticalWell>
+                                </MudTabPanel>
+
+                            </MudTabs>                           
+                        </RadzenSplitterPane>
+                        <RadzenSplitterPane Size="70%" Min="600px">
+                            <RadzenSplitter Orientation="Orientation.Vertical" Resize="OnResize">
+                                <RadzenSplitterPane Size="70%">
+
+                                    <MudPaper Class="diagram-designer-container">
+                                        <MudPaper Class="ma-2" Elevation="0" Outlined="true">
+                                            <MudToolBar Dense="true">
+                                                <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.FitScreen" OnClick="ZoomToFitAsync"></MudIconButton>
+                                                <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.FilterCenterFocus" OnClick="CenterContentAsync"></MudIconButton>
+                                                <MudIconButton Size="MudBlazor.Size.Small" Style="margin-right:20px;" Icon="@Icons.Material.Outlined.AutoAwesomeMosaic" OnClick="AutoLayoutAsync"></MudIconButton>
+                                                <MudDivider Vertical></MudDivider>
+                                                <MudSpacer />
+                                                <MudText>@($"[{PlugData?.Name}]执行与监控,当前登录用户：{userName}")</MudText>
+
+                                                <MudSpacer />
+                                                <MudTooltip Text="编辑原始流程">
+                                                    <MudIconButton
+                                                    Icon="@Icons.Material.Outlined.EditNote"
+                                                    OnClick="@(() => OnEditClicked())">
+                                                    </MudIconButton>
+                                                </MudTooltip>
+                                                <MudText>@Elapsed.ToString(@"hh\:mm\:ss")</MudText>
+                                            </MudToolBar>
+                                        </MudPaper>
+                                        <MudProgressLinear Color="@(Processing ? Color.Primary : Color.Transparent)" Indeterminate="true" />
+                                        @if (string.IsNullOrEmpty(Flowchart?.ToString()))
+                                        {
+                                            <MudAlert>努力加载中...</MudAlert>
+                                            <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+                                        }
+                                        else
+                                        {
+                                            <FlowchartDesigner @ref="@Designer" IsReadOnly="IsReadOnly"
+                                            Flowchart="@Flowchart"
+                                            ActivitySelected="@OnActivitySelected"
+                                            CanvasSelected="@OnCanvasSelected"
+                                            ActivityStats="ActivityStats"/>
+
+                                        }
+                                    </MudPaper>
+
+                                </RadzenSplitterPane>
+                                <RadzenSplitterPane Size="30%">
+                                    <LogsWrapper HeightPercent="100-SplitterPanelPercent"></LogsWrapper>
+                                </RadzenSplitterPane>
+                            </RadzenSplitter>
+
+                        </RadzenSplitterPane>
+                    </RadzenSplitter>
+
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="30%" Min="444px" Collapsed="string.IsNullOrEmpty(JobDefinitionId)">
+                    <MudTabs MinimumTabWidth="88" Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0">
+                        <MudTabPanel Text="执行数据">
+                            <JobExecuteData SelectedActivity="SelectedActivity" InstanceId="@WorkflowInstanceId"></JobExecuteData>
+                        </MudTabPanel>
+                    </MudTabs>
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+        </MudStack>
+
+
+    </CascadingValue>
+</CascadingValue>
+@code {
+    [Parameter]
+    public string PlugDefinitionId { get; set; } = default!;
+    [Parameter]
+    public string? JobDefinitionId { get; set; }
+
+    public PlugDataZone? PlugDataZone { get; set; }
+    private string? WorkflowInstanceId { get; set; }
+    string _value = "逻辑流";
+
+    public double SplitterPanelPercent { get; set; } = 70;
+
+    private FlowchartDesigner Designer { get; set; } = default!;
+    public JsonObject? Flowchart { get; set; } = default!;
+
+
+    public WorkflowDefinition? WorkflowDefinition { get; set; }
+    //private Plug? Process { get; set; } = new();
+    private PlugData? PlugData { get; set; } = new();
+    private JsonObject? SelectedActivity { get; set; }
+    private string? userName { get; set; }
+
+    public IDictionary<string, ActivityStats> ActivityStats { get; set; } = new Dictionary<string, ActivityStats>();
+    private bool Processing { get; set; } = false;
+    public bool IsReadOnly { get; set; } = true;
+    bool JsonType = false;
+    public DateTimeOffset StartTime { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset EndTime { get; set; } = DateTimeOffset.UtcNow;
+    //private TimeSpan Elapsed => EndTime < StartTime ? TimeSpan.Zero : EndTime - StartTime;
+    private TimeSpan Elapsed { get; set; }
+    private Timer? timer;
+    MudTabs tabs=default!;
+
+    public async Task ZoomToFitAsync() => await Designer.ZoomToFitAsync();
+    public async Task CenterContentAsync() => await Designer.CenterContentAsync();
+    public async Task AutoLayoutAsync() => await Designer.AutoLayoutAsync(Flowchart, ActivityStats);
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Process = await MainApiClient.GetPlugByDefinitionIdAsync(definitionId) ?? new();
+        // var PDZId = await DomInteropService.GetCurrentUserName() + definitionId;
+        // PlugDataZone = await MainApiClient.GetPDZByIdAsync(PDZId);
+        // Flowchart = PlugDataZone?.GetFlowchartData(definitionId) ?? Process?.ToActivityJson();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //Process = await MainApiClient.GetPlugByDefinitionIdAsync(PlugDefinitionId) ?? new();
+
+            var PDZId = await DomInteropService.GetCurrentUserName() + PlugDefinitionId+PDZTypeEnum.Desi.ToString();
+            if (!string.IsNullOrEmpty(JobDefinitionId))
+            {
+                var Job = await MainApiClient.GetJobByDefinitionIdAsync(JobDefinitionId);
+                PDZId = Job.JobCorrelationId;
+                await HubActivityStatus(PDZId);
+
+                //通过作业号获取Elsa引擎作业
+                var instance = await ElsaApiClient.GetWorkflowInstanceByCorrelationIdAsync(PDZId);
+                //Log.Information($"引擎InstanceId:{JsonSerializer.Serialize(instance)}");
+                WorkflowInstanceId = instance?.Id;
+                await tabs.ActivatePanelAsync("JobJournal");
+            }
+            //Log.Information($"PDZ:{PDZId}");
+            PlugDataZone = await MainApiClient.GetPDZByPDZIdAsync(PDZId);
+            Flowchart = PlugDataZone?.GetFlowchartData(PlugDefinitionId);
+            PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+            userName = await DomInteropService.GetCurrentUserName();
+
+            StateHasChanged();
+        }
+
+    }
+
+    void OnResize(RadzenSplitterResizeEventArgs args)
+    {
+        //Log.Information($"Pane {args.PaneIndex} Resize (New size {args.NewSize})");
+        SplitterPanelPercent = args.NewSize;
+    }
+
+    private async Task OnCanvasSelected()
+    {
+        //Log.Information("OnCanvasSelected>>>>>>>>>>>>>>>" + WorkflowDefinition.DefinitionId);
+        SelectedActivity = Flowchart;
+    }
+    private async Task OnActivitySelected(JsonObject activity)
+    {
+        //Console.WriteLine("selected activity is:" + activity);
+        SelectedActivity = activity;
+    }
+
+    private void StartTimer()
+    {
+        if (timer == null)
+        {
+            timer = new Timer(1000);
+            timer.Elapsed += OnTimedEvent;
+            timer.AutoReset = true;
+            timer.Enabled = true;
+        }
+    }
+    private void OnTimedEvent(Object source, ElapsedEventArgs e)
+    {
+        Elapsed = DateTime.Now - StartTime;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Start()
+    {
+        Processing = true;
+        StartTime = DateTime.Now;
+        StartTimer();
+
+        var currentUser = await DomInteropService.GetCurrentUserName();
+        var TriggerActivityId = PlugDataZone?.TriggerPlugDefinitionId;
+        (var PDZId,var JobDefinitionId) = await MainApiClient.SubmitExecute(PlugData, currentUser, PlugDataZone, PDZTypeEnum.Job2);
+        NavigationManager.NavigateTo($"/process/{PlugDefinitionId}/execute/{JobDefinitionId}");
+        PlugDataZone = await MainApiClient.GetPDZByPDZIdAsync(PDZId);
+        Log.Information($"开始监听PDZ{PDZId}-{JobDefinitionId}的执行状态。");
+        await HubActivityStatus(PDZId);
+
+        var executeSetting = new ExecuteSetting
+        {
+            CorrelationId = PDZId,
+                TriggerActivityId = TriggerActivityId,
+        };
+        var executeResult = await ElsaApiClient.ExecuteWorkflowWithExecuteSetting(Flowchart, executeSetting);
+        
+        //Log.Information("启动信息:" + JsonSerializer.Serialize(executeResult));
+        timer?.Stop();
+
+        WorkflowInstanceId = executeResult.ExecuteResultMessage;
+        if (WorkflowInstanceId != null)
+        {
+            Snackbar.Add($"Successfully started workflow({WorkflowInstanceId})", Severity.Success);
+
+            // if (WorkflowDefinitionExecuted != null)
+            //     await WorkflowDefinitionExecuted(workflowInstanceId);
+            //else
+            //NavigationManager.NavigateTo($"JobMonitor3/{workflowInstanceId}");
+            //NavigationManager.NavigateTo($"/process/{definitionId}/execute/{JobDefinitionId}");
+        }
+        Processing = false;
+        
+    }
+
+    public async Task HubActivityStatus(string PDZId)
+    {
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.ActivityStatusNow.ToString() + PDZId);
+        //通过长连接添加活动状态监听
+        HubConnectionManagerService._hubConnection.On<string, string, string>(
+            LogTypeEnum.ActivityStatusNow.ToString() + PDZId,
+            (PDZId, DefinitionId, status) =>
+           {
+               Console.WriteLine($"NewStatus:{PDZId}-{DefinitionId}-{status}");
+               InvokeAsync(async() =>
+               {
+                   var tmpStats = JsonSerializer.Deserialize<ActivityStats>(status);
+                   ActivityStats[DefinitionId] = tmpStats ?? new ActivityStats();
+                   foreach (var acs in ActivityStats)
+                   {
+                       await Designer.UpdateActivityStatsAsync(acs.Key, acs.Value);
+                   }
+                   //StateHasChanged();
+               });
+           });
+    }
+
+
+    public Task OnEditClicked()
+    {
+
+        NavigationManager.NavigateTo($"/ProcessEdit/{PlugData?.PlugDefinitionId}");
+        return Task.CompletedTask;
+    }
+}

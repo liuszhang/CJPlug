@@ -1,0 +1,44 @@
+﻿
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Serilog
+<MudTable Items="@dataList" Hover="true" Striped="true" Dense>
+    <HeaderContent>
+        @* <MudTh></MudTh> *@
+        <MudTh>名称</MudTh>
+        <MudTh>解析表达式</MudTh>
+        <MudTh>输出值</MudTh>
+        @* <MudTh>操作</MudTh>  *@                                    
+    </HeaderContent>
+    <RowTemplate>
+        @* <MudTd>@($"{@EditorContext.Variable.Type}[{@dataList.IndexOf(context)}]")</MudTd> *@
+        <MudTd>@context.OutputName</MudTd>
+        <MudTd>@context.ReadSchemaValue</MudTd>
+        <MudTd>@context.Value</MudTd>
+        @* <MudTd></MudTd> *@
+    </RowTemplate>
+</MudTable>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private List<DefaultOutputMapping> dataList { get; set; } = new();
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            dataList = JsonSerializer.Deserialize<List<DefaultOutputMapping>?>(EditorContext.Variable.Value);
+            //Log.Information(JsonSerializer.Serialize(dataList));
+        }
+        catch (Exception ex)
+        {
+            Log.Information(ex.Message);
+        }
+        StateHasChanged();
+    }
+}

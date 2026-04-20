@@ -1,0 +1,231 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Relation
+@using CJ.Plug.Models.Station
+@using CJ.Plug.StationAndTool.Components
+@using CJ.Plug.StationAndToolApi.Models
+@using CJ.Plug.StationAndToolApiClient
+@using Microsoft.AspNetCore.SignalR.Client
+@using Radzen.Blazor
+@using System.Text.Json
+
+@inject IStationAndToolApiClient StationAndToolApiClient
+@inject MainApiClient RelationApiClient
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject ISnackbar Snackbar
+
+
+<MudDialog Class="stack-resize">
+    <DialogContent>
+
+        <MudStack Justify="Justify.FlexStart">
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudButton OnClick="GetStationStatus" Variant="Variant.Filled" Color="Color.Primary">刷新图站状态</MudButton>
+                <MudCheckBox @bind-Value="@ShowAllToolAgents" @bind-Value:after="StateHasChanged" Color="Color.Tertiary">显示所有图站</MudCheckBox>
+            </MudStack>
+            @if (Loading)
+            {
+                <MudProgressLinear Indeterminate Color="Color.Primary"></MudProgressLinear>
+            }
+
+            <MudDataGrid Items="@StationsToShow" Filterable="false" SortMode="@SortMode.None" Groupable="false" Hover NoRecordsContent="NoRecordsContent">
+                <Columns>
+                    <HierarchyColumn T="Station" EnableHeaderToggle/>
+
+                    <TemplateColumn Title="图站地址">
+                        <CellTemplate>
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                <MudAvatar Color="@(context.Item.IsStarted? Color.Success: Color.Default)" Size="Size.Small">On</MudAvatar>
+                                <MudText>@context.Item.StationIp</MudText>
+                            </MudStack>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.StationCategory" Title="图站类型" />
+                    <TemplateColumn CellClass="d-flex justify-end">
+                        <CellTemplate>
+                            <MudCheckBox Value="@DeployStatus[context.Item.Id].IsDeployed" ValueChanged="(bool v)=>SetDeployStatus(context.Item,v)" T="bool" Label="部署" Color="Color.Success"></MudCheckBox>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+                <ChildRowContent>
+                    <ToolDeploySetting Tool="Tool" Station="@context.Item" ToolDeploySettingContent="@DeployStatus[context.Item.Id]"></ToolDeploySetting>
+                </ChildRowContent>
+            </MudDataGrid>
+
+
+
+        </MudStack>
+
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>_MudDialog.Close(DialogResult.Cancel()))">保存</MudButton>
+        <MudButton OnClick="@(()=>_MudDialog.Close(DialogResult.Cancel()))">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code
+{
+    [Parameter]
+    public Tool? Tool { get; set; }
+
+    [CascadingParameter] IMudDialogInstance _MudDialog { get; set; }
+
+    private bool Loading = true;
+    private bool ShowAllToolAgents = true;
+    public IReadOnlyCollection<string> SelectedValues = ["Milk", "Cafe Latte"];
+    public string? SelectedValue { get; set; }
+    public Station? SelectedStation { get; set; }
+    public string? ToolPath { get; set; }
+    public bool PathSetByDefault { get; set; } = true;
+    public bool Processing = true;
+    private List<Station> AllStations = new();
+    private List<Station> OnlineStations = new();
+    private List<Station> OfflineStations = new();
+    private List<Station>? StationsToShow
+    {
+        get
+        {
+            return ShowAllToolAgents ? AllStations : OnlineStations;
+        }
+    }
+    private RenderFragment NoRecordsContent = new RenderFragment(builder =>
+    {
+        builder.AddContent(0, "无连接到的图站，请稍后再试");
+    });
+    private IEnumerable<CommonRelation?> AllRelations { get; set; }
+    private Dictionary<int?, ToolDeploySettingModel> DeployStatus = new();
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            Position = DialogPosition.Center,
+            BackdropClick = false,
+            FullWidth = true
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await _MudDialog.SetOptionsAsync(diaOption);
+        ToolPath = Tool?.ToolPath;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+              {
+                  //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
+                  // 将新日志添加到本地列表并触发UI更新
+                  InvokeAsync(async () =>
+                  {
+                      //Console.WriteLine(ip);
+                      await ProcessStationList(ip);
+                      StateHasChanged();
+                  });
+              });
+            await GetStationStatus();
+
+            //AllStations = await MainApiClient.GetAllStationsAsync() ?? new List<Station>();
+            //AllStations?.Clear();
+            Console.WriteLine($"loading done{AllStations.Count}");
+            Loading = false;
+            StateHasChanged();
+        }
+
+        //await TestHub();
+    }
+
+    private async Task GetStationStatus()
+    {
+        AllStations = await StationAndToolApiClient.GetAllStationsAsync() ?? new List<Station>();
+        AllRelations = (await RelationApiClient.GetRelationsByCategoryAsync(RelationCategory.ToolToStation.ToString()))
+        .Where(r => r.RoleAId == Tool.Id);
+        foreach (var station in AllStations)
+        {
+            var relation = AllRelations.FirstOrDefault(r => r.RoleBId == station.Id);
+            if (relation != null && !string.IsNullOrEmpty(relation.RelationSetting))
+            {
+                var deploySetting = JsonSerializer.Deserialize<ToolDeploySettingModel>(relation.RelationSetting);
+                DeployStatus[station.Id] = deploySetting;
+            }
+            else
+            {
+                DeployStatus[station.Id] = new ToolDeploySettingModel();
+            }
+        }
+        await HubConnectionManagerService.ConnectAsync();
+        await HubConnectionManagerService.InvokeAsync<string>("TellMeStatus", null);
+    }
+
+    private async Task SetDeployStatus(Station station,bool deployStatus)
+    {
+        DeployStatus[station.Id].IsDeployed = deployStatus;
+        var relation = AllRelations.FirstOrDefault(r => r.RoleBId == station.Id);
+        if (relation == null)
+        {
+            relation = new CommonRelation
+            {
+                RoleAId=Tool.Id,
+                RoleAName=Tool.ToolName,
+                RoleBId=station.Id,
+                RoleBName=station.StationName,
+                RelationCategory=RelationCategory.ToolToStation.ToString(),
+                RelationSetting=JsonSerializer.Serialize(new ToolDeploySettingModel
+                {
+                    IsDeployed=deployStatus
+                })
+            };
+        }
+        else
+        {
+            var deploySetting = JsonSerializer.Deserialize<ToolDeploySettingModel>(relation.RelationSetting) ?? new();
+            deploySetting.IsDeployed = deployStatus;
+            relation.RelationSetting = JsonSerializer.Serialize(deploySetting);
+        }
+        await RelationApiClient.CreateOrUpdateRelationAsync(relation);
+        Snackbar.Add("修改工具部署状态成功");
+
+    }
+
+    private async Task ProcessStationList(string ip)
+    {
+        foreach (var station in AllStations!)
+        {
+            if (station.StationIp == ip)
+            {
+                station.IsStarted = true;
+            }
+        }
+    }
+
+    private async Task<bool> GetToolDeployStatus(Station station)
+    {
+        SelectedValue = station.StationIp;
+        SelectedStation = station;
+        var filter = new RelationFilter()
+            {
+                RoleAId = Tool?.Id,
+                RoleBId = station.Id,
+                RelationCategory = RelationCategory.ToolToStation.ToString()
+            };
+        var relations = await RelationApiClient.GetRealationByFilterAsync(filter);
+        if (relations != null && relations.Count > 0)
+        {
+            var relation = relations.FirstOrDefault();
+            var toolDeploySetting = JsonSerializer.Deserialize<ToolDeploySettingModel>(relation.RelationSetting);
+            return toolDeploySetting?.IsDeployed ?? true;            
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+    private bool GetDeployStatus(Station station)
+    {
+        return true;
+    }
+}

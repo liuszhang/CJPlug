@@ -1,0 +1,183 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using Serilog
+
+@inject IJSRuntime JSRuntime
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudText>结束循环条件：</MudText>
+    <MudSelect Value="ConditionPlug" Text="@ConditionPlug?.Name" ValueChanged="(Plug? p)=>SelectedPlugChanged(p)" Variant="Variant.Outlined" Label="选择组件" Dense Clearable>
+        @foreach (var p in PlugsInPDZ)
+        {
+            <MudSelectItem Value="p">@p.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect Value="ConditionVariable" Text="@ConditionVariable?.Name" ValueChanged="(PDZVariable? p)=>SelectedPlugVariableChanged(p)" Variant="Variant.Outlined" Label="选择组件参数" Dense Clearable>
+        @foreach (var v in VariablesOfSelectedPlug)
+        {
+            <MudSelectItem Value="v">@v.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect Value="ConditionExpression.Expression" ValueChanged="(string s) => { ConditionExpression.Expression=s; GenerateConditionData(); }" Dense Label="运算符" Variant="Variant.Filled" Adornment="Adornment.None" Style="width:60px;">
+        <MudSelectItem Value="@("==")">==</MudSelectItem>
+        <MudSelectItem Value="@("!=")">!=</MudSelectItem>
+        <MudSelectItem Value="@(">")">></MudSelectItem>
+        <MudSelectItem Value="@("<")">@("<")</MudSelectItem>
+    </MudSelect>
+    <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+        @if (ConditionExpression.IsValueFromVariable)
+        {
+            <MudSelect Value="ConditionExpression.ConditionValue" ValueChanged="(string s) => { ConditionExpression.ConditionValue = s; GenerateConditionData(); }" Variant="Variant.Outlined" Label="值" Dense Clearable>
+                @foreach (var v in PlugVariablesInPDZ)
+                {
+                    <MudSelectItem Value="v.Name">@v.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            <MudTextField Value="ConditionExpression.ConditionValue" ValueChanged="(string s) => { ConditionExpression.ConditionValue = s; GenerateConditionData(); }" Label="值" Variant="Variant.Outlined"></MudTextField>
+        }
+        <MudCheckBox Value="@ConditionExpression.IsValueFromVariable" ValueChanged="(bool s) => { ConditionExpression.IsValueFromVariable = s; GenerateConditionData(); }" Label="参数" Dense Color="Color.Primary" />
+    </MudStack>
+</MudStack>
+
+
+<MudTextField @bind-Value="ConditionExpressionString" Label="自定义条件表达式" Lines="3" Variant="Variant.Outlined"></MudTextField>
+
+@* <MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+</MudStack> *@
+
+<MudDivider></MudDivider>
+
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudText>最大循环次数(0为无限制)：</MudText>
+    <MudTextField T="int" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:200px;"></MudTextField>
+</MudStack>
+
+<MudCheckBox T="bool" Label="保存执行数据" Color="Color.Primary"></MudCheckBox>
+<MudCheckBox T="bool" Label="循环过程出错中止后续循环" Color="Color.Primary"></MudCheckBox>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public Plug? Plug { get; set; } = new();
+
+    private List<PlugVariableData>? PlugVariablesInPDZ = new List<PlugVariableData>();
+    private List<PlugVariableData>? VariablesOfSelectedPlug = new List<PlugVariableData>();
+    private List<Plug>? PlugsInPDZ = new List<Plug>();
+
+
+    private ConditionExpression? ConditionExpression { get; set; } = new();
+    private Plug? ConditionPlug { get; set; }
+    private PDZVariable? ConditionVariable { get; set; }
+
+    private string? ConditionExpressionString { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PlugDataZone != null)
+        {
+            PlugVariablesInPDZ = PlugDataZone.GetVariablesOfPlug(Plug?.DefinitionId);
+            var MainPlug = await MainApiClient.GetPlugByDefinitionIdAsync(PlugDataZone.PlugDefinitionId);
+            if (MainPlug == null)
+            {
+                CLog.Error("无法获取主组件，请检查PlugDataZone的PlugDefinitionId是否正确。");
+                return;
+            }
+            try
+            {
+                PlugsInPDZ.Clear();
+                // var jsonData = MainPlug.ToActivityJson();
+                // var activities = jsonData.GetActivities();
+                // foreach (var a in activities)
+                // {
+                //     Log.Information($"获取到的组件：{a.GetId()} - {a.GetName()}");
+                //     var plug = await MainApiClient.GetPlugByDefinitionIdAsync(a.GetId());
+                //     if (plug != null)
+                //     {
+                //         PlugsInPDZ.Add(plug);
+                //     }
+                // }
+
+                var PlugIds = PlugDataZone.GetPlugDefinitonIdsInPDZ();
+                foreach (var id in PlugIds)
+                {
+                    var plug = await MainApiClient.GetPlugByDefinitionIdAsync(id.PlugDefinitionId);
+                    if(plug!=null) PlugsInPDZ.Add(plug);
+                }
+            
+                ConditionExpressionString = PlugDataZone.GetVariableValue(Plug?.DefinitionId, InitVariableNames.ConditionExpression.ToString());
+                ConditionExpression = JsonSerializer.Deserialize<ConditionExpression?>(ConditionExpressionString) ?? new();
+                ConditionPlug = await MainApiClient.GetPlugByDefinitionIdAsync(ConditionExpression.PlugDefinitionId);
+                ConditionVariable = PlugDataZone.PDZVariables?.Where(v=>v.Id==ConditionExpression.VariableId).FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message);
+                ConditionExpression = new ConditionExpression();
+            }
+        
+            StateHasChanged();
+        }
+
+    }
+
+
+
+    private async Task SelectedPlugChanged(Plug? plug)
+    {
+        ConditionPlug = plug;
+        if (plug != null)
+        {
+            ConditionExpression.PlugDefinitionId = plug.DefinitionId;
+            ConditionExpression.PlugName = plug.Name;
+            VariablesOfSelectedPlug = PlugDataZone.GetVariablesOfPlug(plug.DefinitionId);
+        }
+        else
+        {
+            ConditionExpression.PlugDefinitionId = string.Empty;
+            ConditionExpression.PlugName = string.Empty;
+            VariablesOfSelectedPlug.Clear();
+        }
+        GenerateConditionData();
+    }
+    private async Task SelectedPlugVariableChanged(PDZVariable? variable)
+    {
+        ConditionVariable = variable;
+        if (variable != null)
+        {
+            ConditionExpression.VariableId = variable.Id;
+            ConditionExpression.VariableName = variable.Name;
+        }
+        else
+        {
+            ConditionExpression.VariableId = null;
+            ConditionExpression.VariableName = string.Empty;
+        }
+        GenerateConditionData();
+    }
+
+
+    private async Task GenerateConditionData()
+    {
+        //PlugDataZone?.SetVariableValue(Plug.DefinitionId, InitVariableNames.ConditionExpression.ToString(), JsonSerializer.Serialize(ConditionExpression));
+    }
+}
+

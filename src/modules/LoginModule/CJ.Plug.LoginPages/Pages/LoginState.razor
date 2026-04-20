@@ -1,0 +1,45 @@
+﻿@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.SharedPages.Contracts
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+
+
+@inject IDomInteropService DomInteropService
+@inject NavigationManager NavigationManager
+
+<MudButton EndIcon="@Icons.Material.Outlined.Logout" Color="Color.Inherit" @onclick="@Logout">欢迎：@userName</MudButton>
+@* <AuthorizeView> *@
+@*     <Authorized> *@
+@*         <MudText>欢迎, @context.User.Identity.Name!</MudText> *@
+@*         <MudButton OnClick="Logout">注销</MudButton> *@
+@*     </Authorized> *@
+@*     <NotAuthorized> *@
+@*         <MudButton OnClick="Login">登录</MudButton> *@
+@*     </NotAuthorized> *@
+@* </AuthorizeView> *@
+
+
+
+@code{
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private string? userName { get; set; } = "";
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            userName = await DomInteropService.GetCurrentUserName();
+            StateHasChanged();
+        }
+    }
+
+    private void Logout()
+    {
+        AuthenticationState = null;
+        NavigationManager.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,246 @@
+@page "/CRUD/Nested"
+<PageTitle>嵌套</PageTitle>
+<Amis Data="GetObj()"></Amis>
+
+@code {
+
+    private object GetObj()
+    {
+        var data = new
+        {
+            title = "支持多层嵌套，列数据中有 children 字段即可。（建议不超过10层）",
+            body = new
+            {
+                type = "crud",
+                syncLocation=false,
+                api = "/api/mock/crud/tableWithChildren",
+                deferApi = "/api/mock/crud/dynamic?parentId=${id}",
+                saveOrderApi = "/api/mock/Sample/Sample/SaveOrder",
+                draggable = true,
+                columns = new object[]
+                {
+                    new
+                    {
+                        name = "id",
+                        label = "ID",
+                        sortable = true,
+                        type = "text",
+                        toggled = true,
+                        width = 150
+                    },
+                    new
+                    {
+                        name = "engine",
+                        label = "Rendering engine",
+                        sortable = true,
+                        searchable = true,
+                        type = "text",
+                        toggled = true
+                    },
+                    new
+                    {
+                        name = "browser",
+                        label = "Browser",
+                        sortable = true,
+                        type = "text",
+                        toggled = true
+                    },
+                    new
+                    {
+                        name = "platform",
+                        label = "Platform(s)",
+                        sortable = true,
+                        type = "text",
+                        toggled = true
+                    },
+                    new
+                    {
+                        name = "version",
+                        label = "Engine version",
+                        quickEdit = true,
+                        type = "text",
+                        toggled = true
+                    },
+                    new
+                    {
+                        name = "grade",
+                        label = "CSS grade",
+                        quickEdit = new
+                        {
+                            mode = "inline",
+                            type = "select",
+                            options = new[] { "A", "B", "C", "D", "X" },
+                            inputClassName = "w-xs",
+                            saveImmediately = true
+                        },
+                        type = "text",
+                        toggled = true
+                    },
+                    new
+                    {
+                        type = "operation",
+                        label = "操作",
+                        width = 100,
+                        buttons = new object[]
+                        {
+                            new
+                            {
+                                type = "button",
+                                icon = "fa fa-eye",
+                                actionType = "dialog",
+                                dialog = new
+                                {
+                                    title = "查看",
+                                    body = new
+                                    {
+                                        type = "form",
+                                        body = new object[]
+                                        {
+                                            new
+                                            {
+                                                type = "static",
+                                                name = "engine",
+                                                label = "Engine"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "static",
+                                                name = "browser",
+                                                label = "Browser"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "static",
+                                                name = "platform",
+                                                label = "Platform(s)"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "static",
+                                                name = "version",
+                                                label = "Engine version"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "static",
+                                                name = "grade",
+                                                label = "CSS grade"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "html",
+                                                html = "<p>添加其他 <span>Html 片段</span> 需要支持变量替换（todo）.</p>"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            new
+                            {
+                                type = "button",
+                                icon = "fa fa-pencil",
+                                actionType = "drawer",
+                                drawer = new
+                                {
+                                    position = "left",
+                                    size = "lg",
+                                    title = "编辑",
+                                    body = new
+                                    {
+                                        type = "form",
+                                        name = "sample-edit-form",
+                                        api = "/api/mock/Sample/Sample/$id",
+                                        body = new object[]
+                                        {
+                                            new
+                                            {
+                                                type = "input-text",
+                                                name = "engine",
+                                                label = "Engine",
+                                                required = true
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "input-text",
+                                                name = "browser",
+                                                label = "Browser",
+                                                required = true
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "input-text",
+                                                name = "platform",
+                                                label = "Platform(s)",
+                                                required = true
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "input-text",
+                                                name = "version",
+                                                label = "Engine version"
+                                            },
+                                            new
+                                            {
+                                                type = "divider"
+                                            },
+                                            new
+                                            {
+                                                type = "select",
+                                                name = "grade",
+                                                label = "CSS grade",
+                                                options = new[] { "A", "B", "C", "D", "X" }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            new
+                            {
+                                type = "button",
+                                icon = "fa fa-times text-danger",
+                                actionType = "ajax",
+                                confirmText = "您确认要删除?",
+                                api = "delete:/api/mock/Sample/Sample/$id"
+                            }
+                        },
+                        toggled = true
+                    }
+                }
+            }
+        };
+        return data;
+    }
+
+}

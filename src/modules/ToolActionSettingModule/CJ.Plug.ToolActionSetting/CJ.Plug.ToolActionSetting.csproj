@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <ProjectReference Include="..\CJ.Plug.GUIDesigner\CJ.Plug.GUIDesigner.csproj" />
+    <ProjectReference Include="..\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
+    <ProjectReference Include="..\CJ.Plug.ToolActionSettingApi\CJ.Plug.ToolActionSettingApi.csproj" />
+  </ItemGroup>
+
+</Project>

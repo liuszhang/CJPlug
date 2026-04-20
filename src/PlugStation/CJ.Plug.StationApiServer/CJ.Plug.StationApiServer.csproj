@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CJ.Plug.StationApiService</RootNamespace>
+    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="AgentApi\**" />
+    <Compile Remove="StationLogs\**" />
+    <Content Remove="AgentApi\**" />
+    <Content Remove="StationLogs\**" />
+    <EmbeddedResource Remove="AgentApi\**" />
+    <EmbeddedResource Remove="StationLogs\**" />
+    <None Remove="AgentApi\**" />
+    <None Remove="StationLogs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
+    <PackageReference Include="NSwag.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
+    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
+    <ProjectReference Include="..\..\modules\FileManageModule\CJ.Plug.FileManageApiClient\CJ.Plug.FileManageApiClient.csproj" />
+  </ItemGroup>
+
+</Project>

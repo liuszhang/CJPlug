@@ -1,0 +1,67 @@
+﻿
+@using CJ.Plug.Models.Contracts
+@using CJ.Plug.Models.Shared
+@using Microsoft.AspNetCore.Components.Routing
+@using MudBlazor
+
+@inject IEnumerable<IMenuService> MenuServices
+
+<MudNavMenu>
+    @foreach (var menu in _menuItems)
+    {
+        if (menu.GroupName!=MenuGroupEnum.调试.ToString())
+        {
+            <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
+        }
+    }
+    
+
+    <MudNavGroup Title="调试" Icon="@Icons.Material.Filled.Settings" Expanded="true" >
+        <MudNavLink Match="NavLinkMatch.All" Href="/JobManageList2" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">作业列表2</MudNavLink>
+
+        @foreach (var menu in _menuItems)
+        {
+            if (menu.GroupName == MenuGroupEnum.调试.ToString())
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
+            }
+        }
+        @* <MudNavLink Match="NavLinkMatch.All" Href="/JobMonitor" Icon="@Icons.Material.Filled.TaskAlt" IconColor="Color.Primary">作业监控</MudNavLink> *@
+        @* <MudNavLink Match="NavLinkMatch.All" Href="/AIAgent" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">AIAgent</MudNavLink> *@
+    </MudNavGroup>
+
+    
+
+    @* @foreach (var menuItemGroup in _menuItemsGroups.Values)
+    {
+        var menuItems = _menuItems.Where(x => x.GroupName == menuItemGroup.Name).ToList();
+
+        @if (menuItems.Any())
+        {
+            <MudText Typo="Typo.body2" Class="px-4 py-4 mud-text-secondary">@menuItemGroup.Text</MudText>
+
+            foreach (var menuItem in menuItems)
+            {
+                <NavMenuItem MenuItem="menuItem" />
+            }
+        }
+    } *@
+</MudNavMenu>
+
+
+@code
+{
+    // private IDictionary<string, MenuItemGroup> _menuItemsGroups = new Dictionary<string, MenuItemGroup>();
+    private List<MenuItem> _menuItems = new List<MenuItem>();
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        // _menuItemsGroups = (await MenuService.GetMenuItemGroupsAsync()).ToDictionary(x => x.Name);
+        @foreach (var menu in MenuServices)
+        {
+            var menuItems = await menu.GetMenuItemsAsync();
+            _menuItems.AddRange(menuItems);
+        }
+    }
+}

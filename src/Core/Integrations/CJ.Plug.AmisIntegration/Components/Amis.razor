@@ -1,0 +1,60 @@
+@using System.Text.Json
+@using Microsoft.JSInterop
+
+
+<div id="@_id"></div>
+
+@code {
+    [Inject] public IJSRuntime Js { get; set; }
+    //支持直接传递Json对象
+    [Parameter] public object? Data { get; set; }
+
+    //目前采用string进行GUI数据保存和传递
+    [Parameter] public string? JsonStringData { get; set; }
+    private string _id = "amis-" + Guid.NewGuid().ToString("N");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (Data != null)
+            {
+                var json = JsonSerializer.Serialize(Data);
+                await Js.InvokeAsync<string>("amisLoad", _id, json);
+                return;
+            }
+
+            await Js.InvokeAsync<string>("amisLoad", _id, JsonStringData);
+
+            
+            // var json = JsonSerializer.Serialize(Data);
+            // await Js.InvokeAsync<string>("amisLoad", _id, json);
+            //await Js.InvokeAsync<string>("amisLoad", _id, JsonStringData);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // if(string.IsNullOrEmpty(JsonStringData))
+        // {
+        //     Console.WriteLine($"Amis json done is null.");
+        // }
+        // await Js.InvokeAsync<string>("amisLoad", _id, JsonStringData);
+        if (Data != null)
+        {
+            var json = JsonSerializer.Serialize(Data);
+            await Js.InvokeAsync<string>("amisLoad", _id, json);
+            return;
+        }
+        await Js.InvokeAsync<string>("amisLoad", _id, JsonStringData);
+
+        
+
+        //Console.WriteLine($"Amis component initialized with data done.");
+        StateHasChanged();
+    }  
+
+
+}

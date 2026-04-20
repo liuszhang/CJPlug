@@ -1,0 +1,62 @@
+﻿@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using ExcelPlug.Pages.Components
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+
+@inject IJSRuntime JSRuntime
+
+
+@inject ISnackbar Snackbar
+@using MudExtensions
+@using MudExtensions.Utilities
+
+
+@* <MudCsvMapper @ref="_csvMapper" Delimiter="," Class="pa-4" AllowCreateExpectedHeaders="true" NormalizeHeaders="true" ShowIncludeUnmappedData="true"  ExpectedHeaders="_expectedFields" OnImported="Upload" ></MudCsvMapper> *@
+
+
+@code {
+    // MudCsvMapper? _csvMapper;
+
+    // List<MudExpectedHeader> _expectedFields = new() {
+    //     new MudExpectedHeader("Email", true),
+    //     new MudExpectedHeader("First Name"),
+    //     new MudExpectedHeader("Last Name"),
+    //     new MudExpectedHeader("Phone"),
+    //     new MudExpectedHeader("Date", false, true),
+    //     new MudExpectedHeader("Source", true, true),
+    // };
+
+    private async Task<bool> Upload()
+    {
+        await Task.Delay(1); // Replace with real world example
+        // var file = _csvMapper?.CsvFile; IBrowserFile / .csv that was uploaded
+        //byte[]? fileContent = _csvMapper?.FileContentByte; // file with headers updated to correct names
+
+        //This is where you do the work with the renamed headers using the the fileContent.
+        //Send the CSV file to MudTable or to the Database to be parsed
+
+        Snackbar.Add($"CSV Mapped!", Severity.Info);
+        return true;
+    }
+}
+
+
+<MudDivider></MudDivider>
+<MudText Typo="Typo.h6" Class="mb-4">Excel内容</MudText>
+<SheetJsWrapper Plug="Plug"></SheetJsWrapper>
+
+
+@code{
+    [Parameter]
+    public Plug? Plug { get; set; }
+}
+

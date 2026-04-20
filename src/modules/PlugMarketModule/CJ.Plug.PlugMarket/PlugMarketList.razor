@@ -1,0 +1,178 @@
+﻿@page "/PlugMarket"
+<PageTitle>应用商店</PageTitle>
+
+@using System.Net.Http.Json
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.Plug
+@using System.Text
+@using CJ.Plug.Models.Relation
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IPlugMarketApiClient PlugMarketApiClient
+@inject IRelationApiClient RelationApiClient
+@inject ILocalStorageService _localStorageService
+
+
+
+<MudSlider @bind-Value="spacing" Min="0" Max="10" Color="Color.Info" Class="mb-6">APP间距: @spacing.ToString()</MudSlider>
+
+<MudExpansionPanels Style="flex:1">
+    <MudExpansionPanel Expanded="true" Text="开发库">
+        <MudGrid Spacing="@(spacing)">
+            @foreach (var element in tmpElements)
+            {
+                <MudItem>
+                    <MudCard>
+                        @* <MudImage Src="@Base64ImageUrl" /> *@
+                        @if (element.Base64ImageUrl == string.Empty)
+                        {
+                            <MudCardMedia Image="img/plug.png" Height="220" />
+                        }
+                        else
+                        {
+                            <MudCardMedia Image="@(element.Base64ImageUrl)" Height="220" />
+                        }
+
+                        <MudCardContent>
+                            <MudStack Style="width:220px;height:175px;">
+                                <MudText Typo="Typo.h5">@element.MarketName</MudText>
+                                @* <MudText Typo="Typo.body2">@element.Description</MudText> *@
+                                <MudTextField ReadOnly T="string" AutoGrow Margin="Margin.Dense" Variant="Variant.Outlined" Text="@element.Description" Lines="2" MaxLines="2"></MudTextField>
+                                <MudText Typo="Typo.subtitle2">创建人：@element.Creater (root id:@element.RootPlugID)</MudText>
+                                <MudText Typo="Typo.subtitle2">下载数：@element.UsersCount</MudText>
+                            </MudStack>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton OnClick="@((e)=>AddToMyPlug(element))" Variant="Variant.Text" Color="Color.Primary">加入我的库</MudButton>
+                            <MudButton OnClick="@((e)=>ShowPlugDetail(element))" Variant="Variant.Text" Color="Color.Primary">详细信息</MudButton>
+                            @{
+                                if (CurrentUser == element.Creater)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(()=>DeleteMarketPlug(element))" Size="Size.Small" Color="Color.Error"></MudIconButton>
+                                }
+                            }
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+
+        </MudGrid>
+
+    </MudExpansionPanel>
+    <MudExpansionPanel Text="产品库">
+        <MudText Typo="@Typo.body2">
+            桌面类插头：
+            程序路径
+            工作目录
+            数据接口方式：文件/启动参数
+            数据接口目录（文件）
+            启动参数
+            WEB类插头：
+            程序地址
+            参数
+            输入参数
+            获取输出接口
+        </MudText>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+
+
+
+@code {
+    public int spacing { get; set; } = 2;
+    List<MarketPlug> tmpElements = new List<MarketPlug>();
+    private string Base64ImageUrl { get; set; } = string.Empty;
+    private string[]? Base64ImageUrls { get; set; }
+    private string? CurrentUser {get;set;}
+
+    //private Wrap _wrap = Wrap.Wrap;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            CurrentUser = await _localStorageService.GetItemAsync<string>("username");
+            await InitPlugData();
+            StateHasChanged();
+        }
+    }
+
+    public async Task InitPlugData()
+    {
+        tmpElements = await PlugMarketApiClient.GetMarketPlugsAsync() ?? new List<MarketPlug>();
+    }
+
+
+    public string BytesToBase64(byte[] MarketImageBytes)
+    {
+        var Base64ImageUrl1 = Convert.ToBase64String(MarketImageBytes);
+        Base64ImageUrl = string.Format("data:image/jpeg;base64,{0}", Base64ImageUrl1);
+        return Base64ImageUrl;
+    }
+
+
+    public async void AddToMyPlug(MarketPlug marketPlug)
+    {
+        //Snackbar.Add("添加到我的库");
+        string currentUser = await _localStorageService.GetItemAsync<string>("username");
+        //currentUser = await CommonActions.GetCurrentUserName(AuthenticationState);
+        //currentUser = _HttpHostIp.CurrentUser;
+        if (String.IsNullOrEmpty(currentUser))
+        {
+            Snackbar.Add("登录状态异常，请重试",Severity.Error);
+            return;
+        }
+        // if (AuthenticationState != null)
+        // {
+        //     var authState = await AuthenticationState;
+        //     if (authState.User.Identity?.IsAuthenticated == true && !authState.User.Claims.IsExpired())
+        //     {
+        //         currentUser = authState.User.Claims.ToList().First().Value;
+        //     }
+        // }
+        if (marketPlug.Creater == currentUser)
+        {
+            Snackbar.Add("这是你自己的插头，编号为：" + marketPlug.RootPlugID);
+            return;
+        }
+        int check = 0;  
+        //check = await PlugManage.CheckMarketPlugIsInMyPlugs(currentUser, marketPlug);
+        if (check!=0)
+        {
+            Snackbar.Add("插头已经在库中，编号为：" + check);
+            return;
+        }
+
+        //添加插头到自己的库中
+        //await PlugManage.CreateNewPlugFromMarket(currentUser, marketPlug);
+        NavigationManager.NavigateTo($"ProcessManageList");
+
+    }
+
+    public async void ShowPlugDetail(MarketPlug marketPlug)
+    {
+        Snackbar.Add("插头详情");     
+        //MyCon1sole.WriteLine(marketPlug.RootPlugID);
+        //MyCon1sole.WriteLine(marketPlug.Creater);
+        //MyCon1sole.WriteLine(_HttpHostIp.CurrentUser);        
+    }
+
+    public async Task DeleteMarketPlug(MarketPlug marketPlug)
+    {
+        await PlugMarketApiClient.DeleteMarketPlugAsync(marketPlug);
+        var newRelation = new CommonRelation()
+        {
+            RelationCategory = RelationCategory.UserToMarketPlug.ToString(),
+            RoleBId = marketPlug.Id
+        };
+        await RelationApiClient.DeleteRealationAsync(newRelation);
+        await InitPlugData();
+        StateHasChanged();
+    }
+
+}

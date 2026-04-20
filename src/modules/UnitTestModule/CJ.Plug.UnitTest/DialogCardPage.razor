@@ -1,0 +1,115 @@
+﻿
+@using Microsoft.AspNetCore.Components.Rendering
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Radzen
+@using Radzen.Blazor
+@using Orientation=Radzen.Orientation
+@using AlignItems=Radzen.AlignItems
+@using Variant=Radzen.Variant
+
+@inject Radzen.DialogService dialogService
+
+@if(TestContent!=null)
+    @TestContent
+else
+{
+    <MudProgressCircular Class="rz-m-4" Color="Color.Primary" Size="Size.Large" Indeterminate="true" Style="width: 50px; height: 50px;" />
+}
+
+@TestMarkDownContent
+
+<RadzenMarkdown class="rz-p-0 rz-p-md-12">
+    <ChildContent>
+        ### You can use arbitrary Blazor components within the markdown content.
+
+        | Blazor component | Description |
+        | --- | --- |
+        | `RadzenButton` | @TestContent|
+        | `RadzenButton` | <RadzenButton Text="Focus RadzenDatePicker" Click=@FocusDatePicker />|
+        | `RadzenDatePicker` | <RadzenDatePicker @ref=@datePicker @bind-Value=@date /> |
+        | `button` | <button type="button" @onclick=@FocusInput>Focus input</button>|
+        | `input` | <input @ref=@input /> |
+        | Text `@@date`| @date |
+    </ChildContent>
+</RadzenMarkdown>
+
+@* <RadzenStack Gap="1rem" Orientation="Orientation.Vertical" JustifyContent="JustifyContent.SpaceBetween" Style="height: 100%;">
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+
+    </RadzenStack>
+
+    <RadzenStack Visible="@ShowClose" Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Click="@((args) => dialogService.Close(true))" Variant="Variant.Flat" Text="Close" Style="width: 120px" />
+    </RadzenStack>
+</RadzenStack> *@
+@code {
+    [Parameter] public int OrderID { get; set; }
+    [Parameter] public bool ShowClose { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the markdown content as a string. Overrides <see cref="ChildContent"/> if set.
+    /// </summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>
+    /// Gets or sets the markdown content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+
+    DateTime date = DateTime.Today;
+    RadzenDatePicker<DateTime> datePicker;
+    ElementReference input;
+    public RenderFragment? TestContent { get; set; }
+    public RenderFragment? TestMarkDownContent { get; set; }
+    public string? MarkdownContent = "### You can use arbitrary Blazor components within the markdown content.\n| Blazor component | Description |\n| --- | --- |";
+
+
+    void FocusDatePicker(MouseEventArgs args)
+    {
+        datePicker.FocusAsync();
+    }
+
+    void FocusInput()
+    {
+        input.FocusAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var sequence = 0;
+
+            TestContent = new RenderFragment(builder =>
+                        {
+
+                            builder.OpenComponent<RadzenButton>(sequence++);
+                            builder.AddAttribute(sequence++, nameof(RadzenButton.Text), "Focus RadzenDatePicker");
+                            //builder.AddAttribute(sequence++, nameof(RadzenButton.Click), FocusDatePicker);
+                            builder.AddAttribute(sequence++, nameof(RadzenButton.Click), EventCallback.Factory.Create<MouseEventArgs>(this, FocusDatePicker));
+
+                            builder.CloseComponent();
+
+                        });
+
+            TestMarkDownContent = new RenderFragment(builder =>
+                                    {
+
+                                        builder.OpenComponent<RadzenMarkdown>(sequence++);
+                                        //builder.AddAttribute(sequence++, nameof(RadzenMarkdown.ChildContent), MarkdownContent);
+                                        builder.CloseComponent();
+
+                                    });
+
+            StateHasChanged();
+        }
+        
+            
+        
+    }
+}

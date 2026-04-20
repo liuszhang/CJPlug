@@ -1,0 +1,42 @@
+﻿@using MudBlazor
+
+@inherits LayoutComponentBase
+
+<MudThemeProvider IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider/>
+
+<MudLayout>
+    <MudScrollToTop Visible="true" OnClick="SwichTheme">
+        <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit"/>
+    </MudScrollToTop>
+    @Body
+</MudLayout>
+
+@code {
+    public string DarkLightModeButtonIcon => _isDarkMode switch
+    {
+        true => Icons.Material.Rounded.AutoMode,
+        false => Icons.Material.Outlined.DarkMode,
+    };
+    private bool _isDarkMode = true;
+    // private MudTheme CurrentTheme => ThemeService.CurrentTheme;
+
+    // protected override void OnInitialized()
+    // {
+    //     ThemeService.CurrentThemeChanged += OnThemeChanged;
+    //     StateHasChanged();
+    // }
+
+    // public void Dispose()
+    // {
+    //     ThemeService.CurrentThemeChanged -= OnThemeChanged;
+    // }
+
+    // private void OnThemeChanged() => StateHasChanged();
+    private void SwichTheme()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+}

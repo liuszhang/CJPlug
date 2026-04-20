@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CJ.Plug.SharedPages</RootNamespace>
+
+	  <VersionPrefix>1.0.3</VersionPrefix>
+	  <PackageOutputPath>..\..\..\04.Nuget</PackageOutputPath>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BlazorMonaco" />
+    <PackageReference Include="CodeBeam.MudBlazor.Extensions" />
+    <PackageReference Include="Elsa.Api.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="MudBlazor" />
+    <PackageReference Include="Radzen.Blazor" />
+    <PackageReference Include="Z.Blazor.Diagrams" />
+    <PackageReference Include="Z.Blazor.Diagrams.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CJ.Plug.VariableUIHandler\CJ.Plug.VariableUIHandler.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="CustomePlugSettingLayout.razor">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Update="PlugSettingPages\ActionDLLSettingContent.razor">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+</Project>

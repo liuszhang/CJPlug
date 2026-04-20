@@ -1,0 +1,47 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+
+<MudDialog>
+    <DialogContent>
+        <MudStack>
+            <MudTextField @bind-Value="JsonContent" Lines="26" ReadOnly="true" FullWidth="true" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    public string JsonContent { get; set; } = @"
+---
+name: code-reviewer
+description: Review code for security issues and best practices. Use when user asks for code review.
+---
+
+# Code Review Skill
+
+## Instructions
+1. 检查常见安全漏洞（SQL 注入、XSS、命令注入等）
+2. 评估性能问题和代码异味
+3. 检查代码风格一致性
+4. 给出具体的改进建议和代码示例
+
+## Output Format
+每个问题按以下格式输出：
+- **Severity**: Critical / High / Medium / Low
+- **Location**: 文件名:行号
+- **Issue**: 问题描述
+- **Fix**: 修复建议
+
+## Examples
+输入: ""Review this Python function for security issues""
+输出: 按格式给出安全审查报告
+";
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private void Close() => MudDialog.Cancel();
+}

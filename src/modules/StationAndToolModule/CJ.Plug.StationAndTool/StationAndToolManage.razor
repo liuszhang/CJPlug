@@ -1,0 +1,78 @@
+﻿@page "/StationAndTool"
+<PageTitle>图站与工具</PageTitle>
+
+
+@using CJ.Plug.Models.Station
+@using CJ.Plug.StationAndTool.Pages
+@using CJ.Plug.StationAndToolApiClient
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject HubConnectionManagerService HubConnectionManagerService
+@inject IStationAndToolApiClient StationAndToolApiClient
+
+
+
+<MudTabs>
+    <MudTabPanel Text="图站状态">
+        <StationStatusList AllStations="AllStations" OnlineStations="OnlineStations" OnGetStationStatus="GetStationStatus"></StationStatusList>
+    </MudTabPanel>
+    <MudTabPanel Text="工具配置">
+        <ToolsManage OnlineStations="OnlineStations"></ToolsManage>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    public List<Station>? AllStations { get; set; } = new();
+    public List<Station>? OnlineStations { get; set; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+              {
+                  //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
+                  // 将新日志添加到本地列表并触发UI更新
+                  InvokeAsync(async () =>
+                  {
+                      Console.WriteLine(ip);
+                      await ProcessStationList(ip);
+                      StateHasChanged();
+                  });
+              });
+            await GetStationStatus();
+        }
+
+        //await TestHub();
+    }
+
+    private async Task ProcessStationList(string ip)
+    {
+        foreach (var station in AllStations!)
+        {
+            if (station.StationIp == ip)
+            {
+                station.IsStarted = true;
+                OnlineStations.Add(station);
+            }
+            else
+            {
+                station.IsStarted = false;
+            }
+        }
+        //去重
+        // 按 StationIp 去重
+        OnlineStations = OnlineStations
+            .GroupBy(s => s.StationIp)
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    private async Task GetStationStatus()
+    {
+        AllStations = await StationAndToolApiClient.GetAllStationsAsync() ?? new List<Station>();
+        OnlineStations.Clear();
+        await HubConnectionManagerService.ConnectAsync();
+        await HubConnectionManagerService.InvokeAsync<string>("TellMeStatus", null);
+    }
+}

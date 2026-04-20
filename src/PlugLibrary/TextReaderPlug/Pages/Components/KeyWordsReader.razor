@@ -1,0 +1,125 @@
+﻿@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages.SharedComponents
+@using MudBlazor
+@using MudExtensions
+@using Serilog
+<MudStack Row>
+    <MudButton OnClick="GetValue" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">拾取关键字</MudButton>
+    <MudTextField Margin="Margin.Dense" @bind-Value="@tmpTextMapping.Keywords" T="string" Label="关键字"></MudTextField>
+</MudStack>
+
+<MudStack Row>
+    <MudStack>
+        <MudNumericField ValueChanged="@((int e)=>GetNewSelection(e,0))" Value="@tmpTextMapping.PositionOffset[0]" Variant="Variant.Text" Margin="Margin.Dense" Label="起始行偏移"></MudNumericField>
+        <MudNumericField ValueChanged="@((int e)=>GetNewSelection(e,2))" Value="@tmpTextMapping.PositionOffset[2]" Variant="Variant.Text" Margin="Margin.Dense" Label="结束行偏移"></MudNumericField>
+    </MudStack>
+    <MudStack>
+        @* <MudRangeSlider @bind-Value="@tmpTextMapping.PositionOffset[1]" @bind-Value:event="@((int e)=>GetNewSelection(e,1))"
+                        @bind-UpperValue="@tmpTextMapping.PositionOffset[3]" @bind-UpperValue:event="@((int e) => GetNewSelection(e, 3))"
+        Size="Size.Large" Variant="Variant.Filled" ValueLabel Range TickMarks Immediate="true"
+                        Min="0" Max="20" Step="1" Display MinDistance="1">选择列范围</MudRangeSlider> *@
+        <MudNumericField ValueChanged="@((int e)=>GetNewSelection(e,1))" Value="@tmpTextMapping.PositionOffset[1]" Variant="Variant.Text" Margin="Margin.Dense" Label="起始列偏移"></MudNumericField>
+        <MudNumericField ValueChanged="@((int e)=>GetNewSelection(e,3))" Value="@tmpTextMapping.PositionOffset[3]" Variant="Variant.Text" Margin="Margin.Dense" Label="结束列偏移"></MudNumericField>
+    
+    </MudStack>
+    <MudButton OnClick="CheckKeywords" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">测试</MudButton>
+</MudStack>
+
+<MudStack Row>
+    <MudTextField ReadOnly Margin="Margin.Dense" T="string" Value="@String.Join(",", tmpTextMapping.Position)" Label="选中坐标值"></MudTextField>
+    <MudTextField ReadOnly Margin="Margin.Dense" T="string" Value="@String.Join(",", tmpTextMapping.PositionOffset)" Label="设置坐标值"></MudTextField>
+</MudStack>
+
+
+@* <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+    <MudButton Disabled Variant="Variant.Filled" Color="Color.Info" Size="Size.Small">读取至参数：@SelectedParameter</MudButton>
+    <MudMenu Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+        @foreach (var v in PlugVariablesInPDZ)
+        {
+            <MudMenuItem OnClick="@(()=>InsertValue(v.Name))">@v.Name</MudMenuItem>
+        }
+    </MudMenu>
+</MudButtonGroup> *@
+
+<MudAutocomplete @bind-Value="@SelectedParameter" SearchFunc="Search"
+                 CoerceText="true" CoerceValue="true"
+                 Dense Margin="Margin.Dense" Label="输出至参数" Placeholder="选择或创建参数" />
+
+<MudButton OnClick="InsertMapping"
+Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input"
+Color="Color.Info" Size="Size.Small">插入映射</MudButton>
+
+@code {
+    [CascadingParameter]
+    private MonacoEditorWrapper _editor { get; set; } = null!;
+
+    [Parameter]
+    public TextMapping tmpTextMapping { get; set; } = new TextMapping();
+    [Parameter]
+    public List<PlugVariableData>? PlugVariablesInPDZ { get; set; } = new List<PlugVariableData>();
+    [Parameter]
+    public EventCallback GetValue { get; set; }
+    [Parameter]
+    public EventCallback CheckKeywords { get; set; }
+    [Parameter]
+    public EventCallback<TextMapping> OnInsertTextMapping { get; set; }
+
+    private Selection EditorSelection = new Selection();
+    private string SelectedParameter = "";
+
+
+
+
+
+    private async Task GetNewSelection(int offset, int index)
+    {
+        tmpTextMapping.PositionOffset[index] = offset;
+        EditorSelection.SelectionStartLineNumber = tmpTextMapping.Position[0] + tmpTextMapping.PositionOffset[0];
+        EditorSelection.SelectionStartColumn = tmpTextMapping.Position[1] + tmpTextMapping.PositionOffset[1];
+        EditorSelection.PositionLineNumber = tmpTextMapping.Position[2] + tmpTextMapping.PositionOffset[2];
+        EditorSelection.PositionColumn = tmpTextMapping.Position[3] + tmpTextMapping.PositionOffset[3];
+
+        await _editor.SetSelection(EditorSelection, "");
+
+        //StateHasChanged();
+    }
+
+    private async Task InsertValue(string value)
+    {
+        tmpTextMapping.BindingVariableName = value;
+        StateHasChanged();
+    }
+
+    private async Task InsertMapping()
+    {
+        if (string.IsNullOrEmpty(tmpTextMapping.Keywords))
+        {
+            Log.Information("未选择关键字！");
+            return;
+        }
+        tmpTextMapping.BindingVariableName = SelectedParameter;
+        tmpTextMapping.ReadSchemaMode = ReadSchemaMode.关键字;
+        tmpTextMapping.ReadSchemaValue = String.Join(",", tmpTextMapping.PositionOffset);
+
+        await CheckKeywords.InvokeAsync();
+
+        if (OnInsertTextMapping.HasDelegate)
+            OnInsertTextMapping.InvokeAsync(tmpTextMapping);
+    }
+
+
+    private async Task<IEnumerable<string>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return PlugVariablesInPDZ.Select(v => v.Name);
+
+        return PlugVariablesInPDZ.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+
+}

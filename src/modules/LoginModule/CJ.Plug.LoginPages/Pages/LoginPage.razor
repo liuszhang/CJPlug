@@ -1,0 +1,189 @@
+﻿@page "/login"
+@using Blazored.LocalStorage
+
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.LoginApiClient.ApiClients
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.Layout
+@using Elsa.Studio
+@using Elsa.Studio.Contracts
+@using Elsa.Studio.Login.Contracts
+@using Elsa.Studio.Login.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using System.Net.Http.Headers
+@using System.Text.Json
+@using System.Text
+
+@layout BasicLayout
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+@inject ICredentialsValidator CredentialsValidator
+@inject NavigationManager NavigationManager
+@inject IJwtAccessor JwtAccessor
+@inject IRemoteBackendAccessor remoteBackendAccessor
+@inject HttpClient HttpClient
+@inject ILoginApiClient UserApiClient
+@inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudStack Spacing="10">
+        <h2 class="LoginTitle">V0.0.1</h2>
+        <MudPaper Elevation="1">
+            <MudGrid Spacing="0" Justify="Justify.Center">
+                <MudItem md="9" xs="7" Class="pa-4 mx-auto my-4">
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.h5">登录</MudText>
+                        <EditForm Model="@_model" OnValidSubmit="TryLogin">
+                            <div class="d-flex flex-column">
+                                <DataAnnotationsValidator />
+                                <MudTextField Label="用户名" Required="true" Variant="Variant.Outlined" For="@(() => _model.Username)" @bind-Value="_model.Username" autocomplete="username" />
+                                <MudTextField Label="密码" Required="false" Variant="Variant.Outlined" For="@(() => _model.Password)" @bind-Value="_model.Password" InputType="InputType.Password" autocomplete="current-password" />
+                                <MudCheckBox @bind-Value="_model.RememberMe" Label="记住我" />
+                                <MudStack Row Class="mt-3 align-self-end">
+                                    <MudButton OnClick="SignUp" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 align-self-end">注册</MudButton>
+                                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 align-self-end">登录</MudButton>
+
+                                </MudStack>
+                            </div>
+                        </EditForm>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudStack>
+    <MudText Typo="Typo.subtitle2" Align="Align.Center" Class="mt-2">测试版本 0.1</MudText>
+</MudContainer>
+
+
+@code {
+    internal class LoginModel
+    {
+        public string Username { get; set; } = default!;
+        public string Password { get; set; } = default!;
+        public bool RememberMe { get; set; }
+    }
+
+    private LoginModel _model = new LoginModel();
+
+    private async Task TryLogin()
+    {
+        var user = new User()
+            {
+                UserName = _model.Username,
+                Password = _model.Password
+            };
+        var result = await MainApiClient.Login(user);
+        //Snackbar.Add(isValid.ToString(), Severity.Error);
+        if (result == null)
+        {
+            Snackbar.Add("Invalid credentials. Please try again", Severity.Error);
+            return;
+        }
+        await DomInteropService.SetCurrentUserId(result.Id);
+        await DomInteropService.SetCurrentUserName(result.UserName);
+        //await _localStorageService.SetItemAsync<int>("userid", result.Id);
+        //await _localStorageService.SetItemAsStringAsync("username", result.UserName);
+        ((AccessTokenAuthenticationStateProvider)AuthenticationStateProvider).NotifyAuthenticationStateChanged();
+        NavigationManager.NavigateTo("", true);
+    }
+
+    private async Task TryLoginToElsa()
+    {
+        var isValid = await ValidateCredentials(_model.Username, _model.Password);
+        if (!isValid)
+        {
+            Snackbar.Add("Invalid credentials. Please try again", Severity.Error);
+            return;
+        }
+
+        ((AccessTokenAuthenticationStateProvider)AuthenticationStateProvider).NotifyAuthenticationStateChanged();
+        NavigationManager.NavigateTo("", true);
+    }
+
+    private async Task<bool> ValidateCredentials(string username, string password)
+    {
+        if (string.IsNullOrEmpty(username) && string.IsNullOrEmpty(password))
+            return false;
+
+        var result = await CredentialsValidator.ValidateCredentialsAsync(username, password);
+
+        if (!result.IsAuthenticated)
+            return false;
+
+        await JwtAccessor.WriteTokenAsync(TokenNames.AccessToken, result.AccessToken!);
+        await JwtAccessor.WriteTokenAsync(TokenNames.RefreshToken, result.RefreshToken!);
+        //await _localStorageService.SetItemAsStringAsync("username", username);
+        await DomInteropService.SetCurrentUserName(username);
+        return true;
+    }
+
+    private async Task SignUp()
+    {
+        var user = new User()
+        {
+                UserName = _model.Username,
+                Password = _model.Password
+        };
+        var response = await MainApiClient.Register(user);
+        if (response != null)
+        {
+            Snackbar.Add("User registered successfully", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to register user", Severity.Error);
+        }
+        // if (response.IsSuccessStatusCode)
+        // {
+        //     Console.WriteLine(response.ReasonPhrase);
+        //     var str = await response.Content.ReadAsStringAsync();
+        //     Console.WriteLine(str);
+        //     Snackbar.Add("User registered successfully", Severity.Success);
+        // }
+        // else
+        // {
+        //     Snackbar.Add("Failed to register user", Severity.Error);
+        // }
+    }
+
+    private async Task SignUpInElsa()
+    {
+        var url = remoteBackendAccessor.RemoteBackend.Url + "/identity/users";
+        var refreshRequestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+        //refreshRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", refreshToken);
+        var request = new Request
+            {
+                Name = _model.Username,
+                Password = _model.Password
+            };
+        // Send request.
+        var jsonRequest = JsonSerializer.Serialize(request);
+        var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+
+        var response = await HttpClient.PostAsync(url, content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine(response.ReasonPhrase);
+            var str = await response.Content.ReadAsStringAsync();
+            Console.WriteLine(str);
+            Snackbar.Add("User registered successfully", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to register user", Severity.Error);
+        }
+    }
+
+    internal class Request
+    {
+        public string Name { get; set; } = default!;
+        public string? Password { get; set; }
+        public ICollection<string>? Roles { get; set; }
+    }
+}

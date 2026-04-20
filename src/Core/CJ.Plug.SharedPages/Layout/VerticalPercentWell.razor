@@ -1,0 +1,11 @@
+﻿<div class="pa-0" style="@($"overflow-y: scroll; max-height: calc((80vh - var(--mud-appbar-height))*({SplitterPanelPercent}/100));")">
+    @ChildContent
+</div>
+
+@code
+{
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public double SplitterPanelPercent { get; set; }
+}

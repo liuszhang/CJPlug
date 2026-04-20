@@ -1,0 +1,51 @@
+﻿using CJ.Plug_Aspire.Models.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+using NX.Services;
+
+namespace NX.Extensions
+{
+    // 注意: 使用“重构”菜单上的“重命名”命令，可以同时更改代码和配置文件中的类名“ServiceCollectionExtensions”。
+    public static class ServiceCollectionExtensions
+    {
+        /// <summary>
+        /// 添加前端所需依赖注入
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddNX(this IServiceCollection services)
+        {
+            services
+                //.AddScoped<IFeature, Feature>()
+                //.AddScoped<IBusinessToolEnumProvider, NXToolEnumProvider>()
+                //.AddScoped<IExtraInputProvider, NXExtraInputProvider>()
+                //.AddScoped<IExtraOutputProvider, NXExtraOutputProvider>()
+                .AddScoped<IPlugSettingDialogShow, NXPlugSettingDialogShow>()
+                //.AddScoped<INXExecuteAction,NXExecuteAction>()
+                .AddSingleton<IPlugDisplaySettingsProvider, NXPlugDisplaySettingProvider>();
+           
+
+            //services.AddTransient<IMyBusinessToolDialogShow>(sp => new MyPatranDialogShow(), name: "NX");
+
+            return services;
+        }
+
+        /// <summary>
+        /// 添加后端API执行时所需依赖注入
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection AddNXExecute(this IServiceCollection services)
+        {
+            //services
+            //    .AddScoped<IBusinessToolEnumProvider, NXToolEnumProvider>()
+            //    .AddScoped<IExtraInputProvider, NXExtraInputProvider>()
+            //    .AddScoped<IExtraOutputProvider, NXExtraOutputProvider>()
+            //    .AddScoped<INXExecuteAction, NXExecuteAction>()
+            //    .AddScoped<IPlugExecute, NXPlugExecute>();
+
+
+            return services;
+        }
+
+    }
+}

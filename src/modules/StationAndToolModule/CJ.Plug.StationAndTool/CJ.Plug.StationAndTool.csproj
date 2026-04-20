@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <ProjectReference Include="..\..\RelationManageModule\CJ.Plug.RelationApiClient\CJ.Plug.RelationApiClient.csproj" />
+    <ProjectReference Include="..\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
+    <ProjectReference Include="..\CJ.Plug.StationAndToolApi\CJ.Plug.StationAndToolApi.csproj" />
+  </ItemGroup>
+
+</Project>

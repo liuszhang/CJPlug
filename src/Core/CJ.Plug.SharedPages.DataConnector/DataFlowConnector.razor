@@ -1,0 +1,60 @@
+﻿@using Microsoft.JSInterop
+
+@inject IJSRuntime JsRuntime
+
+<div @ref="diagramContainer" class="jointjs-container" style="width: 100%; height: 500px;"></div>
+
+@code {
+    private ElementReference diagramContainer;
+    private IJSObjectReference? module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 加载JointJS和相关依赖
+            module = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "/js/JointJsInterop.js");
+
+            // 初始化图表
+            await InitializeDiagram();
+        }
+    }
+
+    private async Task InitializeDiagram()
+    {
+        if (module != null)
+        {
+            await module.InvokeVoidAsync(
+                "initializeDiagram",
+                diagramContainer,
+                ModelData);
+        }
+    }
+
+    [Parameter]
+    public object ModelData { get; set; } = new { };
+
+    public async Task UpdateDiagram(object newData)
+    {
+        ModelData = newData;
+
+        if (module != null)
+        {
+            await module.InvokeVoidAsync(
+                "updateDiagram",
+                diagramContainer,
+                ModelData);
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (module != null)
+        {
+            return module.DisposeAsync();
+        }
+
+        return ValueTask.CompletedTask;
+    }
+}

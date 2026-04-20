@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\PlugMarketModule\CJ.Plug.PlugMarketApiClient\CJ.Plug.PlugMarketApiClient.csproj" />
+    <ProjectReference Include="..\..\RelationManageModule\CJ.Plug.RelationApiClient\CJ.Plug.RelationApiClient.csproj" />
+    <ProjectReference Include="..\CJ.Plug.ProcessManageApiClient\CJ.Plug.ProcessManageApiClient.csproj" />
+    <ProjectReference Include="..\CJ.Plug.ProcessManageApi\CJ.Plug.ProcessManageApi.csproj" />
+  </ItemGroup>
+
+</Project>

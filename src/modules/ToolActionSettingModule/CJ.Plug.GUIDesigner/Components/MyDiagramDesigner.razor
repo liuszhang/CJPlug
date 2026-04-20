@@ -1,0 +1,218 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Blazor.Diagrams
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets
+@using Blazor.Diagrams.Core
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Controls.Default
+@using Blazor.Diagrams.Core.Geometry
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Models.Base
+@using Blazor.Diagrams.Core.Options
+@using Blazor.Diagrams.Core.PathGenerators
+@using Blazor.Diagrams.Core.Routers
+@using Blazor.Diagrams.Options
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.GUIDesigner.Contracts
+@using CJ.Plug.GUIDesigner.Models
+@using CJ.Plug.GUIDesigner.Models.Shared
+@using CJ.Plug.GUIDesigner.Widgets
+@using MudBlazor
+@using System.Text.Json.Nodes
+
+
+@inject IDialogService DialogService
+@inject IGuiItemHandlerService GuiItemHandlerService
+
+
+
+@if (IsReadOnly)
+{
+    <div class="guidesigner-container" ondragover="event.preventDefault();" @ondragover:preventDefault @oncontextmenu:preventDefault>
+
+        <CascadingValue Value="MyDiagram" IsFixed="true">
+            <DiagramCanvas Class="diagram-designer">
+                <GridWidget Size="30" Mode="GridMode.Point" BackgroundColor="white" />
+            </DiagramCanvas>
+        </CascadingValue>
+
+    </div>
+}
+else
+{
+    <div class="guidesigner-container" ondragover="event.preventDefault();" @ondragover:preventDefault @ondrop="OnDrop" @oncontextmenu:preventDefault>
+
+        <CascadingValue Value="MyDiagram" IsFixed="true">
+            <DiagramCanvas>
+                <Widgets>
+                    <GridWidget Size="30" Mode="GridMode.Point" BackgroundColor="white" />
+                    <NavigatorWidget Width="200" Height="120"
+                    Class="border border-black bg-white absolute"
+                    Style="bottom: 15px; right: 15px;" />
+                    <SelectionBoxWidget />
+                </Widgets>
+            </DiagramCanvas>
+        </CascadingValue>
+
+    </div>
+}
+
+@code {
+    private BlazorDiagram MyDiagram { get; set; } = null!;
+
+    [Parameter]
+    public bool IsReadOnly { get; set; } = false;
+
+    [CascadingParameter]
+    private DragDropManager _draggedType { get; set; }
+    [CascadingParameter]
+    public Plug? SelectedPlug { get; set; }
+
+    private BaseGuiItemModel? SelectedNode;
+
+    [Parameter]
+    public EventCallback<BaseGuiItemModel?> OnSelectedNodeChanged { get; set; }
+    [Parameter]
+    public EventCallback<string?> OnGuiChanged { get; set; }
+
+    //public IEnumerator<IOpenActivtySettingDialog> enumerator { get; set; } = default!;
+    protected override void OnInitialized()
+    {
+
+
+        MyDiagram = new BlazorDiagram();
+        MyDiagram.RegisterComponent<BaseGuiItemModel, BaseGuiItemWidget>();
+
+        // var node4 = MyDiagram.Nodes.Add(new BaseGuiItemModel("default", GuiItemHandlerService, position: new Point(150, 50))
+        // {
+        //     //Title = "测试控件"
+        // });
+
+        MyDiagram.Changed += async () =>
+        {
+            await SaveGuiJsonData(MyDiagram);
+        };
+        //单纯拖动组件时，似乎不会触发Changed事件，所以这里额外添加鼠标移出事件来保存数据
+        MyDiagram.PointerLeave+= async(a,b) =>
+        {
+            await SaveGuiJsonData(MyDiagram);
+        };
+
+
+        MyDiagram.SelectionChanged += (e) =>
+        {
+            SelectedNode = (BaseGuiItemModel)e;
+            OnSelectedNodeChanged.InvokeAsync(SelectedNode);
+        };
+
+
+
+    }
+
+    private void GenarateGuiJson()
+    {
+        MyDiagram.Nodes.Clear();
+        var jsonData = SelectedPlug?.GuiJsonData;
+        if (string.IsNullOrEmpty(jsonData))
+        {
+            Console.WriteLine("SelectedPlug.GuiJsonData is null or empty.");
+            return;
+        }
+            ;
+        //将JSON转换为BlazorDiagram对象，未完待续
+        // 解析JSON
+        var jsonNode = JsonNode.Parse(jsonData);
+
+        // 获取container的body数组
+        var containerBody = jsonNode?["body"] as JsonArray;
+
+        if (containerBody != null)
+        {
+            // 提取每个元素的所有属性和 style.inset
+            var elements = containerBody
+                .Select(item => item as JsonObject)
+                .Where(obj => obj != null)
+                .Select(obj =>
+                {
+                    // 提取 style.inset
+                    string inset = obj?["style"]?["inset"]?.ToString() ?? string.Empty;
+
+                    // 复制其他属性（排除 style）
+                    var properties = new Dictionary<string, object>();
+                    foreach (var property in obj)
+                    {
+                        if (property.Key != "style")
+                        {
+                            properties[property.Key] = property.Value?.ToString() ?? string.Empty;
+                        }
+                    }
+
+                    // 添加 inset 到属性集合
+                    properties["inset"] = inset;
+
+                    return properties;
+                })
+                .ToList();
+
+            // 输出结果
+            foreach (var element in elements)
+            {
+                Console.WriteLine($"元素属性:");
+                foreach (var property in element)
+                {
+                    Console.WriteLine($"  {property.Key}: {property.Value}");
+                }
+                MyDiagram.Nodes.Add(new BaseGuiItemModel(
+                    element["type"]?.ToString() ?? "default",
+                    GuiItemHandlerService,
+                    position: new Point(
+                        x: double.TryParse(element["inset"]?.ToString()?.Split(' ')[3].TrimEnd("px".ToCharArray()), out var x) ? x : 0,
+                        y: double.TryParse(element["inset"]?.ToString()?.Split(' ')[0].TrimEnd("px".ToCharArray()), out var y) ? y : 0
+                    )
+                ));
+                Console.WriteLine();
+            }
+        }
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            GenarateGuiJson();
+        }
+
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+
+
+
+    private void OnDrop(DragEventArgs e)
+    {
+        //Console.WriteLine("拖进去的是个："+_draggedType.Payload);
+        if (string.IsNullOrEmpty(_draggedType.Payload?.ToString())) // Unkown item
+            return;
+
+        var position = MyDiagram.GetRelativeMousePoint(e.ClientX, e.ClientY);
+        var node = new BaseGuiItemModel(_draggedType.Payload.ToString(), GuiItemHandlerService, position);
+        MyDiagram.Nodes.Add(node);
+        //_draggedType = "";
+    }
+
+
+    private async Task SaveGuiJsonData(BlazorDiagram blazorDiagram)
+    {
+        var options = new JsonSerializerOptions
+            {
+                Converters = { new DiagramJsonConverter(SelectedPlug.Name) },
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+        var jsonData = JsonSerializer.Serialize(MyDiagram, options);
+        Console.WriteLine(">>>>>>>>>>>DiagramData Changed:{jsonData}");
+        await OnGuiChanged.InvokeAsync(jsonData);
+    }
+}
+

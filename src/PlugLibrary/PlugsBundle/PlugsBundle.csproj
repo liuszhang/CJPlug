@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIAgentPlug\AIAgentPlug.csproj" />
+    <ProjectReference Include="..\CMDPlug\CMDPlug.csproj" />
+    <ProjectReference Include="..\CommonToolExecute\CommonToolExecute.csproj" />
+    <ProjectReference Include="..\ExcelPlug\ExcelPlug.csproj" />
+    <ProjectReference Include="..\FileDownloadPlug\FileDownloadPlug.csproj" />
+    <ProjectReference Include="..\Loop\ForPlug\ForPlug.csproj" />
+    <ProjectReference Include="..\Loop\IfPlug\IfPlug.csproj" />
+    <ProjectReference Include="..\MatlabPlug\MatlabPlug.csproj" />
+    <ProjectReference Include="..\MCDataGetPlug\MCDataGetPlug.csproj" />
+    <ProjectReference Include="..\NXPlug\NXPlug.csproj" />
+    <ProjectReference Include="..\NXPlug_AIModel\NXPlug_AIModel.csproj" />
+    <ProjectReference Include="..\PythonPlug\PythonPlug.csproj" />
+    <ProjectReference Include="..\RESTPlug\RESTPlug.csproj" />
+    <ProjectReference Include="..\Script\CalculatorPlug\CalculatorPlug.csproj" />
+    <ProjectReference Include="..\Script\CSharpPlug\CSharpPlug.csproj" />
+    <ProjectReference Include="..\Script\DllLoaderPlug\DllLoaderPlug.csproj" />
+    <ProjectReference Include="..\Script\JavaScriptPlug\JavaScriptPlug.csproj" />
+    <ProjectReference Include="..\SendHttpRequestPlug\SendHttpRequestPlug.csproj" />
+    <ProjectReference Include="..\TextReaderPlug\TextReaderPlug.csproj" />
+    <ProjectReference Include="..\TextWriterPlug\TextWriterPlug.csproj" />
+    <ProjectReference Include="..\WordPlug\WordPlug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="PlugConfig\Plugs\WhilePlug\WhilePlug.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="PlugConfig\UserPlugs.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

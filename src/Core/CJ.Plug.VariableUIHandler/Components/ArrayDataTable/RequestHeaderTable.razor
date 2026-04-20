@@ -1,0 +1,50 @@
+﻿
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using MudBlazor
+@using System.Text.Json
+@using Serilog
+<MudTable Items="@dataList" Hover="true" Striped="true" Dense>
+    <HeaderContent>
+        <MudTh>类型</MudTh>
+        <MudTh>名称</MudTh>
+        <MudTh>默认值</MudTh>
+        <MudTh>绑定参数</MudTh>
+        <MudTh>必需</MudTh>                    
+        <MudTh>操作</MudTh>                    
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.Type</MudTd>
+        <MudTd>@($"{@EditorContext.Variable.Type}[{@dataList.IndexOf(context)}]")</MudTd>
+        <MudTd>@context.Value</MudTd>
+        <MudTd>@context.SourceValueVariableId</MudTd>
+        <MudTd>@context.IsRequired</MudTd>
+        <MudTd></MudTd>
+        @* <MudTd>@String.Join(',', context.PositionOffset)</MudTd> *@
+
+    </RowTemplate>
+</MudTable>
+
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private List<BaseVariable> dataList = new();
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            dataList = JsonSerializer.Deserialize<List<BaseVariable>?>(EditorContext.Variable.Value);
+        }
+        catch (Exception ex)
+        {
+            Log.Information(ex.Message);
+        }
+        StateHasChanged();
+    }
+
+}

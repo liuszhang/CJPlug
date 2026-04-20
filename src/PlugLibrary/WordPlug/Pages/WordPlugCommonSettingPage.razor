@@ -1,0 +1,400 @@
+﻿@using BlazorMonaco.Editor
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.VariableUIHandler.Pages
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Http
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using WordPlug.Services
+@using Serilog
+
+@inject MainApiClient MainApiClient
+@inject ILocalStorageService _localStorageService
+@inject IDomInteropService DomInteropService
+@inject IDialogService DialogService
+
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudFileUpload T="IBrowserFile" FilesChanged="@((f) => CheckLocalFile(f))" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" StartIcon="@Icons.Material.Filled.UploadFile" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">导入文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+    <MudButton OnClick="LoadRootData" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">重新加载文件</MudButton>
+    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">导入系统文件</MudButton>
+
+</MudStack>
+<MudText>文件内容预览(@FileName) </MudText>
+
+<MudStack Row Justify="Justify.SpaceBetween">
+
+    <MudStack Style="width:100%;border:dashed">
+        @if (!string.IsNullOrEmpty(PdfContent))
+        {
+            <iframe src="@PdfContent" width="100%" height="600px"></iframe>
+        }
+        @if(Processing)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small"></MudProgressCircular>
+        }   
+
+        @if (!string.IsNullOrEmpty(HtmlContent))
+        {
+            <Radzen.Blazor.RadzenHtmlEditor @bind-Value="HtmlContent" Style="width:100%;height:500px" >
+            </Radzen.Blazor.RadzenHtmlEditor>
+
+
+            @* <div>@((MarkupString)HtmlContent)</div> *@
+        }
+        else
+        {
+            @* <p>Loading...</p> *@
+        }
+        @* <iframe src="test.pdf" width="100%" height="600px"></iframe> *@
+    </MudStack>
+
+    <MudStack Justify="Justify.FlexStart" AlignItems="AlignItems.Stretch" Style="min-width:380px">
+        <MudText>绑定内容至书签</MudText>
+        <Radzen.Blazor.RadzenHtmlEditor @bind-Value="TmpInput" Input=@OnInput Change=@OnChange Style="width:380px;height:200px" Execute=@OnExecute>
+            <Radzen.Blazor.RadzenHtmlEditorCustomTool CommandName="InsertToday" Icon="today" Title="Insert today" />
+            <Radzen.Blazor.RadzenHtmlEditorCustomTool CommandName="InsertToday" Title="绑定至参数" />
+            <Radzen.Blazor.RadzenHtmlEditorCustomTool Icon="list" CommandName="InsertVariable" Title="绑定至参数" />
+        </Radzen.Blazor.RadzenHtmlEditor>
+
+        <MudStack Row>
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+                <MudButton Disabled Variant="Variant.Filled" Color="Color.Info" Size="Size.Small">插入至书签：@SelectedBM</MudButton>
+                <MudMenu Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+                    @foreach(var bm in BookMarkList)
+                    {
+                        <MudMenuItem OnClick='()=>SelectedBM=bm'>@bm</MudMenuItem>
+                    }
+                </MudMenu>
+            </MudButtonGroup>
+
+            <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input" OnClick="TestInsertToBM" Disabled="Processing"
+            Color="Color.Info" Size="Size.Small">
+                @if (Processing)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small"></MudProgressCircular>
+                }
+                else
+                {
+                    <MudText>确认并预览</MudText>
+                }                
+            </MudButton>
+
+        </MudStack>
+        <MudDataGrid T="WordTextMapping" Items="TextMappings" Dense ReadOnly="false" SortMode="SortMode.None" Style="width:380px"
+        EditTrigger="@(DataGridEditTrigger.Manual)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">已配置书签映射清单</MudText>
+            </ToolBarContent>
+            <Columns>
+                @* <PropertyColumn Property="x=>x.Id" Title="编号" Editable="false" /> *@
+                <PropertyColumn Property="x=>x.InputSchema" Title="内容" Editable="false" />
+                <PropertyColumn Property="x=>x.BMName" Title="书签名" Editable="false" />
+                <TemplateColumn CellClass="d-flex justify-end">
+                    <CellTemplate>
+                        <MudStack Row>
+                            <MudButton OnClick="@(()=>DeleteMapping(@context.Item))" Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">删除</MudButton>
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+
+            </Columns>
+
+        </MudDataGrid>
+
+    </MudStack>
+
+</MudStack>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+    
+    public PlugData? PlugData { get; set; } = new();
+
+    private string? FileId { get; set; }
+    private string? FileName { get; set; }
+    private string? TmpLocalFilePath { get; set; }
+
+    private Radzen.Blazor.RadzenHtmlEditor Reditor = null!;
+    public string? TmpInput{ get; set; }
+    public List<string>? BookMarkList { get; set; } = new List<string>();
+    public List<WordTextMapping> TextMappings { get; set; } = new List<WordTextMapping>();
+    private string? SelectedBM { get; set; }
+    private bool Processing { get; set; } = false;  
+    private IBrowserFile checkedFile;
+    private string? CurrentUser { get; set; }
+    private PlugSettings? PlugSettings { get; set; }
+    private PlugSettings? WordBMMapping { get; set; } = new();
+
+    private string HtmlContent;
+    private string PdfContent;
+    private string pdfFilePath;
+
+    protected override async Task OnParametersSetAsync()
+    {             
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            PlugData = PlugDataZone.GetPlugData(PlugDefinitionId);
+        }
+        await LoadRootData();        
+        await RefreshWordContent();        
+    }
+
+    private async Task LoadRootData()
+    {
+        Processing = true;
+        var bmMappingJson = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString());
+        if (!string.IsNullOrEmpty(bmMappingJson))
+        {
+            TextMappings = JsonSerializer.Deserialize<List<WordTextMapping>>(bmMappingJson) ?? new List<WordTextMapping>();
+        }
+        CurrentUser = await DomInteropService.GetCurrentUserName();
+
+        var fileVariable = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString());
+        if (!string.IsNullOrEmpty(fileVariable))
+        {
+            FileName = fileVariable.Split(':').FirstOrDefault();
+            FileId = fileVariable.Split(':').LastOrDefault();
+        }
+        if (string.IsNullOrEmpty(FileId) || string.IsNullOrEmpty(FileName))
+        {
+            Processing = false;
+            return;
+        }
+        //StateHasChanged();
+        TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+
+        await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+        using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
+        {
+            await sourceStream?.CopyToAsync(stream);
+        }
+        Processing = false;
+    }
+
+    private async Task RefreshWordContent()
+    {
+        Processing = true;
+        PdfContent = "";
+        if (string.IsNullOrEmpty(TmpLocalFilePath))
+        {
+            return;
+        }
+        try
+        {
+            BookMarkList = WordService_OpenXml.GetBookmarksFromWordFile(TmpLocalFilePath);
+            pdfFilePath = TmpLocalFilePath.Replace(".docx", ".pdf");
+            //Log.Information("pdf path is:" + pdfFilePath);
+            //方法一：使用aspose.words直接转
+            WordService_Aspose.ConvertToPdf(TmpLocalFilePath, pdfFilePath);
+
+
+
+            //方法二：使用图站的桌面工具进行转换
+            // var inputs = new List<StationExectionVariable>();
+            // inputs.Add(new StationExectionVariable { Name = "WordFilePath", Value = Plug.RealValuePath });
+            // inputs.Add(new StationExectionVariable { Name = "PdfFilePath", Value = Plug.RealValuePath.Replace(".docx",".pdf") });
+
+            // var toolCommandRequest = new StationExecutionRequest
+            //     {
+            //         ExecutionToolType=ExecutionToolTypeEnum.SystemInitCMD.ToString(),
+            //         ToolName = "WordToPdf",
+            //         InputVariables = inputs
+            //     };
+            // //Log.Information(toolCommandRequest.GetInputValue("PdfFilePath"));
+            // await MainApiClient.ExecuteToolCommand(toolCommandRequest);
+
+
+            //转换完成后读取PDF内容并展示到界面    
+            pdfFilePath = pdfFilePath.Trim('\"');
+            //Log.Information("pdf path is:" + pdfFilePath);
+            PdfContent = $"data:application/pdf;base64,{Convert.ToBase64String(File.ReadAllBytes(pdfFilePath))}";
+            StateHasChanged();
+        }
+        catch (Exception e)
+        {
+            Log.Information("word转pdf失败："+e.Message);
+        }
+        Processing = false;
+        StateHasChanged();
+
+        // 替换为你的Word文件路径
+        //string wordFilePath = "C:/tmp/test.docx";
+        //HtmlContent = WordToHtmlService.ConvertToHtml(wordFilePath);
+        //string pdfFilePath = "C:/tmp/test.pdf";
+
+        //WordToPdfService.ConvertToPdf(wordFilePath, pdfFilePath);
+    }
+
+    async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        //Console.WriteLine("checked file name:" + browserFile.Name);
+        if (browserFile != null)
+        {
+            try
+            {
+                (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile,PlugData);
+                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString(), browserFile.Name + ":" + fileId);
+                await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+                TmpLocalFilePath = filePath;
+                // Plug.Value = browserFile.Name;
+                // Plug.RealValuePath = null;
+                // var fileUploadRequest = new FileUploadRequest
+                //     {
+                //         FileId = RandomLongIdentityGenerator.GenerateId(),
+                //         FileName = browserFile.Name,
+                //         FileCreator = CurrentUser,
+                //         FileUploadType = FileFolderType.Design.ToString(),
+                //         PlugDefinitionId = Plug.DefinitionId,
+                //         ProcessDefinitionId = Plug.ParentPlugDefinitionId
+                //     };
+                // Plug.RealValuePath = await MainApiClient.UploadFileByRequest(browserFile,fileUploadRequest);
+                // PlugSettings.SetSetting(PlugSettingKey.FileId.ToString(), fileUploadRequest.FileId);
+                // Plug.PlugSettingsJson = JsonSerializer.Serialize(PlugSettings);
+
+                await RefreshWordContent();
+            }
+            catch (Exception ex)
+            {
+                Log.Information("上传文件出错："+ex.Message);
+            }
+        }
+
+    }
+
+    void OnChange(string html)
+    {
+        TmpInput = html;
+        //Log.Information($"Change: {html}");
+    }
+
+    void OnInput(string html)
+    {
+        TmpInput = html;
+        //Log.Information($"Input: {html}");
+    }
+
+    async Task OnExecute(Radzen.HtmlEditorExecuteEventArgs args)
+    {
+        if (args.CommandName == "InsertToday")
+        {
+            await InsertDate(args.Editor, DateTime.Now);
+            Log.Information("输入值："+TmpInput);
+        }
+        if (args.CommandName == "InsertVariable")
+        {
+            //await ChooseVariable();
+        }
+    }
+
+    async Task ChooseVariable()
+    {
+        var parameters = new DialogParameters<ChooseVariablesDialog>{
+            //{x=>x.Plug,Plug}
+        };
+        var dialog = await DialogService.ShowAsync<ChooseVariablesDialog>("选择流程参数", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var selectedVariable = result.Data as PlugVariable;
+            //Console.WriteLine("choosed variable:" + selectedVariable.Name);
+            TmpInput = TmpInput + $"{{{{ {selectedVariable.Name} }}}}";
+
+        }
+    }
+
+    async Task InsertDate(Radzen.Blazor.RadzenHtmlEditor editor, DateTime date)
+    {
+        await editor.ExecuteCommandAsync(Radzen.HtmlEditorCommands.InsertHtml, $"<strong>{date.ToLongDateString()}</strong>");
+    }
+
+
+    private async Task TestInsertToBM()
+    {
+        PdfContent = "";
+        Processing = true;
+        //await Task.Delay(1000);
+        string bookmarkName = SelectedBM;
+        string textToInsert = TmpInput;
+        string imagePath = "C:/tmp/image.jpg";
+
+        try
+        {
+            //方法一是直接进行处理
+            WordService_Aspose.InsertHtmlAtBookmark(TmpLocalFilePath, bookmarkName, textToInsert);            
+            //WordToHtmlService.InsertImageAtBookmark(Plug.RealValuePath.Trim('"'), bookmarkName, imagePath);
+
+            //方法二是调用图站工具进行处理
+            // var inputs = new List<StationExectionVariable>();
+            // inputs.Add(new StationExectionVariable { Name = "WordFilePath", Value = Plug.RealValuePath });
+            // inputs.Add(new StationExectionVariable { Name = "BmName", Value = bookmarkName });
+            // inputs.Add(new StationExectionVariable { Name = "TextToInsert", Value = textToInsert });
+            // //inputs.Add("WordFilePath", "C:/tmp/test.docx");
+            // var toolCommandRequest = new StationExecutionRequest
+            //     {
+            //         ExecutionToolType = ExecutionToolTypeEnum.SystemInitCMD.ToString(),
+            //         ToolName = "InsertDataToWord",
+            //         InputVariables = inputs
+            //     };
+            // await MainApiClient.ExecuteToolCommand(toolCommandRequest);
+
+            //HtmlContent = WordToHtmlService.ConvertToHtml(filePath);
+            //Console.WriteLine(TmpInput);
+
+            TextMappings.Add(new WordTextMapping { InputSchema = TmpInput, BMName = bookmarkName ,Id=GetNextTextMappingId()});
+            PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+
+            await RefreshWordContent();
+        }
+        catch (Exception e)
+        {
+            Log.Information("插入书签数据出错："+e.Message);
+        }
+
+
+        Processing = false;
+        //StateHasChanged();
+    }
+
+    private async Task DeleteMapping(WordTextMapping textMapping)
+    {
+        TextMappings.Remove(textMapping);
+        PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+        //StateHasChanged();
+    }
+    private int? GetNextTextMappingId()
+    {
+        var idList = TextMappings.Select(x => x.Id).ToList();
+        var maxId = idList.Max();
+        if (maxId==null)
+        {
+            maxId = 0;
+        }
+        return maxId + 1;
+    }
+
+
+
+
+    
+}

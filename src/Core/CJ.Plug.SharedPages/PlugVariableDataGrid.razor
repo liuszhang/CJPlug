@@ -1,0 +1,193 @@
+﻿@using System.Text.Json
+@using System.Text.Json.Nodes
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
+@using CJ.Plug.SharedPages.Layout
+@using CJ.Plug.SharedPages.Variable
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Serilog
+@using Size=MudBlazor.Size
+
+@inject IDialogService DialogService
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+<VerticalPercentWell SplitterPanelPercent="HeightPercent">
+
+<MudDataGrid T="PlugVariable" Items="@Plug?.PlugVariables" ReadOnly="false" EditMode="@(MudBlazor.DataGridEditMode.Cell)" MultiSelection
+SortMode="SortMode.None" Height="100%" SelectedItemsChanged="@SelectedItemsChanged"
+CommittedItemChanges="@CommittedItemChanges"
+Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgressColor="Color.Primary">
+    <ToolBarContent>
+        <MudButtonGroup Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+            <MudButton OnClick="NewVariable" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Newspaper">快速新建</MudButton>
+            <MudMenu Dense Size="Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+                <MudMenuItem OnClick="CreateParameter">新建参数</MudMenuItem>
+                <MudMenuItem>导入</MudMenuItem>
+                <MudMenuItem>导出</MudMenuItem>
+            </MudMenu>
+        </MudButtonGroup>
+        <MudSpacer></MudSpacer>
+
+        <MudButton OnClick="Refresh" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh">刷新</MudButton>
+        <MudButton OnClick="DeleteVariables" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Newspaper">移除</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RestartAlt">重置默认值</MudButton>
+    </ToolBarContent>
+    @* <ColGroup>
+        <col style="padding:0;" />
+        <col style="min-width: 50px;" />
+        <col />
+        <col />
+        <col />
+    </ColGroup> *@
+    <Columns>
+        <SelectColumn T="PlugVariable"/>
+        <PropertyColumn Property="x => x.Name" Title="名称">
+            <EditTemplate>
+                @if (context.Item.IsInitVariable)
+                {
+                    <MudAlert Severity="Severity.Normal" Dense="true" NoIcon>@context.Item.Name</MudAlert>
+                }
+                else
+                {
+                    <MudTextField @bind-Value="context.Item.Name" AutoGrow
+                                  DebounceInterval="200" OnDebounceIntervalElapsed="NameChanged"></MudTextField>
+                }
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.Type" Title="类型">
+            <EditTemplate>
+                <MudSelect Value="context.Item.Type" ValueChanged="@((string v)=>TypeChanged(context.Item,v))" 
+                    Required ReadOnly="context.Item.IsInitVariable" RequiredError="You must select a type"
+                           Margin="@Margin.Dense" ToStringFunc="@(t=>VariableTypeConverter.GetTypeDisplayName(t))">
+                    @foreach (var t in Enum.GetNames(typeof(VariableTypeEnum)))
+                    {
+                        <MudSelectItem T="string" Value="@t">@VariableTypeConverter.GetTypeDisplayName(t)</MudSelectItem>
+                    }
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.Value" Title="值" Required="false">
+            <EditTemplate>
+                <VariableValueUI PlugDefinitionId="@Plug?.DefinitionId" BaseVariable="@(context.Item)"></VariableValueUI>
+            </EditTemplate>
+        </PropertyColumn>
+        @* <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Required="false" >
+            <EditTemplate>
+                <VariableValueUI Plug="Plug" PlugVariable="@context.Item" OnValueChanged="SavePlugAndActivity" IsDefaultValue="true"></VariableValueUI>
+            </EditTemplate>
+        </PropertyColumn> *@
+        @* <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出">
+            <EditTemplate>
+                <MudStack Style="min-width:69px;" Spacing="0">
+                    <MudCheckBox T="bool" Value="@context.Item.IsInput" Size="Size.Small" Dense Label="输入" Color="Color.Primary"></MudCheckBox>
+                    <MudCheckBox T="bool" Value="@context.Item.IsOutput" Size="Size.Small" Dense Label="输出" Color="Color.Primary"></MudCheckBox>
+                </MudStack>
+            </EditTemplate>
+        </PropertyColumn> *@
+        @* <TemplateColumn CellClass="d-flex justify-end">
+                    <CellTemplate>
+                        <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Delete" OnClick="@context.Actions.StartEditingItemAsync" />
+                    </CellTemplate>
+                </TemplateColumn> *@
+    </Columns>
+</MudDataGrid>
+
+</VerticalPercentWell>
+@code {
+    [Parameter]
+    public double HeightPercent { get; set; } = 35.00;
+
+    [Parameter]
+    public Plug? Plug { get; set; } = new();
+
+    private List<PlugVariable>? SelectedPlugVariables = new List<PlugVariable>();
+    public List<BaseVariable>? BaseVariables { get; set; } = new(); 
+
+
+    private async Task NewVariable()
+    {
+        var VaraibleName = VariableNameGenerator.GetNextVariableName(Plug.PlugVariables);
+        var tmpVariables = new PlugVariable() { Name = VaraibleName, Type = VariableTypeEnum.String.ToString()};
+        Plug.PlugVariables.Add(tmpVariables);
+        await SavePlugAndActivity();
+    }
+    private async Task DeleteVariables()
+    {
+        foreach (var s in SelectedPlugVariables)
+        {
+            if (s.IsInitVariable==true)
+            {
+                continue;
+            }
+            Plug.PlugVariables.Remove(s);
+        }
+        await SavePlugAndActivity();
+    }
+
+    private async Task CreateParameter()
+    {
+        // var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
+
+        // return DialogService.ShowAsync<NewParameter>("新建参数", options);
+        // var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        // var dialog = await DialogService.ShowAsync<NewParameter>("新建参数", options);
+        // var result = await dialog.Result;
+        // if (!result.Canceled)
+        // {
+        //     BaseVariables.Add((BaseVariable)result.Data);
+        //     await SavePlugAndActivity();
+        //     Console.WriteLine(">>>>>>>>>>>end update variables!:" + JsonSerializer.Serialize(BaseVariables));
+        // }
+    }
+    void SelectedItemsChanged(HashSet<PlugVariable> items)
+    {
+        SelectedPlugVariables = items.ToList();
+    }
+
+    async Task<DataGridEditFormAction> CommittedItemChanges(PlugVariable? item)
+    {
+        Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
+        Snackbar.Add($"更新插头{Plug.Name}参数成功");
+        await SavePlugAndActivity();
+
+        return DataGridEditFormAction.Close;
+    }
+
+    async Task NameChanged(string value)
+    {
+        Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
+        Snackbar.Add($"更新插头{Plug.Name}参数名成功");
+        await SavePlugAndActivity();
+    }
+    async Task TypeChanged(PlugVariable item, string value)
+    {
+        Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
+        item.Type = value;
+
+        await SavePlugAndActivity();
+        Snackbar.Add($"更新插头{Plug.Name}参数类型成功");
+
+    }
+
+    async Task Refresh()
+    {
+        StateHasChanged();
+    }
+
+    async Task SavePlugAndActivity(PlugDataZone? pdz=null)
+    {
+        //Plug = Plug2 ?? Plug;
+        await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+        //Console.WriteLine(">>>>>>>>>>>end update plug:" + JsonSerializer.Serialize(Plug));
+    }
+}

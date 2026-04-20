@@ -1,0 +1,471 @@
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.ElsaIntegration.Services
+@using CJ.Plug.Models
+
+@using CJ.Plug.Models.Job
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.DataConnector
+@using CJ.Plug.SharedPages.DataConnector.Pages
+@using CJ.Plug.SharedPages.FileExplorer
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Enums
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Responses
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Studio
+@using Elsa.Studio.Components
+@using Elsa.Studio.Models
+@using Elsa.Studio.Workflows.Components.WorkflowDefinitionEditor.Components
+@using Elsa.Studio.Workflows.Designer.Components
+@using Elsa.Studio.Workflows.Designer.Interop
+@using Elsa.Studio.Workflows.DiagramDesigners.Flowcharts
+@using Elsa.Studio.Workflows.Domain.Contexts
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.Domain.Models
+@using Elsa.Studio.Workflows.Extensions
+@using Elsa.Studio.Workflows.Models
+@using Elsa.Studio.Workflows.Shared.Args
+@using Elsa.Studio.Workflows.Shared.Components
+@using Elsa.Studio.Workflows.UI.Args
+@using Elsa.Studio.Workflows.UI.Contexts
+@using Elsa.Studio.Workflows.UI.Contracts
+@using Elsa.Studio.Workflows.UI.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using Serilog
+@using Size=MudBlazor.Size
+
+@inherits StudioComponentBase
+
+@inject IEnumerable<IPlugSettingDialogShow> PlugSettingDialogShow
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+@inject IElsaDomToolService ElsaDomToolService
+@inject IElsaStudioService ElsaEngineService
+@inject IDialogService DialogService
+@inject IDomInteropService DomInteropService
+@inject ElsaApiClient ElsaApiClient
+
+
+<style>
+    .custom-gradient {
+    background-image: linear-gradient(to right top, #051937, #004d7a, #008793, #00bf72, #a8eb12);
+    color: white !important;
+    }
+
+    .custom-striped {
+    background: repeating-linear-gradient( 45deg, #606dbc, #606dbc 10px, #465298 10px, #465298 20px );
+    color: white !important;
+    }
+</style>
+
+
+@if (string.IsNullOrEmpty(Flowchart?.ToJsonString()))
+{
+    <MudAlert>加载流程中...</MudAlert>
+    <MudProgressCircular Color="Color.Success" Indeterminate="true" />
+
+}
+else
+{
+    <MudPaper Class="ma-2" Elevation="0" Outlined="true">
+        <MudToolBar Dense="true" Style="min-width:672px;">
+            <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.FitScreen" OnClick="ZoomToFitAsync"></MudIconButton>
+            <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.FilterCenterFocus" OnClick="CenterContentAsync"></MudIconButton>
+            <MudIconButton Size="MudBlazor.Size.Small" Style="margin-right:20px;" Icon="@Icons.Material.Outlined.AutoAwesomeMosaic" OnClick="AutoLayoutAsync"></MudIconButton>
+            <MudDivider Vertical></MudDivider>
+            <MudToggleGroup Style="margin-left:15px" Size="MudBlazor.Size.Small" T="string" SelectedClass="@("custom-striped")"  @bind-Value ="_value" CheckMark>
+                <MudToggleItem Value="@("逻辑流")" />
+                <MudToggleItem Value="@("数据流")" />
+            </MudToggleGroup>
+            <MudSpacer />
+            @* <MudSwitch T="bool?" Color="Color.Primary" Label="自动保存" LabelPosition="LabelPosition.Start" /> *@
+            <MudTooltip Text="打开工作目录">
+                <MudIconButton OnClick="OpenFileExplorer" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Style="margin-right:10px"></MudIconButton>
+            </MudTooltip>
+            <MudTooltip Text="自动保存">
+                <MudCheckBox ReadOnly Size="MudBlazor.Size.Small" T="bool" Color="Color.Primary" Dense Value="true" Style="margin-right:10px">自动</MudCheckBox>
+            </MudTooltip>
+            <MudTooltip Text="保存" Delay="1000">
+                <MudBadge Color="@(DataDirty? Color.Error:Color.Success)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+                    <MudIconButton OnClick="SaveAsync" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.Save" />
+                </MudBadge>
+            </MudTooltip>
+
+            <MudTooltip Text="导出当前流程为JSON文件." Inline="false" Delay="1000">
+                <MudIconButton OnClick="ExportWorkflow" Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small">导出</MudIconButton>
+            </MudTooltip>
+            <MudTooltip Text="导入JSON流程文件." Inline="false" Delay="1000">
+                <MudFileUpload T="IBrowserFile" FilesChanged="ImportWorkflow" Style="margin-bottom:-4px;">
+                    <CustomContent>
+                        <MudIconButton OnClick="@context.OpenFilePickerAsync" Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small">导入</MudIconButton>
+                    </CustomContent>
+                </MudFileUpload>
+            </MudTooltip>
+
+            <MudTooltip Text="发布当前流程." Delay="1000">
+                <MudButtonGroup Size="MudBlazor.Size.Small" Color="Color.Default" Variant="Variant.Text">
+                    <MudIconButton OnClick="PublishWorkflow" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" />
+                    
+                    <MudMenu Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown">
+                        @if (Process.ShowInPlugLibrary == true)
+                        {
+                            <MudTooltip Text="取消发布当前流程." Inline="false" Delay="1000">
+                                <MudMenuItem OnClick="UnPublishWorkflow" Icon="@Icons.Material.Filled.CloudDownload">取消发布</MudMenuItem>
+                            </MudTooltip>
+                            <MudDivider DividerType="DividerType.FullWidth"></MudDivider>
+                        }
+                    </MudMenu>
+                </MudButtonGroup>
+            </MudTooltip>
+            
+            @* <MudIconButton OnClick="ExecuteOption" Size="MudBlazor.Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Settings">执行选项</MudIconButton>
+            <MudIconButton OnClick="ExecuteFlow" Disabled="ExeButtonDisabled" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Variant="Variant.Text" Class="ml-4" />
+             *@
+            <MudTooltip Text="清除活动状态">
+                <MudIconButton OnClick="ClearActivityStatus" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.CleaningServices" Color="Color.Default" Variant="Variant.Text" Class="ml-4" />
+            </MudTooltip>
+
+
+
+            <MudButtonGroup Size="MudBlazor.Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                <MudToggleIconButton Toggled="ExeButtonDisabled"
+                ToggledChanged="ExecuteOrStopFlow"
+                Icon="@Icons.Material.Filled.PlayArrow"
+                Color="@Color.Success"
+                ToggledIcon="@Icons.Material.Filled.Stop"
+                ToggledColor="@Color.Error"
+                Size="MudBlazor.Size.Small" />
+                @* <MudIconButton OnClick="ExecuteFlow" Disabled="ExeButtonDisabled" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Variant="Variant.Text" Class="ml-4" /> *@
+                <MudMenu Size="MudBlazor.Size.Small" Dense Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">创建作业</MudMenuItem>
+                    <MudMenuItem IconColor="Color.Success">跳转作业</MudMenuItem>
+                </MudMenu>
+            </MudButtonGroup>
+        </MudToolBar>
+    </MudPaper>
+    <MudProgressLinear Color="@(IsProgressing ? Color.Primary : Color.Transparent)" Indeterminate="true" />
+
+    @if(_value== "逻辑流")
+    {
+        <ElsaFlowchartDesigner @ref="@Designer"
+        IsReadOnly="IsReadOnly"
+        ProcessDefinitionId="@ProcessDefinitionId"
+        Flowchart="@Flowchart"
+        ActivityStats="ActivityStats" 
+        OnSave="OnSave"/>
+
+        
+    }
+    else if(_value=="数据流")
+    {
+
+        @* <DataFlowDesigner></DataFlowDesigner> *@
+        <DataConnector></DataConnector>
+    }
+
+}
+
+
+
+@code
+{
+    string _value = "逻辑流";
+    bool ExeButtonDisabled = false;
+
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public IDictionary<string, ActivityStats> ActivityStats { get; set; }
+    [Parameter]
+    public string? ProcessDefinitionId { get; set; }
+
+    private ElsaFlowchartDesigner Designer { get; set; } = default!;
+
+    [Parameter]
+    public Plug? Process { get; set; } = default!;
+    public PlugData? PlugData { get; set; }
+
+    public JsonObject? Flowchart { get; set; }
+
+    [Parameter]
+    public bool IsProgressing { get; set; }
+    /// Whether the designer is read-only.
+    [Parameter] public bool IsReadOnly { get; set; }
+
+    private bool DataDirty = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PlugDataZone != null)
+        {
+            try
+            {
+                Flowchart = PlugDataZone?.GetFlowchartData(ProcessDefinitionId);
+                PlugData = PlugDataZone?.GetPlugData(ProcessDefinitionId);
+                //CLog.Information("获取流程数据成功", PlugDataZone.PDZId);
+                //CLog.Information(Flowchart?.ToJsonString(), PlugDataZone.PDZId);
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message);
+                CLog.Error(ex.StackTrace);
+            }
+            
+        }
+        
+    }
+
+    // protected override async Task OnAfterRenderAsync(bool firstRender)
+    // {
+    //     Console.WriteLine("load done 1");
+    // }
+
+    private async Task OnSave(bool IsDirty)
+    {
+        // 使用InvokeAsync确保在UI线程更新状态
+        await InvokeAsync(() =>
+        {
+            DataDirty = IsDirty;
+            StateHasChanged(); // 显式通知组件状态已更改（在某些场景下可能需要）
+        });
+
+    }
+
+    public async Task ZoomToFitAsync() => await Designer.ZoomToFitAsync();
+    public async Task CenterContentAsync() => await Designer.CenterContentAsync();
+    public async Task AutoLayoutAsync() => await Designer.AutoLayoutAsync();
+    public async Task SaveAsync() => await Designer.SaveAsync();
+    public async Task LoadActivityAsync(JsonObject root) => await Designer.LoadActivityAsync(root);
+
+
+
+    /// <summary>
+    /// 暴露给外部的接口，用于更新活动
+    /// </summary>
+    /// <param name="activity"></param>
+    /// <returns></returns>
+    public async Task UpdateActivity(JsonObject activity)
+    {        
+        //Log.Information($"开始更新活动：{activity}");
+        //Console.WriteLine(">>>>>>>>>>start update activity");
+        //await Designer.UpdateActivityAsync(activity.GetId(), activity);
+        //Console.WriteLine(">>>>>>>>>>end update activity");
+    }
+
+    private async Task OpenFileExplorer()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false , FullScreen=false,MaxWidth=MaxWidth.False,CloseButton=true,Position=DialogPosition.TopCenter};
+        var parameters = new DialogParameters<OpenFileExplorer> { { x => x.PlugDataZone, PlugDataZone } };
+
+        await DialogService.ShowAsync<OpenFileExplorer>("工作目录", parameters, options);
+    }
+
+
+    private async Task ExecuteOption()
+    {
+
+    }
+
+    private void ClearActivityStatus()
+    {
+        foreach (var acs in ActivityStats)
+        {
+            ActivityStats[acs.Key] = null; //清除活动状态
+        }
+    }
+
+    private async Task ExecuteOrStopFlow()
+    {
+        if (ExeButtonDisabled)
+        {
+            //如果正在执行，则停止
+            ExeButtonDisabled = false;
+            IsProgressing = false;
+            IsReadOnly = false;
+            Snackbar.Add("流程已停止", Severity.Warning);
+            Log.Information($"流程已停止：{Process.DefinitionId}");
+        }
+        else
+        {
+            //如果未执行，则开始执行
+            await ExecuteFlow();
+        }
+    }
+
+    private async Task ExecuteFlow()
+    {
+        ExeButtonDisabled = true;
+        IsProgressing = true;
+        IsReadOnly = true;
+
+        ClearActivityStatus();
+
+        var TriggerActivityId = PlugDataZone?.TriggerPlugDefinitionId;
+        //创建执行作业PDZ
+        var currentUser = await DomInteropService.GetCurrentUserName();
+        (var PDZId,var JobDefinitionId) = await MainApiClient.SubmitExecute(PlugData, currentUser, PlugDataZone, PDZTypeEnum.Job1);
+        CLog.Information($"{PlugDataZone?.PDZId}:开始执行流程：{Process.DefinitionId}", PDZId);
+
+        //使用引擎执行流程，利用引擎的逻辑调度、后台长时间执行等特性
+        //var result = await ElsaEngineService.ExecuteAsync(Process);
+        //var result = await ElsaEngineService.ExecuteWithCorrelationIdAsync(Plug,PlugDataZone.PDZId);
+        //var result = await ElsaApiClient.ExecutePlugWithCorrelationIdAsync(Plug,PlugDataZone.PDZId);
+        //var result = await ElsaApiClient.ExecuteJsonWithCorrelationIdAsync(Plug.ToActivityJson(),PlugDataZone.PDZId);
+        var executeSetting = new ExecuteSetting
+        {
+                CorrelationId = PDZId,
+                TriggerActivityId = TriggerActivityId,
+        };
+        var FlowchartJson = PlugDataZone.GetFlowchartData(Process.DefinitionId);
+        var result = await ElsaApiClient.ExecuteWorkflowWithExecuteSetting(FlowchartJson, executeSetting);
+        //Log.Information(JsonSerializer.Serialize(result));
+
+        Snackbar.Add("成功启动流程", Severity.Success);
+        //Log.Information($"执行流程：{Plug.DefinitionId}。作业实例号：{result.ExecuteResultMessage}");
+
+        ExeButtonDisabled = false;
+        IsProgressing = false;
+        IsReadOnly = false;
+    }
+
+    private async Task ExportWorkflow()
+    {
+        await ElsaDomToolService.ExportFromJsonDataAsync(Process.Name+".json",PlugDataZone.GetFlowchartData(Process.DefinitionId).ToString());
+    }
+
+    private async Task ImportWorkflow(IBrowserFile? file)
+    {
+        if (file == null)
+            return;
+        // 创建文件流
+        using var stream = file.OpenReadStream();
+
+        // 使用StreamReader读取为字符串
+        using var reader = new StreamReader(stream);
+        var content = await reader.ReadToEndAsync();
+        // 先解析为 JsonDocument，再转换为 JsonObject
+        using var jsonDoc = JsonDocument.Parse(content);
+        JsonObject jsonObject = JsonObject.Create(jsonDoc.RootElement);
+        jsonObject.SetId(ProcessDefinitionId);
+        jsonObject.SetNodeId(ProcessDefinitionId);
+        jsonObject.SetProperty(ProcessDefinitionId, "definitionId");
+        jsonObject.SetName(Process.Name);
+        //var newFlowchartData = PlugDataZone?.SetFlowchartData(ProcessDefinitionId, jsonObject);
+        //await MainApiClient.UpdateFlowchartData(newFlowchartData);
+
+        PlugDataZone?.SetFlowchartData(ProcessDefinitionId, jsonObject);
+        await Designer.LoadActivityAsync(jsonObject);
+
+        //还需要添加PlugData和PlugVariableData
+        var plugDatas = jsonObject.GetActivities();
+        //PlugDataZone.PlugDatas.Clear();
+        PlugDataZone.PlugVariableDatas.Clear();
+        PlugDataZone.PlugDatas.Clear();
+        PlugDataZone?.PlugDatas.Add(new PlugData
+        {
+            PlugDefinitionId = ProcessDefinitionId,
+            Name = Process.Name,
+            WorkPath = PlugDataZone.PDZWorkPath,
+            PlugPosition = $"0.0 0.0",//记录插头坐标值，用于绘制数据流等功能
+        });
+        foreach (var plugData in plugDatas)
+        {
+            var x = plugData.GetDesignerMetadata().Position.X;
+            var y = plugData.GetDesignerMetadata().Position.Y;
+            PlugDataZone?.PlugDatas.Add(new PlugData
+            {
+                PlugDefinitionId = plugData.GetId(),
+                ParentPlugDefinitionId = ProcessDefinitionId,
+                Name = plugData.GetName(),
+                PlugType = plugData.GetTypeName(),
+                PlugTypeKey = plugData?.GetTypeName(),
+                WorkPath = Path.Combine(PlugDataZone.PDZWorkPath, plugData.GetId()),
+                PlugPosition = $"{x} {y}",//记录插头坐标值，用于绘制数据流等功能
+            });
+            //添加PlugVariableData
+            var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(plugData.GetTypeName());
+            if (rootPlug != null)
+            {
+                foreach (var p in rootPlug.PlugVariables)
+                {
+                    PlugDataZone.PlugVariableDatas.Add(new PlugVariableData()
+                    {
+                        PlugDefinitionId = plugData.GetId(),
+                        Name = p.Name,
+                        Value = p.Value,
+                        DefaultValue = p.DefaultValue,
+                        Type = p.Type,
+                        IsInitVariable = p.IsInitVariable,
+                        IsBrowsable = p.IsBrowsable,
+                        IsArray = p.IsArray,
+                    });
+                }
+            }
+        }
+
+        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+        StateHasChanged();
+    }
+
+    private async Task ImportWorkflows(IReadOnlyList<IBrowserFile>? files)
+    {
+        if (files == null || files.Count == 0)
+            return;
+        var options = new ImportOptions
+        {
+            DefinitionId = ProcessDefinitionId,
+            ImportedCallback = async definition =>
+            {
+                //await SetWorkflowDefinitionAsync(definition);
+                var newFlowchartData = PlugDataZone?.SetFlowchartData(ProcessDefinitionId, definition.Root);
+                await MainApiClient.UpdateFlowchartData(newFlowchartData);
+                await Designer.LoadActivityAsync(definition.Root);
+            },
+            ErrorCallback = ex =>
+            {
+                CLog.Error($"Failed to import workflow definition: {ex.Message}", PlugDataZone.PDZId);
+                return Task.CompletedTask;
+            }
+        };
+        await ElsaDomToolService.ImportFromJsonAsync(files, options);
+        StateHasChanged();
+    }
+
+
+    private async Task PublishWorkflow()
+    {
+        Process.ShowInPlugLibrary = true;
+        await MainApiClient.UpdatePlugAsync(Process.Id, Process);
+        //WorkflowDefinition.IsPublished = true;
+        Snackbar.Add("发布成功！");
+        StateHasChanged();
+    }
+
+    private async Task UnPublishWorkflow()
+    {
+        Process.ShowInPlugLibrary = false;
+        await MainApiClient.UpdatePlugAsync(Process.Id, Process);
+        //WorkflowDefinition.IsPublished = false;
+        Snackbar.Add("取消发布成功！");
+        StateHasChanged();
+    }
+
+
+}

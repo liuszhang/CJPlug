@@ -1,0 +1,201 @@
+﻿
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.SharedPages
+@using MudBlazor
+@using Serilog
+
+@inject IEnumerable<IPlugActionSettingContent> PlugActionSettingContent
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
+@inject MainApiClient MainApiClient
+
+@if (Loading)
+{
+    <MudProgressLinear Indeterminate Color="Color.Primary"></MudProgressLinear>
+}
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.Start">
+    @if (RootPlugActions?.Count > 0)
+    {
+        <MudSelect Margin="Margin.Dense" Clearable Dense T="Plug" @bind-Value="TmpSelectedAction" Label="选择执行动作" Class="me-3" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents">
+            @foreach (var a in RootPlugActions)
+            {
+                <MudSelectItem Value="@a">@a.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudButton OnClick="AddActionToPlug" Disabled="@(TmpSelectedAction==null)" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">添加动作</MudButton>
+        <MudButton OnClick="ClearAction" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">清空动作</MudButton>
+        <MudCheckBox Dense ReadOnly @bind-Value="PlugData.OnlyExecuteAction" Label="仅执行插头动作" Color="Color.Error"></MudCheckBox>
+
+    }
+
+
+</MudStack>
+
+<MudExpansionPanels MultiExpansion="true">
+    @foreach (var a in CurrentPlugActionDatas)
+    {
+        <MudExpansionPanel>
+            <TitleContent>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.ResetTv" class="mr-3"></MudIcon>
+                    <MudText>(@a.SN)</MudText>
+                    <MudText>@a.Name</MudText>
+                    <MudSpacer></MudSpacer>
+                    <MudIconButton OnClick="()=>RemoveActionFromPlug(a)" Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                </MudStack>
+            </TitleContent>
+            <ChildContent>
+                @if (PlugActionSettingContents.ContainsKey(a.ActionIdentityId))
+                {
+                    @PlugActionSettingContents?[a.ActionIdentityId]
+                }
+            </ChildContent>
+        </MudExpansionPanel>
+    }
+</MudExpansionPanels>
+
+@code {
+    [Parameter]
+    public PlugData? PlugData { get; set; }
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public EventCallback<PlugDataZone> PDZUpdated { get; set; }
+
+
+    private List<Plug>? RootPlugActions { get; set; } = new();
+    private List<ActionData>? CurrentPlugActionDatas { get; set; } = new();
+    private List<Plug>? CurrentPlugActions { get; set; } = new();
+    private Dictionary<string, RenderFragment?>? PlugActionSettingContents { get; set; } = new();
+    private Plug? TmpSelectedAction { get; set; }
+
+    private bool Loading { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Loading = true;
+            var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(PlugData.PlugType);
+            Console.WriteLine($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
+            RootPlugActions = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(rootPlug?.DefinitionId) ?? new();
+            Loading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {        
+        await GetActionDatas();
+    }
+
+
+    private async Task GetActionDatas()
+    {        
+        CurrentPlugActionDatas = PlugDataZone?.ActionDatas?
+            .Where(a => a.PlugDefinitionId == PlugData.PlugDefinitionId)
+            .ToList() ?? new();
+        foreach (var a in CurrentPlugActionDatas)
+        {
+            //var plugAction = await MainApiClient.GetPlugByDefinitionIdAsync(a.PlugActionDefinitionId);
+            var plugAction = await MainApiClient.GetRootPlugByTypeNameAsync(a.ActionPlugType);
+            if (plugAction != null)
+            {
+                CurrentPlugActions?.Add(plugAction);
+                RenderFragment? TMPContent = null;
+                //插头注入的动作执行设置
+                // foreach (var pasc in PlugActionSettingContent)
+                // {
+                //     TMPContent = await pasc.GetPlugActionSettingContent(plugAction);
+                //     if (TMPContent != null)
+                //     {
+                //         PlugActionSettingContents[a.ActionIdentityId] = TMPContent;
+                //         break;
+                //     }
+                // }
+                //插头自身的执行设置
+                // if (TMPContent==null)
+                // {
+                //     foreach (var pcsc in PlugCommonSettingContent)
+                //     {
+                //         TMPContent = await pcsc.GetPlugCommonSettingContent(plugAction);
+                //         if (TMPContent != null)
+                //         {
+                //             PlugActionSettingContents[a.ActionIdentityId] = TMPContent;
+                //             break;
+                //         }
+                //     }
+                // }
+                //如果没有找到插头动作执行设置，则使用默认的参数表
+                if (TMPContent == null)
+                {
+                    var sequence = 0;
+                    PlugActionSettingContents[a.ActionIdentityId] = new RenderFragment(builder =>
+                    {
+                        builder.OpenComponent<PDZVariableDataGrid>(sequence++);
+                        builder.AddAttribute(sequence++, nameof(PDZVariableDataGrid.PDZId), PlugDataZone?.PDZId);
+                        builder.AddAttribute(sequence++, nameof(PDZVariableDataGrid.ActionIdentityId), a.ActionIdentityId);
+
+                        builder.CloseComponent();
+
+                    });
+                }
+            }
+        }
+
+        
+    }
+
+    public async Task AddActionToPlug()
+    {
+        if (TmpSelectedAction==null)
+        {
+            return;
+        }
+        var ActionIdentityId = RandomLongIdentityGenerator.GenerateId();
+        var newAction = new ActionData()
+            {
+                Name = TmpSelectedAction.Name,
+                PlugDefinitionId = PlugData.PlugDefinitionId,
+                ActionPlugType = TmpSelectedAction.Type,
+                ActionPlugRootDefinitionId = TmpSelectedAction.DefinitionId,
+                ActionIdentityId = ActionIdentityId,
+                SN = CurrentPlugActionDatas.LastOrDefault() == null ? 1 : CurrentPlugActionDatas.LastOrDefault().SN + 1,
+            };
+        PlugDataZone.ActionDatas?.Add(newAction);
+        Log.Information($"Adding action {TmpSelectedAction.Name} to pdz with variable: {TmpSelectedAction.PlugVariables.Count}");
+        foreach(var v in TmpSelectedAction.PlugVariables)
+        {
+            Log.Information($"Adding action variable {v.Name} to pdz");
+            PlugDataZone.ActionVariableDatas?.Add(new ActionVariableData()
+                {
+                    Name = v.Name,
+                    Type = v.Type,
+                    Value = v.Value,
+                    DefaultValue = v.DefaultValue,
+                    PlugDefinitionId = PlugData.PlugDefinitionId,
+                    ActionRootDefinitionId = TmpSelectedAction.DefinitionId,
+                    ActionIdentityId = ActionIdentityId,
+                IsInitVariable = v.IsInitVariable,
+                });
+        }
+        await GetActionDatas();
+        //await PDZUpdated.InvokeAsync(PlugDataZone);
+        TmpSelectedAction = null;
+        StateHasChanged();
+    }
+
+    private async Task ClearAction()
+    {
+        PlugDataZone.ActionDatas.RemoveAll(v => v.PlugDefinitionId == PlugData.PlugDefinitionId);
+        await PDZUpdated.InvokeAsync(PlugDataZone);
+    }
+
+    public async Task RemoveActionFromPlug(ActionData action)
+    {
+        PlugDataZone.ActionDatas.RemoveAll(v => v.ActionIdentityId == action.ActionIdentityId);
+        await PDZUpdated.InvokeAsync(PlugDataZone);
+    }
+}

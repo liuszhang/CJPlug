@@ -1,0 +1,46 @@
+﻿@using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Models
+@using CJ.Plug.SharedPages.DataConnector.Models
+@using MudBlazor
+
+<style>
+    .variable-port-left {
+        width: 20px;
+        height: 30px;
+        background: red;
+        left: -9px;
+        /* position: absolute; */
+    }
+
+    .variable-port-right {
+        width: 20px;
+        height: 30px;
+        background: green;
+        right: -9px;
+        /* position: absolute; */
+    }
+</style>
+
+
+<MudStack Row AlignItems="MudBlazor.AlignItems.Center" Justify="Justify.SpaceBetween" StretchItems="StretchItems.Middle">
+    <PortRenderer 
+                  Class="variable-port-left"
+    Port="Node.GetInPort(Variable)" ></PortRenderer>
+
+    
+    <MudTooltip Text="@($"变量：{Variable?.Name}，类型：{Variable?.Type}")">
+        <MudText Style="min-width:150px;max-width:150px;" Typo="Typo.body2">@($"{Variable?.Name}<{Variable?.Type}>")</MudText>
+    </MudTooltip>
+
+
+    <PortRenderer 
+                  Class="variable-port-right"
+    Port="Node.GetOutPort(Variable)"></PortRenderer>
+</MudStack>
+
+@code {
+    [Parameter]
+    public PlugVariableItemModel Variable { get; set; } = null!;
+    [Parameter]
+    public PlugDataTableNodeModel? Node { get; set; } = null!;
+}

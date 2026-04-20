@@ -1,0 +1,15 @@
+﻿@page "/workflows/instances/{id}/view"
+@using Elsa.Studio.Components
+@using Elsa.Studio.Workflows.Components.WorkflowInstanceViewer
+@inherits StudioComponentBase
+
+<PageTitle>作业状态监控</PageTitle>
+<WorkflowInstanceViewer InstanceId="@Id"/>
+
+@code
+{
+    /// <summary>
+    /// The ID of the workflow instance to view.
+    /// </summary>
+    [Parameter] public string Id { get; set; } = default!;
+}

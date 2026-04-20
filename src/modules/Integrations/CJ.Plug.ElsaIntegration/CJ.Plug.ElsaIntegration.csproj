@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Elsa" />
+    <PackageReference Include="Elsa.Api.Client" />
+    <PackageReference Include="Elsa.CSharp" />
+    <PackageReference Include="Elsa.EntityFrameworkCore" />
+    <PackageReference Include="Elsa.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Elsa.Identity" />
+    <PackageReference Include="Elsa.JavaScript" />
+    <PackageReference Include="Elsa.Liquid" />
+    <PackageReference Include="Elsa.Scheduling" />
+    <PackageReference Include="Elsa.Studio" />
+    <PackageReference Include="Elsa.Studio.Agents" />
+    <PackageReference Include="Elsa.Studio.Core" />
+    <PackageReference Include="Elsa.Studio.Core.BlazorServer" />
+    <PackageReference Include="Elsa.Studio.Login" />
+    <PackageReference Include="Elsa.Studio.Login.BlazorServer" />
+    <PackageReference Include="Elsa.Webhooks" />
+    <PackageReference Include="Elsa.Workflows.Api" />
+    <PackageReference Include="Elsa.Workflows.Runtime" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+  </ItemGroup>
+
+</Project>

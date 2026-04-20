@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net4.8</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+	<LangVersion>10.0</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="NXOpen">
+      <HintPath>DLLs\NXOpen.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NXOpen.UF">
+      <HintPath>DLLs\NXOpen.UF.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NXOpen.Utilities">
+      <HintPath>DLLs\NXOpen.Utilities.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NXOpenUI">
+      <HintPath>DLLs\NXOpenUI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="DLLs\libuginit.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

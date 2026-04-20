@@ -1,0 +1,32 @@
+﻿@using CJ.Plug.AmisIntegration.Components
+@using CJ.Plug.GUIDesigner.Models
+@using CJ.Plug.GUIDesigner.Models.Shared
+@using MudBlazor
+<MudPaper Height="100%" Width="100%">
+    @* <MudText>@ItemDisplaySetting?.ItemName</MudText>
+    <MudText>@ItemDisplaySetting?.ItemType</MudText>
+    <MudText>-----------</MudText>
+    <MudCheckBox T="bool" Label="这是一个勾选框"></MudCheckBox>
+    @GuiItemContent
+    <MudText>-----------</MudText> *@
+    <Amis Data="@Node.GuiItemService.ToAmisObject()"></Amis>
+</MudPaper>
+
+
+
+
+@code {
+    [Parameter] 
+    public BaseGuiItemModel Node { get; set; } = null!;
+
+    private RenderFragment? GuiItemContent { get; set; }
+    private ItemDisplaySetting? ItemDisplaySetting { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var handler = Node.GuiItemService;
+        GuiItemContent = await handler.GetItemGuiContent();
+        ItemDisplaySetting = handler.GetItemDisplaySetting();
+        StateHasChanged();
+    }
+}

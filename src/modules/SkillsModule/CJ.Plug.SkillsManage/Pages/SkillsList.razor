@@ -1,0 +1,227 @@
+﻿@page "/SkillsManage"
+
+@using CJ.Plug.Models.MCPTools
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.SharedPages.Layout
+@using CJ.Plug.SkillsManage.Components
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using Elsa.Api.Client.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using Radzen.Blazor
+@using Serilog
+@using Size=MudBlazor.Size
+@inject IDialogService DialogService
+@using Microsoft.AspNetCore.Components
+@using System.Threading.Tasks
+@using System.Linq
+
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+
+
+
+
+<PageTitle>Skills管理</PageTitle>
+
+<div class="skills-page">
+    <div class="search-row">
+        <MudTextField @bind-Value="searchQuery"
+                      Placeholder="搜索Agent Skills"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      Class="search-input"
+                      OnImmediate="(_,__) => StateHasChanged()" />
+    </div>
+
+    <RadzenSplitter Style="height: calc(90vh - var(--mud-appbar-height));">
+        <RadzenSplitterPane Size="15%">
+            <MudPaper Class="sidebar-paper" Elevation="0">
+                <MudList T="string" Dense="true">
+                    <MudListSubheader>分类</MudListSubheader>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.GridView" Selected="@(selectedCategory == "all")" OnClick='@(() => SelectCategory("all"))'>
+                        <div style="display:flex;align-items:center;width:100%">
+                            <span class="ms-2">全部</span>
+                            <div style="flex:1"></div>
+                            <MudBadge Color="Color.Primary" Content="@(mcpTools?.Count ?? 0)" />
+                        </div>
+                    </MudListItem>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Star" Selected="@(selectedCategory == "featured")" OnClick='@(() => SelectCategory("featured"))'>
+                        <span class="ms-2">精选</span>
+                    </MudListItem>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.AutoAwesome" Selected="@(selectedCategory == "automation")" OnClick='@(() => SelectCategory("automation"))'>
+                        <span class="ms-2">自动化</span>
+                    </MudListItem>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Code" Selected="@(selectedCategory == "code")" OnClick='@(() => SelectCategory("code"))'>
+                        <span class="ms-2">代码</span>
+                    </MudListItem>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Article" Selected="@(selectedCategory == "doc")" OnClick='@(() => SelectCategory("doc"))'>
+                        <span class="ms-2">文档</span>
+                    </MudListItem>
+
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Api" Selected="@(selectedCategory == "api")" OnClick='@(() => SelectCategory("api"))'>
+                        <span class="ms-2">API</span>
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            @if (DisplayedTools?.Any() != true)
+            {
+                <MudText Typo="Typo.body1">未找到任何Skill。</MudText>
+            }
+            else
+            {
+                <div class="cards-grid">
+                    @foreach (var tool in DisplayedTools)
+                    {
+                        <MudPaper Class="skill-card" Elevation="1">
+                            <div class="card-header">
+                                <div class="avatar">AI</div>
+                                <div class="title-block">
+                                    <div class="card-title">@tool.Name</div>
+                                    <div class="card-sub">@tool.Author</div>
+                                </div>
+                                <MudSpacer />
+                                <MudIconButton Icon="@Icons.Material.Filled.Preview" OnClick="() => OpenDetail(tool)" />
+                            </div>
+                            <div class="card-body">@ShortDesc(tool.Description)</div>
+                            <div class="card-footer">
+                                <div class="meta">
+                                    <span class="star"><MudIcon Icon="@Icons.Material.Filled.Star" /></span>
+                                    <span class="meta-text">@tool?.Id</span>
+                                    <span class="date ms-3"><MudIcon Icon="@Icons.Material.Filled.CalendarToday" /> @tool.CreatedAt.ToString("yyyy-MM-dd")</span>
+                                </div>
+                                <div class="actions">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Edge="Edge.End" />
+                                </div>
+                            </div>
+                        </MudPaper>
+                    }
+                </div>
+            }
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+    
+
+    <MudDrawer @bind-Open="@_open" Anchor="@Anchor.End" Width="600px" Elevation="1" Variant="@DrawerVariant.Temporary">
+        <SkillDetailDrawer/>
+    </MudDrawer>
+</div>
+
+<style>
+    .skills-page { padding: 24px; }
+    .search-row { display:flex; justify-content:center; margin-bottom:28px; }
+    .search-input { width:640px; border-radius:32px; box-shadow:0 6px 20px rgba(58,66,86,0.06); }
+    .content-row { display:flex; gap:24px; }
+    .sidebar { width:220px; }
+    .sidebar-paper { padding:16px; border-radius:12px; }
+    .sidebar-title { font-weight:600; color:#1976d2; margin-bottom:8px }
+    .category-item { align-items:center; }
+    .category-item .count { background:#eef6ff; padding:2px 8px; border-radius:12px; font-size:12px }
+    .cards-area { flex:1; }
+    .cards-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(305px, 1fr)); gap:12px; }
+    .skill-card { padding:18px; border-radius:12px; cursor:pointer; }
+    .card-header { display:flex; gap:12px; align-items:center; margin-bottom:12px }
+    .avatar { width:48px; height:48px; border-radius:8px; background:#111; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700 }
+    .card-title { font-weight:700; font-size:16px }
+    .card-sub { font-size:13px; color:#777 }
+    .card-body { color:#555; font-size:13px; min-height:60px; margin-bottom:12px }
+    .card-footer { display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f3f5; padding-top:10px }
+    .meta { display:flex; align-items:center; color:#777; font-size:13px }
+    .meta .star { color:#f6b44a; margin-right:6px }
+</style>
+
+
+
+
+@code {
+     private List<MCPTool>? mcpTools = new();
+    private bool _open;
+    private string searchQuery = string.Empty;
+
+    private IEnumerable<MCPTool>? DisplayedTools =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? mcpTools
+            : mcpTools?.Where(t => ((t.Name ?? string.Empty).Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+                                     || (t.Description ?? string.Empty).Contains(searchQuery, StringComparison.OrdinalIgnoreCase)));
+
+    private string ShortDesc(string? desc)
+    {
+        if (string.IsNullOrWhiteSpace(desc)) return string.Empty;
+        const int max = 120;
+        return desc.Length <= max ? desc : desc.Substring(0, max).TrimEnd() + "...";
+    }
+
+     protected override Task OnInitializedAsync()
+     {
+         LoadSampleData();
+         return base.OnInitializedAsync();
+     }
+
+     private async Task LoadSampleData()
+     {
+         var result = await MainApiClient.GetAllMCPToolsAsync();
+         mcpTools = result?.ToList();
+     }
+
+     private void Refresh()
+     {
+         // For now just reload sample data. Replace with API refresh logic.
+         LoadSampleData();
+     }
+
+     private async Task DeleteTool(int id)
+     {
+         await MainApiClient.DeleteMCPToolAsync(id);
+         
+         // Implement delete logic here.
+         // For now, just log a message.
+         Snackbar.Add("DeleteTool clicked.");
+         LoadSampleData();
+     }
+
+     private async Task UpdateTool(MCPTool tool,bool isEnable)
+     {
+         tool.IsEnabled = isEnable;
+         await MainApiClient.UpdateMCPToolAsync(tool);
+         Snackbar.Add($"MCPTool '{tool.Name}' 已更新。", Severity.Success);
+     }
+
+
+     private async Task OpenDetail(MCPTool tool)
+     {
+        _open = true;
+     }
+
+    private string selectedCategory = "all";
+
+    private void SelectCategory(string category)
+    {
+        selectedCategory = category;
+        // TODO: filter DisplayedTools based on category when backend supports categories
+        StateHasChanged();
+    }
+
+     private async Task OnToolUpdated(MCPTool updated)
+     {
+         if (updated is null) return;
+         await MainApiClient.UpdateMCPToolAsync(updated);
+         Snackbar.Add($"MCPTool '{updated.Name}' 已更新。", Severity.Success);
+         await LoadSampleData();
+     }
+ }
+
+
+

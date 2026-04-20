@@ -1,0 +1,42 @@
+﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages.Variable
+@using MudBlazor
+<MudExpansionPanels MultiExpansion>
+    <MudExpansionPanel Text="基础属性" >
+        <JobPropertyPanel></JobPropertyPanel>
+    </MudExpansionPanel>
+    <MudExpansionPanel Text="输入数据" Expanded="true">
+        <MudCheckBox Label="仅显示必填参数" T="bool" Value="true" Color="Color.Primary" Size="Size.Small"></MudCheckBox>
+        
+            @foreach (var p in PDZVariables)
+            {
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.body2">@p.Name:</MudText>
+                <VariableValueUI BaseVariable="p" PlugDefinitionId="@PlugDefinitionId"></VariableValueUI>
+
+                </MudStack>
+                @* <MudTextField Label="@p.Name" Variant="Variant.Filled" Value="@p.Value" Margin="Margin.Dense"/> *@
+            }
+        
+
+    </MudExpansionPanel>
+    <MudExpansionPanel Text="执行配置">
+        @* <MudAlert>暂无执行配置信息</MudAlert> *@
+        @* <MudCheckBox Label="启动后跳转至作业监控" T="bool" Color="Color.Primary"></MudCheckBox> *@
+        <MudCheckBox Label="出错后继续执行" T="bool" Value="true" Color="Color.Primary"></MudCheckBox>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public string? PlugDefinitionId { get; set; }
+
+    private List<PlugVariableData> PDZVariables { get; set; } = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        PDZVariables = PlugDataZone?.GetVariablesOfPlug(PlugDefinitionId) ?? new();
+    }
+}

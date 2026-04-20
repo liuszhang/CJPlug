@@ -1,0 +1,45 @@
+﻿
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using MudBlazor
+
+@PlugDataZone?.PDZId
+
+<MudAlert Dense>运行参数定义</MudAlert>
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudAutocomplete @bind-Value="SelectedVariable"
+                     SearchFunc="Search"
+                     CoerceText="true"
+                     CoerceValue="true"
+                     Variant="Variant.Outlined"
+                     Label="参数列表"
+                     Margin="Margin.Dense"
+                     Dense="true"
+                     Placeholder="选择或创建参数"
+                     Clearable="true" />
+
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary">插入参数</MudButton>
+</MudStack>
+
+<MudTextField T="string" Label="执行命令配置" Variant="Variant.Outlined" Lines="3" />
+
+@code {
+    [Parameter]
+    public Plug? Plug { get; set; }
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    private string? SelectedVariable { get; set; }
+
+    private async Task<IEnumerable<string>> Search(string value, CancellationToken token)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5, token);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return Plug.PlugVariables.Select(v => v.Name);
+
+        return Plug.PlugVariables.Where(x => x.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(v => v.Name);
+    }
+}

@@ -1,0 +1,154 @@
+﻿@page "/UnitTest"
+<PageTitle>单元测试</PageTitle>
+
+
+@using CJ.Plug.DeekSeekIn
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.Extensions
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Identity
+@using MudBlazor
+@using Serilog
+
+@inject MainApiClient MainApiClient;
+@inject IDeepSeekService DeepSeekService
+@inject ISnackbar Snackbar;
+
+
+@inject Radzen.DialogService DialogService
+
+
+<PageTitle>单元测试</PageTitle>
+
+<MudTextField @bind-Value="@TestText" Label="参数输入" Variant="Variant.Outlined"></MudTextField>
+<MudStack Row>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary">测试删除PDZ</MudButton>
+    <MudButton OnClick="TestMovablePanel" Variant="Variant.Outlined" Color="Color.Primary">测试可拖动框</MudButton>
+</MudStack>
+<MudDivider />
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudTextField Label="CorrelationId" @bind-Value="@CorrelationId" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+    <MudTextField Label="DefinitionId" @bind-Value="@DefinitionId" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudTextField Label="InstanceId" @bind-Value="@InstanceId" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudButton OnClick="CompleteActivity" Variant="Variant.Outlined">CompleteActivity</MudButton>
+
+</MudStack>
+<MudDivider></MudDivider>
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudTextField Label="Log" @bind-Value="@_logText" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+    <MudButton OnClick="SendLog" Variant="Variant.Outlined">Send Log</MudButton>
+    <MudButton OnClick="SendCLog" Variant="Variant.Outlined">Send CLog</MudButton>
+    <MudTextField Label="PDZId" @bind-Value="@_pdzId" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudButton OnClick="GetPDZType" Variant="Variant.Outlined">获取PDZ类型</MudButton>
+    <MudButton OnClick="GetDesignPDZId" Variant="Variant.Outlined">获取设计PDZ</MudButton>
+
+    <MudText>@_pdzType</MudText>
+</MudStack>
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudTextField Label="RoleName" @bind-Value="@RoleNmae" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudButton OnClick="CreateRole" Variant="Variant.Outlined">创建角色</MudButton>
+
+    <MudText>@_pdzType</MudText>
+</MudStack>
+<MudButton Variant="Variant.Outlined" OnClick="TestAI" Disabled="Processing">
+    
+    @if (Processing)
+    {
+        <MudProgressCircular Indeterminate="true" Size="Size.Small"/>
+        <MudText>AI处理中...</MudText>
+    }
+    else
+    {
+        <MudText>测试AI中台 </MudText >
+    }
+</MudButton>
+
+@code {
+    private string? TestText { get; set; } = "测试文本";
+
+    public string? CorrelationId { get; set; }
+    public string? InstanceId { get; set; }
+    public string? DefinitionId { get; set; }
+
+    private string? _logText = "test";
+    private string? _pdzId;
+    private string? _pdzType;
+    private string? RoleNmae;
+
+    private bool Processing = false;
+
+    private void CompleteActivity()
+    {
+        //StatusReporter.ResumeProcess(InstanceId, DefinitionId,CorrelationId);
+        StatusReporter.CompleteActivityContext(CorrelationId, DefinitionId);
+
+    }
+
+    private async Task TestMovablePanel()
+    {
+        await DialogService.OpenAsync<DialogCardPage>($"测试可拖动",
+               new Dictionary<string, object>() { { "OrderID", 1 } },
+               new Radzen.DialogOptions()
+                   {
+                       Resizable = true,
+                       Draggable = true,
+                   // Resize = OnResize,
+                   // Drag = OnDrag,
+                       Width = "700px",
+                       Height = "512px",
+                   //Left = "100px",
+                   //Top = "100px"
+                   });
+    }
+
+
+    private async Task SendLog()
+    {
+        Log.Information(_logText);
+        Log.Warning(_logText);
+        Log.Error(_logText);
+    }
+    private async Task SendCLog()
+    {
+        CLog.Information(_logText);
+        CLog.Warning(_logText);
+        CLog.Error(_logText);
+    }
+    private async Task GetPDZType()
+    {
+        _pdzType = _pdzId?.GetPDZType();
+    }
+    private async Task GetDesignPDZId()
+    {
+        _pdzType = _pdzId?.GetDesignPDZId();
+    }
+    private async Task CreateRole()
+    {        
+        // var result = await RoleManager.CreateAsync(
+        //     new UserRole
+        //     {
+        //         Name = RoleNmae,
+        //         NormalizedName = RoleNmae?.ToUpper()
+        //     });
+        // CLog.Information("创建角色 {RoleName} 结果：{Result}"+ RoleNmae+result.Succeeded);
+    }
+
+    private async Task TestAI()
+    {
+        Processing = true;
+        //var response = await MainApiClient.GetAllJobsAsync();
+        var result = DeepSeekService.Ask("1+1等于几？");
+        var Answer = "AI:";
+        await foreach (var response in result)
+        {
+            //Console.WriteLine(response);
+            Answer += response;
+        }
+        //Snackbar.Add($"获取到 {response.ToList().Count} 条作业信息", Severity.Success);
+        Snackbar.Add($"获取到 {Answer} ", Severity.Success);
+        Processing = false;
+    }
+}

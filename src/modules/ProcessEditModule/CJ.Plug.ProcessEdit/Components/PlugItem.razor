@@ -1,0 +1,138 @@
+﻿@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Studio.Workflows.UI.Contracts
+@using Serilog
+@using CJ.Plug.PlugBaseCore.Contracts
+
+@inject IActivityDisplaySettingsRegistry ActivityDisplaySettingsRegistry
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
+@inject IDomInteropService DomInteropService
+
+
+
+<MudMenu ActivationEvent="@MudBlazor.MouseEvent.RightClick" PositionAtCursor="true">
+    <ActivatorContent>
+        <MudTooltip Text="@ActivityDescriptor?.Description">
+
+            @if (ShowModel == "apps")
+            {
+                <MudPaper draggable="true" @ondragstart="@(e => OnDragStart(ActivityDescriptor))" Class="dragdrop-item-app">
+                    <MudStack Spacing="0" AlignItems="AlignItems.Center">
+                        @* @if (_icon != null)
+                        {
+                            <MudIcon Icon="@_icon"></MudIcon>
+                        } *@
+                        @*Elsa更新后，插头自带了默认图标，排除默认图标*@
+                        @if (_icon!=null && !_icon.Contains("M21,16.5C21,16.88"))
+                        {
+                            <MudIcon Icon="@_icon"></MudIcon>
+                        }
+                        else
+                        {
+                            
+                        
+                        <MudAvatar Square="true" Color="Color.Transparent">
+                                <MudImage Src="@PlugIconPath" FallbackSrc="@FallbackImagePath" />
+                            </MudAvatar>
+                        }
+                        <MudText Typo="Typo.body2">@PlugDisplayName</MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+            else
+            {
+                <MudPaper draggable="true" @ondragstart="@(e => OnDragStart(ActivityDescriptor))" MinHeight="45px" Style="align-content:center;" Class="dragdrop-item">
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+                        @if (_icon != null && !_icon.Contains("M21,16.5C21,16.88"))
+                        {                            
+                            <MudIcon Icon="@_icon"></MudIcon>
+                        }
+                        else if (XmlPlugIconPath != null)
+                        {
+                            <MudAvatar Square Color="Color.Transparent">
+                                <MudImage Src="@XmlPlugIconPath" FallbackSrc="@FallbackImagePath" />
+                            </MudAvatar>
+                        }
+                        else
+                        {
+                            <MudAvatar Square="true" Color="Color.Transparent">
+                                <MudImage Src="@PlugIconPath" FallbackSrc="@FallbackImagePath" />
+                            </MudAvatar>
+                        }
+                        <MudText>@PlugDisplayName</MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+
+
+        </MudTooltip>
+    </ActivatorContent>
+    <ChildContent>
+        <MudMenuItem>添加组件</MudMenuItem>
+        <MudMenuItem>组件详情</MudMenuItem>
+    </ChildContent>
+</MudMenu>
+
+@code {
+    [CascadingParameter]
+    public MyDragDropManager? DragDropManager { get; set; }
+    [Parameter]
+    public string? PlugDisplayName { get; set; }
+    [Parameter]
+    public ActivityDescriptor? ActivityDescriptor { get; set; }
+    [Parameter]
+    public string? ShowModel { get; set; } = "apps";
+
+    private string? PlugIconPath { get; set; }
+    private string? XmlPlugIconPath { get; set; }
+    private string? FallbackImagePath { get; set; } = "defultplug.ico";
+    private string _color = default!;
+    private string? _icon;
+
+    //备用图标设计
+    public string IconPath = "M 0 0 L 0 -7 L 8 -7 L 8 0 L 0 0 M 0 2 L 1 0 L 2 2 M 5 0 L 3 1 L 5 2 M 6 0 L 6 2 L 8 1 L 6 0";
+    public const string IconPath2 = "<path d=\"M0 0h24v24H0z\" fill=\"none\"/><path d=\"M 0 0 L 0 -7 L 8 -7 L 8 0 L 0 0 M 0 2 L 1 0 L 2 2 M 5 0 L 3 1 L 5 2 M 6 0 L 6 2 L 8 1 L 6 0\"/>";
+    public const string ElsaIcon = "";
+
+
+    private async Task OnDragStart(ActivityDescriptor? ActivityDescriptor)
+    {
+        DragDropManager.Payload = ActivityDescriptor;
+        await DomInteropService.SetDragPayload(DragDropManager.Payload);
+
+        Console.WriteLine("start drag item:" + DragDropManager.Payload);
+
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!string.IsNullOrEmpty(ActivityDescriptor?.DisplayName))
+            {
+                var displaySettings = ActivityDisplaySettingsRegistry.GetSettings(ActivityDescriptor.TypeName);
+                _color = displaySettings.Color;
+                _icon = displaySettings.Icon;
+
+                PlugDisplayName = ActivityDescriptor?.DisplayName;
+                PlugIconPath = $"_content/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico";
+                XmlPlugIconPath = $"plugconfig/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico";
+
+                var XmlPlugIconLocalPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    $"../../../PlugConfig/Plugs/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico"
+                );
+                if (!File.Exists(XmlPlugIconLocalPath))
+                {
+                    XmlPlugIconPath = null;
+                }
+                //Log.Information("PlugTypeName:{0}, PlugIconPath:{1}", PlugTypeName, PlugIconPath);
+            }
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+}

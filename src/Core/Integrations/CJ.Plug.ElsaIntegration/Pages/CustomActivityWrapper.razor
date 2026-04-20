@@ -1,0 +1,279 @@
+﻿@using System.Text.Json.Nodes
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.ElsaIntegration.Pages.Components
+@using CJ.Plug.Models.LogModels
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Extensions
+@using CJ.Plug.SharedPages.Contracts
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Enums
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Studio.Workflows.Designer.Components
+@using Elsa.Studio.Workflows.Designer.Interop
+@using Elsa.Studio.Workflows.Domain.Contexts
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Elsa.Studio.Workflows.UI.Contracts
+@using Elsa.Studio.Workflows.UI.Models
+@using System.Text.Json
+@using Elsa.Workflows.Services
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Serialization
+@using Radzen
+@using Radzen.Blazor
+@using Serilog
+@using AlignItems=MudBlazor.AlignItems
+@using Variant=MudBlazor.Variant
+
+@inject IActivityPortService ActivityPortService
+@inject IActivityRegistry ActivityRegistry
+@inject IActivityDisplaySettingsRegistry ActivityDisplaySettingsRegistry
+@inject MainApiClient MainApiClient
+@* @inject DesignerJsInterop DesignerInterop *@
+@inject IJSRuntime JSRuntime
+@inject IDomInteropService DomInteropService
+@inject ContextMenuService ContextMenuService
+
+
+@{
+    const string white = "#ffffff";
+    var colorStyle = CanStartWorkflow ? $"color: {white};" : "";
+    var color = Stats == null ? Color.Transparent : Stats.Faulted ? Color.Error : Stats.Blocked ? Color.Warning : Stats.Uncompleted > Stats.Completed ? Color.Info : Stats.Completed > 0 ? Color.Success : Color.Default;
+    var content = Stats == null ? null : Stats.Blocked ? null : Stats.Faulted ? "E" : Stats.Completed.ToString();
+    //var content = Stats == null ? null : Stats.Blocked ? null : @Icons.Material.Outlined.Check;
+    var icon = Stats == null ? null : content == null ? Stats.Blocked ? Icons.Material.Outlined.HourglassTop : Stats.Uncompleted > 0 ? Icons.Material.Outlined.PlayArrow : null : null;
+    var showBadge = Stats != null;
+}
+
+<CascadingValue Value="Activity">
+    <MudBadge @oncontextmenu=@(args => ShowContextMenuWithContent(args))
+    Color="color" Content="content" Overlap="true" Icon="@icon" Style="width: 100%; height: 100%;"
+    Visible="showBadge">
+        <MudPaper Class="elsa-activity pa-1"
+                  Style="@($"border-left-color: {_borderleftColor}; {(CanStartWorkflow ? $"background-color: {_backgroundColor}" : $"background-color: {_backgroundColor}")};")"
+        Outlined="true">
+
+            @if (false)
+            {
+
+                _backgroundColor = "#9b929d";
+                _borderleftColor = "#9b929d";
+                
+                <ContainerActivity></ContainerActivity>
+            }
+            else
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Style="height:100%">
+                    @if (_icon != null)
+                    {
+                        <MudIcon Icon="@_icon" Style="@colorStyle"></MudIcon>
+                    }
+                    else
+                    {
+                        @* <MudAvatar Square="true" Variant="Variant.Outlined" Color="Color.Transparent">
+                            <MudImage Src="@PlugIconPath" FallbackSrc="@FallbackImagePath" />
+                        </MudAvatar> *@
+                        <!-- 使用原生img标签结合MudBlazor样式实现 -->
+                        <MudPaper Elevation="0" Class="d-flex align-center justify-center">
+                            <img src="@CurrentIconPath"
+                                 @onerror="HandleImageError"
+                                 style="height:48px; width:48px;"
+                                 alt="Icon" />
+                        </MudPaper>
+                    }
+
+                    <MudStack Style="height:100%" Justify="Justify.Center" Spacing="0">
+                        <MudText Typo="Typo.body2" Style="@colorStyle">@_label</MudText>
+                        @{
+                            var visiblePorts = _ports.Where(x => x is { Type: PortType.Embedded, IsBrowsable: true }).ToList();
+                        }
+                        @if (visiblePorts.Any())
+                        {
+                            <MudStack Row="true">
+                                @foreach (var port in visiblePorts)
+                                {
+                                    var portName = port.Name;
+                                    var providerContext = new PortProviderContext(_activityDescriptor, Activity);
+                                    var portProvider = ActivityPortService.GetProvider(providerContext);
+                                    var childActivity = portProvider.ResolvePort(portName, new PortProviderContext(_activityDescriptor, Activity));
+
+                                    @if (childActivity != null)
+                                    {
+                                        <MudField Label="@port.DisplayName" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                            <div id="@($"activity-{childActivity.GetId()}")" class="embedded-port embedded-port-occupied cursor-pointer" data-port-name="@port.Name">
+                                                <EmbeddedActivityWrapper ActivityId="@childActivity.GetId()" Activity="childActivity" IsSelected="@(SelectedPortName == port.Name)" />
+                                            </div>
+                                        </MudField>
+                                    }
+                                    else
+                                    {
+                                        <MudPaper Elevation="0" Class="embedded-port pa-4 cursor-pointer" data-port-name="@port.Name" Style="border: 1px dashed var(--mud-palette-lines-default)">
+                                            @port.DisplayName
+                                        </MudPaper>
+                                    }
+                                }
+                            </MudStack>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_description) && _showDescription)
+                        {
+                            <MudText Typo="Typo.caption" Style="@colorStyle">@_description</MudText>
+                        }
+                    </MudStack>
+                </MudStack>
+            }
+
+
+        </MudPaper>
+    </MudBadge>
+</CascadingValue>
+
+
+
+
+
+@code{
+    [Parameter]
+    public JsonObject Activity { get; set; } = default!;
+    [Parameter]
+    public string ActivityJson { get; set; } = default!;
+    [Parameter]
+    public ActivityStats? Stats { get; set; }
+    [Parameter]
+    public string? SelectedPortName { get; set; }
+    [Parameter]
+    public string? ElementId { get; set; }
+
+    private bool CanStartWorkflow => Activity.GetCanStartWorkflow() == true;
+    private string _backgroundColor = default!;
+    private string _borderleftColor = default!;
+    private string? _icon;
+    private string _label = default!;
+    private string _description = default!;
+    private bool _showDescription;
+    private ICollection<Port> _ports = new List<Port>();
+    private ActivityDescriptor _activityDescriptor = default!;
+    private string? PlugIconPath { get; set; }
+    private string? FallbackImagePath { get; set; } = "defultplug.ico";
+    private string[]? _iconPaths;
+    private int _currentIndex = 0;
+    private string CurrentIconPath { get; set; } = "defultplug.ico";
+
+    private string ActivityHeight { get; set; }
+    private string ActivityWidth { get; set; }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ActivityJson))
+            Activity = JsonSerializer.Deserialize<JsonObject>(ActivityJson, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+
+        await ActivityRegistry.EnsureLoadedAsync();
+
+        var activity = Activity;
+        var activityDisplayText = activity.GetDisplayText()?.Trim();
+        var activityDescription = activity.GetDescription()?.Trim();
+        var activityType = activity.GetTypeName();
+        var activityVersion = activity.GetVersion();
+        var descriptor = ActivityRegistry.Find(activityType, activityVersion);
+        var displaySettings = ActivityDisplaySettingsRegistry.GetSettings(activityType);
+
+        _label = !string.IsNullOrEmpty(activityDisplayText) ? activityDisplayText : descriptor?.DisplayName ?? descriptor?.Name ?? "Unknown Activity";
+        _description = !string.IsNullOrEmpty(activityDescription) ? activityDescription : descriptor?.Description ?? string.Empty;
+        _showDescription = activity.GetShowDescription() == true;
+        //_backgroundColor = displaySettings.Color;
+        _borderleftColor = displaySettings.Color;
+        _icon = displaySettings.Icon;
+        _activityDescriptor = descriptor!;
+        _ports = descriptor != null ? ActivityPortService.GetPorts(new PortProviderContext(descriptor, activity)).ToList() : [];
+
+        var typeName = _activityDescriptor?.TypeName;
+        // 定义查找顺序
+        _iconPaths = new[]
+        {
+                $"_content/{typeName}/{typeName}.ico",
+                $"plugconfig/{typeName}/{typeName}.ico",
+                "defultplug.ico"
+            };
+
+        // 开始尝试第一个路径
+        _currentIndex = 0;
+        CurrentIconPath = _iconPaths[_currentIndex];
+
+        //PlugIconPath = $"_content/{_activityDescriptor?.TypeName}/{_activityDescriptor?.TypeName}.ico";
+        //PlugIconPath = $"plugconfig/{_activityDescriptor?.TypeName}/{_activityDescriptor?.TypeName}.ico";
+        //PlugIconPath = $"defultplug.ico";
+
+    }   
+
+    // 图片加载失败时触发
+    private void HandleImageError()
+    {
+        // 尝试下一个路径
+        if (_iconPaths != null && _currentIndex < _iconPaths.Length - 1)
+        {
+            _currentIndex++;
+            CurrentIconPath = _iconPaths[_currentIndex];
+        }
+    }
+
+    private async Task ExePlug()
+    {
+        try
+        {
+            Stats = Stats ?? new();
+            Stats.Blocked = true;
+            var PDZId = await DomInteropService.GetItemValue("PDZId");
+            //Log.Information($"开始执行插头:{Activity.GetName()}，PDZ:{PDZId}");
+            //var definitionId = Activity.GetId();
+            //await MainApiClient.ExecutePlugByDefifnitionId(definitionId);
+
+            var request = new PlugExecutionRequest();
+            request.ExecuteResultData.Ids.PlugDefinitionId = Activity.GetId();
+            request.ExecuteResultData.Ids.PDZId = PDZId;
+            request.ExecuteMode = ExecuteMode.Plug;
+            await MainApiClient.ExecutePlug(request);
+        }
+        catch (Exception ex)
+        {
+            CLog.Error(ex.Message);
+            return;
+        }
+        
+    }
+
+
+    void ShowContextMenuWithContent(MouseEventArgs args) => ContextMenuService.Open(args, ds =>
+        @<RadzenMenu Click="OnMenuItemClick">
+        <RadzenMenuItem Text="执行" Value="1" Icon="flight_takeoff"></RadzenMenuItem>
+            <RadzenMenuItem Text="删除" Value="2" Icon="delete"></RadzenMenuItem>
+            <RadzenMenuItem Text="关闭" Value="3" Icon="close"></RadzenMenuItem>
+        </RadzenMenu>);
+
+    void OnMenuItemClick(MenuItemEventArgs args)
+    {
+        //Log.Information($"Menu item with Value={args.Value} clicked");
+        if (args.Value.Equals(1))
+        {
+            ContextMenuService.Close();
+            ExePlug();
+            //ContextMenuService.Close();
+        }
+        else if (args.Value.Equals(2))
+        {
+            // Delete logic here
+            Log.Information($"假装 Delete activity with ID: {Activity.GetId()}");
+            ContextMenuService.Close();
+            // Call the delete method or service here
+        }
+        else if(args.Value.Equals(3))
+        {
+            ContextMenuService.Close();
+        }
+    }
+
+
+}

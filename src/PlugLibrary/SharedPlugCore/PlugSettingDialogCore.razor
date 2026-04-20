@@ -1,0 +1,392 @@
+﻿@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
+@using BlazorMonaco.Editor
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug_Aspire.Models.Plug
+@using CJ.Plug_Aspire.Models.PlugAction
+@using CJ.Plug_Aspire.Models.Relation
+@using CJ.Plug_Aspire.Models.Shared
+@using CJ.Plug_Aspire.Models.Shared.LogModels
+@using CJ.Plug_Aspire.Models.Station
+@using CJ.Plug_Aspire.SharedPages
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+@using Radzen.Blazor
+@using Size=MudBlazor.Size
+
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
+@inject IEnumerable<IPlugActionSettingContent> PlugActionSettingContent
+@inject IDialogService DialogService
+@inject HubConnectionManagerService HubConnectionManagerService
+
+
+
+<MudDialog Class="stack-resize">
+    <TitleContent>
+        <MudStack Row>
+            <MudText>@Activity.GetDisplayText()</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Row>
+            <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+                <RadzenSplitterPane Size="@LogPercent">
+                    <MudStack>
+                        <MudText>执行日志</MudText>
+                        <MudStack Row Style="width:268px;" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                            <MudButton OnClick="@(()=>{LogContent="";})" Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+                            <MudButton OnClick="@(()=>{StateHasChanged();})" Variant="Variant.Outlined" Color="Color.Primary">刷新</MudButton>
+                            <MudButton OnClick="@(()=>{LogPercent="0%";})" Variant="Variant.Outlined" Color="Color.Primary">隐藏</MudButton>
+                        </MudStack>
+                        <MudTextField T="string" Label="结果预览" ReadOnly Variant="Variant.Outlined" Text="@LogContent" Lines="12" AutoGrow MaxLines="25" />
+                    </MudStack>
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="@MainPercent" Min="200px">
+                    <MudTabs Elevation="2" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="width:100%">
+                        <MudTabPanel Text="基础属性">
+                            @if (Loading)
+                            {
+                                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+                            }
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="编号" @bind-Text="@Plug.DefinitionId" ReadOnly Variant="Variant.Filled"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型" @bind-Text="@Plug.Type" ReadOnly Variant="Variant.Filled"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="核心类型" @bind-Text="@Plug.CoreType" ReadOnly Variant="Variant.Filled"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="KEY" @bind-Text="@Plug.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="名称" @bind-Text="@Plug.Name" Variant="Variant.Outlined"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="描述" @bind-Text="@Plug.Description" Variant="Variant.Outlined" Lines="3"></MudTextField>
+                        </MudTabPanel>
+                        <MudTabPanel Text="参数配置">
+                            <ParametersData Plug="Plug"></ParametersData>
+                        </MudTabPanel>
+                        <MudTabPanel Text="插头配置">
+                            @PlugCommonExecuteSettingContent
+                        </MudTabPanel>
+                        <MudTabPanel Text="动作配置">
+                            <MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+                                @if (ToolVersions.Count > 0)
+                                {
+                                    <MudSelect Margin="Margin.Dense" Dense T="string" Clearable Label="工具版本" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents select-tool-version">
+                                        @foreach (var v in ToolVersions)
+                                        {
+                                            <MudSelectItem T="string" Value="v">@v</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                @if (RootPlugActions.Count > 0)
+                                {
+                                    <MudSelect Margin="Margin.Dense" Clearable Dense T="PlugAction" @bind-Value="TmpSelectedToolAction" Label="选择支持的工具动作" Class="me-3" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents">
+                                        @foreach (var a in RootPlugActions)
+                                        {
+                                            <MudSelectItem Value="@a">@a.Name</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                    <MudButton OnClick="AddActionToPlug" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">添加动作</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">清空动作</MudButton>
+
+                                }
+
+
+
+
+                            </MudStack>
+                            <MudExpansionPanels MultiExpansion="true">
+                                @foreach (var a in PlugActionsToExecute)
+                                {
+                                    foreach (var pasc in PlugActionSettingContent)
+                                    {
+                                        var TMPContent = pasc.GetPlugActionSettingContent(a).Result;
+                                        if (TMPContent != null)
+                                        {
+                                            PlugActionExecuteSettingContent = TMPContent;
+                                            break;
+                                        }
+                                    }
+
+
+                                    <MudExpansionPanel>
+                                        <TitleContent>
+                                            <MudStack Row AlignItems="AlignItems.Center">
+                                                <MudIcon Icon="@Icons.Material.Filled.ResetTv" class="mr-3"></MudIcon>
+                                                <MudText>@a.Name</MudText>
+                                                <MudSpacer></MudSpacer>
+                                                <MudIconButton OnClick="()=>RemoveActionFromPlug(a)" Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+                                            </MudStack>
+                                        </TitleContent>
+                                        <ChildContent>
+                                            @if (PlugActionExecuteSettingContent == null)
+                                            {
+                                                <MudText>工作命令行：@(a.PlugSettingsJson)</MudText>
+                                            }
+                                            else
+                                            {
+                                                @PlugActionExecuteSettingContent
+                                            }
+                                        </ChildContent>
+                                    </MudExpansionPanel>
+                                }
+                            </MudExpansionPanels>
+                        </MudTabPanel>
+                    </MudTabs>
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+            @if(LogShow)
+            {
+
+            }            
+
+
+        </MudStack>
+
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="Processing" OnClick="@(()=>MudDialog.Close(DialogResult.Cancel()))">取消</MudButton>
+        <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>ExecuteActivity(Plug))">执行</MudButton>
+        <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlug(Plug))">应用</MudButton>
+        <MudButton Disabled="Processing" Color="Color.Primary" OnClick="@(()=>SavePlugAndCloseDialog(Plug))">
+            @if (Processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>        
+            }
+            else
+            {
+                <MudText>确定</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+
+</MudDialog>
+
+<style>
+
+</style>
+
+
+@code {
+    [Parameter]
+    public string? DefinitionId { get; set; }
+    [Parameter]
+    public JsonObject? Activity { get; set; }
+    [Parameter]
+    public ActivityDescriptor? ActivityDescriptor { get; set; }
+    [Parameter] 
+    public Plug? Plug { get; set; } = new();
+    [Parameter]
+    public EventCallback<JsonObject> OnSave { get; set; }
+
+    public RenderFragment? PlugCommonExecuteSettingContent { get; set; }
+    public RenderFragment? PlugActionExecuteSettingContent { get; set; }
+
+    private List<string> ToolVersions { get; set; } = new();
+    private List<PlugAction> RootPlugActions { get; set; } = new();
+    private List<PlugAction> PlugActionsToExecute { get; set; } = new();
+    private PlugAction? TmpSelectedToolAction { get; set; }
+
+
+    private List<PlugVariable> TmpVariables = new List<PlugVariable>();
+    private List<PlugVariable>? SelectedPlugVariables = new List<PlugVariable>();
+    //private PlugVariable TmpInput = new PlugVariable();
+    private bool _readOnly;
+    private bool _isCellEditMode = true;
+    private List<string> _events = new();
+    private bool _editTriggerRowClick;
+
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; }
+    private bool Processing = false;
+
+
+    private bool Loading = true;
+    private bool showProgress = false;
+    private bool IsInput = false;
+    private bool IsOutput = false;
+    private bool LogShow = false;
+    private string? LogContent = "";
+    private string LogPercent = "0%";
+    private string MainPercent = "100%";
+
+
+    DialogOptions diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.TopCenter,
+            BackdropClick = false,
+            FullWidth=true            
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        MudDialog.SetOptionsAsync(diaOption);
+        //Console.WriteLine($"activity definition id is:{Activity.GetId()}");
+        //Console.WriteLine(JsonSerializer.Serialize(Plug));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Plug = await MainApiClient.GetPlugByDefinitionIdAsync(Activity.GetId());
+            var rootPlug = await MainApiClient.GetPlugByTypeNameAsync(Plug.Type);
+            ToolVersions = rootPlug?.ToolVersions ?? new();
+            RootPlugActions = await MainApiClient.GetPlugActionsByPlugIdAsync(rootPlug?.Id) ?? new();
+            PlugActionsToExecute = await MainApiClient.GetPlugActionsToExecuteByPlugId(Plug.Id) ?? new();
+            foreach (var pcsc in PlugCommonSettingContent)
+            {
+                var tmpContent = await pcsc.GetPlugCommonSettingContent(Plug);
+                if (tmpContent != null)
+                {
+                    PlugCommonExecuteSettingContent = tmpContent;                    
+                    break;
+                }
+            }
+            HubConnectionManagerService._hubConnection.On<string>("ReceiveLog", (message) =>
+           {
+               var logModel = JsonSerializer.Deserialize<LogModel>(message);
+               //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
+               // 将新日志添加到本地列表并触发UI更新
+               InvokeAsync(() =>
+               {
+                   LogContent += logModel.Description;
+                   LogContent += "\n";
+                   StateHasChanged();
+               });
+           });
+            
+        }
+        Loading = false;    
+        StateHasChanged();
+    }
+
+    async Task SavePlugAndCloseDialog(Plug plug)
+    {
+        Processing = true;
+        //Activity.SetName(plug.Name);
+        foreach (var v in plug.PlugVariables)
+        {
+            Activity.SetProperty(JsonSerializer.SerializeToNode(v.Value, new JsonSerializerOptions { WriteIndented = true }), v.Name);
+        }
+        Activity.SetDisplayText(plug.Name);
+        await SavePlug(plug);
+        Console.WriteLine($"the new activity is:{Activity}");
+        MudDialog.Close(Activity);
+    }
+
+    async Task SavePlug(Plug plug)
+    {
+        Processing = true;
+        //Console.WriteLine($"prepare to update plug:{JsonSerializer.Serialize(plug.PlugVariables)}");
+        //更新插头基本信息
+        await MainApiClient.UpdatePlugAsync(plug.Id, plug);
+        //更新插头执行动作关系表
+        //await MainApiClient.SetExecutePlugActionsToPlug(plug, PlugActionsToExecute);
+        Processing = false;
+    }
+
+    public async Task AddActionToPlug()
+    {
+        //TmpSelectedToolAction.Id = null;
+        //无法从父类直接转换未子类，需要手动复制
+        //var newToolActionItem = (PlugAction)TmpSelectedToolAction.DeepCopy();
+        // var newToolActionItem=new PlugAction();
+        // newToolActionItem.Name = TmpSelectedToolAction.Name;
+        // newToolActionItem.PlugTypeKey = TmpSelectedToolAction.PlugTypeKey;
+        // newToolActionItem.ExecutingString = TmpSelectedToolAction.ExecutingString;
+        // newToolActionItem.PlugSettingsJson = TmpSelectedToolAction.PlugSettingsJson;
+        // newToolActionItem.ParentPlugId = Plug.Id;
+        // newToolActionItem.ParentPlugDefinitionId = Plug.DefinitionId;
+        // newToolActionItem.ParentPlugVersion = TmpSelectedToolAction.ParentPlugVersion;
+        // // foreach(var v in TmpSelectedToolAction.PlugVariables)
+        // // {
+        // //     newToolActionItem.PlugVariables.Add(new PlugVariable() { Name = v.Name, Type = v.Type, Value = v.Value, DefultValue = v.DefultValue, IsInput = v.IsInput, IsOutput = v.IsOutput });
+        // // }
+        // var result=await MainApiClient.CreatePlugAction(newToolActionItem);
+        // // AllPlugActions.Add(newToolActionItem);
+        // await MainApiClient.SetExecutePlugActionsToPlug(Plug, PlugActionsToExecute);
+
+        var result = await MainApiClient.CreateAndAddPlugActionToPlug(Plug, TmpSelectedToolAction, RelationTypes.执行);
+
+        PlugActionsToExecute.Add(result);
+        Console.WriteLine(PlugActionsToExecute.Count);
+        //ToolActions.Remove(TmpSelectedToolAction);
+        TmpSelectedToolAction = null;
+        StateHasChanged();
+    }
+
+    public async Task RemoveActionFromPlug(PlugAction toolActionItem)
+    {
+        await MainApiClient.DeletePlugAction(toolActionItem);
+        PlugActionsToExecute.Remove(toolActionItem);
+        //await MainApiClient.SetExecutePlugActionsToPlug(Plug, PlugActionsToExecute);
+        Console.WriteLine(PlugActionsToExecute.Count);
+        //ToolActions.Add(toolActionItem);
+        StateHasChanged();
+    }
+
+    private async Task NewVariable()
+    {        
+        var tmpVariables = new PlugVariable() { Name = "p1", Type = "string", IsInput = true, IsOutput = true };
+        Plug.PlugVariables.Add(tmpVariables);        
+        //await MainApiClient.UpdateToolItemAsync(SelectedToolItem.Id, SelectedToolItem);
+    }
+    private async Task DeleteVariables()
+    {
+        foreach (var s in SelectedPlugVariables)
+        {
+            Plug.PlugVariables.Remove(s);
+        }        
+        //await MainApiClient.UpdateToolItemAsync(SelectedToolItem.Id, SelectedToolItem);
+    }
+    private async Task IsInputValueChanged(CellContext<PlugVariable> context, bool isChecked)
+    {
+        context.Item.IsInput = isChecked;
+        //context.Item.InputAndOutput = "";
+        //context.Item.InputAndOutput += "I";
+        //Console.WriteLine(JsonSerializer.Serialize(context.Item));
+        //Console.WriteLine(JsonSerializer.Serialize(SelectedToolItem));
+        //await MainApiClient.UpdateToolItemAsync(SelectedToolItem.Id, SelectedToolItem);
+
+    }
+    private async Task IsOutputValueChanged(CellContext<PlugVariable> context, bool isChecked)
+    {
+        context.Item.IsOutput = isChecked;
+        //Console.WriteLine(JsonSerializer.Serialize(context.Item));
+        //Console.WriteLine(JsonSerializer.Serialize(SelectedToolItem));
+        //await MainApiClient.UpdateToolItemAsync(SelectedToolItem.Id, SelectedToolItem);
+    }
+    void SelectedItemsChanged(HashSet<PlugVariable> items)
+    {        
+        SelectedPlugVariables = items.ToList();
+    }
+
+
+    public async Task ExecuteActivity(Plug plug)
+    {
+        LogShow = true;
+        LogPercent = "30%";
+        MainPercent = "70%";
+        //Console.WriteLine(">>>>>>>>>>>>start to execute activity:"+JsonSerializer.Serialize(Activity));
+        
+
+
+
+
+        await MainApiClient.ExecutePlugByDefifnitionId(plug.DefinitionId);
+        StateHasChanged();
+    }
+
+
+}

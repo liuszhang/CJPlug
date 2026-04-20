@@ -1,0 +1,308 @@
+﻿@using Blazor.Diagrams
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets
+@using Blazor.Diagrams.Core
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Behaviors
+@using Blazor.Diagrams.Core.Geometry
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.Options
+@using Blazor.Diagrams.Core.PathGenerators
+@using Blazor.Diagrams.Core.Routers
+@using Blazor.Diagrams.Options
+@using CJ.Plug.Models.DataFlow
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.SharedPages.DataConnector.Components
+@using CJ.Plug.SharedPages.DataConnector.Interop
+@using CJ.Plug.SharedPages.DataConnector.Models
+@using System.Text.Json.Nodes
+@using Elsa.Api.Client.Extensions
+@using MudBlazor
+@using Serilog
+@using System.Text.Json
+
+@inject IPDZApiClient MainApiClient
+
+<MudStack Row>
+
+    <MudBadge Origin="Origin.BottomRight" Dot Overlap Color="@(dataDirty?Color.Error:Color.Tertiary)">
+        <MudButton OnClick="SaveDiagram" Variant="MudBlazor.Variant.Outlined" Size="MudBlazor.Size.Small">保存</MudButton>
+
+    </MudBadge>
+
+    <MudButton Variant="MudBlazor.Variant.Outlined" Size="MudBlazor.Size.Small">同名自动映射</MudButton>
+    <MudButton Variant="MudBlazor.Variant.Outlined" Size="MudBlazor.Size.Small">清空映射</MudButton>
+
+</MudStack>
+
+<div class="diagram-container">
+    <CascadingValue Value="Diagram">
+        <DiagramCanvas>
+            @* <AdditionalHtml>
+                <MudButton>Test</MudButton>
+            </AdditionalHtml> *@
+            <Widgets>
+                <GridWidget Size="30" Mode="GridMode.Point" BackgroundColor="white" />        
+                <NavigatorWidget Width="200" Height="120"
+                                 Class="border border-black bg-white absolute"
+                                 Style="bottom: 15px; right: 15px;" />
+                @* <SelectionBoxWidget/> *@
+            </Widgets>
+        </DiagramCanvas>
+    </CascadingValue>
+</div>
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [CascadingParameter]
+    public SetDataGridShowNotify? SetDataGridShowNotify { get; set; }
+
+    private double scale = 1.0;
+    private double translateX = 0;
+    private double translateY = 0;
+
+    private bool dataDirty = false;
+
+
+    public BlazorDiagram Diagram { get; } = new BlazorDiagram(new BlazorDiagramOptions
+    {
+        AllowMultiSelection = true,
+        Zoom =
+            {
+                Enabled = false,
+            },
+        Links =
+            {
+                DefaultRouter = new NormalRouter(),
+                DefaultPathGenerator = new SmoothPathGenerator()
+            },
+
+    });
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        //Activity.GetConnections();
+
+        Diagram.RegisterComponent<PlugDataTableNodeModel, PlugDataTableNodeWidget>();
+
+        Diagram.Nodes.Clear();
+
+        //添加主流程节点
+        var mainPlugData=PlugDataZone.PlugDatas
+            .Where(p => p.PlugDefinitionId == PlugDataZone.PlugDefinitionId)
+            .FirstOrDefault();
+        if (mainPlugData != null)
+        {
+            if (mainPlugData.PlugPosition==null)
+            {
+                mainPlugData.PlugPosition = "0 0";
+            }
+            var point = new Point(double.Parse(mainPlugData.PlugPosition?.Split()[0]), double.Parse(mainPlugData.PlugPosition?.Split()[1]));
+            var mainNode = Diagram.Nodes.Add(new PlugDataTableNodeModel(point));
+            mainNode.PlugName = "流程参数";
+            mainNode.PlugDefinitionId = PlugDataZone.PlugDefinitionId;
+            mainNode.PlugVariables?.Clear();
+            var mainNodeVariables = PlugDataZone.GetVariablesOfPlug(PlugDataZone.PlugDefinitionId);
+            foreach (var v in mainNodeVariables)
+            {
+                var plugVariable = new PlugVariableItemModel
+                    {
+                        Id = v.Id,
+                        Name = v.Name,
+                        Type = v.Type,
+                    };
+                mainNode.PlugVariables?.Add(plugVariable);
+                mainNode.AddPort(plugVariable);
+            }
+
+        }
+
+        //添加其他插头节点
+        foreach (var p in PlugDataZone?.GetPlugDefinitonIdsInPDZ())
+        {
+            //CLog.Information($"准备添加插头：{p.Name}({p.PlugDefinitionId})", PlugDataZone.PDZId);
+            try
+            {
+                double.TryParse(p.PlugPosition?.Split()[0], out var x);
+                double.TryParse(p.PlugPosition?.Split()[1], out var y);
+
+                var node = Diagram.Nodes.Add(new PlugDataTableNodeModel(new Point(x, y)));
+                node.PlugName = p.Name;
+                node.PlugDefinitionId = p.PlugDefinitionId;
+                node.PlugVariables?.Clear();
+                var variables = PlugDataZone.GetVariablesOfPlug(p.PlugDefinitionId);
+                foreach (var v in variables)
+                {
+                    var plugVariable = new PlugVariableItemModel
+                        {
+                            Id = v.Id,
+                            Name = v.Name,
+                            Type = v.Type,
+                        };
+                    node.PlugVariables?.Add(plugVariable);
+                    node.AddPort(plugVariable);
+                }
+            }
+            catch (Exception ex)
+            {
+                CLog.Error(ex.Message,PlugDataZone.PDZId);
+                CLog.Error(ex.StackTrace, PlugDataZone.PDZId);
+            }            
+        }
+
+        var linkDatas = PlugDataZone.DataFlowDatas;
+        foreach (var l in linkDatas)
+        {
+            //Log.Information($"准备处理数据流数据：{l.SourceVariableName}->{l.TargetVariableName}");
+            if (string.IsNullOrEmpty(l.PortLinkData))
+            {
+                continue;
+            }
+            var linkModel = JsonSerializer.Deserialize<PortLinkModel>(l.PortLinkData);
+            var source = FindPort(linkModel.SourcePort.ToIdentifierString());
+            var target = FindPort(linkModel.TargetPort.ToIdentifierString());
+            if (source != null && target != null)
+            {
+                Diagram.Links.Add(new LinkModel(source, target));
+            }
+        }
+
+        Diagram.Wheel += HandleWheelEvent;
+
+        //await GlobalEventBus.SetDataGridCollapsed(true);
+        SetDataGridShowNotify?.Invoke(true);
+
+        //var beh = Diagram.GetBehavior<DragNewLinkBehavior>();
+
+        Diagram.Changed += () =>
+        {
+            dataDirty = true;
+            StateHasChanged();
+        };
+
+        //Diagram.ZoomToFit();
+
+        // var node1 = Diagram.Nodes.Add(new PlugDataTableNodeModel(new Point(50, 80)));
+        // node1.PlugName = "REST组件1";
+
+        // var node2 = Diagram.Nodes.Add(new PlugDataTableNodeModel(new Point(350, 80)));
+        // node2.PlugName = "文本解析-读2";
+
+        // var node3 = Diagram.Nodes.Add(new PlugDataTableNodeModel(new Point(650, 80)));
+        // node3.PlugName = "CMD命令执行1";
+
+        // var sourceAnchor = new SinglePortAnchor(node1.Ports[1]);
+        // var targetAnchor = new SinglePortAnchor(node2.Ports[2]);
+        // var link = Diagram.Links.Add(new LinkModel(sourceAnchor, targetAnchor));
+        // sourceAnchor = new SinglePortAnchor(node2.Ports[3]);
+        // targetAnchor = new SinglePortAnchor(node3.Ports[0]);
+        // Diagram.Links.Add(new LinkModel(sourceAnchor, targetAnchor));
+
+    }
+
+    private PlugVariablePort? FindPort(string identifier)
+    {
+        foreach (PlugDataTableNodeModel node in Diagram.Nodes)
+        {
+            var port = node.GetPort(identifier);
+            if (port != null)
+            {
+                return port as PlugVariablePort;
+            }
+        }
+        return null;
+    }
+
+    private async Task SaveDiagram()
+    {
+        try
+        {
+            //处理连接数据
+            var list = new List<DataFlowData>();
+            foreach (var l in Diagram.Links)
+            {
+                if (l.Source?.Model != null && l.Target?.Model != null)
+                {
+                    var linkModel = new PortLinkModel();
+                    linkModel.SourcePort = JsonSerializer.Deserialize<PortIdentifierModel>(((PlugVariablePort)l.Source?.Model)?.Identifier);
+                    linkModel.TargetPort = JsonSerializer.Deserialize<PortIdentifierModel>(((PlugVariablePort)l.Target?.Model)?.Identifier);
+                    list.Add(new DataFlowData()
+                    {
+                            PortLinkData = JsonSerializer.Serialize(linkModel),
+                            SourcePlugDefinitionId = linkModel.SourcePort?.PlugDefinitionId,
+                            SourceVariableId = linkModel.SourcePort?.VariableId,
+                            SourceVariableName = linkModel.SourcePort?.VariableName,
+                            TargetPlugDefinitionId = linkModel.TargetPort?.PlugDefinitionId,
+                            TargetVariableId = linkModel.TargetPort?.VariableId,
+                            TargetVariableName = linkModel.TargetPort?.VariableName,
+
+                            PlugDataZoneId = PlugDataZone.Id,
+                    });
+                    var variable = PlugDataZone.PlugVariableDatas
+                    .Where(v => v.PlugDefinitionId == linkModel.TargetPort.PlugDefinitionId)
+                    .Where(v => v.Name == linkModel.TargetPort.VariableName)
+                    .FirstOrDefault();
+                    variable.IsValueFromOtherVariable = true;
+                    variable.SourceValueVariableId = linkModel.SourcePort.VariableId;
+                    variable.SourceValueVariableName = linkModel.SourcePort.VariableName;
+                    variable.SourceValuePlugDefinitionId = linkModel.SourcePort.PlugDefinitionId;
+                    variable.Value = null;
+                    var sourcePlug = PlugDataZone.PlugDatas.FirstOrDefault(p => p.PlugDefinitionId == variable.SourceValuePlugDefinitionId);
+                    variable.DisplayValue = $"{sourcePlug?.Name}({linkModel.SourcePort.PlugDefinitionId}):{linkModel.SourcePort.VariableName}";
+                }
+            }
+            PlugDataZone.DataFlowDatas = list;
+
+            //处理节点位置数据
+            foreach (PlugDataTableNodeModel n in Diagram.Nodes)
+            {
+                var position = $"{n.Position.X} {n.Position.Y}";
+                PlugDataZone.SetPlugPosition(n.PlugDefinitionId, position);
+            }
+            await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+            CLog.Information("保存数据流成功", PlugDataZone.PDZId);
+            dataDirty = false;
+        }
+        catch(Exception ex)
+        {
+            CLog.Error(ex.StackTrace);
+            CLog.Error(ex.Message);
+        }        
+    }
+
+    private void HandleWheelEvent(Blazor.Diagrams.Core.Events.WheelEventArgs e)
+    {
+        // 阻止事件冒泡和默认行为（避免页面整体滚动）
+        //e.Handled = true;
+
+        // DeltaY > 0 表示向上滚动（缩小），DeltaY < 0 表示向下滚动（放大）
+        var zoomStep = 0.1; // 每次缩放的步长（可根据需要调整）
+        var currentZoom = Diagram.Zoom; // 获取当前缩放比例
+
+        if (e.DeltaY < 0)
+        {
+            // 放大：限制最大缩放比例（例如最大 2.0 倍）
+            Diagram.SetZoom(Math.Min(currentZoom + zoomStep, 2.0));
+        }
+        else
+        {
+            // 缩小：限制最小缩放比例（例如最小 0.5 倍）
+            Diagram.SetZoom(Math.Max(currentZoom - zoomStep, 0.5));
+        }
+
+    }
+
+    // 组件销毁时解绑事件（避免内存泄漏）
+    public void Dispose()
+    {
+        if (Diagram != null)
+            Diagram.Wheel -= HandleWheelEvent;
+    }
+}

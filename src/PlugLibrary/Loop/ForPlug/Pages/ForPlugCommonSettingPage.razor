@@ -1,0 +1,39 @@
+﻿@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+
+
+@* <MudText>@PlugDataZone?.PDZId</MudText>
+<MudText>@Plug?.DefinitionId</MudText> *@
+
+<MudTextField Value="@From" Label="From"></MudTextField>
+<MudTextField Value="@To" Label="To"></MudTextField>
+<MudTextField Value="@Step" Label="Step"></MudTextField>
+
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+</MudStack>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public Plug? Plug { get; set; }
+
+    private string? From { get; set; }
+    private string? To { get; set; }
+    private string? Step { get; set; }
+
+}

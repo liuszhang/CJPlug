@@ -1,0 +1,180 @@
+﻿
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using System.Text.Json
+@using CJ.Plug.SharedPages.PlugSettingPages
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
+@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
+@using Elsa.Api.Client.Shared.Models
+@using Elsa.Studio.Workflows.Domain.Contracts
+@using Size=MudBlazor.Size
+
+@inject MainApiClient MainApiClient
+@inject IWorkflowDefinitionService WorkflowDefinitionService
+@inject IWorkflowDefinitionEditorService WorkflowDefinitionEditorService
+@inject ISnackbar Snackbar
+@inject IElsaStudioService ElsaEngineService
+
+@* <MudBadge Dot="true" Color="Color.Info" Visible="@toolItem.ShowInPlugLibrary"> *@
+<MudPaper>
+    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+
+        <MudStack Spacing="1" AlignItems="AlignItems.Center" Justify="Justify.Center">
+
+            @if (Plug.CreateType==PlugCreateTypeEnum.SystemInitPlug.ToString())
+            {
+                <MudAlert Severity="Severity.Info" Dense>@Plug.Name (@Plug.Id)</MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Normal" Dense>@Plug.Name (@Plug.Id)</MudAlert>
+            }
+
+            @if (Plug.ToolVersions?.Count>0)
+            {
+                <MudSelect T="string" Variant="Variant.Outlined" Value="Plug.ToolVersion" ValueChanged="ChangeVersion" Dense Margin="Margin.Dense" FullWidth="false">
+                    @foreach(var v in Plug.ToolVersions)
+                    {
+                        <MudSelectItem Value="@v">@v</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </MudStack>
+        <MudStack Row>
+            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" />
+            @if (!(Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()))
+            {
+                <MudIconButton Disabled="@_processing" OnClick="DeleteToolItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" />
+            }
+            @if (Plug.ShowInPlugLibrary)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check"  Title="已插入" Color="Color.Success" ></MudIcon>
+            }
+        </MudStack>
+    </MudStack>
+    @if (showDetails)
+    {
+        <MudTextField FullWidth @bind-text="Plug.Name" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="插头名称"></MudTextField>
+        <MudTextField FullWidth @bind-text="Plug.Type" ReadOnly Margin="Margin.Dense" Variant="Variant.Filled" T="string" Label="插头类型"></MudTextField>
+        <MudTextField FullWidth @bind-text="Plug.GroupName" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="插头分组"></MudTextField>
+        
+        <MudTextField FullWidth @bind-text="Plug.ToolDisplayName" ReadOnly Margin="Margin.Dense" Variant="Variant.Filled" T="string" Label="绑定工具"></MudTextField>
+        <MudTextField FullWidth @bind-text="Plug.Category" ReadOnly Margin="Margin.Dense" Variant="Variant.Filled" T="string" Label="工具种类"></MudTextField>
+
+        <MudStack Justify="@Justify.Center"
+        Class="mud-width-full">
+
+            <MudCheckBox Dense @bind-Value="Plug.ShowInPlugLibrary" Label="插入插座" Color="Color.Primary"></MudCheckBox>
+            <MudCheckBox Dense @bind-Value="Plug.OnlyExecuteAction" Label="仅执行插头动作" Color="Color.Error"></MudCheckBox>
+
+            <MudStack Spacing="1">
+                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>                
+                <MudCollapse Expanded="_expanded">
+                    <MudTextField @bind-Value="Plug.PlugTypeKey" Label="唯一标识符(开发人员)" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+                </MudCollapse>
+                <MudDivider />
+            </MudStack>
+
+
+            <StationPlugSettingContent Plug="Plug" OnSaveClick="SaveToolItem"></StationPlugSettingContent>
+        </MudStack>
+
+    }
+    else
+    {
+
+    }
+</MudPaper>
+
+
+@code {
+    public string toolVersion { get; set; } = "12.0";
+    public string? tmpVersion { get; set; }
+    public bool showDetails { get; set; } = false;    
+    public string? toolName { get; set; } = "NX";
+
+    public Dictionary<string,string?>? versonPathDic { get; set; } = new();
+    [Parameter]
+    public Plug? Plug { get; set; } = new();
+    public PlugSettings? PlugSettings { get; set; }
+    [CascadingParameter]
+    public Plug? SelectedToolItem { get; set; } = new();
+    [Parameter]
+    public EventCallback<string> OnDelete { get; set; }
+    [Parameter]
+    public EventCallback<string> OnChangeVersion { get; set; }
+    public string? toolPath { get; set; } = @"""C:\Program Files\Siemens\NX 12.0\NXBIN\uggraf.exe""";
+
+    private readonly List<string> toolVersions = ["11.0", "12.0"];
+    private int _numberOfColors = Enum.GetValues(typeof(Color)).Length;
+
+    bool _expanded = false;
+    bool _processing = false;
+
+
+
+    protected override async Task OnParametersSetAsync()
+    {      
+        PlugSettings = Plug.GetPlugSettings();
+    }
+
+
+    private async Task ShowDetails()
+    {
+        showDetails = !showDetails;
+        //StateHasChanged();
+    }
+    private async Task DeleteToolItem()
+    {
+        _processing = true;
+        StateHasChanged();
+        Console.WriteLine(Plug.Id.ToString());
+        try
+        {
+            await WorkflowDefinitionService.DeleteAsync(Plug.DefinitionId);
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        //_processing = false;
+        await OnDelete.InvokeAsync();
+    }
+    private async Task ChangeVersion(string version)
+    {
+        Console.WriteLine(version);
+        Plug.ToolVersion = version;
+        //Console.WriteLine(JsonSerializer.Serialize(toolItem));
+        //tmpVersionPath = versonPathDic[version];
+        await OnChangeVersion.InvokeAsync();
+    }
+
+    private async Task SaveToolItem(Plug Plug)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(Plug.GetPlugSettings()));
+
+        //await ElsaEngineService.CreateOrUpdateWorkflowFromPlug(Plug);
+        await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+        Console.WriteLine("update done!");
+        showDetails = false;
+
+        StateHasChanged();
+    }
+
+
+    private async Task CreateAndPublishWorkflow(Plug item,bool publish)
+    {
+        
+        WorkflowDefinition workflowDefinition =await WorkflowDefinitionService.FindByDefinitionIdAsync(item.DefinitionId,VersionOptions.Latest) ?? new();
+        Console.WriteLine($"target workflow id:{workflowDefinition.DefinitionId}");
+        workflowDefinition.Name = item.Name;        
+        workflowDefinition.Options.UsableAsActivity = true;
+        workflowDefinition.Options.AutoUpdateConsumingWorkflows = true;
+        //workflowDefinition.IsPublished = false;
+        //先取消发布，防止有历史版本正处于发布中
+        await WorkflowDefinitionEditorService.RetractAsync(workflowDefinition);
+        await WorkflowDefinitionEditorService.SaveAsync(workflowDefinition, publish);
+    }
+
+}

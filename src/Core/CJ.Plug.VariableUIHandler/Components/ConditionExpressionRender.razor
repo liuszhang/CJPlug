@@ -1,0 +1,43 @@
+﻿@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.VariableUIHandler.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using Serilog
+@using System.Text.Json
+
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0">
+    
+    <MudText Typo="Typo.body2">@expression</MudText>
+
+</MudStack>
+
+@code {
+    [Parameter]
+    public DisplayInputEditorContext EditorContext { get; set; } = null!;
+
+    private string? expression;
+    private BaseVariable? Variable => EditorContext.Variable;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(Variable?.Value))
+        {
+            try
+            {
+                var conditionExpression = JsonSerializer.Deserialize<ConditionExpression>(Variable?.Value);
+                expression = $"{conditionExpression?.VariableName}{conditionExpression?.Expression}{conditionExpression?.ConditionValue}";
+            }
+            catch (Exception ex)
+            {
+                CLog.Error("Error deserializing condition expression");
+            }
+        
+        }        
+    }
+}
