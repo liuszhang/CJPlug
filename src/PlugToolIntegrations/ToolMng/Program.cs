@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Builder;
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
-Console.WriteLine("Á¬½Óµ½Ö÷»úµØÖ·£º"+StaticData.MainServerHostIp);
+Console.WriteLine("è¿æ¥åˆ°ä¸»æœºåœ°å€ï¼š"+StaticData.MainServerHostIp);
 //StaticData.ToolAgentServerHttpsPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Https").GetSection("Url").Value.Split(':')[2];
 StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
 StaticData.ToolAgentServerHttpPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[2];
@@ -31,24 +31,24 @@ builder.Services.AddCors(options =>
         name: "AllowSpecificOrigin",
         builder =>
         {
-            builder.WithOrigins(StaticData.MainServerHostIp) // ÔÊĞíµÄÇ°¶ËÓ¦ÓÃµØÖ·
-                   .AllowAnyMethod() // ÔÊĞíÈÎºÎHTTP·½·¨
-                   .AllowAnyHeader(); // ÔÊĞíÈÎºÎÍ·²¿
+            builder.WithOrigins(StaticData.MainServerHostIp) // å…è®¸çš„å‰ç«¯åº”ç”¨åœ°å€
+                   .AllowAnyMethod() // å…è®¸ä»»ä½•HTTPæ–¹æ³•
+                   .AllowAnyHeader(); // å…è®¸ä»»ä½•å¤´éƒ¨
         });
     options.AddPolicy(
             name: "AllowAll Origins",
             builder =>
             {
-                builder.SetIsOriginAllowed(_ => true) // ÔÊĞíËùÓĞÀ´Ô´
-                       .AllowAnyMethod() // ÔÊĞíÈÎºÎHTTP·½·¨
-                       .AllowAnyHeader(); // ÔÊĞíÈÎºÎÍ·²¿
+                builder.SetIsOriginAllowed(_ => true) // å…è®¸æ‰€æœ‰æ¥æº
+                       .AllowAnyMethod() // å…è®¸ä»»ä½•HTTPæ–¹æ³•
+                       .AllowAnyHeader(); // å…è®¸ä»»ä½•å¤´éƒ¨
             });
 });
 
 builder.Services.AddScoped<IToolAgentServices, ToolAgentServices>();
 builder.Services.AddScoped<IToolAgentNXServices, ToolAgentNXServices>();
 
-builder.Services.AddHostedService<ToolMngService>(); // ×¢²áÎªºóÌ¨·şÎñ
+builder.Services.AddHostedService<ToolMngService>(); // æ³¨å†Œä¸ºåå°æœåŠ¡
 
 var app = builder.Build();
 
@@ -63,7 +63,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-// Ê¹ÓÃCORS²ßÂÔ
+// ä½¿ç”¨CORSç­–ç•¥
 app.UseCors("AllowAll Origins");
 
 app.UseRouting();

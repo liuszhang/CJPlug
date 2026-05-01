@@ -16,6 +16,7 @@ using CJ.Plug.ProcessManageApiClient;
 using CJ.Plug.StationAndToolApiClient;
 using CJ.Plug.TASApiClient;
 using CJ.Plug.UserManageApiClient;
+using CJ.Plug.UserManageModels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -38,15 +39,16 @@ public partial class MainApiClient
     private readonly Lazy<IPlugMarketApiClient> PlugMarketApiClient;
     private readonly Lazy<IProcessManageApiClient> ProcessManageApiClient;
     private readonly Lazy<IUserManageApiClient> UserManageApiClient;
+    private readonly Lazy<IRoleManageApiClient> RoleManageApiClient;
     private readonly Lazy<IMCPToolApiClient> MCPToolApiClient;
     //private readonly Lazy<IDeepSeekService> DeepSeekApiClient;
 
     public MainApiClient(IServiceProvider _serviceProvider)
     {
-        // ÏÔÊ½¼ì²é²ÎÊıÊÇ·ñÎª null£¬ÌáÇ°±¨´í²¢Ã÷È·ÌáÊ¾
+        // é”Ÿæ–¤æ‹·å¼é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿè§’å‡¤æ‹·ä¸º nullé”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·å‰é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·ç¡®é”Ÿæ–¤æ‹·ç¤º
         serviceProvider = _serviceProvider ?? throw new ArgumentNullException(
             nameof(serviceProvider),
-            "IServiceProvider ±ØĞë×¢Èë£¬²»ÄÜÎª null¡£Çë¼ì²éÒÀÀµ×¢ÈëÅäÖÃ¡£"
+            "IServiceProvider é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·æ³¨é”Ÿè¯«ï¼Œé”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·ä¸º nullé”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·æ³¨é”Ÿæ–¤æ‹·é”Ÿæ–¤æ‹·é”ŸçŸ«â˜…æ‹·"
         );
         this.serviceProvider = _serviceProvider;
 
@@ -61,6 +63,7 @@ public partial class MainApiClient
         PlugMarketApiClient = new Lazy<IPlugMarketApiClient>(() => serviceProvider.GetRequiredService<IPlugMarketApiClient>());
         ProcessManageApiClient = new Lazy<IProcessManageApiClient>(() => serviceProvider.GetRequiredService<IProcessManageApiClient>());
         UserManageApiClient = new Lazy<IUserManageApiClient>(() => serviceProvider.GetRequiredService<IUserManageApiClient>());
+        RoleManageApiClient = new Lazy<IRoleManageApiClient>(() => serviceProvider.GetRequiredService<IRoleManageApiClient>());
         MCPToolApiClient = new Lazy<IMCPToolApiClient>(() => serviceProvider.GetRequiredService<IMCPToolApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
     }

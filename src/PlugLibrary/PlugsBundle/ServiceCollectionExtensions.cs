@@ -28,9 +28,11 @@ using System.Reflection;
 using TextReaderPlug.Extensions;
 using TextWriterPlug.Extensions;
 using WordPlug.Extensions;
+using AndPlug.Extensions;
 using CalculatorPlug.Extensions;
 using CSharpPlug.Extensions;
 using DllLoaderPlug;
+using StlViewerPlug.Extensions;
 
 
 namespace PlugsBundle
@@ -55,7 +57,7 @@ namespace PlugsBundle
             services.AddTextReader();
             services.AddTextWriter();
             services.AddJavaScript();
-            services.AddMCDataGet();
+            //services.AddMCDataGet();
             services.AddMatlab();
             services.AddWord();
             services.AddAiAgent();
@@ -67,9 +69,11 @@ namespace PlugsBundle
             services.AddCommonToolExecute();
             services.AddFor();
             services.AddIf();
+            services.AddAnd();
             services.AddCSharp();
             services.AddCalculator();
             services.AddDllLoaderPage();
+            services.AddStlViewer();
 
 
 
@@ -113,9 +117,11 @@ namespace PlugsBundle
             services.AddCommonToolExecuteExecute();
             services.AddForExecute();
             services.AddIfExecute();
+            services.AddAndExecute();
             services.AddCSharpExecute();
             services.AddCalculatorExecute();
             services.AddDllLoaderExecute();
+            services.AddStlViewerExecute();
 
             return services;
         }

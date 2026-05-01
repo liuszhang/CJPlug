@@ -75,7 +75,7 @@ public abstract class BasePlugExecuteService : IPlugCommonExecute
             var result = plugExecutionRequest.ExecuteResultData ?? new ExecuteResultData();
             PDZApiClient= PDZApiClient??_serviceProvider.GetRequiredService<IPDZApiClient>();
             PlugDataZone = await PDZApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.ExecuteResultData.Ids.PDZId);
-            CLog.Information($"成功获取PDZ，ID为{plugExecutionRequest.ExecuteResultData.Ids.PDZId}", plugExecutionRequest.ExecuteResultData.Ids.PDZId);
+            CLog.Information($"PDZID:{plugExecutionRequest.ExecuteResultData.Ids.PDZId}", plugExecutionRequest.ExecuteResultData.Ids.PDZId);
             if (PlugDataZone == null)
             {
                 CLog.Error("未找到数据空间，执行中止，请检查数据。");

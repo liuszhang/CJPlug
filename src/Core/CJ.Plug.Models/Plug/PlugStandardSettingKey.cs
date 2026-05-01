@@ -15,7 +15,7 @@ namespace CJ.Plug.Models.Plug
         InitVariables,
         InitVariableTypes,
         Outcomes,
-        Category,
+        Category,  //插头主分类，桌面类/Web类/脚本类
         Group,
         IsContainerPlug,
         IconData,

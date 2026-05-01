@@ -1,4 +1,4 @@
-﻿using CJ.Plug.ApiClient.Contracts;
+using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
@@ -6,6 +6,8 @@ using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.StationApiServer.Contracts;
 using CJ.Plug.StationApiService.Contracts;
+using CJ.Plug_Aspire.StationApiService.Models;
+using CJ.Plug_Aspire.StationApiService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Diagnostics;
@@ -30,6 +32,22 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
 
 
 
+            // 连接状态接口 - 供 StationSettingUI 查询图站与主服务器的长连接状态
+            api.MapGet("/connection-status", (StationHubService hubService) =>
+            {
+                return TypedResults.Ok(new
+                {
+                    HubConnected = hubService.IsHubConnected,
+                    MainServerUrl = hubService.MainServerUrl,
+                    LocalTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                });
+            });
+
+            // 图站任务列表
+            api.MapGet("/tasks", GetTasks);
+
+            // 图站任务详情
+            api.MapGet("/tasks/{id}", GetTaskById);
 
             api.MapGet("/test", () => TypedResults.Ok("pong!"));
 
@@ -94,6 +112,18 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
             }
 
             return Task.FromResult("Station返回消息：\n" + tmp);
+        }
+
+        private static IResult GetTasks(StationTaskStore taskStore)
+        {
+            var tasks = taskStore.GetAll(200);
+            return TypedResults.Ok(tasks);
+        }
+
+        private static IResult GetTaskById(StationTaskStore taskStore, int id)
+        {
+            var task = taskStore.GetById(id);
+            return task is not null ? TypedResults.Ok(task) : TypedResults.NotFound();
         }
     }
 }

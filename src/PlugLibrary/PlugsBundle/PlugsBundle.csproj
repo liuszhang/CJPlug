@@ -16,6 +16,7 @@
     <ProjectReference Include="..\CommonToolExecute\CommonToolExecute.csproj" />
     <ProjectReference Include="..\ExcelPlug\ExcelPlug.csproj" />
     <ProjectReference Include="..\FileDownloadPlug\FileDownloadPlug.csproj" />
+    <ProjectReference Include="..\Loop\AndPlug\AndPlug.csproj" />
     <ProjectReference Include="..\Loop\ForPlug\ForPlug.csproj" />
     <ProjectReference Include="..\Loop\IfPlug\IfPlug.csproj" />
     <ProjectReference Include="..\MatlabPlug\MatlabPlug.csproj" />
@@ -29,6 +30,7 @@
     <ProjectReference Include="..\Script\DllLoaderPlug\DllLoaderPlug.csproj" />
     <ProjectReference Include="..\Script\JavaScriptPlug\JavaScriptPlug.csproj" />
     <ProjectReference Include="..\SendHttpRequestPlug\SendHttpRequestPlug.csproj" />
+    <ProjectReference Include="..\CAD\StlViewerPlug\StlViewerPlug.csproj" />
     <ProjectReference Include="..\TextReaderPlug\TextReaderPlug.csproj" />
     <ProjectReference Include="..\TextWriterPlug\TextWriterPlug.csproj" />
     <ProjectReference Include="..\WordPlug\WordPlug.csproj" />

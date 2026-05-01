@@ -35,7 +35,7 @@ var configuration = builder.Configuration;
 //builder.WebHost.UseStaticWebAssets();
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetValue<string>("env"));
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
-Console.WriteLine($"µ±Ç°»·¾³: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+Console.WriteLine($"å½“å‰ç¯å¢ƒ: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
 builder.Services.AddMudServices();
 builder.Services.AddMudExtensions();
@@ -70,33 +70,33 @@ builder.Services.AddSignalR(options =>
 //builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 //builder.Services.AddMediatR(typeof(Program).Assembly);
 
-// ×¢²á EventAggregator ·şÎñ
+// æ³¨å†Œ EventAggregator æœåŠ¡
 builder.Services.AddEventAggregator();
 
-//Ìí¼ÓELSAÁ÷³ÌÒıÇæÏà¹Ø·şÎñ×¢²á
+//æ·»åŠ ELSAæµç¨‹å¼•æ“ç›¸å…³æœåŠ¡æ³¨å†Œ
 builder.AddElsaServicesForWeb();
 
 builder.Services.AddScoped<CJ.Plug.Models.Contracts.IAppBarService, DefaultAppBarService>();
 builder.Services.ConfigModulePageServices();
 
-//Ìí¼Ó²åÍ·Ç°¶Ë¼¯ºÏ°üÒÀÀµ
+//æ·»åŠ æ’å¤´å‰ç«¯é›†åˆåŒ…ä¾èµ–
 builder.Services.AddPlugsBundle();
 builder.Services.AddXmlConfiguredServices();
 builder.Services.AddXmlConfiguredExecuteServices();
 
 
-//Ìí¼ÓRadzen¿Ø¼ş·şÎñ
+//æ·»åŠ Radzenæ§ä»¶æœåŠ¡
 builder.Services.AddRadzenComponents();
 
 
 builder.Services.AddOutputCache();
 
-//ÆäËû·şÎñÅäÖÃ
+//å…¶ä»–æœåŠ¡é…ç½®
 builder.Services.ConfigOtherServices();
 
 
 
-// ¿ªÆôÏêÏ¸´íÎóĞÅÏ¢
+// å¼€å¯è¯¦ç»†é”™è¯¯ä¿¡æ¯
 builder.Services.Configure<CircuitOptions>(options =>
 {
     options.DetailedErrors = true;
@@ -107,7 +107,7 @@ builder.Services.Configure<CircuitOptions>(options =>
 var app = builder.Build();
 
 var serviceProvider=builder.Services.BuildServiceProvider();
-// »ñÈ¡ËùÓĞ×¢²áµÄ IModule ÊµÀı
+// è·å–æ‰€æœ‰æ³¨å†Œçš„ IModule å®ä¾‹
 var modules = serviceProvider.GetRequiredService<IEnumerable<IModule>>().ToList();
 var moduleAssemblies = modules.Select(m => m.GetType().Assembly).Distinct().ToList();
 foreach (var module in modules)
@@ -132,15 +132,15 @@ app.UseAntiforgery();    // Add this line
 app.MapDefaultEndpoints();
 //app.UseHttpsRedirection();
 
-// 1. ÅĞ¶Ïµ±Ç°²Ù×÷ÏµÍ³²¢¶¨Òå»ù´¡Â·¾¶
+// 1. åˆ¤æ–­å½“å‰æ“ä½œç³»ç»Ÿå¹¶å®šä¹‰åŸºç¡€è·¯å¾„
 var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 var basePlugPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../PlugConfig/Plugs");
 
 var baseWebFilePath = isWindows
-    ? GlobalData.MainWebFileServer // WindowsÊ¹ÓÃÏÖÓĞÅäÖÃ
-    : "/cj/apps"; // Linux¶ÔÓ¦µÄwebÎÄ¼şÂ·¾¶
+    ? GlobalData.MainWebFileServer // Windowsä½¿ç”¨ç°æœ‰é…ç½®
+    : "/cj/apps"; // Linuxå¯¹åº”çš„webæ–‡ä»¶è·¯å¾„
 
-// 2. È·±£Ä¿Â¼´æÔÚ£¨¹Ø¼ü²½Öè£º×Ô¶¯´´½¨ÎÄ¼ş¼Ğ£©
+// 2. ç¡®ä¿ç›®å½•å­˜åœ¨ï¼ˆå…³é”®æ­¥éª¤ï¼šè‡ªåŠ¨åˆ›å»ºæ–‡ä»¶å¤¹ï¼‰
 Directory.CreateDirectory(basePlugPath);
 Directory.CreateDirectory(baseWebFilePath);
 

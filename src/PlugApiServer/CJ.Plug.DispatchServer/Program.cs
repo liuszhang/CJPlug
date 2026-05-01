@@ -5,23 +5,23 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetValue<string>("env"));
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
-Console.WriteLine($"µ±Ç°»·¾³: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+Console.WriteLine($"å½“å‰ç¯å¢ƒ: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
 //GlobalData.MainApiServer = "http://localhost:5061";
-//apisre·şÎñÖ§³Ö
+//apisreæœåŠ¡æ”¯æŒ
 builder.AddServiceDefaults();
 
 
 
-// Ìí¼Ó Swagger ·şÎñ
+// æ·»åŠ  Swagger æœåŠ¡
 //builder.Services.AddSwaggerGen();
 
-//·şÎñ°üÅäÖÃ
+//æœåŠ¡åŒ…é…ç½®
 builder.Services.AddDispatchApiService();
 
 
 builder.Services.AddEndpointsApiExplorer();
-// Ìí¼Ó NSwag ·şÎñ
+// æ·»åŠ  NSwag æœåŠ¡
 builder.Services.AddOpenApiDocument(configure =>
 {
     configure.Title = "DS API";
@@ -35,11 +35,11 @@ app.UseRouting();
 
 app.MapDefaultEndpoints();
 
-//µ÷¶ÈAPIÅäÖÃ
+//è°ƒåº¦APIé…ç½®
 app.UseDispatchServiceEndpoints();
 
 
-// ÆôÓÃ NSwag ºÍ Swagger UI
+// å¯ç”¨ NSwag å’Œ Swagger UI
 app.UseOpenApi();
 app.UseSwaggerUi();
 if (app.Environment.IsDevelopment())

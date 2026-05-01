@@ -1,0 +1,108 @@
+@page "/stlviewer"
+@using CJ.Plug.FileManageApiClient
+@using CJ.Plug.Models.Extensions
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using StlViewerPlug
+
+@inject IFileManageApiClient FileManageApiClient
+@inject MainApiClient MainApiClient
+
+<MudStack Style="padding:8px;">
+    <MudStack Row AlignItems="AlignItems.Center" Style="gap:12px;">
+        <MudFileUpload T="IBrowserFile" FilesChanged="@OnFileSelected" Accept=".stl">
+            <CustomContent>
+                <MudButton OnClick="@context.OpenFilePickerAsync"
+                           Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.UploadFile">
+                    上传 STL 文件
+                </MudButton>
+            </CustomContent>
+            <SelectedTemplate>
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">@_selectedFileName</MudChip>
+            </SelectedTemplate>
+        </MudFileUpload>
+
+        <MudText Typo="Typo.body2">
+            @if (!string.IsNullOrEmpty(_displayFileName))
+            {
+                <span style="color:green;">当前模型: @_displayFileName</span>
+            }
+            else
+            {
+                <span style="color:gray;">请上传一个 .stl 文件</span>
+            }
+        </MudText>
+    </MudStack>
+
+    <MudDivider />
+
+    <MudPaper Elevation="3" Style="overflow:hidden; width:100%;">
+        @if (!string.IsNullOrEmpty(_stlPath))
+        {
+            <ThreeJSViewer ModelUrl="@_stlPath" ModelType="stl"
+                           Height="500" ModelColor="0x4a90d9" />
+        }
+        else
+        {
+            <MudContainer Style="width:100%;height:500px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;">
+                <MudText Color="Color.Dark" Typo="Typo.h6">请上传 STL 文件以预览</MudText>
+            </MudContainer>
+        }
+    </MudPaper>
+</MudStack>
+
+@code {
+    [CascadingParameter] public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter] public string? PlugDefinitionId { get; set; }
+
+    private string? _stlPath;
+    private string? _displayFileName;
+    private string? _selectedFileName;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            var stlVar = PlugDataZone?.PlugVariableDatas?
+                .FirstOrDefault(v => v.PlugDefinitionId == PlugDefinitionId
+                                  && v.Name == InitVariableNames.StlFile.ToString());
+            if (stlVar != null && !string.IsNullOrEmpty(stlVar.Value))
+            {
+                _displayFileName = stlVar.Value.GetFileNameFromFileVariable();
+                _stlPath = await FileManageApiClient.UploadFileToWebServer(stlVar);
+            }
+        }
+    }
+
+    private async Task OnFileSelected(IBrowserFile file)
+    {
+        if (file == null || !file.Name.EndsWith(".stl", StringComparison.OrdinalIgnoreCase)) return;
+        _selectedFileName = file.Name; StateHasChanged();
+        try
+        {
+            var stlVar = PlugDataZone?.PlugVariableDatas?
+                .FirstOrDefault(v => v.PlugDefinitionId == PlugDefinitionId
+                                  && v.Name == InitVariableNames.StlFile.ToString());
+            var (_, fileId) = await FileManageApiClient.UploadFileToVariable(
+                file.OpenReadStream(200_000_000), file.Name, stlVar);
+            if (!string.IsNullOrEmpty(fileId))
+            {
+                PlugDataZone?.SetVariableValue(PlugDefinitionId,
+                    InitVariableNames.StlFile.ToString(), file.Name + ":" + fileId);
+                _displayFileName = file.Name;
+
+                // 复制到 Web 服务器可访问路径，获取相对路径供 ThreeJSViewer 直接加载
+                var fileData = new PlugVariableData
+                {
+                    Name = InitVariableNames.StlFile.ToString(),
+                    Value = file.Name + ":" + fileId
+                };
+                _stlPath = await FileManageApiClient.UploadFileToWebServer(fileData);
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"上传失败: {ex.Message}"); }
+    }
+}

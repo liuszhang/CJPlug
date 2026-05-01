@@ -1,4 +1,4 @@
-﻿@using System.Text
+@using System.Text
 @using System.Text.Json
 @using System.Text.Json.Nodes
 @using BlazorMonaco.Editor
@@ -41,9 +41,9 @@
     <MudButton Onclick="@(()=>{CMDExeResult="";})" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ClearAll">清空日志</MudButton>
     <MudCheckBox T="bool" Color="Color.Primary">bat方式运行</MudCheckBox>
     <MudSpacer></MudSpacer>
-    <MudCheckBox Value="showConsole" ValueChanged="@((bool a)=>OnValueChanged(a))">显示执行窗口</MudCheckBox>
-    <MudCheckBox Value="redirectOutput" ValueChanged="@((bool a)=>OnValueChanged(a))">重定向输出信息</MudCheckBox>
-    <MudCheckBox Value="redirectWorkPath" ValueChanged="@((bool a)=>OnValueChanged(a))">重定向工作目录</MudCheckBox>
+    <MudCheckBox @bind-Value="showConsole" @bind-Value:after="UpdatePlugSettings">显示执行窗口</MudCheckBox>
+    <MudCheckBox @bind-Value="redirectOutput" @bind-Value:after="UpdatePlugSettings">重定向输出信息</MudCheckBox>
+    <MudCheckBox @bind-Value="redirectWorkPath" @bind-Value:after="UpdatePlugSettings">重定向工作目录</MudCheckBox>
 </MudStack>
 <MudStack Row AlignItems="AlignItems.Center">
     <MudText>编辑脚本内容</MudText>
@@ -81,13 +81,13 @@
             <MudStack Spacing="0">
                 <MudGrid Style="margin-left:-12px;">
                     <MudItem xs="12" md="12">
-                        <MudRadioGroup Value="waitType" ValueChanged="@((string a)=>OnValueChanged2(a))">
+                        <MudRadioGroup @bind-Value="waitType" @bind-Value:after="UpdatePlugSettings">
                             <MudRadio Color="Color.Primary" Value="@("waitforever")">无限等待</MudRadio>
                             <MudRadio Color="Color.Primary" Value="@("waitsometime")">
                                 <ChildContent>
                                     <MudStack Row AlignItems="AlignItems.Center">
                                         指定超时
-                                        <MudTextField Value="waitTime" ValueChanged="@((string a)=>OnValueChanged2(a))" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
+                                        <MudTextField @bind-Value="waitTime" @bind-Value:after="UpdatePlugSettings" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
                                         秒
                                     </MudStack>
                                 </ChildContent>
@@ -95,7 +95,7 @@
                         </MudRadioGroup>
                     </MudItem>
                 </MudGrid>
-                <MudCheckBox Value="autoCloseProcess" ValueChanged="@((bool a)=>OnValueChanged(a))">超时自动关闭</MudCheckBox>
+                <MudCheckBox @bind-Value="autoCloseProcess" @bind-Value:after="UpdatePlugSettings">超时自动关闭</MudCheckBox>
 
             </MudStack>
         </MudCardContent>
@@ -110,13 +110,13 @@
             <MudStack Spacing="0">
                 <MudGrid Style="margin-left:-12px;">
                     <MudItem xs="12" md="12">
-                        <MudRadioGroup Value="watchProcessType" ValueChanged="@((string a)=>OnValueChanged2(a))">
+                        <MudRadioGroup @bind-Value="watchProcessType" @bind-Value:after="UpdatePlugSettings">
                             <MudRadio Color="Color.Primary" Value="@("default")">默认调用的进程</MudRadio>
                             <MudRadio Color="Color.Primary" Value="@("custome")">
                                 <ChildContent>
                                     <MudStack Row AlignItems="AlignItems.Center">
                                         进程名称（不带后缀，多个进程用|分隔）
-                                        <MudTextField Value="watchProcessName" ValueChanged="@((string a)=>OnValueChanged2(a))" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
+                                        <MudTextField @bind-Value="watchProcessName" @bind-Value:after="UpdatePlugSettings" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
 
                                     </MudStack>
                                 </ChildContent>
@@ -125,8 +125,8 @@
                     </MudItem>
                 </MudGrid>
                 <MudStack Row>
-                    <MudCheckBox Value="autoCloseProcess" ValueChanged="@((bool a)=>OnValueChanged(a))">执行完成关闭进程</MudCheckBox>
-                    <MudCheckBox Value="closeProcessWhenError" ValueChanged="@((bool a)=>OnValueChanged(a))">执行错误或终止时关闭进程</MudCheckBox>
+                    <MudCheckBox @bind-Value="autoCloseProcess" @bind-Value:after="UpdatePlugSettings">执行完成关闭进程</MudCheckBox>
+                    <MudCheckBox @bind-Value="closeProcessWhenError" @bind-Value:after="UpdatePlugSettings">执行错误或终止时关闭进程</MudCheckBox>
                 </MudStack>
 
             </MudStack>
@@ -190,7 +190,7 @@
     private bool showProgress = false;
     private bool IsInput = false;
     private bool IsOutput = false;
-    private PlugSettings? PlugSettings;
+
 
 
     DialogOptions diaOption = new DialogOptions()
@@ -207,34 +207,16 @@
         //Console.WriteLine(">>>>>>>>>>>>>>start init");
         await MudDialog.SetOptionsAsync(diaOption);
 
-        //Log.Information(Plug.Value);
-        if(Plug.GetPlugSettings()?.Settings.Count==0)
-        {
-            PlugSettings = new PlugSettings();
-            PlugSettings.SetSetting("WaitType", "waitforever");
-            PlugSettings.SetSetting("WaitTime", "0");
-            PlugSettings.SetSetting("WatchProcessType", "default");
-            PlugSettings.SetSetting("WatchProcessName", "");
-            PlugSettings.SetSetting("AutoCloseProcess", "false");
-            PlugSettings.SetSetting("CloseProcessWhenError", "false");
-            PlugSettings.SetSetting("ShowConsole", "true");
-            PlugSettings.SetSetting("RedirectOutput", "true");
-            PlugSettings.SetSetting("RedirectWorkPath", "true");
-        }
-        else
-        {
-            PlugSettings = JsonSerializer.Deserialize<PlugSettings>(Plug.PlugSettingsJson);
-        }
-
-        waitType = PlugSettings.GetSetting("WaitType");
-        waitTime = PlugSettings.GetSetting("WaitTime");
-        watchProcessType = PlugSettings.GetSetting("WatchProcessType");
-        watchProcessName = PlugSettings.GetSetting("WatchProcessName");
-        autoCloseProcess = string.IsNullOrEmpty(PlugSettings.GetSetting("AutoCloseProcess")) ? false : bool.Parse(PlugSettings.GetSetting("AutoCloseProcess"));
-        closeProcessWhenError = string.IsNullOrEmpty(PlugSettings.GetSetting("CloseProcessWhenError")) ? false : bool.Parse(PlugSettings.GetSetting("CloseProcessWhenError"));
-        showConsole = string.IsNullOrEmpty(PlugSettings.GetSetting("ShowConsole")) ? false : bool.Parse(PlugSettings.GetSetting("ShowConsole"));
-        redirectOutput = string.IsNullOrEmpty(PlugSettings.GetSetting("RedirectOutput")) ? true : bool.Parse(PlugSettings.GetSetting("RedirectOutput"));
-        redirectWorkPath = string.IsNullOrEmpty(PlugSettings.GetSetting("RedirectWorkPath")) ? true : bool.Parse(PlugSettings.GetSetting("RedirectWorkPath"));
+        // 从插头参数加载配置，设置默认值
+        waitType = Plug.GetVariableValue(InitVariableNames.WaitType.ToString()) ?? "waitforever";
+        waitTime = Plug.GetVariableValue(InitVariableNames.ExecutionTimeout.ToString()) ?? "0";
+        watchProcessType = Plug.GetVariableValue(InitVariableNames.WatchProcessType.ToString()) ?? "default";
+        watchProcessName = Plug.GetVariableValue(InitVariableNames.WatchProcessName.ToString()) ?? "";
+        autoCloseProcess = bool.TryParse(Plug.GetVariableValue(InitVariableNames.AutoCloseProcess.ToString()), out var acp) ? acp : false;
+        closeProcessWhenError = bool.TryParse(Plug.GetVariableValue(InitVariableNames.CloseProcessWhenError.ToString()), out var cpe) ? cpe : false;
+        showConsole = bool.TryParse(Plug.GetVariableValue(InitVariableNames.ShowConsole.ToString()), out var sc) ? sc : true;
+        redirectOutput = bool.TryParse(Plug.GetVariableValue(InitVariableNames.RedirectOutput.ToString()), out var ro) ? ro : true;
+        redirectWorkPath = bool.TryParse(Plug.GetVariableValue(InitVariableNames.RedirectWorkPath.ToString()), out var rwp) ? rwp : true;
 
         Plug.Value = Plug.GetVariableValue(InitVariableNames.CMDCommand.ToString());
         CMDCommand = Plug.Value ?? "notepad";
@@ -260,14 +242,30 @@
 
     protected override Task OnParametersSetAsync()
     {
-        //CLog.Information($"当前PDZ：{PlugDataZone.PDZId}");
-        //CLog.Information($"当前PLug：{DefinitionId}");
         CMDCommand = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.CMDCommand.ToString());
-        //MyCon1sole.WriteLine($"CMDCommand:{CMDCommand}");
         if (string.IsNullOrEmpty(CMDCommand))
         {
             CMDCommand = "powershell";
         }
+        // 从PDZ加载所有配置参数
+        var val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.WaitType.ToString());
+        if (!string.IsNullOrEmpty(val)) waitType = val;
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.ExecutionTimeout.ToString());
+        if (!string.IsNullOrEmpty(val)) waitTime = val;
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.WatchProcessType.ToString());
+        if (!string.IsNullOrEmpty(val)) watchProcessType = val;
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.WatchProcessName.ToString());
+        if (!string.IsNullOrEmpty(val)) watchProcessName = val;
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.AutoCloseProcess.ToString());
+        if (!string.IsNullOrEmpty(val)) { bool.TryParse(val, out var b); autoCloseProcess = b; }
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.CloseProcessWhenError.ToString());
+        if (!string.IsNullOrEmpty(val)) { bool.TryParse(val, out var b); closeProcessWhenError = b; }
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.ShowConsole.ToString());
+        if (!string.IsNullOrEmpty(val)) { bool.TryParse(val, out var b); showConsole = b; }
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.RedirectOutput.ToString());
+        if (!string.IsNullOrEmpty(val)) { bool.TryParse(val, out var b); redirectOutput = b; }
+        val = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.RedirectWorkPath.ToString());
+        if (!string.IsNullOrEmpty(val)) { bool.TryParse(val, out var b); redirectWorkPath = b; }
         return base.OnParametersSetAsync();
     }
 
@@ -359,28 +357,18 @@
         //StateHasChanged();
     }
 
-    private async Task OnValueChanged(bool value)
-    {
-        UpdatePlugSettings();         
-    }
-    private async Task OnValueChanged2(string value)
-    {
-        UpdatePlugSettings();
-    }
-
     private async void UpdatePlugSettings()
     {
-        PlugSettings.SetSetting("WaitType", waitType);
-        PlugSettings.SetSetting("WaitTime", waitTime);
-        PlugSettings.SetSetting("WatchProcessType", watchProcessType);
-        PlugSettings.SetSetting("WatchProcessName", watchProcessName);
-        PlugSettings.SetSetting("AutoCloseProcess", autoCloseProcess.ToString());
-        PlugSettings.SetSetting("CloseProcessWhenError", closeProcessWhenError.ToString());
-        PlugSettings.SetSetting("ShowConsole", showConsole.ToString());
-        PlugSettings.SetSetting("RedirectOutput", redirectOutput.ToString());
-        PlugSettings.SetSetting("RedirectWorkPath", redirectWorkPath.ToString());
-        Plug.PlugSettingsJson = JsonSerializer.Serialize(PlugSettings);
-        //await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+        // 将所有配置保存到插头参数（PDZ变量）
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WaitType.ToString(), waitType);
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.ExecutionTimeout.ToString(), waitTime);
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessType.ToString(), watchProcessType);
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessName.ToString(), watchProcessName);
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.AutoCloseProcess.ToString(), autoCloseProcess.ToString());
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.CloseProcessWhenError.ToString(), closeProcessWhenError.ToString());
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.ShowConsole.ToString(), showConsole.ToString());
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.RedirectOutput.ToString(), redirectOutput.ToString());
+        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.RedirectWorkPath.ToString(), redirectWorkPath.ToString());
     }
 
 }

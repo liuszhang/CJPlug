@@ -42,7 +42,7 @@ public class WordPlugCommonExecuteService(IServiceProvider serviceProvider) : Ba
             var fileId = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString())?.GetFileIdFromFileVariable();
             if (string.IsNullOrEmpty(fileId))
             {
-                CLog.Error($"未找到文件");
+                CLog.Error($"未找到文件",PlugDataZone?.PDZId);
                 return await ReportErrorResult(erd);
             }
             // 获取原始文件流

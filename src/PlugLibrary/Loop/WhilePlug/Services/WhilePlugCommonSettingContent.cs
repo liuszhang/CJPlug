@@ -53,11 +53,10 @@ namespace WhilePlug.Services
                 IsBrowsable = true
             });
 
-            settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-                JsonSerializer.Serialize(InitVariables));
-            settings.SetSetting(PlugSettingKey.IsContainerPlug.ToString(),
-                "true");
+            settings.SetSetting(PlugSettingKey.InitVariables.ToString(), JsonSerializer.Serialize(InitVariables));
+            settings.SetSetting(PlugSettingKey.IsContainerPlug.ToString(), "true");
             settings.SetSetting(PlugSettingKey.Group.ToString(),PlugGroupEnum.流程控制.ToString());
+            settings.SetSetting(PlugSettingKey.Outcomes.ToString(), "结束|循环");
 
             return Task.FromResult<PlugSettings?>(settings);
         }

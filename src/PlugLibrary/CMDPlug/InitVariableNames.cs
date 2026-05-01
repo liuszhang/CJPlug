@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,5 +10,14 @@ namespace CMDPlug
     {
         CMDCommand,
         ResultString,
+        ExecutionTimeout,
+        WaitType,
+        WatchProcessType,
+        WatchProcessName,
+        AutoCloseProcess,
+        CloseProcessWhenError,
+        ShowConsole,
+        RedirectOutput,
+        RedirectWorkPath,
     }
 }

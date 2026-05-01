@@ -9,18 +9,18 @@ public class WordToPdfService
 
         try
         {
-            // ´ò¿ª Word ÎÄµµ
+            // æ‰“å¼€ Word æ–‡æ¡£
             wordDoc = wordApp.Documents.Open(wordFilePath);
 
-            // ±£´æÎª PDF
+            // ä¿å­˜ä¸º PDF
             wordDoc.SaveAs2(pdfFilePath, WdSaveFormat.wdFormatPDF);
 
-            // ¹Ø±ÕÎÄµµ
+            // å…³é—­æ–‡æ¡£
             wordDoc.Close();
         }
         finally
         {
-            // ÍË³ö Word Ó¦ÓÃ³ÌĞò
+            // é€€å‡º Word åº”ç”¨ç¨‹åº
             wordApp.Quit();
         }
     }

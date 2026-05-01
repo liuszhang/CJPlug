@@ -58,14 +58,14 @@ public class CommonCorePlugActivity : CodeActivity
                     //Log.Information($"receive ActivityContext:{ActivityContext}");
                     //await OnResumeAsync(context);
                     //await context.CompleteActivityAsync();
-                    //Log.Information($"组件执行完成：{context.IsCompleted}");
+                    CLog.Information($"组件执行完成：{context.IsCompleted}");
                     //Log.Information($"1组件执行完成：{context.Activity.Name}");
                     IsCompleted = true;
                     
                 }
                 else
                 {
-                    //Log.Information($"receive ActivityContext:{ActivityContext},but not current ID:{context.WorkflowExecutionContext.CorrelationId + context.Activity.Id}");
+                    CLog.Information($"receive ActivityContext:{ActivityContext},but not current ID:{context.WorkflowExecutionContext.CorrelationId + context.Activity.Id}");
                 }
             });
 
@@ -90,7 +90,7 @@ public class CommonCorePlugActivity : CodeActivity
 
 
 
-            Console.WriteLine("============CREATE BOOKMARK,WAIT FOR EXECUTING...============");
+            CLog.Information("============CREATE BOOKMARK,WAIT FOR EXECUTING...============");
 
             //await MainApiClient.ExecutePlug(request);
 
@@ -131,7 +131,7 @@ public class CommonCorePlugActivity : CodeActivity
                 //return;
             }
             HubConnectionManagerService._hubConnection.Remove("CompleteActivityContext");
-            Log.Information($"组件执行完成：{context.Activity.Name}");
+            CLog.Information($"组件执行完成：{context.Activity.Name}");
 
             //await MainApiClient.SyncJournalData(context.WorkflowExecutionContext.CorrelationId);
 
@@ -147,7 +147,7 @@ public class CommonCorePlugActivity : CodeActivity
 
     private async ValueTask OnResumeAsync(ActivityExecutionContext context)
     {
-        Log.Information("=======88888888888=====RESUME FROM BOOKMARK============");
+        CLog.Information("=======88888888888=====RESUME FROM BOOKMARK============");
         foreach (var b in context.Bookmarks)
         {
             //Log.Information($"书签:{b.Id}");
@@ -155,7 +155,7 @@ public class CommonCorePlugActivity : CodeActivity
         try
         {
             await context.CompleteActivityAsync();
-            Log.Information(context.IsCompleted.ToString());
+            CLog.Information(context.IsCompleted.ToString());
         }
         catch(Exception ex)
         {

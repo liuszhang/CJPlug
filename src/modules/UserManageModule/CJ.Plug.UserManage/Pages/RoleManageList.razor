@@ -1,12 +1,13 @@
-﻿@page "/RoleManageList"
+@page "/RoleManageList"
 
+@using CJ.Plug.UserManageModels
 @using MudBlazor
 @using System.Globalization
-@using System.Linq
 
-@inject HttpClient Http
+@inject IRoleManageApiClient RoleApiClient
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>角色管理</PageTitle>
 
@@ -15,119 +16,14 @@
     <MudStack Row AlignItems="AlignItems.Center">
         <MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="角色操作" Color="Color.Default" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft">
             <MudMenuItem OnClick="@DeleteSelectedRoles">删除</MudMenuItem>
-            <MudMenuItem OnClick="@ExportSelectedRoles">导出</MudMenuItem>
         </MudMenu>
 
-        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateRole">创建角色</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建角色</MudButton>
         <MudButton OnClick="async()=>await dataGrid.ReloadServerData()" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
     </MudStack>
 
-
-@code {
-    private MudDataGrid<RoleDto> dataGrid;
-    public HashSet<RoleDto> SelectedRoles { get; set; } = new HashSet<RoleDto>();
-    public string? searchString { get; set; }
-
-    // 示例数据：替换为后端 API 调用
-    private List<RoleDto> AllRoles { get; set; } = new List<RoleDto>()
-    {
-        new RoleDto { Id = 1, Name = "管理员", Description = "系统管理权限", Permissions = "*", IsSystem = true, CreatedAt = DateTimeOffset.Now.AddYears(-1) },
-        new RoleDto { Id = 2, Name = "运维", Description = "运维相关权限", Permissions = "Job:View,Job:Manage", IsSystem = false, CreatedAt = DateTimeOffset.Now.AddMonths(-6) },
-        new RoleDto { Id = 3, Name = "普通用户", Description = "普通使用者", Permissions = "Job:View", IsSystem = false, CreatedAt = DateTimeOffset.Now.AddMonths(-2) }
-    };
-
-    private async Task<GridData<RoleDto>> LoadData(GridState<RoleDto> state, CancellationToken token)
-    {
-        var query = AllRoles.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(searchString))
-        {
-            var s = searchString.Trim();
-            query = query.Where(r =>
-                (!string.IsNullOrEmpty(r.Name) && r.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(r.Description) && r.Description.Contains(s, StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(r.Permissions) && r.Permissions.Contains(s, StringComparison.OrdinalIgnoreCase))
-            );
-        }
-
-        var sortDef = state.SortDefinitions?.FirstOrDefault();
-        if (sortDef != null)
-        {
-            if (sortDef.SortBy == nameof(RoleDto.Name))
-                query = query.OrderBy(r => r.Name);
-            else if (sortDef.SortBy == nameof(RoleDto.CreatedAt))
-                query = query.OrderBy(r => r.CreatedAt);
-        }
-        else
-        {
-            query = query.OrderByDescending(r => r.CreatedAt);
-        }
-
-        var total = query.Count();
-        var items = query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
-        await Task.CompletedTask;
-        return new GridData<RoleDto> { TotalItems = total, Items = items };
-    }
-
-    private void CreateRole()
-    {
-        // placeholder: open dialog to create role
-        var newId = (AllRoles.Count == 0) ? 1 : AllRoles.Max(x => x.Id) + 1;
-        AllRoles.Insert(0, new RoleDto { Id = newId, Name = $"新角色{newId}", Description = "请编辑描述", Permissions = "", IsSystem = false, CreatedAt = DateTimeOffset.Now });
-        _ = dataGrid.ReloadServerData();
-        Snackbar.Add("已创建新角色（请实现编辑弹窗）", Severity.Success);
-    }
-
-    private void EditRole(RoleDto role)
-    {
-        Snackbar.Add($"编辑角色：{role.Name}（请实现打开编辑对话框）", Severity.Info);
-    }
-
-    private async Task DeleteRole(RoleDto role)
-    {
-        if (role == null)
-            return;
-        AllRoles.RemoveAll(r => r.Id == role.Id);
-        await dataGrid.ReloadServerData();
-        Snackbar.Add($"已删除角色：{role.Name}", Severity.Success);
-    }
-
-    private async Task DeleteSelectedRoles()
-    {
-        foreach (var r in SelectedRoles.ToList())
-            AllRoles.RemoveAll(x => x.Id == r.Id);
-        SelectedRoles.Clear();
-        await dataGrid.ReloadServerData();
-        Snackbar.Add("已删除所选角色", Severity.Success);
-    }
-
-    private void ExportSelectedRoles()
-    {
-        Snackbar.Add("导出所选角色（请实现导出逻辑）", Severity.Info);
-    }
-
-    private void CloneRole(RoleDto role)
-    {
-        if (role == null) return;
-        var newId = (AllRoles.Count == 0) ? 1 : AllRoles.Max(x => x.Id) + 1;
-        var clone = new RoleDto { Id = newId, Name = role.Name + " - 复制", Description = role.Description, Permissions = role.Permissions, IsSystem = false, CreatedAt = DateTimeOffset.Now };
-        AllRoles.Insert(0, clone);
-        _ = dataGrid.ReloadServerData();
-        Snackbar.Add($"已复制角色：{role.Name}", Severity.Success);
-    }
-
-    public class RoleDto
-    {
-        public int Id { get; set; }
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public string? Permissions { get; set; }
-        public bool IsSystem { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
-    }
-}
     <MudDataGrid @ref="dataGrid"
-                 T="RoleDto"
+                 T="RoleManageDto"
                  ServerData="LoadData"
                  Dense="true"
                  Hover="true"
@@ -143,7 +39,7 @@
             <MudTextField T="string"
                           @bind-Value="searchString"
                           Margin="Margin.Dense"
-                          Placeholder="可搜索：角色名、描述、权限"
+                          Placeholder="可搜索：角色名、描述"
                           Variant="Variant.Outlined"
                           AdornmentIcon="@Icons.Material.Outlined.Search"
                           Adornment="Adornment.End"
@@ -154,7 +50,7 @@
         </ToolBarContent>
 
         <Columns>
-            <SelectColumn T="RoleDto" />
+            <SelectColumn T="RoleManageDto" />
 
             <TemplateColumn Title="角色名" Sortable="true">
                 <CellTemplate>
@@ -168,9 +64,11 @@
                 </CellTemplate>
             </TemplateColumn>
 
-            <TemplateColumn Title="权限">
+            <TemplateColumn Title="角色类型">
                 <CellTemplate>
-                    <MudText Typo="Typo.caption">@context.Item.Permissions</MudText>
+                    <MudChip Color="@(context.Item.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                        @(context.Item.RoleType ?? "自定义角色")
+                    </MudChip>
                 </CellTemplate>
             </TemplateColumn>
 
@@ -184,16 +82,17 @@
 
             <TemplateColumn Title="创建时间" Sortable="true">
                 <CellTemplate>
-                    @context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    @(context.Item.CreatedAt > DateTimeOffset.MinValue
+                        ? context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                        : "-")
                 </CellTemplate>
             </TemplateColumn>
 
             <TemplateColumn Style="text-align:right" Title="操作">
                 <CellTemplate>
                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                        <MudMenuItem OnClick="@(()=>EditRole(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
                         <MudMenuItem OnClick="@(()=>DeleteRole(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                        <MudMenuItem OnClick="@(()=>CloneRole(context.Item))" Icon="@Icons.Material.Outlined.ContentCopy">复制</MudMenuItem>
                     </MudMenu>
                 </CellTemplate>
             </TemplateColumn>
@@ -213,3 +112,188 @@
     </MudDataGrid>
 
 </MudContainer>
+
+@code {
+    private MudDataGrid<RoleManageDto> dataGrid;
+    public HashSet<RoleManageDto> SelectedRoles { get; set; } = new HashSet<RoleManageDto>();
+    public string? searchString { get; set; }
+    private List<RoleManageDto> _allRoles = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+            _allRoles = await RoleApiClient.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载角色失败: {ex.Message}", Severity.Error);
+            _allRoles = [];
+        }
+    }
+
+    private async Task<GridData<RoleManageDto>> LoadData(GridState<RoleManageDto> state, CancellationToken token)
+    {
+        var query = _allRoles.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            var s = searchString.Trim();
+            query = query.Where(r =>
+                (!string.IsNullOrEmpty(r.Name) && r.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(r.Description) && r.Description.Contains(s, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        var sortDef = state.SortDefinitions?.FirstOrDefault();
+        if (sortDef != null)
+        {
+            if (sortDef.SortBy == "Name")
+                query = sortDef.Descending
+                    ? query.OrderByDescending(r => r.Name)
+                    : query.OrderBy(r => r.Name);
+            else if (sortDef.SortBy == "CreatedAt")
+                query = sortDef.Descending
+                    ? query.OrderByDescending(r => r.CreatedAt)
+                    : query.OrderBy(r => r.CreatedAt);
+        }
+        else
+        {
+            query = query.OrderByDescending(r => r.Id);
+        }
+
+        var items = query.ToList();
+        var total = items.Count;
+        var pageItems = items.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new GridData<RoleManageDto> { TotalItems = total, Items = pageItems };
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<CreateRoleDialog>
+        {
+            { d => d.RoleName, "" },
+            { d => d.RoleDescription, "" },
+            { d => d.RoleType, "自定义角色" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateRoleDialog>("创建角色", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateRoleRequest request)
+        {
+            try
+            {
+                await RoleApiClient.CreateAsync(request);
+                Snackbar.Add($"角色 \"{request.Name}\" 创建成功", Severity.Success);
+                await LoadRoles();
+                await dataGrid.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建角色失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(RoleManageDto role)
+    {
+        var parameters = new DialogParameters<EditRoleDialog>
+        {
+            { d => d.RoleId, role.Id },
+            { d => d.RoleName, role.Name ?? "" },
+            { d => d.RoleDescription, role.Description ?? "" },
+            { d => d.RoleType, role.RoleType ?? "自定义角色" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditRoleDialog>("编辑角色", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdateRoleRequest request)
+        {
+            try
+            {
+                await RoleApiClient.UpdateAsync(request);
+                Snackbar.Add($"角色 \"{request.Name}\" 更新成功", Severity.Success);
+                await LoadRoles();
+                await dataGrid.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新角色失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteRole(RoleManageDto role)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除角色 \"{role.Name}\" 吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await RoleApiClient.DeleteAsync(role.Id);
+            if (success)
+            {
+                Snackbar.Add($"已删除角色：{role.Name}", Severity.Success);
+                await LoadRoles();
+                await dataGrid.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Add("删除角色失败：角色不存在", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除角色失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteSelectedRoles()
+    {
+        if (SelectedRoles.Count == 0)
+        {
+            Snackbar.Add("请先选择要删除的角色", Severity.Warning);
+            return;
+        }
+
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认批量删除",
+            $"确定要删除选中的 {SelectedRoles.Count} 个角色吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        var failedCount = 0;
+        foreach (var r in SelectedRoles.ToList())
+        {
+            try
+            {
+                await RoleApiClient.DeleteAsync(r.Id);
+            }
+            catch
+            {
+                failedCount++;
+            }
+        }
+
+        SelectedRoles.Clear();
+        await LoadRoles();
+        await dataGrid.ReloadServerData();
+
+        if (failedCount == 0)
+            Snackbar.Add("已删除所选角色", Severity.Success);
+        else
+            Snackbar.Add($"已删除 {SelectedRoles.Count - failedCount} 个角色，{failedCount} 个删除失败", Severity.Warning);
+    }
+}

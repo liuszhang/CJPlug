@@ -1,4 +1,4 @@
-﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.VariableUIHandler.Models
 @using MudBlazor
@@ -6,28 +6,31 @@
 @using Size=MudBlazor.Size
 
 
-@* @SelectedPlug.Name *@
-<MudDataGrid T="PlugVariableData" Items="@EditorContext?.PlugDataZone.GetVariablesOfPlug(SelectedPlugDefinitionId)" ReadOnly="true"
-SortMode="SortMode.None" Height="100%" SelectedItemChanged="SelectVariable"
-Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgressColor="Color.Primary">
+<MudDataGrid T="PlugVariableData" Items="@_allVariables" ReadOnly="true"
+    SortMode="SortMode.None" Height="100%" SelectedItemChanged="SelectVariable"
+    Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgressColor="Color.Primary"
+    Groupable="@_enableGrouping" GroupExpanded="@_enableGrouping">
     <ToolBarContent>
         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh">刷新</MudButton>
     </ToolBarContent>
     <Columns>
         <SelectColumn T="PlugVariableData" />
         <PropertyColumn Property="x => x.Name" Title="名称" />
-        <PropertyColumn Property="x => x.Type" Title="类型" />            
-        @* <PropertyColumn Property="x => x.Value" Title="值" Required="false" >
-            
-        </PropertyColumn> *@
+        <PropertyColumn Property="x => x.Type" Title="类型" />
         <TemplateColumn>
             <CellTemplate>
                 <MudTextField T="string" ReadOnly Style="max-width:300px" Size="@Size.Small" Text="@context.Item.Value" Lines="1" AutoGrow></MudTextField>
             </CellTemplate>
         </TemplateColumn>
-            
-        @* <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Required="false" /> *@
-        <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出"/>            
+        <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出"/>
+        @if (_enableGrouping)
+        {
+            <TemplateColumn Title="所属插头" Groupable="true" Grouping="true" GroupBy="@((PlugVariableData x) => GetPlugName(x.PlugDefinitionId))">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2">@GetPlugName(context.Item.PlugDefinitionId)</MudText>
+                </CellTemplate>
+            </TemplateColumn>
+        }
     </Columns>
 </MudDataGrid>
 
@@ -36,26 +39,34 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
     [Parameter]
     public DisplayInputEditorContext? EditorContext { get; set; }
 
-    // [Parameter]
-    // public Plug? SelectedPlug { get; set; } = new();
     [Parameter]
     public string? SelectedPlugDefinitionId { get; set; }
 
     [Parameter]
     public EventCallback<PlugVariableData> SelectedVariableChanged { get; set; }
 
-    //private List<PDZVariable> variables = new List<PDZVariable>();
+    private List<PlugVariableData> _allVariables = new();
+    private bool _enableGrouping => string.IsNullOrEmpty(SelectedPlugDefinitionId);
 
 
     protected override async Task OnParametersSetAsync()
     {
-        // foreach (var p in EditorContext.PlugDataZone.PDZVariables)
-        // {
-        //     Console.WriteLine(p.Name);
-        // }
-
-        // Console.WriteLine("---->>>>"+SelectedPlug?.Name);
+        var variables = EditorContext?.PlugDataZone.GetVariablesOfPlug(SelectedPlugDefinitionId) ?? new();
+        var selfId = EditorContext?.Variable?.Id;
+        if (selfId != null)
+        {
+            variables = variables.Where(v => v.Id != selfId).ToList();
+        }
+        _allVariables = variables;
         StateHasChanged();
+    }
+
+    private string GetPlugName(string? plugDefId)
+    {
+        if (string.IsNullOrEmpty(plugDefId)) return "未归属";
+        var plugData = EditorContext?.PlugDataZone?.PlugDatas
+            ?.FirstOrDefault(p => p.PlugDefinitionId == plugDefId);
+        return plugData?.Name ?? plugDefId;
     }
 
     private async Task SelectVariable(PlugVariableData PDZVariable)

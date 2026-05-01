@@ -1,297 +1,149 @@
-﻿
-
-@using System.Text
 @using System.Text.Json
-@using System.Text.Json.Nodes
-@using BlazorMonaco.Editor
-@using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Shared
-@using CJ.Plug.Models.Station
-@using CJ.Plug.TASApiClient
-@using Elsa.Api.Client.Extensions
-@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
-@using Elsa.Api.Client.Shared.Models
-@using Humanizer
-@using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.AspNetCore.SignalR.Client
+@using CJ.Plug.PlugBaseCore.Models
 @using MudBlazor
-@using Serilog
 
-@inject ITASApiClient TASApiClient
-@inject IExecuteApiClient ExecuteApiClient
-@inject HubConnectionManagerService HubConnectionManagerService
+<MudStack Spacing="4">
+    <MudText Typo="Typo.h6">模型选择</MudText>
+    <MudSelect T="string" @bind-Value="_selectedModel" @bind-Value:after="SaveSettings" 
+    Label="选择大模型" Dense AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined">
+        @foreach (var model in _availableModels)
+        {
+            <MudSelectItem Value="@model">@model</MudSelectItem>
+        }
+    </MudSelect>
 
+    <MudDivider />
 
-<MudStack>
-    <MudText>输入参数</MudText>
-    <CJ.Plug.SharedPages.PDZVariableDataGrid></CJ.Plug.SharedPages.PDZVariableDataGrid>    
-</MudStack>
+    <MudText Typo="Typo.h6">输入参数</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">配置AI请求中可用的输入参数，可在提示词中使用 [参数名] 引用</MudText>
+    @foreach (var param in _inputParameters)
+    {
+        var p = param;
+        <MudStack Row AlignItems="AlignItems.Center" Style="margin-bottom:4px;">
+            <MudTextField T="string" Value="@p.Name"
+                          ValueChanged="@(async (string v) => { p.Name = v; await SaveSettings(); })"
+                          Label="参数名" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:200px;" />
+            <MudTextField T="string" Value="@p.Value"
+                          ValueChanged="@(async (string v) => { p.Value = v; await SaveSettings(); })"
+                          Label="默认值" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:200px;" />
+            <MudIconButton OnClick="@(() => RemoveInputParameter(p))"
+                           Icon="@Icons.Material.Filled.RemoveCircleOutline" Size="Size.Small" Color="Color.Error" />
+        </MudStack>
+    }
+    <MudButton OnClick="AddInputParameter" Size="Size.Small" Variant="Variant.Outlined"
+               StartIcon="@Icons.Material.Filled.Add">添加输入参数</MudButton>
 
-<MudStack Style="width:100%;">
-    <MudText>执行指令</MudText>
-    <StandaloneCodeEditor CssClass="aiagent-editor"
-    Id="aiagent-editor"
-    @ref="_editor"
+    <MudDivider />
 
-    ConstructionOptions="EditorConstructionOptions" 
-    OnDidInit="EditorOnDidInit"
-    OnDidChangeModelContent="TextChanged" />
-</MudStack>
-<MudStack>
-    <MudText>模型配置</MudText>
-    <MudStack Spacing="0">
-        <MudGrid Style="margin-left:-12px;">
-            <MudItem xs="12" md="12">
-                <MudRadioGroup Value="waitType" ValueChanged="@((string a)=>OnValueChanged2(a))">
-                    <MudRadio Color="Color.Primary" Value="@("waitforever")">无限等待</MudRadio>
-                    <MudRadio Color="Color.Primary" Value="@("waitsometime")">
-                        <ChildContent>
-                            <MudStack Row AlignItems="AlignItems.Center">
-                                指定超时
-                                <MudTextField Value="waitTime" ValueChanged="@((string a)=>OnValueChanged2(a))" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
-                                秒
-                            </MudStack>
-                        </ChildContent>
-                    </MudRadio>
-                </MudRadioGroup>
-            </MudItem>
-        </MudGrid>
-        <MudCheckBox Value="autoCloseProcess" ValueChanged="@((bool a)=>OnValueChanged(a))">超时自动关闭</MudCheckBox>
+    <MudText Typo="Typo.h6">系统提示词</MudText>
+    <MudTextField T="string" @bind-Value="_systemPrompt" @bind-Value:after="SaveSettings"
+                  Lines="5" Variant="Variant.Outlined"
+                  Label="输入系统提示词，定义AI的行为角色"
+                  Style="width:100%;" />
 
-    </MudStack>   
+    <MudDivider />
+
+    <MudText Typo="Typo.h6">用户提示词</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">可使用 [参数名] 引用输入参数的值，如：请分析 [文件路径] 中的内容</MudText>
+    <MudTextField T="string" @bind-Value="_userPrompt" @bind-Value:after="SaveSettings"
+                  Lines="5" Variant="Variant.Outlined"
+                  Label="输入用户提示词"
+                  Style="width:100%;" />
+
+    <MudDivider />
+
+    <MudText Typo="Typo.h6">输出绑定</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">选择接收AI回复内容的输出参数，可将结果传递给下游插头</MudText>
+    <MudSelect T="string" @bind-Value="_outputVariable" @bind-Value:after="SaveSettings"
+               Label="选择输出参数" Dense Clearable AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined">
+        @if (VariablesOfPlug != null)
+        {
+            @foreach (var v in VariablesOfPlug)
+            {
+                <MudSelectItem Value="@v.Name">@v.Name</MudSelectItem>
+            }
+        }
+    </MudSelect>
 </MudStack>
 
 @code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
     [Parameter]
-    public string? DefinitionId { get; set; }
-    [Parameter]
-    public JsonObject? Activity { get; set; }
-    [Parameter]
-    public ActivityDescriptor? ActivityDescriptor { get; set; }
+    public GetSettingContext? SettingContext { get; set; }
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
 
-    //模型类参数
-    private StandaloneCodeEditor _editor = null!;
-    private string editorCode = "";
-    private string CMDExeResult = "";
-    private string iniValue = "";
-    private string DefaultValue = "";
-    private bool AutoSaveCode = true;
-    private bool _isDirty = false;
-    public Placement Placement { get; set; } = Placement.Top;
+    private string? DefinitionId { get; set; }
 
-    private string? waitType = "waitforever";
-    private string? waitTime = "0";
-    private string? watchProcessType = "default";
-    private string? watchProcessName = "";
-    private bool autoCloseProcess = false;
-    private bool closeProcessWhenError = false;
-    private bool showConsole = true;
-    private bool redirectOutput = true;
-    private bool redirectWorkPath = true;
+    private string _selectedModel = "qwen3:4b";
+    private string _systemPrompt = "";
+    private string _userPrompt = "";
+    private string? _outputVariable;
+    private List<InputParam> _inputParameters = new();
 
-
-
-    [Parameter] 
-    public Plug? Plug { get; set; } = new();
-    private List<PlugVariable> TmpInputs = new List<PlugVariable>();
-    //private PlugVariable TmpInput = new PlugVariable();
-    private bool _readOnly;
-    private bool _isCellEditMode = true;
-    private List<string> _events = new();
-    private bool _editTriggerRowClick;
-
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
-
-    List<PlugVariable> rootPlugVariables = new List<PlugVariable>();
-    private IBrowserFile File;
-    private string? RealFilePath;
-    private bool Loading = false;
-    private bool showProgress = false;
-    private bool IsInput = false;
-    private bool IsOutput = false;
-    private PlugSettings? PlugSettings;
-
-
-    DialogOptions diaOption = new DialogOptions()
-        {
-            MaxWidth = MaxWidth.Large,
-            Position = DialogPosition.TopCenter,
-            BackdropClick = false,
-            FullWidth = true
-        };
-
-
-    protected override async Task OnInitializedAsync()
+    private static List<string> _availableModels = new()
     {
-        //Console.WriteLine(">>>>>>>>>>>>>>start init");
-        await MudDialog.SetOptionsAsync(diaOption);
+        "qwen3:4b",
+        "qwen3:1.7b",
+        "deepseek-r1:1.5b",
+        "deepseek-r1:7b",
+        "deepseek-r1:14b",
+        "llama3.2",
+        "openrouter/free",
+    };
 
-        //Log.Information(Plug.Value);
-        if(Plug.GetPlugSettings()?.Settings.Count==0)
-        {
-            PlugSettings = new PlugSettings();
-            PlugSettings.SetSetting("WaitType", "waitforever");
-            PlugSettings.SetSetting("WaitTime", "0");
-            PlugSettings.SetSetting("WatchProcessType", "default");
-            PlugSettings.SetSetting("WatchProcessName", "");
-            PlugSettings.SetSetting("AutoCloseProcess", "false");
-            PlugSettings.SetSetting("CloseProcessWhenError", "false");
-            PlugSettings.SetSetting("ShowConsole", "true");
-            PlugSettings.SetSetting("RedirectOutput", "true");
-            PlugSettings.SetSetting("RedirectWorkPath", "true");
-        }
-        else
-        {
-            PlugSettings = JsonSerializer.Deserialize<PlugSettings>(Plug.PlugSettingsJson);
-        }
+    public List<PlugVariableData>? VariablesOfPlug => PlugDataZone?.GetVariablesOfPlug(DefinitionId);
 
-        waitType = PlugSettings.GetSetting("WaitType");
-        waitTime = PlugSettings.GetSetting("WaitTime");
-        watchProcessType = PlugSettings.GetSetting("WatchProcessType");
-        watchProcessName = PlugSettings.GetSetting("WatchProcessName");
-        autoCloseProcess = string.IsNullOrEmpty(PlugSettings.GetSetting("AutoCloseProcess")) ? false : bool.Parse(PlugSettings.GetSetting("AutoCloseProcess"));
-        closeProcessWhenError = string.IsNullOrEmpty(PlugSettings.GetSetting("CloseProcessWhenError")) ? false : bool.Parse(PlugSettings.GetSetting("CloseProcessWhenError"));
-        showConsole = string.IsNullOrEmpty(PlugSettings.GetSetting("ShowConsole")) ? false : bool.Parse(PlugSettings.GetSetting("ShowConsole"));
-        redirectOutput = string.IsNullOrEmpty(PlugSettings.GetSetting("RedirectOutput")) ? true : bool.Parse(PlugSettings.GetSetting("RedirectOutput"));
-        redirectWorkPath = string.IsNullOrEmpty(PlugSettings.GetSetting("RedirectWorkPath")) ? true : bool.Parse(PlugSettings.GetSetting("RedirectWorkPath"));
-
-        //Log.Information(PlugSettings.GetSettingsJson());
-        //stlPath = null;
-        //JsRuntime.InvokeVoidAsync("updateAndReloadIframe", stlPath2);
-        HubConnectionManagerService._hubConnection.On<string>("ReceiveLog", (message) =>
-           {
-               var logModel = JsonSerializer.Deserialize<LogModel>(message);
-               //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
-               // 将新日志添加到本地列表并触发UI更新
-               InvokeAsync(() =>
-               {
-                   CMDExeResult += logModel.Description;
-                   CMDExeResult += "\n";
-                   StateHasChanged();
-               });
-           });
-
+    private class InputParam
+    {
+        public string Name { get; set; } = "";
+        public string Value { get; set; } = "";
     }
 
-    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    protected override Task OnInitializedAsync()
     {
-        //MyCon1sole.WriteLine("编辑器开始构造");
-        return new StandaloneEditorConstructionOptions
+        DefinitionId = SettingContext?.PlugDefinitionId;
+
+        if (DefinitionId != null)
+        {
+            _selectedModel = PlugDataZone?.GetVariableValue(DefinitionId, "AIModelName") ?? "qwen3:4b";
+            _systemPrompt = PlugDataZone?.GetVariableValue(DefinitionId, "AISystemPrompt") ?? "";
+            _userPrompt = PlugDataZone?.GetVariableValue(DefinitionId, "AIUserPrompt") ?? "";
+            _outputVariable = PlugDataZone?.GetVariableValue(DefinitionId, "AIOutputVariable");
+
+            var inputParamsJson = PlugDataZone?.GetVariableValue(DefinitionId, "AIInputParameters");
+            if (!string.IsNullOrEmpty(inputParamsJson))
             {
-            //AutomaticLayout = true,
-                GlyphMargin = true,
-                Language = "python",
-                Value = iniValue,
-                Minimap=new EditorMinimapOptions(){Enabled=false }
-
-            };
-    }
-    private async void TextChanged()
-    {
-        _isDirty = true;
-        if (AutoSaveCode == true)
-        {
-            //await Task.Delay(500);
-            //MyCon1sole.WriteLine("开始自动保存");
-            await OnSaveClick();
-            //StateHasChanged();
-            //Log.Information("自动保存完成");
-        }
-    }
-    private async Task EditorOnDidInit()
-    {
-        //MyCon1sole.WriteLine("初始化编辑器");
-        //Log.Information("初始化编辑器");
-        //Log.Information($"Plug.Value:{Plug.Value}");
-        if (Plug.Value == null)
-        {
-            iniValue = @"powershell";
-        }
-        else
-        {
-            iniValue = Plug.Value;
-        }
-        if (iniValue != null)
-        {
-            await _editor.SetValue(iniValue);
+                _inputParameters = JsonSerializer.Deserialize<List<InputParam>>(inputParamsJson) ?? new();
+            }
         }
 
-        //MyCon1sole.WriteLine("初始化编辑器完成");
-
+        return Task.CompletedTask;
     }
 
-
-    private async void TestCMD()
+    private async Task SaveSettings()
     {
-        //StateHasChanged();
-        //var model = await _editor.GetModel();
-        //editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-        //Log.Information(editorCode);
-        //CMDExeResult += editorCode;
-        
-        PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
-        stationExecutionRequest.ToolName = editorCode;
-        //stationExecutionRequest.RequestCommand = editorCode;
-        var result = await ExecuteApiClient.ExecuteToolCommand(stationExecutionRequest);
-        //await MainApiClient.ExecutePlugByDefifnitionId(Plug.DefinitionId);
-        StateHasChanged();
+        if (PlugDataZone == null || DefinitionId == null) return;
+
+        PlugDataZone.SetVariableValue(DefinitionId, "AIModelName", _selectedModel);
+        PlugDataZone.SetVariableValue(DefinitionId, "AISystemPrompt", _systemPrompt);
+        PlugDataZone.SetVariableValue(DefinitionId, "AIUserPrompt", _userPrompt);
+        PlugDataZone.SetVariableValue(DefinitionId, "AIOutputVariable", _outputVariable);
+        PlugDataZone.SetVariableValue(DefinitionId, "AIInputParameters", JsonSerializer.Serialize(_inputParameters));
     }
 
-
-    private async void GetDefaultValue()
+    private async Task AddInputParameter()
     {
-        await _editor.SetValue(DefaultValue);
-        StateHasChanged();
+        _inputParameters.Add(new InputParam());
+        await SaveSettings();
     }
 
-    private async Task OnSaveClick()
+    private async Task RemoveInputParameter(InputParam param)
     {
-        //_isDirty = false;
-        if (_editor != null)
-        {
-            var model = await _editor.GetModel();
-            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            Plug.Value = editorCode;
-            //Log.Information(Plug.Value);
-            await TASApiClient.UpdatePlugAsync(Plug.Id, Plug);
-            // 将字符串转换为字节数组
-            //byte[] stringBytes = Encoding.UTF8.GetBytes(editorCode);
-            //using Stream stream = new MemoryStream(stringBytes);
-            //string fileName = testPlug.Id +"|"+ testPlug.Name + ".py";
-            //Plug.Value = Plug.Name + ".py";
-            //Plug.WorkPath = await FileManage.GetCurrentWorkPath(Plug.Id?.ToString(), null);
-            //var filePath = await FileManage.UploadFileStreamToServerPath(stream, Plug.WorkPath, Plug.Value);
-            //Plug.RealValuePath = filePath;
-            _isDirty = false;
-            StateHasChanged();
-        }
-        //await _editor.SetValue(DefaultValue);
-        //StateHasChanged();
+        _inputParameters.Remove(param);
+        await SaveSettings();
     }
-
-    private async Task OnValueChanged(bool value)
-    {
-        UpdatePlugSettings();         
-    }
-    private async Task OnValueChanged2(string value)
-    {
-        UpdatePlugSettings();
-    }
-
-    private async void UpdatePlugSettings()
-    {
-        PlugSettings.SetSetting("WaitType", waitType);
-        PlugSettings.SetSetting("WaitTime", waitTime);
-        PlugSettings.SetSetting("WatchProcessType", watchProcessType);
-        PlugSettings.SetSetting("WatchProcessName", watchProcessName);
-        PlugSettings.SetSetting("AutoCloseProcess", autoCloseProcess.ToString());
-        PlugSettings.SetSetting("CloseProcessWhenError", closeProcessWhenError.ToString());
-        PlugSettings.SetSetting("ShowConsole", showConsole.ToString());
-        PlugSettings.SetSetting("RedirectOutput", redirectOutput.ToString());
-        PlugSettings.SetSetting("RedirectWorkPath", redirectWorkPath.ToString());
-        Plug.PlugSettingsJson = JsonSerializer.Serialize(PlugSettings);
-        //await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
-    }
-
 }

@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Plug;
 using Microsoft.AspNetCore.Components;
 using CMDPlug.Pages;
 using CJ.Plug.ApiClient.Contracts;
@@ -50,15 +50,6 @@ namespace CMDPlug.Services
             PlugSettings.PlugDisplayName = "CMD命令执行";
             PlugSettings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
             //PlugSettings.SetSetting(PlugSettingKey.Outcomes.ToString(), "成功|失败");
-            PlugSettings.SetSetting("WaitType", "waitforever");
-            PlugSettings.SetSetting("WaitTime", "0");
-            PlugSettings.SetSetting("WatchProcessType", "default");
-            PlugSettings.SetSetting("WatchProcessName", "");
-            PlugSettings.SetSetting("AutoCloseProcess", "false");
-            PlugSettings.SetSetting("CloseProcessWhenError", "false");
-            PlugSettings.SetSetting("ShowConsole", "true");
-            PlugSettings.SetSetting("RedirectOutput", "true");
-            PlugSettings.SetSetting("RedirectWorkPath", "true");
 
             var InitVariables = new List<BaseVariable>();
             InitVariables.Add(new BaseVariable()
@@ -66,10 +57,62 @@ namespace CMDPlug.Services
                 Name = InitVariableNames.CMDCommand.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
             });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ExecutionTimeout.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.WaitType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.WatchProcessType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.WatchProcessName.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.AutoCloseProcess.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.CloseProcessWhenError.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ShowConsole.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.RedirectOutput.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.RedirectWorkPath.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+            });
 
-            PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-                JsonSerializer.Serialize(InitVariables));
-
+            PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(),JsonSerializer.Serialize(InitVariables));
             PlugSettings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
 
             //PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(), InitVariableNames.CMDCommand.ToString());

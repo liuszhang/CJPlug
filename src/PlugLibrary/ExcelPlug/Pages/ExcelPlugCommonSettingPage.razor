@@ -1,62 +1,299 @@
-﻿@using BlazorMonaco.Editor
 @using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.SharedComponents
 @using Elsa.Api.Client.Extensions
-@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
-@using Elsa.Api.Client.Shared.Models
-@using ExcelPlug.Pages.Components
-@using Humanizer
 @using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.JSInterop
 @using MudBlazor
-@using System.Text.Json.Nodes
 @using System.Text.Json
-@using System.Text
+@using Serilog
+@using ExcelPlug.Models
+@using ExcelPlug.Utils
 
-@inject IJSRuntime JSRuntime
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudFileUpload T="IBrowserFile" FilesChanged="@((f) => CheckLocalFile(f))" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" StartIcon="@Icons.Material.Filled.UploadFile" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">导入文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+    <MudButton OnClick="LoadRootData" Size="Size.Small" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Settings">重新加载文件</MudButton>
+    <MudText Typo="Typo.h6">文件：@FileName</MudText>
+
+</MudStack>
 
 
-@inject ISnackbar Snackbar
-@using MudExtensions
-@using MudExtensions.Utilities
+<MudStack Row Justify="Justify.SpaceBetween">
+    <MudStack Style="width:100%;min-height:200px;overflow:hidden;" Justify="Justify.FlexStart">
+        @if (Processing && PreviewData is null)
+        {
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="min-height:200px">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            </MudStack>
+        }
+        else if (PreviewData != null)
+        {
+            <MudText Typo="Typo.subtitle2" Class="my-2">
+                工作表：@PreviewData.SheetName ｜
+                @PreviewData.TotalRows 行 × @PreviewData.TotalColumns 列
+                @if (PreviewData.IsTruncated)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">仅显示前 @PreviewData.Rows.Count 行</MudChip>
+                }
+            </MudText>
+            <div style="overflow:auto;max-height:500px;border:1px solid #ddd;border-radius:4px;">
+                <MudTable Items="@PreviewData.Rows" Dense Hover Striped ReadOnly>
+                    <HeaderContent>
+                        <MudTh Style="position:sticky;top:0;background:#f5f5f5;z-index:1;">#</MudTh>
+                        @for (int i = 0; i < PreviewData.Headers.Count; i++)
+                        {
+                            var colIdx = i;
+                            <MudTh Style="position:sticky;top:0;background:#f5f5f5;z-index:1;">@PreviewData.Headers[colIdx]</MudTh>
+                        }
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="#">@(PreviewData.Rows.IndexOf(context) + 1)</MudTd>
+                        @foreach (var cell in context)
+                        {
+                            <MudTd DataLabel=" ">@cell</MudTd>
+                        }
+                    </RowTemplate>
+                </MudTable>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(FileName))
+        {
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="min-height:200px">
+                <MudText>已加载文件：@FileName</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">正在准备预览…</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="min-height:200px">
+                <MudText Color="Color.Secondary">请导入Excel文件</MudText>
+            </MudStack>
+        }
+    </MudStack>
 
+    <MudStack Justify="Justify.FlexStart" AlignItems="AlignItems.Stretch" Style="min-width:420px">
+        <MudText Typo="Typo.h6">配置单元格映射</MudText>
 
-@* <MudCsvMapper @ref="_csvMapper" Delimiter="," Class="pa-4" AllowCreateExpectedHeaders="true" NormalizeHeaders="true" ShowIncludeUnmappedData="true"  ExpectedHeaders="_expectedFields" OnImported="Upload" ></MudCsvMapper> *@
+        <MudTextField @bind-Value="CellRef" Label="单元格引用 (如 A1, B3, Sheet1!C5)" Variant="Variant.Outlined" Size="Size.Small" />
 
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="0">
+            @if (_isBoundToVariable)
+            {
+                <PlugParameterSelector PlugDataZone="PlugDataZone"
+                                       @bind-VariableName="_boundVariableName"
+                                       @bind-PlugDefinitionId="_boundPlugDefinitionId" />
+            }
+            else
+            {
+                <MudTextField @bind-Value="CellValue" Label="写入值" Variant="Variant.Outlined" Size="Size.Small"
+                              Style="min-width:320px" Margin="Margin.Dense" />
+            }
+            <MudCheckBox @bind-Value="_isBoundToVariable" T="bool" Label="参数" Dense Size="Size.Small"
+                         @bind-Value:after="OnBindingToggle" />
+        </MudStack>
+
+        <MudStack Row>
+            <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input" OnClick="AddMapping"
+                       Disabled="Processing || string.IsNullOrEmpty(CellRef) || (_isBoundToVariable && string.IsNullOrEmpty(_boundVariableName))"
+                       Color="Color.Info" Size="Size.Small">
+                <MudText>添加映射</MudText>
+            </MudButton>
+        </MudStack>
+
+        <MudDataGrid T="ExcelCellMapping" Items="CellMappings" Dense ReadOnly="false" SortMode="SortMode.None" Style="width:100%">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">已配置单元格映射清单</MudText>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x=>x.CellRef" Title="单元格" Editable="false" />
+                <TemplateColumn Title="值">
+                    <CellTemplate>
+                        @if (context.Item.IsBoundToVariable == true && !string.IsNullOrEmpty(context.Item.BoundVariableName))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Primary">[@context.Item.BoundVariableName]</MudText>
+                        }
+                        else
+                        {
+                            <MudText>@context.Item.Value</MudText>
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn CellClass="d-flex justify-end">
+                    <CellTemplate>
+                        <MudStack Row>
+                            <MudButton OnClick="@(()=>DeleteMapping(@context.Item))" Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">删除</MudButton>
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudStack>
+</MudStack>
 
 @code {
-    // MudCsvMapper? _csvMapper;
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
 
-    // List<MudExpectedHeader> _expectedFields = new() {
-    //     new MudExpectedHeader("Email", true),
-    //     new MudExpectedHeader("First Name"),
-    //     new MudExpectedHeader("Last Name"),
-    //     new MudExpectedHeader("Phone"),
-    //     new MudExpectedHeader("Date", false, true),
-    //     new MudExpectedHeader("Source", true, true),
-    // };
+    private string? FileId { get; set; }
+    private string? FileName { get; set; }
+    private string? CellRef { get; set; }
+    private string? CellValue { get; set; }
+    private bool Processing { get; set; } = false;
+    private List<ExcelCellMapping> CellMappings { get; set; } = new();
+    private ExcelPreviewData? PreviewData { get; set; }
 
-    private async Task<bool> Upload()
+    // 变量绑定状态
+    private bool _isBoundToVariable = false;
+    private string? _boundVariableName;
+    private string? _boundPlugDefinitionId;
+
+    protected override async Task OnParametersSetAsync()
     {
-        await Task.Delay(1); // Replace with real world example
-        // var file = _csvMapper?.CsvFile; IBrowserFile / .csv that was uploaded
-        //byte[]? fileContent = _csvMapper?.FileContentByte; // file with headers updated to correct names
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            await LoadRootData();
+        }
+    }
 
-        //This is where you do the work with the renamed headers using the the fileContent.
-        //Send the CSV file to MudTable or to the Database to be parsed
+    private async Task LoadRootData()
+    {
+        Processing = true;
 
-        Snackbar.Add($"CSV Mapped!", Severity.Info);
-        return true;
+        var mappingJson = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString());
+        if (!string.IsNullOrEmpty(mappingJson))
+        {
+            CellMappings = JsonSerializer.Deserialize<List<ExcelCellMapping>>(mappingJson) ?? new();
+        }
+
+        var fileVariable = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.ExcelFile.ToString());
+        if (!string.IsNullOrEmpty(fileVariable))
+        {
+            FileName = fileVariable.Split(':').FirstOrDefault();
+            FileId = fileVariable.Split(':').LastOrDefault();
+        }
+
+        await LoadPreviewAsync();
+
+        Processing = false;
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        if (string.IsNullOrEmpty(FileId))
+        {
+            PreviewData = null;
+            return;
+        }
+
+        try
+        {
+            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+            if (sourceStream != null)
+            {
+                PreviewData = ExcelService.ReadSheetPreview(sourceStream);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Information("加载Excel预览出错：" + ex.Message);
+            PreviewData = null;
+        }
+    }
+
+    private async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        if (browserFile == null) return;
+
+        try
+        {
+            Processing = true;
+            var plugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+            (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, plugData);
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.ExcelFile.ToString(), browserFile.Name + ":" + fileId);
+            await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+            FileName = browserFile.Name;
+            FileId = fileId;
+
+            await LoadPreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Information("上传文件出错：" + ex.Message);
+        }
+        finally
+        {
+            Processing = false;
+        }
+    }
+
+    private async Task OnBindingToggle()
+    {
+        if (_isBoundToVariable)
+        {
+            CellValue = "";
+            _boundVariableName = null;
+            _boundPlugDefinitionId = null;
+        }
+        else
+        {
+            _boundVariableName = null;
+            _boundPlugDefinitionId = null;
+        }
+    }
+
+    private async Task AddMapping()
+    {
+        if (string.IsNullOrEmpty(CellRef)) return;
+
+        var boundVarName = _isBoundToVariable ? _boundVariableName : null;
+        var boundPlugDefId = _isBoundToVariable ? _boundPlugDefinitionId : null;
+
+        CellMappings.Add(new ExcelCellMapping
+        {
+            Id = GetNextId(),
+            CellRef = CellRef,
+            Value = _isBoundToVariable ? $"{GetPlugName(boundPlugDefId)}:{boundVarName}" : (CellValue ?? ""),
+            IsBoundToVariable = _isBoundToVariable ? true : null,
+            BoundVariableName = boundVarName,
+            BoundPlugDefinitionId = boundPlugDefId,
+        });
+
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(CellMappings));
+        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+        CellRef = "";
+        CellValue = "";
+        _isBoundToVariable = false;
+        _boundVariableName = null;
+        _boundPlugDefinitionId = null;
+    }
+
+    private string GetPlugName(string? plugDefinitionId)
+    {
+        if (string.IsNullOrEmpty(plugDefinitionId)) return "?";
+        var plugData = PlugDataZone?.PlugDatas?.FirstOrDefault(p => p.PlugDefinitionId == plugDefinitionId);
+        return plugData?.Name ?? plugDefinitionId[..Math.Min(8, plugDefinitionId.Length)];
+    }
+
+    private async Task DeleteMapping(ExcelCellMapping mapping)
+    {
+        CellMappings.Remove(mapping);
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(CellMappings));
+        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+    }
+
+    private int GetNextId()
+    {
+        var maxId = CellMappings.Any() ? CellMappings.Max(x => x.Id) : 0;
+        return (maxId ?? 0) + 1;
     }
 }
-
-
-<MudDivider></MudDivider>
-<MudText Typo="Typo.h6" Class="mb-4">Excel内容</MudText>
-<SheetJsWrapper Plug="Plug"></SheetJsWrapper>
-
-
-@code{
-    [Parameter]
-    public Plug? Plug { get; set; }
-}
-

@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetValue<string>("env"));
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
-Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+Console.WriteLine($"褰撳墠鐜: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
 Log.Logger = new LoggerConfiguration()
     //.WriteTo.File("StationLogs/log.txt",
@@ -44,7 +44,16 @@ builder.Services.AddOpenApiDocument(configure =>
     configure.Title = "Station API";
 });
 
-builder.Services.AddHostedService<StationHubService>(); // 注册为后台服务
+builder.Services.AddSingleton<StationHubService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StationHubService>());
+
+// 鍥剧珯浠诲姟鏈湴瀛樺偍
+builder.Services.AddSingleton<StationTaskStore>(sp =>
+{
+    var store = new StationTaskStore();
+    store.Init();
+    return store;
+});
 
 
 builder.Services.AddScoped<IStationExecuteService, DefaultStationExecuteService>();

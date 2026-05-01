@@ -18,10 +18,10 @@ public class WordService_Aspose
         
         try
         {
-            // ¼ÓÔØ Word ÎÄµµ
+            // åŠ è½½ Word æ–‡æ¡£
             Document doc = new Document(wordFilePath);
             Console.WriteLine("start convert word to pdf");
-            // ±£´æÎª PDF
+            // ä¿å­˜ä¸º PDF
             doc.Save(pdfFilePath, SaveFormat.Pdf);
             Console.WriteLine("convert word to pdf success");
         }
@@ -38,7 +38,7 @@ public class WordService_Aspose
     public static void InsertHtmlAtBookmark(string filePath, string bookmarkName, string text)
     {
         HookAspose();
-        // ¼ÓÔØÎÄµµ
+        // åŠ è½½æ–‡æ¡£
         Document doc = new Document(filePath);
         Bookmark bookmark = doc.Range.Bookmarks[bookmarkName];
         if (bookmark != null)
@@ -58,7 +58,7 @@ public class WordService_Aspose
     public static void InsertTextAtBookmark(string filePath, string bookmarkName, string text)
     {
         HookAspose();
-        // ¼ÓÔØÎÄµµ
+        // åŠ è½½æ–‡æ¡£
         Console.WriteLine($"Inserting text at bookmark '{bookmarkName}' in document '{filePath}'");
         Document doc = new Document(filePath);
         Bookmark bookmark = doc.Range.Bookmarks[bookmarkName];
@@ -78,7 +78,7 @@ public class WordService_Aspose
     public static void InsertTableAtBookmark(string filePath, string bookmarkName)
     {
         HookAspose();
-        // ¼ÓÔØÎÄµµ
+        // åŠ è½½æ–‡æ¡£
         Document doc = new Document(filePath);
         Bookmark bookmark = doc.Range.Bookmarks[bookmarkName];
         if (bookmark != null)
@@ -88,16 +88,16 @@ public class WordService_Aspose
 
             Table table = (Table)builder.StartTable();
 
-            // Ìí¼Ó±íÍ·
+            // æ·»åŠ è¡¨å¤´
             builder.InsertCell();
-            builder.Write("ĞÕÃû");
+            builder.Write("å§“å");
             builder.InsertCell();
-            builder.Write("ÄêÁä");
+            builder.Write("å¹´é¾„");
             builder.EndRow();
 
-            // Ìí¼ÓÊı¾İĞĞ
+            // æ·»åŠ æ•°æ®è¡Œ
             builder.InsertCell();
-            builder.Write("ÕÅÈı");
+            builder.Write("å¼ ä¸‰");
             builder.InsertCell();
             builder.Write("30");
             builder.EndRow();
@@ -110,7 +110,7 @@ public class WordService_Aspose
     public static void InsertImageAtBookmark(string filePath, string bookmarkName, string imagePath)
     {
         HookAspose();
-        // ¼ÓÔØÎÄµµ
+        // åŠ è½½æ–‡æ¡£
         Document doc = new Document(filePath);
         Bookmark bookmark = doc.Range.Bookmarks[bookmarkName];
         if (bookmark != null)

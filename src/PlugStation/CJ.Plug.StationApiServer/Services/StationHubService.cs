@@ -12,6 +12,17 @@ namespace CJ.Plug_Aspire.StationApiService.Services
         private readonly HttpClient _httpClient = new HttpClient();
         private HubConnection _hubConnection;
         private readonly string _webApiBaseUrl = StaticData.MainServerHostIp;
+        private volatile bool _isHubConnected;
+
+        /// <summary>
+        /// 获取与平台主服务器的长连接状态
+        /// </summary>
+        public bool IsHubConnected => _isHubConnected;
+
+        /// <summary>
+        /// 获取主服务器地址
+        /// </summary>
+        public string MainServerUrl => _webApiBaseUrl;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -61,6 +72,7 @@ namespace CJ.Plug_Aspire.StationApiService.Services
             {
                 Console.WriteLine("HUB Disconnected.");
                 isConnected = false;
+                _isHubConnected = false;
                 while (!isConnected)
                 {
                     await Task.Delay(new Random().Next(0, 5) * 1000);
@@ -99,6 +111,7 @@ namespace CJ.Plug_Aspire.StationApiService.Services
                 await _hubConnection.StartAsync();
                 Console.WriteLine("----------[success connected to main server]---------");
                 isConnected = true;
+                _isHubConnected = true;
                 await _hubConnection.InvokeAsync("SendStationStatus", StaticData.ToolAgentServerHttpScheme + "://" + ipv4.ToString() + ":" + StaticData.ToolAgentServerHttpPort, "running");
                 return;
             }

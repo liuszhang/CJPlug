@@ -1,0 +1,100 @@
+@* ThreeJSViewer — 可复用的 Three.js 3D 模型查看器 *@
+@inject NavigationManager Navigation
+
+<iframe srcdoc="@_viewerHtml"
+        style="width:100%;height:@($"{Height}px");border:none;"
+        sandbox="allow-scripts allow-same-origin"
+        title="3D Viewer">
+</iframe>
+
+@code {
+    /// <summary>模型文件 URL（STL/OBJ/GLTF 等）</summary>
+    [Parameter] public string? ModelUrl { get; set; }
+
+    /// <summary>模型类型: stl / obj / gltf，默认 stl</summary>
+    [Parameter] public string ModelType { get; set; } = "stl";
+
+    /// <summary>查看器高度 px</summary>
+    [Parameter] public int Height { get; set; } = 500;
+
+    /// <summary>模型颜色 (hex)</summary>
+    [Parameter] public string ModelColor { get; set; } = "0xff6600";
+
+    /// <summary>背景颜色 (hex)</summary>
+    [Parameter] public string BackgroundColor { get; set; } = "0xcccccc";
+
+    /// <summary>网格参考线颜色</summary>
+    [Parameter] public bool ShowGrid { get; set; } = true;
+
+    private string _viewerHtml = "";
+
+    protected override void OnParametersSet()
+    {
+        _viewerHtml = BuildViewerHtml();
+    }
+
+    private string BuildViewerHtml()
+    {
+        //var url = ModelUrl ?? "";
+        var url = "webFiles/Mhyt-123.stl";
+        var gridJs = ShowGrid
+            ? "s.add(new THREE.GridHelper(200,20,0x333355,0x222244));"
+            : "";
+
+        var loaderJs = ModelType.ToLower() switch
+        {
+            "stl" => $"new STLLoader().load('{url}',onLoad,onProg,onErr);",
+            _ => $"new STLLoader().load('{url}',onLoad,onProg,onErr);"
+        };
+
+        var addonsImport = ModelType.ToLower() switch
+        {
+            "stl" => "import {STLLoader} from 'three/addons/loaders/STLLoader.js';",
+            _ => "import {STLLoader} from 'three/addons/loaders/STLLoader.js';"
+        };
+
+        return $@"<!DOCTYPE html><html lang=""zh"">
+<head><meta charset=""UTF-8""><meta name=""viewport"" content=""width=device-width,initial-scale=1.0"">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#{BackgroundColor.Replace("0x","")};overflow:hidden;font-family:Arial}}
+#ld{{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ccc;font-size:14px;z-index:10;transition:opacity .3s}}
+#info{{position:absolute;bottom:8px;left:12px;color:#666;font-size:11px;z-index:10}}
+</style></head><body>
+<div id=""ld"">加载中...</div><div id=""info""></div>
+<script type=""importmap"">
+{{""imports"":{{""three"":""{Navigation.BaseUri}_content/CADSharedComponents/js/three.module.js"",""three/addons/"":""{Navigation.BaseUri}_content/CADSharedComponents/js/jsm/""}}}}
+</script>
+<script type=""module"">
+import * as THREE from 'three';
+import {{OrbitControls}} from 'three/addons/controls/OrbitControls.js';
+{addonsImport}
+const L=document.getElementById('ld'),I=document.getElementById('info'),B=document.body;
+const s=new THREE.Scene();s.background=new THREE.Color({BackgroundColor});
+const cam=new THREE.PerspectiveCamera(45,B.clientWidth/Math.max(B.clientHeight,1),0.1,5000);
+cam.position.set(60,40,80);
+const r=new THREE.WebGLRenderer({{antialias:true}});
+r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(B.clientWidth,B.clientHeight);
+r.shadowMap.enabled=true;B.appendChild(r.domElement);
+s.add(new THREE.AmbientLight(0x606060,1.5));
+const d1=new THREE.DirectionalLight(0xffffff,2);d1.position.set(100,100,50);s.add(d1);
+const d2=new THREE.DirectionalLight(0x8899bb,0.6);d2.position.set(-50,-30,-100);s.add(d2);
+{gridJs}
+const ctrl=new OrbitControls(cam,r.domElement);ctrl.enableDamping=true;ctrl.dampingFactor=0.08;
+ctrl.target.set(0,0,0);cam.lookAt(0,0,0);
+const onLoad=geo=>{{L.style.display='none';
+const mat=new THREE.MeshPhongMaterial({{color:{ModelColor},specular:0x111111,shininess:60,side:2}});
+const m=new THREE.Mesh(geo,mat);geo.computeBoundingBox();
+if(geo.boundingBox){{const c=geo.boundingBox.getCenter(new THREE.Vector3());m.position.sub(c);ctrl.target.copy(new THREE.Vector3(0,0,0));}}
+s.add(m);const sz=geo.boundingBox?geo.boundingBox.getSize(new THREE.Vector3()):new THREE.Vector3(10,10,10);
+cam.position.set(sz.x*1.5,sz.y*1.2,sz.z*1.8);cam.lookAt(0,0,0);
+I.textContent=''+Math.round(sz.x)+'×'+Math.round(sz.y)+'×'+Math.round(sz.z);
+}};
+const onProg=p=>{{if(p.total>0)L.textContent='加载 '+Math.round(p.loaded/p.total*100)+'%';}};
+const onErr=e=>{{L.textContent='加载失败';L.style.color='#f44';console.error(e);}};
+{loaderJs}
+(function A(){{requestAnimationFrame(A);ctrl.update();r.render(s,cam);}})();
+addEventListener('resize',()=>{{cam.aspect=B.clientWidth/Math.max(B.clientHeight,1);cam.updateProjectionMatrix();r.setSize(B.clientWidth,B.clientHeight);}});
+</script></body></html>";
+    }
+}

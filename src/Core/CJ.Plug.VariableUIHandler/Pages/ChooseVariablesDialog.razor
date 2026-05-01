@@ -11,6 +11,7 @@
 
 <MudDialog Class="stack-resize" Style="height:800px">
     <DialogContent>
+        <div style="height:100%; overflow:hidden;">
 
         @if (string.IsNullOrEmpty(WorkflowDefinitionId))
         {
@@ -18,8 +19,8 @@
         }
         else
         {
-            <RadzenSplitter>
-                <RadzenSplitterPane Size="20%" Min="100px">
+            <RadzenSplitter Style="height:100%;">
+                <RadzenSplitterPane Size="20%" Min="100px" Style="overflow:auto;">
                     <MudTreeView T="string" @bind-SelectedValue="SelectedPlugDefinitionId">
                         <MudTreeViewItem Value='@rootPlug?.DefinitionId' Text="@rootPlug?.Name"
                         Expanded Icon="@Icons.Custom.Uncategorized.Folder" IconExpanded="@Icons.Custom.Uncategorized.FolderOpen" IconColor="Color.Info"
@@ -31,15 +32,13 @@
                         </MudTreeViewItem>
                     </MudTreeView>
                 </RadzenSplitterPane>
-                <RadzenSplitterPane Size="80%" Min="100px">
+                <RadzenSplitterPane Size="80%" Min="100px" Style="overflow:auto;">
                     <PDZVariablesDataReadOnly EditorContext="EditorContext" SelectedPlugDefinitionId="@SelectedPlugDefinitionId" SelectedVariableChanged="SelectedChanged"></PDZVariablesDataReadOnly>
                 </RadzenSplitterPane>
             </RadzenSplitter>
         }
-
-
-        @*         <ChooseVariablesContent WorkflowDefinitionId="@WorkflowDefinitionId" SelectedVariableChanged="SelectedChanged"></ChooseVariablesContent>
- *@    </DialogContent>
+        </div>
+    </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">取消</MudButton>
         <MudButton Disabled="@(string.IsNullOrEmpty(SelectedVariable?.Name))" Color="Color.Primary" OnClick="Submit">确认</MudButton>

@@ -1,0 +1,34 @@
+@using BlazorMonaco.Editor
+
+@using CJ.Plug.Models.Plug
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+
+
+<MudTextField Value="@ConditionA" Label="条件A"></MudTextField>
+<MudTextField Value="@ConditionB" Label="条件B"></MudTextField>
+
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+</MudStack>
+
+
+@code{
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public Plug? Plug { get; set; }
+
+    private string? ConditionA { get; set; }
+    private string? ConditionB { get; set; }
+
+}

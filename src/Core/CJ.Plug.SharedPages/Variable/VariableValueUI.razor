@@ -19,7 +19,7 @@
 {
     <MudChipSet T="string" AllClosable="@true" OnClose="()=>OnChipClosed(BaseVariable)">
         <MudTooltip Text="@($"参数来源：{BaseVariable.DisplayValue}")">
-            <MudChip Value="@BaseVariable.SourceValueVariableName" />
+            <MudChip Value="@BaseVariable.SourceValueVariableName" Size="Size.Small" Variant="Variant.Outlined"/>
         </MudTooltip>
     </MudChipSet>
 }

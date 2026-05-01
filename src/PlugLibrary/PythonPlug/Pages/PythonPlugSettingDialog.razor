@@ -16,6 +16,7 @@
 @using PythonPlug.Services
 @using Size=MudBlazor.Size
 @using System.Text
+@using CJ.Plug.Models.LogModels
 
 @inject ISnackbar Snackbar
 @inject MainApiClient MainApiClient
@@ -308,33 +309,27 @@ if a == 1:
 
     private async void TestPython()
     {
-        var model = await _editor.GetModel();
-        editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-        //string result = await ToolAgentExecute.ExecutePythonCodeOnToolAgent(editorCode, testPlug, null);
-        //MyCon1sole.WriteLine(result);
-        //pythonExeResult += result;
-        pythonExeResult += "result";
+        Loading = true;
+        try
+        {
+            var model = await _editor.GetModel();
+            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
 
-        // if (testPlug.InputData.Count != 0)
-        // {
-        //     foreach (var input in testPlug.InputData)
-        //     {
-        //         MyCon1sole.WriteLine(input.InputName);
-        //     }
-        // }
-        //var newCode = await ToolAgentExecute.EvaluatePythonCodeAsync(editorCode, testPlug);
-        // 将字符串转换为字节数组
-        //【暂时不上传文件至图站，使用代码执行的方式获取结果】
-        // string fileName = testPlug.Id + testPlug.Name + ".py";
-        // byte[] stringBytes = Encoding.UTF8.GetBytes(newCode);
-        // using Stream stream = new MemoryStream(stringBytes);
-        // var toolAgentFileName = await ToolAgentFile.UploadFileStreamToToolAgentServer(stream, fileName);
+            PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
+            stationExecutionRequest.PlugType = PlugKeySetting.CommonExecuteKey;
+            stationExecutionRequest.ExecuteMode = ExecuteMode.Standalone;
+            stationExecutionRequest.ToolName = "Python";
+            stationExecutionRequest.RequestCommand = PythonPlugCommonExecuteService.BuildPythonExecuteCommand(editorCode);
 
-        //图站执行测试
-        //pythonExeResult += await new ToolAgentConnect().ExecutePythonCodeOnToolAgent(editorCode);
-        //pythonExeResult += await ToolAgentExecute.ExecutePythonCodeOnToolAgent(newCode);
-        //MyCon1sole.WriteLine(pythonExeResult);
-        //stream.Close();
+            var result = await MainApiClient.ExecuteOnStation(stationExecutionRequest);
+            CLog.Information($"执行结果：{result.ResultString}");
+            pythonExeResult += result.ResultString;
+        }
+        catch (Exception ex)
+        {
+            CLog.Information(ex.Message);
+        }
+        Loading = false;
         StateHasChanged();
     }
 

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
-// ÉèÖÃ Environment
+// è®¾ç½® Environment
 Environment.SetEnvironmentVariable("ASPNETCORE_URLS", "http://localhost:15288");
 Environment.SetEnvironmentVariable("DOTNET_DASHBOARD_OTLP_ENDPOINT_URL", "http://localhost:19275");
 Environment.SetEnvironmentVariable("DOTNET_RESOURCE_SERVICE_ENDPOINT_URL", "http://localhost:19276");
@@ -67,7 +67,7 @@ if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-//»ñÈ¡µ±Ç°ÔËĞĞ³ÌĞòµÄÂ·¾¶
+//è·å–å½“å‰è¿è¡Œç¨‹åºçš„è·¯å¾„
 var currentDirectory = Directory.GetCurrentDirectory();
 Console.WriteLine($"currentDirectory: {currentDirectory}");
 
@@ -119,7 +119,7 @@ builder.AddExecutable(
         name: "sds",
         command: "dotnet",
         workingDirectory: dispatchServerDirectory,
-        args: dispatchServerDllName // DLL ÎÄ¼şÃû
+        args: dispatchServerDllName // DLL æ–‡ä»¶å
     ).WithUrl("http://localhost:6660");
 
 builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice");
@@ -164,7 +164,7 @@ builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllNam
 builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithUrl("http://localhost:6274");
 
 
-//´ò¿ªä¯ÀÀÆ÷
+//æ‰“å¼€æµè§ˆå™¨
 try
 {
     var url = new Uri("http://localhost:5066");

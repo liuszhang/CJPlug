@@ -7,12 +7,12 @@ namespace CJ.Plug.ElsaIntegration.Services
 {
     public class CJActivityProvider : IActivityProvider
     {
-        private readonly IActivityFactory activityFactory;
+        //private readonly IActivityFactory activityFactory;
         private MainApiClient MainApiClient;
 
-        public CJActivityProvider(IActivityFactory activityFactory, MainApiClient mainApiClient)
+        public CJActivityProvider(MainApiClient mainApiClient)
         {
-            this.activityFactory = activityFactory;
+            //this.activityFactory = activityFactory;
             this.MainApiClient = mainApiClient;           
         }
 
@@ -58,8 +58,9 @@ namespace CJ.Plug.ElsaIntegration.Services
                     IsContainer=x.IsContainerPlug,
                     Constructor = context =>
                     {
-                        var activity = activityFactory.CreateActivity<CommonCorePlugActivity>(context);
-                        return (ActivityConstructionResult)activity;
+                        //var activity = activityFactory.CreateActivity<CommonCorePlugActivity>(context);
+                        var activity = context.CreateActivity<CommonCorePlugActivity>();
+                        return activity;
                     }
                 };
             }).ToList();

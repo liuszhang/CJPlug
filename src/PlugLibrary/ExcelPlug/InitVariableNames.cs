@@ -10,6 +10,7 @@ namespace ExcelPlug
     {
         ExcelFile,
         TextMapping,
-        ConditionalExpressions
+        ConditionalExpressions,
+        ResultFile,
     }
 }

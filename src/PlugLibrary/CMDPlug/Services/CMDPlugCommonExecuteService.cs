@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.PlugBaseCore.Contracts;
@@ -26,6 +26,8 @@ public class CMDPlugCommonExecuteService : BasePlugExecuteService
 
         var resultData = plugExecutionRequest.ExecuteResultData;
         var status = plugExecutionRequest.ExecuteResultData?.ExecuteSubStatus;
+        if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames))))
+            return await ReportErrorResult(resultData);
         CLog.Information($"开始执行CMD插头，状态为{status.ToString()}", context.plugExecutionRequest.ExecuteResultData.Ids.PDZId);
         if (status == JobSubStatus.提交)
         {
@@ -129,11 +131,40 @@ public class CMDPlugCommonExecuteService : BasePlugExecuteService
                 Name = InitVariableNames.CMDCommand.ToString(),
                 Value = GetCMDCommandLine(PDZ, plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId, identityId)
             });
+            // 获取执行超时参数，作为命令参数传入
+            var timeoutValue = GetPDZVariableValue(PDZ, plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId,
+                InitVariableNames.ExecutionTimeout.ToString(), identityId);
+            if (!string.IsNullOrEmpty(timeoutValue))
+            {
+                inputs.Add(new PlugVariableData
+                {
+                    Name = InitVariableNames.ExecutionTimeout.ToString(),
+                    Value = timeoutValue
+                });
+            }
         }
         //将插头的实际参数信息放入执行请求中（如果是独立执行模式，放的是个空的）
         ExecutionRequest.InputVariables.AddRange(inputs);
         resultData = await ToolExecuteService.ExecuteToolAsync(ExecutionRequest);
         return resultData;
+    }
+
+    /// <summary>
+    /// 获取PDZ中指定插头的变量值（兼容普通变量和动作变量）
+    /// </summary>
+    private string? GetPDZVariableValue(PlugDataZone plugDataZone, string plugDefinitionId, string variableName, string? identityId = null)
+    {
+        if (identityId == null)
+        {
+            return plugDataZone.GetVariableValue(plugDefinitionId, variableName);
+        }
+        else
+        {
+            return plugDataZone.ActionVariableDatas?
+                .Where(p => p.ActionIdentityId == identityId)
+                .Where(p => p.Name == variableName)
+                .FirstOrDefault()?.Value;
+        }
     }
 
     

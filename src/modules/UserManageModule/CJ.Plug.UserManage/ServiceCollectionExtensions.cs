@@ -30,6 +30,12 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
+        services.AddHttpClient<IRoleManageApiClient, RoleManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         return services;
     }
 
@@ -38,9 +44,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModuleDbConfig, UserModuleDbConfig>();
 
         services.AddScoped<IUserManageService, UserManageService>();
-
+        services.AddScoped<IRoleManageService, RoleManageService>();
 
         services.AddHttpClient<IUserManageApiClient, UserManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.AddHttpClient<IRoleManageApiClient, RoleManageApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
             client.Timeout = TimeSpan.FromSeconds(60);
@@ -53,6 +65,7 @@ public static class ServiceCollectionExtensions
         return app.UseEndpoints(delegate (IEndpointRouteBuilder endpoints)
         {
             endpoints.MapUserManageApi();
+            endpoints.MapRoleManageApi();
         });
     }
 

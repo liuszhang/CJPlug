@@ -1,0 +1,170 @@
+@namespace CJ.Plug.SharedPages.SharedComponents
+@using CJ.Plug.Models.Plug
+@using MudBlazor
+
+<style>
+    .param-group-header {
+        font-weight: 600 !important;
+        font-size: 0.8rem;
+        color: #1976d2 !important;
+        border-bottom: 1px solid #e0e0e0;
+        cursor: default !important;
+        opacity: 1 !important;
+        pointer-events: none;
+    }
+    .param-group-item {
+        padding-left: 24px !important;
+    }
+</style>
+
+<MudSelect T="string" @bind-Value="_selectedKey" Dense Variant="Variant.Outlined"
+           Label="@Label" Style="@Style" Margin="Margin.Dense"
+           @bind-Value:after="OnSelectionChanged" Disabled="@Disabled">
+    @if (_groups.Count == 0)
+    {
+        <MudSelectItem Value="@("__none__")">（无可用参数）</MudSelectItem>
+    }
+    @foreach (var group in _groups)
+    {
+        <MudSelectItem Value="@($"__header_{group.PlugDefId}")" Disabled="true" Class="param-group-header">
+            @group.PlugName
+        </MudSelectItem>
+        @foreach (var item in group.Variables)
+        {
+            <MudSelectItem Value="@item.Key" Class="param-group-item">
+                @item.VarName
+            </MudSelectItem>
+        }
+    }
+</MudSelect>
+
+@code {
+    [Parameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+
+    [Parameter]
+    public string? ExcludePlugDefinitionId { get; set; }
+
+    [Parameter]
+    public string? SpecifyPlugDefinitionId { get; set; }
+
+    [Parameter]
+    public string? VariableName { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> VariableNameChanged { get; set; }
+
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> PlugDefinitionIdChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "绑定至参数";
+
+    [Parameter]
+    public string Style { get; set; } = "min-width:320px";
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private string? _selectedKey;
+    private List<PlugVariableGroup> _groups = new();
+
+    private class PlugVariableGroup
+    {
+        public string PlugName { get; set; } = "";
+        public string PlugDefId { get; set; } = "";
+        public List<PlugVariableItem> Variables { get; set; } = new();
+    }
+
+    private class PlugVariableItem
+    {
+        public string Key { get; set; } = "";
+        public string VarName { get; set; } = "";
+        public string PlugDefId { get; set; } = "";
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (PlugDataZone != null)
+        {
+            LoadGroups();
+        }
+
+        // 当外部设置 VariableName/PlugDefinitionId 时同步选中项
+        if (!string.IsNullOrEmpty(PlugDefinitionId) && !string.IsNullOrEmpty(VariableName))
+        {
+            var expectedKey = $"{PlugDefinitionId}:::{VariableName}";
+            if (_selectedKey != expectedKey)
+            {
+                _selectedKey = expectedKey;
+            }
+        }
+        else if (string.IsNullOrEmpty(VariableName))
+        {
+            _selectedKey = null;
+        }
+    }
+
+    private void LoadGroups()
+    {
+        _groups.Clear();
+        if (PlugDataZone?.PlugVariableDatas == null) return;
+
+        var grouped = PlugDataZone.PlugVariableDatas
+            .Where(v => v.IsBrowsable == true
+                        && !string.IsNullOrEmpty(v.Name)
+                        && (string.IsNullOrEmpty(SpecifyPlugDefinitionId)
+                            ? v.PlugDefinitionId != ExcludePlugDefinitionId
+                            : v.PlugDefinitionId == SpecifyPlugDefinitionId))
+            .GroupBy(v => v.PlugDefinitionId ?? "");
+
+        foreach (var g in grouped)
+        {
+            var plugDefId = g.Key;
+            var plugName = GetPlugName(plugDefId);
+            var group = new PlugVariableGroup { PlugName = plugName, PlugDefId = plugDefId };
+
+            foreach (var v in g)
+            {
+                var key = $"{plugDefId}:::{v.Name}";
+                group.Variables.Add(new PlugVariableItem
+                {
+                    Key = key,
+                    VarName = v.Name ?? "?",
+                    PlugDefId = plugDefId,
+                });
+            }
+
+            _groups.Add(group);
+        }
+    }
+
+    private async Task OnSelectionChanged()
+    {
+        if (string.IsNullOrEmpty(_selectedKey) || _selectedKey.StartsWith("__header_"))
+            return;
+
+        foreach (var group in _groups)
+        {
+            var match = group.Variables.FirstOrDefault(v => v.Key == _selectedKey);
+            if (match != null)
+            {
+                if (VariableName != match.VarName)
+                    await VariableNameChanged.InvokeAsync(match.VarName);
+                if (PlugDefinitionId != match.PlugDefId)
+                    await PlugDefinitionIdChanged.InvokeAsync(match.PlugDefId);
+                return;
+            }
+        }
+    }
+
+    private string GetPlugName(string? plugDefId)
+    {
+        if (string.IsNullOrEmpty(plugDefId)) return "?";
+        var plugData = PlugDataZone?.PlugDatas?.FirstOrDefault(p => p.PlugDefinitionId == plugDefId);
+        return plugData?.Name ?? plugDefId[..Math.Min(8, plugDefId.Length)];
+    }
+}

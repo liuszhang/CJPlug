@@ -19,7 +19,7 @@ public class CustomErrorBoundaryLogger : IErrorBoundaryLogger
     {
         _logger.LogError(exception, "6868,An unhandled exception has occurred.");
 
-        // 确保在正确的上下文中调用
+        // 纭繚鍦ㄦ纭殑涓婁笅鏂囦腑璋冪敤
         await Task.Run(async () =>
         {
             Console.WriteLine("------------CustomErrorBoundaryLogger--------------");

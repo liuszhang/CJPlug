@@ -2,6 +2,7 @@
 @using System.Text.Json.Serialization
 @using Blazored.LocalStorage
 @using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.SharedPages.Contracts
 @using MudBlazor
@@ -42,7 +43,7 @@
 
     private FileSystemNode[] FileTreeNodes { get; set; } = new FileSystemNode[0];
     private List<TreeItemData<FileSystemNode>>? TreeItems { get; set; } = new ();
-    
+
     private FileSystemNode? SelectedNode { get; set; }
     private string ToolName;
 
@@ -55,7 +56,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine("ChooseServerFiles OnInitializedAsync");
+        CLog.Information("ChooseServerFiles OnInitializedAsync");
         var currentUser = await DomInteropService.GetCurrentUserName();
         var tmpTreeItems = await MainApiClient.GetFolderFiles(null, currentUser, ToolAgentHostToUse);
         if (tmpTreeItems != null)
@@ -69,7 +70,7 @@
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.Message);
+                    CLog.Error(e.Message);
                 }
             }
         }

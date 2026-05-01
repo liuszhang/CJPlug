@@ -12,11 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspose.Cells" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
   </ItemGroup>
 
   <ItemGroup>
 	  <ProjectReference Include="..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
+	  <ProjectReference Include="..\..\Core\CJ.Plug.VariableUIHandler\CJ.Plug.VariableUIHandler.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -77,7 +77,7 @@
 
 @if (string.IsNullOrEmpty(Flowchart?.ToJsonString()))
 {
-    <MudAlert>¼ÓÔØÁ÷³ÌÖĞ...</MudAlert>
+    <MudAlert>åŠ è½½æµç¨‹ä¸­...</MudAlert>
     <MudProgressCircular Color="Color.Success" Indeterminate="true" />
 
 }
@@ -90,43 +90,43 @@ else
             <MudIconButton Size="MudBlazor.Size.Small" Style="margin-right:20px;" Icon="@Icons.Material.Outlined.AutoAwesomeMosaic" OnClick="AutoLayoutAsync"></MudIconButton>
             <MudDivider Vertical></MudDivider>
             <MudToggleGroup Style="margin-left:15px" Size="MudBlazor.Size.Small" T="string" SelectedClass="@("custom-striped")"  @bind-Value ="_value" CheckMark>
-                <MudToggleItem Value="@("Âß¼­Á÷")" />
-                <MudToggleItem Value="@("Êı¾İÁ÷")" />
+                <MudToggleItem Value="@("é€»è¾‘æµ")" />
+                <MudToggleItem Value="@("æ•°æ®æµ")" />
             </MudToggleGroup>
             <MudSpacer />
-            @* <MudSwitch T="bool?" Color="Color.Primary" Label="×Ô¶¯±£´æ" LabelPosition="LabelPosition.Start" /> *@
-            <MudTooltip Text="´ò¿ª¹¤×÷Ä¿Â¼">
+            @* <MudSwitch T="bool?" Color="Color.Primary" Label="è‡ªåŠ¨ä¿å­˜" LabelPosition="LabelPosition.Start" /> *@
+            <MudTooltip Text="æ‰“å¼€å·¥ä½œç›®å½•">
                 <MudIconButton OnClick="OpenFileExplorer" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Style="margin-right:10px"></MudIconButton>
             </MudTooltip>
-            <MudTooltip Text="×Ô¶¯±£´æ">
-                <MudCheckBox ReadOnly Size="MudBlazor.Size.Small" T="bool" Color="Color.Primary" Dense Value="true" Style="margin-right:10px">×Ô¶¯</MudCheckBox>
+            <MudTooltip Text="è‡ªåŠ¨ä¿å­˜">
+                <MudCheckBox ReadOnly Size="MudBlazor.Size.Small" T="bool" Color="Color.Primary" Dense Value="true" Style="margin-right:10px">è‡ªåŠ¨</MudCheckBox>
             </MudTooltip>
-            <MudTooltip Text="±£´æ" Delay="1000">
+            <MudTooltip Text="ä¿å­˜" Delay="1000">
                 <MudBadge Color="@(DataDirty? Color.Error:Color.Success)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
                     <MudIconButton OnClick="SaveAsync" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.Save" />
                 </MudBadge>
             </MudTooltip>
 
-            <MudTooltip Text="µ¼³öµ±Ç°Á÷³ÌÎªJSONÎÄ¼ş." Inline="false" Delay="1000">
-                <MudIconButton OnClick="ExportWorkflow" Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small">µ¼³ö</MudIconButton>
+            <MudTooltip Text="å¯¼å‡ºå½“å‰æµç¨‹ä¸ºJSONæ–‡ä»¶." Inline="false" Delay="1000">
+                <MudIconButton OnClick="ExportWorkflow" Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small">å¯¼å‡º</MudIconButton>
             </MudTooltip>
-            <MudTooltip Text="µ¼ÈëJSONÁ÷³ÌÎÄ¼ş." Inline="false" Delay="1000">
+            <MudTooltip Text="å¯¼å…¥JSONæµç¨‹æ–‡ä»¶." Inline="false" Delay="1000">
                 <MudFileUpload T="IBrowserFile" FilesChanged="ImportWorkflow" Style="margin-bottom:-4px;">
                     <CustomContent>
-                        <MudIconButton OnClick="@context.OpenFilePickerAsync" Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small">µ¼Èë</MudIconButton>
+                        <MudIconButton OnClick="@context.OpenFilePickerAsync" Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small">å¯¼å…¥</MudIconButton>
                     </CustomContent>
                 </MudFileUpload>
             </MudTooltip>
 
-            <MudTooltip Text="·¢²¼µ±Ç°Á÷³Ì." Delay="1000">
+            <MudTooltip Text="å‘å¸ƒå½“å‰æµç¨‹." Delay="1000">
                 <MudButtonGroup Size="MudBlazor.Size.Small" Color="Color.Default" Variant="Variant.Text">
                     <MudIconButton OnClick="PublishWorkflow" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" />
                     
                     <MudMenu Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown">
-                        @if (Process.ShowInPlugLibrary == true)
+                        @if (Process?.ShowInPlugLibrary == true)
                         {
-                            <MudTooltip Text="È¡Ïû·¢²¼µ±Ç°Á÷³Ì." Inline="false" Delay="1000">
-                                <MudMenuItem OnClick="UnPublishWorkflow" Icon="@Icons.Material.Filled.CloudDownload">È¡Ïû·¢²¼</MudMenuItem>
+                            <MudTooltip Text="å–æ¶ˆå‘å¸ƒå½“å‰æµç¨‹." Inline="false" Delay="1000">
+                                <MudMenuItem OnClick="UnPublishWorkflow" Icon="@Icons.Material.Filled.CloudDownload">å–æ¶ˆå‘å¸ƒ</MudMenuItem>
                             </MudTooltip>
                             <MudDivider DividerType="DividerType.FullWidth"></MudDivider>
                         }
@@ -134,10 +134,10 @@ else
                 </MudButtonGroup>
             </MudTooltip>
             
-            @* <MudIconButton OnClick="ExecuteOption" Size="MudBlazor.Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Settings">Ö´ĞĞÑ¡Ïî</MudIconButton>
+            @* <MudIconButton OnClick="ExecuteOption" Size="MudBlazor.Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Settings">æ‰§è¡Œé€‰é¡¹</MudIconButton>
             <MudIconButton OnClick="ExecuteFlow" Disabled="ExeButtonDisabled" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Variant="Variant.Text" Class="ml-4" />
              *@
-            <MudTooltip Text="Çå³ı»î¶¯×´Ì¬">
+            <MudTooltip Text="æ¸…é™¤æ´»åŠ¨çŠ¶æ€">
                 <MudIconButton OnClick="ClearActivityStatus" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.CleaningServices" Color="Color.Default" Variant="Variant.Text" Class="ml-4" />
             </MudTooltip>
 
@@ -153,15 +153,15 @@ else
                 Size="MudBlazor.Size.Small" />
                 @* <MudIconButton OnClick="ExecuteFlow" Disabled="ExeButtonDisabled" Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Variant="Variant.Text" Class="ml-4" /> *@
                 <MudMenu Size="MudBlazor.Size.Small" Dense Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">´´½¨×÷Òµ</MudMenuItem>
-                    <MudMenuItem IconColor="Color.Success">Ìø×ª×÷Òµ</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">åˆ›å»ºä½œä¸š</MudMenuItem>
+                    <MudMenuItem IconColor="Color.Success">è·³è½¬ä½œä¸š</MudMenuItem>
                 </MudMenu>
             </MudButtonGroup>
         </MudToolBar>
     </MudPaper>
     <MudProgressLinear Color="@(IsProgressing ? Color.Primary : Color.Transparent)" Indeterminate="true" />
 
-    @if(_value== "Âß¼­Á÷")
+    @if(_value== "é€»è¾‘æµ")
     {
         <ElsaFlowchartDesigner @ref="@Designer"
         IsReadOnly="IsReadOnly"
@@ -172,7 +172,7 @@ else
 
         
     }
-    else if(_value=="Êı¾İÁ÷")
+    else if(_value=="æ•°æ®æµ")
     {
 
         @* <DataFlowDesigner></DataFlowDesigner> *@
@@ -185,7 +185,7 @@ else
 
 @code
 {
-    string _value = "Âß¼­Á÷";
+    private string _value { get; set; } = "é€»è¾‘æµ";
     bool ExeButtonDisabled = false;
 
     [CascadingParameter]
@@ -218,7 +218,7 @@ else
             {
                 Flowchart = PlugDataZone?.GetFlowchartData(ProcessDefinitionId);
                 PlugData = PlugDataZone?.GetPlugData(ProcessDefinitionId);
-                //CLog.Information("»ñÈ¡Á÷³ÌÊı¾İ³É¹¦", PlugDataZone.PDZId);
+                //CLog.Information("è·å–æµç¨‹æ•°æ®æˆåŠŸ", PlugDataZone.PDZId);
                 //CLog.Information(Flowchart?.ToJsonString(), PlugDataZone.PDZId);
             }
             catch (Exception ex)
@@ -238,11 +238,11 @@ else
 
     private async Task OnSave(bool IsDirty)
     {
-        // Ê¹ÓÃInvokeAsyncÈ·±£ÔÚUIÏß³Ì¸üĞÂ×´Ì¬
+        // ä½¿ç”¨InvokeAsyncç¡®ä¿åœ¨UIçº¿ç¨‹æ›´æ–°çŠ¶æ€
         await InvokeAsync(() =>
         {
             DataDirty = IsDirty;
-            StateHasChanged(); // ÏÔÊ½Í¨Öª×é¼ş×´Ì¬ÒÑ¸ü¸Ä£¨ÔÚÄ³Ğ©³¡¾°ÏÂ¿ÉÄÜĞèÒª£©
+            StateHasChanged(); // æ˜¾å¼é€šçŸ¥ç»„ä»¶çŠ¶æ€å·²æ›´æ”¹ï¼ˆåœ¨æŸäº›åœºæ™¯ä¸‹å¯èƒ½éœ€è¦ï¼‰
         });
 
     }
@@ -256,13 +256,13 @@ else
 
 
     /// <summary>
-    /// ±©Â¶¸øÍâ²¿µÄ½Ó¿Ú£¬ÓÃÓÚ¸üĞÂ»î¶¯
+    /// æš´éœ²ç»™å¤–éƒ¨çš„æ¥å£ï¼Œç”¨äºæ›´æ–°æ´»åŠ¨
     /// </summary>
     /// <param name="activity"></param>
     /// <returns></returns>
     public async Task UpdateActivity(JsonObject activity)
     {        
-        //Log.Information($"¿ªÊ¼¸üĞÂ»î¶¯£º{activity}");
+        //Log.Information($"å¼€å§‹æ›´æ–°æ´»åŠ¨ï¼š{activity}");
         //Console.WriteLine(">>>>>>>>>>start update activity");
         //await Designer.UpdateActivityAsync(activity.GetId(), activity);
         //Console.WriteLine(">>>>>>>>>>end update activity");
@@ -273,7 +273,7 @@ else
         var options = new DialogOptions { CloseOnEscapeKey = false , FullScreen=false,MaxWidth=MaxWidth.False,CloseButton=true,Position=DialogPosition.TopCenter};
         var parameters = new DialogParameters<OpenFileExplorer> { { x => x.PlugDataZone, PlugDataZone } };
 
-        await DialogService.ShowAsync<OpenFileExplorer>("¹¤×÷Ä¿Â¼", parameters, options);
+        await DialogService.ShowAsync<OpenFileExplorer>("å·¥ä½œç›®å½•", parameters, options);
     }
 
 
@@ -286,7 +286,7 @@ else
     {
         foreach (var acs in ActivityStats)
         {
-            ActivityStats[acs.Key] = null; //Çå³ı»î¶¯×´Ì¬
+            ActivityStats[acs.Key] = null; //æ¸…é™¤æ´»åŠ¨çŠ¶æ€
         }
     }
 
@@ -294,16 +294,16 @@ else
     {
         if (ExeButtonDisabled)
         {
-            //Èç¹ûÕıÔÚÖ´ĞĞ£¬ÔòÍ£Ö¹
+            //å¦‚æœæ­£åœ¨æ‰§è¡Œï¼Œåˆ™åœæ­¢
             ExeButtonDisabled = false;
             IsProgressing = false;
             IsReadOnly = false;
-            Snackbar.Add("Á÷³ÌÒÑÍ£Ö¹", Severity.Warning);
-            Log.Information($"Á÷³ÌÒÑÍ£Ö¹£º{Process.DefinitionId}");
+            Snackbar.Add("æµç¨‹å·²åœæ­¢", Severity.Warning);
+            Log.Information($"æµç¨‹å·²åœæ­¢ï¼š{Process.DefinitionId}");
         }
         else
         {
-            //Èç¹ûÎ´Ö´ĞĞ£¬Ôò¿ªÊ¼Ö´ĞĞ
+            //å¦‚æœæœªæ‰§è¡Œï¼Œåˆ™å¼€å§‹æ‰§è¡Œ
             await ExecuteFlow();
         }
     }
@@ -317,12 +317,12 @@ else
         ClearActivityStatus();
 
         var TriggerActivityId = PlugDataZone?.TriggerPlugDefinitionId;
-        //´´½¨Ö´ĞĞ×÷ÒµPDZ
+        //åˆ›å»ºæ‰§è¡Œä½œä¸šPDZ
         var currentUser = await DomInteropService.GetCurrentUserName();
         (var PDZId,var JobDefinitionId) = await MainApiClient.SubmitExecute(PlugData, currentUser, PlugDataZone, PDZTypeEnum.Job1);
-        CLog.Information($"{PlugDataZone?.PDZId}:¿ªÊ¼Ö´ĞĞÁ÷³Ì£º{Process.DefinitionId}", PDZId);
+        CLog.Information($"{PlugDataZone?.PDZId}:å¼€å§‹æ‰§è¡Œæµç¨‹ï¼š{Process.DefinitionId}", PDZId);
 
-        //Ê¹ÓÃÒıÇæÖ´ĞĞÁ÷³Ì£¬ÀûÓÃÒıÇæµÄÂß¼­µ÷¶È¡¢ºóÌ¨³¤Ê±¼äÖ´ĞĞµÈÌØĞÔ
+        //ä½¿ç”¨å¼•æ“æ‰§è¡Œæµç¨‹ï¼Œåˆ©ç”¨å¼•æ“çš„é€»è¾‘è°ƒåº¦ã€åå°é•¿æ—¶é—´æ‰§è¡Œç­‰ç‰¹æ€§
         //var result = await ElsaEngineService.ExecuteAsync(Process);
         //var result = await ElsaEngineService.ExecuteWithCorrelationIdAsync(Plug,PlugDataZone.PDZId);
         //var result = await ElsaApiClient.ExecutePlugWithCorrelationIdAsync(Plug,PlugDataZone.PDZId);
@@ -336,8 +336,8 @@ else
         var result = await ElsaApiClient.ExecuteWorkflowWithExecuteSetting(FlowchartJson, executeSetting);
         //Log.Information(JsonSerializer.Serialize(result));
 
-        Snackbar.Add("³É¹¦Æô¶¯Á÷³Ì", Severity.Success);
-        //Log.Information($"Ö´ĞĞÁ÷³Ì£º{Plug.DefinitionId}¡£×÷ÒµÊµÀıºÅ£º{result.ExecuteResultMessage}");
+        Snackbar.Add("æˆåŠŸå¯åŠ¨æµç¨‹", Severity.Success);
+        //Log.Information($"æ‰§è¡Œæµç¨‹ï¼š{Plug.DefinitionId}ã€‚ä½œä¸šå®ä¾‹å·ï¼š{result.ExecuteResultMessage}");
 
         ExeButtonDisabled = false;
         IsProgressing = false;
@@ -353,13 +353,13 @@ else
     {
         if (file == null)
             return;
-        // ´´½¨ÎÄ¼şÁ÷
+        // åˆ›å»ºæ–‡ä»¶æµ
         using var stream = file.OpenReadStream();
 
-        // Ê¹ÓÃStreamReader¶ÁÈ¡Îª×Ö·û´®
+        // ä½¿ç”¨StreamReaderè¯»å–ä¸ºå­—ç¬¦ä¸²
         using var reader = new StreamReader(stream);
         var content = await reader.ReadToEndAsync();
-        // ÏÈ½âÎöÎª JsonDocument£¬ÔÙ×ª»»Îª JsonObject
+        // å…ˆè§£æä¸º JsonDocumentï¼Œå†è½¬æ¢ä¸º JsonObject
         using var jsonDoc = JsonDocument.Parse(content);
         JsonObject jsonObject = JsonObject.Create(jsonDoc.RootElement);
         jsonObject.SetId(ProcessDefinitionId);
@@ -372,7 +372,7 @@ else
         PlugDataZone?.SetFlowchartData(ProcessDefinitionId, jsonObject);
         await Designer.LoadActivityAsync(jsonObject);
 
-        //»¹ĞèÒªÌí¼ÓPlugDataºÍPlugVariableData
+        //è¿˜éœ€è¦æ·»åŠ PlugDataå’ŒPlugVariableData
         var plugDatas = jsonObject.GetActivities();
         //PlugDataZone.PlugDatas.Clear();
         PlugDataZone.PlugVariableDatas.Clear();
@@ -382,7 +382,7 @@ else
             PlugDefinitionId = ProcessDefinitionId,
             Name = Process.Name,
             WorkPath = PlugDataZone.PDZWorkPath,
-            PlugPosition = $"0.0 0.0",//¼ÇÂ¼²åÍ·×ø±êÖµ£¬ÓÃÓÚ»æÖÆÊı¾İÁ÷µÈ¹¦ÄÜ
+            PlugPosition = $"0.0 0.0",//è®°å½•æ’å¤´åæ ‡å€¼ï¼Œç”¨äºç»˜åˆ¶æ•°æ®æµç­‰åŠŸèƒ½
         });
         foreach (var plugData in plugDatas)
         {
@@ -396,9 +396,9 @@ else
                 PlugType = plugData.GetTypeName(),
                 PlugTypeKey = plugData?.GetTypeName(),
                 WorkPath = Path.Combine(PlugDataZone.PDZWorkPath, plugData.GetId()),
-                PlugPosition = $"{x} {y}",//¼ÇÂ¼²åÍ·×ø±êÖµ£¬ÓÃÓÚ»æÖÆÊı¾İÁ÷µÈ¹¦ÄÜ
+                PlugPosition = $"{x} {y}",//è®°å½•æ’å¤´åæ ‡å€¼ï¼Œç”¨äºç»˜åˆ¶æ•°æ®æµç­‰åŠŸèƒ½
             });
-            //Ìí¼ÓPlugVariableData
+            //æ·»åŠ PlugVariableData
             var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(plugData.GetTypeName());
             if (rootPlug != null)
             {
@@ -454,7 +454,7 @@ else
         Process.ShowInPlugLibrary = true;
         await MainApiClient.UpdatePlugAsync(Process.Id, Process);
         //WorkflowDefinition.IsPublished = true;
-        Snackbar.Add("·¢²¼³É¹¦£¡");
+        Snackbar.Add("å‘å¸ƒæˆåŠŸï¼");
         StateHasChanged();
     }
 
@@ -463,7 +463,7 @@ else
         Process.ShowInPlugLibrary = false;
         await MainApiClient.UpdatePlugAsync(Process.Id, Process);
         //WorkflowDefinition.IsPublished = false;
-        Snackbar.Add("È¡Ïû·¢²¼³É¹¦£¡");
+        Snackbar.Add("å–æ¶ˆå‘å¸ƒæˆåŠŸï¼");
         StateHasChanged();
     }
 

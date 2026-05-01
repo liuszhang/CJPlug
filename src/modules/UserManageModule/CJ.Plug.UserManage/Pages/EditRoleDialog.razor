@@ -1,0 +1,54 @@
+@using CJ.Plug.UserManageModels
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack>
+            <MudTextField @bind-Value="RoleName"
+                          Label="角色名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredErrorText="角色名称不能为空" />
+            <MudTextField @bind-Value="RoleDescription"
+                          Label="角色描述"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLines="5" />
+            <MudSelect @bind-Value="RoleType"
+                       Label="角色类型"
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="@("自定义角色")">自定义角色</MudSelectItem>
+                <MudSelectItem Value="@("系统角色")">系统角色</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public int RoleId { get; set; }
+    [Parameter] public string RoleName { get; set; } = string.Empty;
+    [Parameter] public string RoleDescription { get; set; } = string.Empty;
+    [Parameter] public string RoleType { get; set; } = "自定义角色";
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(RoleName))
+            return;
+
+        MudDialog.Close(DialogResult.Ok(new UpdateRoleRequest
+        {
+            Id = RoleId,
+            Name = RoleName.Trim(),
+            Description = RoleDescription?.Trim(),
+            RoleType = RoleType
+        }));
+    }
+}

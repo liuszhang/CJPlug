@@ -93,7 +93,7 @@
                                  alt="Icon" />
                         </MudPaper>
                     }
-
+                    
                     <MudStack Style="height:100%" Justify="Justify.Center" Spacing="0">
                         <MudText Typo="Typo.body2" Style="@colorStyle">@_label</MudText>
                         @{
@@ -131,6 +131,7 @@
                         {
                             <MudText Typo="Typo.caption" Style="@colorStyle">@_description</MudText>
                         }
+                        <MudText Typo="Typo.body2">(@ActivityCategory)</MudText>
                     </MudStack>
                 </MudStack>
             }
@@ -174,6 +175,8 @@
     private string ActivityHeight { get; set; }
     private string ActivityWidth { get; set; }
 
+    private string ActivityCategory { get; set; } = default!;
+
 
     protected override async Task OnParametersSetAsync()
     {
@@ -198,6 +201,7 @@
         _icon = displaySettings.Icon;
         _activityDescriptor = descriptor!;
         _ports = descriptor != null ? ActivityPortService.GetPorts(new PortProviderContext(descriptor, activity)).ToList() : [];
+        ActivityCategory = descriptor?.Category ?? "Uncategorized";
 
         var typeName = _activityDescriptor?.TypeName;
         // 定义查找顺序
@@ -274,7 +278,7 @@
         else if (args.Value.Equals(2))
         {
             // Delete logic here
-            Log.Information($"假装 Delete activity with ID: {Activity.GetId()}");
+            CLog.Information($"假装 Delete activity with ID: {Activity.GetId()}");
             ContextMenuService.Close();
             // Call the delete method or service here
         }

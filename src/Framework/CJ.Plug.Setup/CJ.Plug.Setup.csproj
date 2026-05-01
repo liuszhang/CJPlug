@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ApiServer\CJ.Plug.ApiServer.csproj" />
+    <ProjectReference Include="..\..\PlugWebHost\CJ.Plug.HostWebServer\CJ.Plug.HostWebServer.csproj" />
+    <ProjectReference Include="..\..\PlugStation\CJ.Plug.StationAgent\CJ.Plug.StationAgent.csproj" />
+  </ItemGroup>
+
+</Project>
