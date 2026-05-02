@@ -1,0 +1,140 @@
+@* ThreeJsViewer — 通用 Three.js 3D 模型查看器（iframe 自包含方案） *@
+@inject NavigationManager Navigation
+
+<iframe srcdoc="@_viewerHtml"
+        style="width:100%;height:@($"{Height}px");border:none;"
+        sandbox="allow-scripts allow-same-origin"
+        title="3D Viewer">
+</iframe>
+
+@code {
+    [Parameter] public string? ModelUrl { get; set; }
+    [Parameter] public string ModelType { get; set; } = "stl";
+    [Parameter] public int Height { get; set; } = 500;
+    [Parameter] public string ModelColor { get; set; } = "0xff6600";
+    [Parameter] public string BackgroundColor { get; set; } = "0xcccccc";
+    [Parameter] public bool ShowGrid { get; set; } = false;
+    [Parameter] public bool ShowAxes { get; set; } = false;
+    [Parameter] public double CameraX { get; set; } = 30;
+    [Parameter] public double CameraY { get; set; } = 20;
+    [Parameter] public double CameraZ { get; set; } = 30;
+
+    private string _viewerHtml = "";
+
+    protected override void OnParametersSet()
+    {
+        _viewerHtml = BuildViewerHtml();
+    }
+
+    private string BuildViewerHtml()
+    {
+        var url = string.IsNullOrEmpty(ModelUrl) ? "webFiles/pr2_head_pan.stl" : "webFiles/" + ModelUrl;
+        var baseUri = Navigation.BaseUri;
+        var bgColor = BackgroundColor.Replace("0x", "");
+        var type = ModelType.ToLower();
+
+        var gridJs = ShowGrid
+            ? "s.add(new THREE.GridHelper(200,20,0x333355,0x222244));"
+            : "";
+        var axesJs = ShowAxes
+            ? "s.add(new THREE.AxesHelper(50));"
+            : "";
+
+        var addonImport = type switch
+        {
+            "obj" => "import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';",
+            "gltf" => "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';",
+            _ => "import { STLLoader } from 'three/addons/loaders/STLLoader.js';",
+        };
+
+        var loaderCall = type switch
+        {
+            "obj" => $"new OBJLoader().load('{url}',onLoad,onProg,onErr);",
+            "gltf" => $"new GLTFLoader().load('{url}',g=>onLoad(g.scene),onProg,onErr);",
+            _ => $"new STLLoader().load('{url}',onLoad,onProg,onErr);",
+        };
+
+        return $@"<!DOCTYPE html><html lang=""zh"">
+<head><meta charset=""UTF-8""><meta name=""viewport"" content=""width=device-width,initial-scale=1.0"">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+html,body{{width:100%;height:100%;overflow:hidden}}
+body{{background:#{bgColor};font-family:Arial}}
+#ld{{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:14px;z-index:10;pointer-events:none;transition:opacity .3s}}
+#info{{position:absolute;bottom:8px;left:12px;color:#888;font-size:11px;z-index:10;pointer-events:none}}
+</style></head><body>
+<div id=""ld"">Loading...</div><div id=""info""></div>
+<script type=""importmap"">
+{{""imports"":{{""three"":""{baseUri}_content/ThreeJsIntegration/js/three/three.module.js"",""three/addons/"":""{baseUri}_content/ThreeJsIntegration/js/three/jsm/""}}}}
+</script>
+<script type=""module"">
+import * as THREE from 'three';
+import {{OrbitControls}} from 'three/addons/controls/OrbitControls.js';
+{addonImport}
+
+const L=document.getElementById('ld'),I=document.getElementById('info'),B=document.body;
+
+const s=new THREE.Scene();
+s.background=new THREE.Color({BackgroundColor});
+
+const cam=new THREE.PerspectiveCamera(45,window.innerWidth/Math.max(window.innerHeight,1),0.1,5000);
+cam.position.set({CameraX.ToString(System.Globalization.CultureInfo.InvariantCulture)},{CameraY.ToString(System.Globalization.CultureInfo.InvariantCulture)},{CameraZ.ToString(System.Globalization.CultureInfo.InvariantCulture)});
+
+const r=new THREE.WebGLRenderer({{antialias:true}});
+r.setPixelRatio(Math.min(devicePixelRatio,2));
+r.setSize(window.innerWidth,window.innerHeight);
+r.outputColorSpace=THREE.SRGBColorSpace;
+B.appendChild(r.domElement);
+
+// Lighting
+s.add(new THREE.HemisphereLight(0xffffff,0x444444,1.5));
+s.add(new THREE.AmbientLight(0x404040,2));
+const dl=new THREE.DirectionalLight(0xffffff,3);
+dl.position.set(50,50,50);
+s.add(dl);
+
+{gridJs}
+{axesJs}
+
+// OrbitControls
+const ctrl=new OrbitControls(cam,r.domElement);
+ctrl.enableDamping=true;
+ctrl.dampingFactor=0.08;
+ctrl.target.set(0,0,0);
+cam.lookAt(0,0,0);
+
+// Model load
+function onLoad(geometry){{
+L.style.display='none';
+const mat=new THREE.MeshPhongMaterial({{color:{ModelColor},specular:0x111111,shininess:60,side:THREE.DoubleSide}});
+const mesh=new THREE.Mesh(geometry,mat);
+geometry.computeBoundingBox();
+if(geometry.boundingBox){{
+const c=geometry.boundingBox.getCenter(new THREE.Vector3());
+mesh.position.set(-c.x,-c.y,-c.z);
+}}
+s.add(mesh);
+const box=new THREE.Box3().setFromObject(mesh);
+const sz=box.getSize(new THREE.Vector3());
+const dist=Math.max(sz.x,sz.y,sz.z)*1.8;
+cam.position.set(dist*0.8,dist*0.6,dist);
+cam.lookAt(0,0,0);
+ctrl.target.set(0,0,0);
+I.textContent=Math.round(sz.x)+'×'+Math.round(sz.y)+'×'+Math.round(sz.z);
+}}
+function onProg(p){{if(p.total>0)L.textContent='Loading '+Math.round(p.loaded/p.total*100)+'%';}}
+function onErr(e){{L.textContent='Failed';L.style.color='#f44';}}
+{loaderCall}
+
+// Render loop
+r.setAnimationLoop(()=>{{ctrl.update();r.render(s,cam);}});
+
+// Resize
+addEventListener('resize',()=>{{
+cam.aspect=window.innerWidth/Math.max(window.innerHeight,1);
+cam.updateProjectionMatrix();
+r.setSize(window.innerWidth,window.innerHeight);
+}});
+</script></body></html>";
+    }
+}

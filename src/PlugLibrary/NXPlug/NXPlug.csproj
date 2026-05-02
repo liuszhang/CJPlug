@@ -16,6 +16,7 @@
   </ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
+		<ProjectReference Include="..\CAD\ThreeJsIntegration\ThreeJsIntegration.csproj" />
   </ItemGroup>
 
   <ItemGroup>

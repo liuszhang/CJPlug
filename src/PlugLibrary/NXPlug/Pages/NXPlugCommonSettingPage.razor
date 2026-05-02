@@ -1,4 +1,4 @@
-﻿@using System.Text.Json.Nodes
+@using System.Text.Json.Nodes
 @using Blazored.LocalStorage
 @using CJ.Plug.FileManageApiClient
 @using CJ.Plug.JobManageApiClient
@@ -25,6 +25,7 @@
 @using Serilog
 @using CJ.Plug.Models.Extensions
 @using Size=MudBlazor.Size
+@using ThreeJsIntegration.Components
 
 
 @inject ISnackbar Snackbar
@@ -105,10 +106,10 @@
                 <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
             }
 
-            <MudPaper MinWidth="555" MinHeight="460px">
+            <MudPaper Width="555px" MinHeight="460px">
                 @* <iframe id="myIframe" style="width:550px;height:455px;" src="stlloader_base.html?stlPath=@stlPath" frameborder="0">
                         </iframe> *@
-                @if (!string.IsNullOrEmpty(stlPath))
+                @* @if (!string.IsNullOrEmpty(stlPath))
                 {
                     <iframe id="myIframe" style="width:545px;height:450px;" src="_content/NXPlug/stlloader_base.html?stlPath=@stlPath" frameborder="0">
                     </iframe>
@@ -117,6 +118,18 @@
                 {
                     <iframe id="myIframe" style="width:545px;height:450px;" src="_content/NXPlug/stlloader_base.html?stlPath=@stlPath2" frameborder="0">
                     </iframe>
+                } *@
+
+                @if (!string.IsNullOrEmpty(stlPath))
+                {                    
+                    <ThreeJsViewer ModelUrl="@(stlPath)" ModelType="stl"
+                                   Height="500" ModelColor="0x4a90d9" />
+                }
+                else
+                {
+                    <MudContainer Style="width:100%;height:500px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;">
+                        <MudText Color="Color.Dark" Typo="Typo.h6">请上传 STL 文件以预览</MudText>
+                    </MudContainer>
                 }
 
             </MudPaper>
@@ -437,7 +450,7 @@
         showProgress = true;
         if (string.IsNullOrEmpty(NXFileData?.Value))
         {
-            Console.WriteLine("no model!");
+            CLog.Information("no model!", PlugDataZone.PDZId);
             return;
         }
         TmpJobCorrelationId = "ToStl" + RandomLongIdentityGenerator.GenerateId();
@@ -482,7 +495,7 @@
     async Task OnToStlDone()
     {
         //StatusReporter.PDZUpdated(PlugDataZone.PDZId);
-        Log.Information("模型转换为STL完成,开始将文件放入WEB SERVER用于展示");
+        CLog.Information("模型转换为STL完成,开始将文件放入WEB SERVER用于展示");
 
         await InvokeAsync(async() =>
         {

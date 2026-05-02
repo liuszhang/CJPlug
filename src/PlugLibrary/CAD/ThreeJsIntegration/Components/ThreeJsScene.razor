@@ -1,0 +1,174 @@
+@* ThreeJsScene — 直接 JS 互操作 Three.js 场景组件，适合需要编程控制场景的场景 *@
+@inject IJSRuntime JsRuntime
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<div id="@_containerId"
+     style="width:100%;height:@($"{Height}px");position:relative;overflow:hidden;">
+</div>
+
+@code {
+    private string _containerId = $"threejs-scene-{Guid.NewGuid():N}";
+    private IJSObjectReference? _module;
+    private bool _initialized;
+
+    /// <summary>模型文件 URL</summary>
+    [Parameter] public string? ModelUrl { get; set; }
+
+    /// <summary>模型类型: stl / obj / gltf</summary>
+    [Parameter] public string ModelType { get; set; } = "stl";
+
+    /// <summary>高度（px）</summary>
+    [Parameter] public int Height { get; set; } = 500;
+
+    /// <summary>模型颜色（hex 字符串，如 "0xff6600"）</summary>
+    [Parameter] public string ModelColor { get; set; } = "0xff6600";
+
+    /// <summary>背景颜色（hex 字符串，如 "0xcccccc"）</summary>
+    [Parameter] public string BackgroundColor { get; set; } = "0xcccccc";
+
+    /// <summary>是否显示网格</summary>
+    [Parameter] public bool ShowGrid { get; set; } = true;
+
+    /// <summary>是否显示坐标轴</summary>
+    [Parameter] public bool ShowAxes { get; set; } = false;
+
+    /// <summary>模型加载完成回调</summary>
+    [Parameter] public EventCallback<ModelLoadResult> OnModelLoaded { get; set; }
+
+    /// <summary>模型加载失败回调</summary>
+    [Parameter] public EventCallback<string> OnModelError { get; set; }
+
+    /// <summary>加载进度回调（0-100）</summary>
+    [Parameter] public EventCallback<int> OnLoadProgress { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeScene();
+        }
+    }
+
+    private async Task InitializeScene()
+    {
+        try
+        {
+            // Inject importmap if not present
+            await JsRuntime.InvokeVoidAsync(
+                "eval",
+                $"if(!document.querySelector('script[type=\"importmap\"]')){{" +
+                $"var s=document.createElement('script');" +
+                $"s.type='importmap';" +
+                $"s.textContent=JSON.stringify({{" +
+                $"imports:{{" +
+                $"three:'{Navigation.BaseUri}_content/ThreeJsIntegration/js/three/three.module.js'," +
+                $"'three/addons/':'{Navigation.BaseUri}_content/ThreeJsIntegration/js/three/jsm/'" +
+                $"}}}});" +
+                $"document.head.appendChild(s);" +
+                $"}}"
+            );
+
+            // Load interop module
+            _module = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                $"{Navigation.BaseUri}_content/ThreeJsIntegration/js/three-integration.js"
+            );
+
+            await _module.InvokeVoidAsync("initViewer", _containerId, new
+            {
+                backgroundColor = BackgroundColor,
+                showGrid = ShowGrid,
+                showAxes = ShowAxes,
+                enableShadows = true,
+            });
+
+            _initialized = true;
+
+            // Load model if URL provided
+            if (!string.IsNullOrEmpty(ModelUrl))
+            {
+                await LoadModelInternal();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ThreeJsScene init failed: {ex.Message}");
+        }
+    }
+
+    private async Task LoadModelInternal()
+    {
+        if (!_initialized || _module is null || string.IsNullOrEmpty(ModelUrl)) return;
+
+        try
+        {
+            var result = await _module.InvokeAsync<ModelLoadResult>(
+                "loadModel", _containerId, ModelUrl, ModelType.ToLower(), new
+                {
+                    color = ParseHexColor(ModelColor),
+                    onProgress = (Func<int, Task>)(async pct =>
+                    {
+                        await OnLoadProgress.InvokeAsync(pct);
+                    }),
+                }
+            );
+
+            await OnModelLoaded.InvokeAsync(result);
+        }
+        catch (Exception ex)
+        {
+            await OnModelError.InvokeAsync(ex.Message);
+        }
+    }
+
+    /// <summary>程序化加载模型</summary>
+    public async Task LoadModel(string url, string type = "stl")
+    {
+        ModelUrl = url;
+        ModelType = type;
+        if (_initialized)
+        {
+            await LoadModelInternal();
+        }
+    }
+
+    /// <summary>重置相机视角</summary>
+    public async Task ResetCamera()
+    {
+        if (_initialized && _module is not null)
+        {
+            await _module.InvokeVoidAsync("resetCamera", _containerId);
+        }
+    }
+
+    /// <summary>设置背景色</summary>
+    public async Task SetBackgroundColor(string color)
+    {
+        BackgroundColor = color;
+        if (_initialized && _module is not null)
+        {
+            await _module.InvokeVoidAsync("setBackgroundColor", _containerId, color);
+        }
+    }
+
+    private static int ParseHexColor(string hex)
+    {
+        if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            hex = hex[2..];
+        return Convert.ToInt32(hex, 16);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.InvokeVoidAsync("disposeViewer", _containerId);
+                await _module.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}

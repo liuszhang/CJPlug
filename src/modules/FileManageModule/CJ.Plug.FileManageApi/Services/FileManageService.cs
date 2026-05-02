@@ -1,4 +1,4 @@
-﻿using CJ.Plug.FileManageApi.Contracts;
+using CJ.Plug.FileManageApi.Contracts;
 using CJ.Plug.Models.Extensions;
 using CJ.Plug.Models.LogModels;
 
@@ -101,7 +101,8 @@ namespace CJ.Plug.FileManageApi.Services
                     await System.IO.File.OpenRead(file.FilePath).CopyToAsync(stream);
                     //Console.WriteLine("2");
                 }
-                return "/webFiles/" + fileId + "-" + fileName;
+                return fileId + "-" + fileName;
+                //return "/webFiles/" + fileId + "-" + fileName;
             }
             catch (HttpRequestException ex)
             {

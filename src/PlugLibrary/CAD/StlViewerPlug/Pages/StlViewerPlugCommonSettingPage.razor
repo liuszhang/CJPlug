@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 @using StlViewerPlug
+@using ThreeJsIntegration.Components
 
 @inject IFileManageApiClient FileManageApiClient
 @inject MainApiClient MainApiClient
@@ -25,7 +26,7 @@
             </SelectedTemplate>
         </MudFileUpload>
 
-        <MudText Typo="Typo.body2">
+        @* <MudText Typo="Typo.body2">
             @if (!string.IsNullOrEmpty(_displayFileName))
             {
                 <span style="color:green;">当前模型: @_displayFileName</span>
@@ -34,7 +35,7 @@
             {
                 <span style="color:gray;">请上传一个 .stl 文件</span>
             }
-        </MudText>
+        </MudText> *@
     </MudStack>
 
     <MudDivider />
@@ -42,7 +43,9 @@
     <MudPaper Elevation="3" Style="overflow:hidden; width:100%;">
         @if (!string.IsNullOrEmpty(_stlPath))
         {
-            <ThreeJSViewer ModelUrl="@_stlPath" ModelType="stl"
+            @* <ThreeJSViewer ModelUrl="@_stlPath" ModelType="stl"
+                           Height="500" ModelColor="0x4a90d9" /> *@
+            <ThreeJsViewer ModelUrl="@_stlPath" ModelType="stl"
                            Height="500" ModelColor="0x4a90d9" />
         }
         else
@@ -101,6 +104,7 @@
                     Value = file.Name + ":" + fileId
                 };
                 _stlPath = await FileManageApiClient.UploadFileToWebServer(fileData);
+                
             }
         }
         catch (Exception ex) { Console.WriteLine($"上传失败: {ex.Message}"); }

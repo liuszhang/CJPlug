@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.EventAggregator;
+using CJ.Plug.Models.EventAggregator;
 using CJ.Plug.Models.Extensions;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Shared;
@@ -587,18 +587,18 @@ namespace CJ.Plug.FileManageApiClient
                     var response = await httpClient.PostAsJsonAsync<PlugVariableData>($"api/file/uploadFileToWebServer", stlFileData);
                     if (response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine("------------File uploaded successfully.");
+                        CLog.Information("------------File uploaded successfully.");
                         return await response.Content.ReadAsStringAsync();
                     }
                     else
                     {
-                        Console.WriteLine($"-----------Failed to upload file to web server. Status code: {response.StatusCode}");
+                        CLog.Warning($"-----------Failed to upload file to web server. Status code: {response.StatusCode}");
                         return null;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Information($"-----------Failed to upload file to web server. Exception: {ex.Message}");
+                    CLog.Error($"-----------Failed to upload file to web server. Exception: {ex.Message}");
                     return null;
                 }
 
