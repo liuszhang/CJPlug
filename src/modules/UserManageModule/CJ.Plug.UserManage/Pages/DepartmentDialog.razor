@@ -1,0 +1,120 @@
+@using CJ.Plug.UserManageModels
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="Model.Name"
+                          Label="部门名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredErrorText="部门名称不能为空" />
+
+            <MudTextField @bind-Value="Model.Code"
+                          Label="部门编码"
+                          Variant="Variant.Outlined" />
+
+            <MudSelect T="int?"
+                       @bind-Value="Model.ParentId"
+                       Label="上级部门"
+                       Variant="Variant.Outlined"
+                       Clearable="true"
+                       Placeholder="无">
+                @foreach (var dept in Departments.Where(d => d.Id != Model.Id))
+                {
+                    <MudSelectItem T="int?" Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="Model.Manager"
+                          Label="负责人"
+                          Variant="Variant.Outlined" />
+
+            <MudSelect T="DataStatus"
+                       @bind-Value="Model.Status"
+                       Label="状态"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="DataStatus" Value="@DataStatus.Active">启用</MudSelectItem>
+                <MudSelectItem T="DataStatus" Value="@DataStatus.Disabled">禁用</MudSelectItem>
+                @if (IsEdit)
+                {
+                    <MudSelectItem T="DataStatus" Value="@DataStatus.Authorizing">授权中</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">@(IsEdit ? "保存" : "创建")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public int DepartmentId { get; set; }
+    [Parameter] public string DepartmentName { get; set; } = string.Empty;
+    [Parameter] public string? DepartmentCode { get; set; }
+    [Parameter] public int? ParentId { get; set; }
+    [Parameter] public string? Manager { get; set; }
+    [Parameter] public DataStatus Status { get; set; } = DataStatus.Active;
+    [Parameter] public List<DepartmentManageDto> Departments { get; set; } = [];
+
+    private DepartmentForm Model { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        Model = new DepartmentForm
+        {
+            Id = DepartmentId,
+            Name = DepartmentName,
+            Code = DepartmentCode,
+            ParentId = ParentId,
+            Manager = Manager,
+            Status = Status
+        };
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.Name))
+            return;
+
+        if (IsEdit)
+        {
+            MudDialog.Close(DialogResult.Ok(new UpdateDepartmentRequest
+            {
+                Id = Model.Id,
+                Name = Model.Name.Trim(),
+                Code = Model.Code?.Trim(),
+                ParentId = Model.ParentId,
+                Manager = Model.Manager?.Trim(),
+                Status = Model.Status
+            }));
+        }
+        else
+        {
+            MudDialog.Close(DialogResult.Ok(new CreateDepartmentRequest
+            {
+                Name = Model.Name.Trim(),
+                Code = Model.Code?.Trim(),
+                ParentId = Model.ParentId,
+                Manager = Model.Manager?.Trim(),
+                Status = Model.Status
+            }));
+        }
+    }
+
+    private class DepartmentForm
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Code { get; set; }
+        public int? ParentId { get; set; }
+        public string? Manager { get; set; }
+        public DataStatus Status { get; set; } = DataStatus.Active;
+    }
+}

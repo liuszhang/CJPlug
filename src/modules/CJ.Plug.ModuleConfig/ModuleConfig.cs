@@ -1,4 +1,10 @@
-﻿using CJ.Plug.HomePage;
+using CJ.Plug.AuthApi;
+using CJ.Plug.AuthUI;
+using CJ.Plug.AuditApi;
+using CJ.Plug.AuditUI;
+using CJ.Plug.GuacamoleApi;
+using CJ.Plug.GuacamoleUI;
+using CJ.Plug.HomePage;
 using CJ.Plug.Login;
 using CJ.Plug.LoginApiClient.ApiClients;
 using CJ.Plug.LoginApis.Apis;
@@ -46,6 +52,14 @@ namespace CJ.Plug.ModuleConfig
             services.AddMCPToolsModuleServices();
             services.AddSkillsModuleServices();
 
+            // 授权管理模块
+            services.AddAuthModulePageServices();
+
+            // 审计管理模块
+            services.AddAuditModulePageServices();
+
+            // Guacamole 远程桌面模块
+            services.AddGuacamoleUIPageServices();
 
             //放在最后，因为用户名需要放在最后
             services.AddLoginModulePageServices();
@@ -75,6 +89,15 @@ namespace CJ.Plug.ModuleConfig
             services.AddMCPToolsApiServices();
             services.AddSkillsApiServices();
 
+            // 授权管理模块API
+            services.AddAuthModuleApiServices();
+
+            // 审计管理模块API
+            services.AddAuditModuleApiServices();
+
+            // Guacamole 远程桌面模块API
+            services.AddGuacamoleApiServices();
+
             return services;
         }
 
@@ -95,6 +118,15 @@ namespace CJ.Plug.ModuleConfig
             app.AddUserManageModuleApi();
             app.AddMCPToolsApi();
             app.AddSkillsApi();
+
+            // 授权管理模块API
+            app.AddAuthModuleApi();
+
+            // 审计管理模块API
+            app.AddAuditModuleApi();
+
+            // Guacamole 远程桌面模块API
+            app.AddGuacamoleApi();
 
             return app;
         }

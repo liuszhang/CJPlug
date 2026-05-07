@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Plug;
 using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
@@ -18,9 +18,13 @@ namespace CJ.Plug.Models.Shared
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Password { get; set; }
-        public string? Department { get; set; }
+        public int? DepartmentId { get; set; }
         public string? Token { get; set; }
         public string? Phone { get; set; }
+        /// <summary>
+        /// 状态：-1=授权中，0=禁用，1=启用
+        /// </summary>
+        public int Status { get; set; } = 1;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

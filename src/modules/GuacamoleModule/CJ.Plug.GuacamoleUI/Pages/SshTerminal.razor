@@ -1,0 +1,141 @@
+@page "/remote/ssh/{StationIp}"
+
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Microsoft.JSInterop
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>@($"SSH 终端 - {StationIp}")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh; background: #1a1a1a;">
+    @if (_showLoginForm)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 80vh;">
+            <MudPaper Style="padding: 32px; min-width: 400px;" Elevation="8">
+                <MudText Typo="Typo.h5" Class="mb-4">SSH 连接</MudText>
+                <MudTextField @bind-Value="_host" Label="主机" Variant="Variant.Outlined" Class="mb-3" />
+                <MudNumericField @bind-Value="_port" Label="端口" Variant="Variant.Outlined" Class="mb-3" />
+                <MudTextField @bind-Value="_username" Label="用户名" Variant="Variant.Outlined" Class="mb-3" />
+                <MudTextField @bind-Value="_password" Label="密码" Variant="Variant.Outlined" 
+                              InputType="InputType.Password" Class="mb-4" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth OnClick="ConnectAsync">
+                    连接
+                </MudButton>
+            </MudPaper>
+        </MudStack>
+    }
+    else if (_loading)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 80vh;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="color: white;">正在连接 SSH...</MudText>
+            <MudText Typo="Typo.body2" Style="color: #aaa;">@_host:@_port</MudText>
+        </MudStack>
+    }
+    else if (_error != null)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 80vh;">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+            <MudText Typo="Typo.h6" Color="Color.Error">连接失败</MudText>
+            <MudText Typo="Typo.body2" Style="color: #aaa;">@_error</MudText>
+            <MudButton Variant="Variant.Outlined" OnClick="() => _showLoginForm = true" Color="Color.Primary">
+                重新配置
+            </MudButton>
+        </MudStack>
+    }
+    else
+    {
+        <div id="terminal-container" style="width: 100%; height: 100%; padding: 4px;">
+            <div id="terminal" style="width: 100%; height: 100%;"></div>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string StationIp { get; set; } = default!;
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Port { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Username { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? AutoConnect { get; set; }
+
+    private bool _loading = false;
+    private bool _showLoginForm = true;
+    private string? _error;
+    private string _host = "";
+    private int _port = 22;
+    private string _username = "root";
+    private string _password = "";
+
+    protected override void OnInitialized()
+    {
+        _host = StationIp;
+        if (Port.HasValue) _port = Port.Value;
+        if (!string.IsNullOrEmpty(Username)) _username = Username;
+
+        // 如果提供了用户名参数，自动连接
+        if (!string.IsNullOrEmpty(Username))
+        {
+            _showLoginForm = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_showLoginForm && _loading == false)
+        {
+            await ConnectAsync();
+        }
+    }
+
+    private async Task ConnectAsync()
+    {
+        _loading = true;
+        _showLoginForm = false;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // WebSocket 连接到当前服务器 (与页面同源)
+            var baseUri = NavigationManager.BaseUri; // e.g. http://localhost:5066/
+            var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
+            var wsUrl = $"{wsBase}/api/remote/ssh?host={_host}&port={_port}&username={Uri.EscapeDataString(_username)}&password={Uri.EscapeDataString(_password)}";
+
+            // 初始化 xterm.js 终端
+            var success = await JSRuntime.InvokeAsync<bool>("xtermInterop.connect", "terminal", wsUrl);
+
+            if (!success)
+            {
+                _error = "无法连接到 SSH 服务器";
+                _showLoginForm = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"连接失败: {ex.Message}";
+            _showLoginForm = true;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("xtermInterop.disconnect");
+    }
+}

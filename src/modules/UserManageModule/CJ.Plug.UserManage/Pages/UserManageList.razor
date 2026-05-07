@@ -1,14 +1,16 @@
-﻿@page "/UserManageList"
+@page "/UserManageList"
 
 @using CJ.Plug.Models.Shared
+@using CJ.Plug.UserManageModels
 @using MudBlazor
 @using System.Globalization
-@using System.Linq
 
-@inject HttpClient Http
+@inject IUserManageApiClient UserApiClient
+@inject IDepartmentManageApiClient DepartmentApiClient
+@inject IRoleManageApiClient RoleApiClient
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
-@inject MainApiClient MainApiClient
+@inject IDialogService DialogService
 
 <PageTitle>用户管理</PageTitle>
 
@@ -17,11 +19,10 @@
     <MudStack Row AlignItems="AlignItems.Center">
         <MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="用户操作" Color="Color.Default" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft">
             <MudMenuItem OnClick="@DeleteSelectedUsers">删除</MudMenuItem>
-            <MudMenuItem OnClick="@ExportSelectedUsers">导出</MudMenuItem>
         </MudMenu>
 
-        <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateUser">创建用户</MudButton>
-        <MudButton OnClick="async()=>await dataGrid.ReloadServerData()" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建用户</MudButton>
+        <MudButton OnClick="RefreshData" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
     </MudStack>
 
     <MudSpacer />
@@ -43,7 +44,7 @@
             <MudTextField T="string"
                           @bind-Value="searchString"
                           Margin="Margin.Dense"
-                          Placeholder="可搜索：用户名、邮箱、角色"
+                          Placeholder="可搜索：用户名、邮箱"
                           Variant="Variant.Outlined"
                           AdornmentIcon="@Icons.Material.Outlined.Search"
                           Adornment="Adornment.End"
@@ -51,20 +52,6 @@
                           DebounceInterval="500"
                           Immediate="true"
                           Class="me-3" />
-
-            @* <MudSelect T="string" Label="角色筛选" Margin="Margin.Dense" Dense Variant="Variant.Outlined" Clearable="true" Class="me-3">
-                <MudSelectItem Value="@string.Empty">全部</MudSelectItem>
-                @foreach (var r in Roles)
-                {
-                    <MudSelectItem Value="@r">@r</MudSelectItem>
-                }
-            </MudSelect> *@
-
-            <MudSelect T="bool?" Label="激活" Margin="Margin.Dense" Dense Variant="Variant.Outlined" Clearable="true" Class="me-3">
-                <MudSelectItem T="bool?" Value="@(default(bool?))">全部</MudSelectItem>
-                <MudSelectItem T="bool?" Value="@(true)">已激活</MudSelectItem>
-                <MudSelectItem T="bool?" Value="@(false)">已禁用</MudSelectItem>
-            </MudSelect>
         </ToolBarContent>
 
         <Columns>
@@ -78,19 +65,36 @@
 
             <PropertyColumn Property="x => x.Email" Title="邮箱" />
 
-            @* <TemplateColumn Title="角色" Sortable="true">
+            <TemplateColumn Title="姓名">
                 <CellTemplate>
-                    @context.Item.Role
+                    @GetDisplayName(context.Item)
                 </CellTemplate>
-            </TemplateColumn> *@
+            </TemplateColumn>
 
-            @* <TemplateColumn Title="状态">
+            <TemplateColumn Title="部门">
                 <CellTemplate>
-                    <MudChip Color="@(context.Item.IsActive ? Color.Success : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
-                        @(context.Item.IsActive ? "启用" : "禁用")
-                    </MudChip>
+                    @GetDepartmentName(context.Item.DepartmentId)
                 </CellTemplate>
-            </TemplateColumn> *@
+            </TemplateColumn>
+
+            <TemplateColumn Title="角色">
+                <CellTemplate>
+                    @{
+                        var roles = GetUserRoleNames(context.Item.Id);
+                    }
+                    @if (roles.Count > 0)
+                    {
+                        @foreach (var role in roles)
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@role</MudChip>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
 
             <TemplateColumn Title="创建时间" Sortable="true">
                 <CellTemplate>
@@ -101,9 +105,8 @@
             <TemplateColumn Style="text-align:right" Title="操作">
                 <CellTemplate>
                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                        <MudMenuItem OnClick="@(()=>EditUser(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
                         <MudMenuItem OnClick="@(()=>DeleteUser(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                        <MudMenuItem OnClick="@(()=>ResetPassword(context.Item))" Icon="@Icons.Material.Outlined.LockReset">重置密码</MudMenuItem>
                     </MudMenu>
                 </CellTemplate>
             </TemplateColumn>
@@ -125,27 +128,100 @@
 </MudContainer>
 
 @code {
-    // 保留并重用页面中原有的注释/字段样式（遵循保留注释的规则）
+    private MudDataGrid<User> dataGrid = default!;
+    public HashSet<User> SelectedUsers { get; set; } = new HashSet<User>();
     public string? searchString { get; set; }
 
-    private MudDataGrid<User> dataGrid;
-    public HashSet<User> SelectedUsers { get; set; } = new HashSet<User>();
+    private List<User> _allUsers = [];
+    private List<DepartmentManageDto> _allDepartments = [];
+    private List<string> _allRoles = [];
+    private Dictionary<int, List<string>> _userRolesCache = new();
 
-    // 临时内存数据。实际请使用后端API替换加载逻辑（若已有用户API，可直接调用 Http.GetFromJsonAsync）
-    private List<User> AllUsers { get; set; } = new List<User>()
+    protected override async Task OnInitializedAsync()
     {
-        new User { Id = 1, UserName = "admin", Email = "admin@example.com"},
-        new User { Id = 2, UserName = "alice", Email = "alice@example.com"},
-        new User { Id = 3, UserName = "bob", Email = "bob@example.com"}
-    };
+        // Load departments and roles first (lightweight), then reload grid
+        await Task.WhenAll(LoadDepartments(), LoadRoles());
+    }
 
-    //private IEnumerable<string> Roles => AllUsers.Select(u => u.Role).Distinct().OrderBy(r => r);
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // First render: load users and their roles, then reload the grid
+            await LoadUsers();
+            await LoadUserRoles();
+            StateHasChanged();
+        }
+    }
 
-    // 简化排序：只根据 SortBy 选择字段，默认升序；避免依赖未在当前 MudBlazor 版本中可用的 Direction/SortDirection 属性
+    private async Task RefreshData()
+    {
+        await LoadDepartments();
+        await LoadRoles();
+        await LoadUsers();
+        await LoadUserRoles();
+        await dataGrid.ReloadServerData();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var users = await UserApiClient.GetAllUsersAsync();
+            _allUsers = users?.Where(u => u != null).Cast<User>().ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户失败: {ex.Message}", Severity.Error);
+            _allUsers = [];
+        }
+    }
+
+    private async Task LoadDepartments()
+    {
+        try
+        {
+            _allDepartments = await DepartmentApiClient.GetAllDepartmentsAsync();
+        }
+        catch
+        {
+            _allDepartments = [];
+        }
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+            var roles = await RoleApiClient.GetAllAsync();
+            _allRoles = roles.Select(r => r.Name).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
+        }
+        catch
+        {
+            _allRoles = [];
+        }
+    }
+
+    private async Task LoadUserRoles()
+    {
+        _userRolesCache.Clear();
+        foreach (var user in _allUsers)
+        {
+            try
+            {
+                var userRoles = await UserApiClient.GetUserRolesAsync(user.Id);
+                _userRolesCache[user.Id] = userRoles;
+            }
+            catch
+            {
+                _userRolesCache[user.Id] = [];
+            }
+        }
+    }
+
     private async Task<GridData<User>> LoadData(GridState<User> state, CancellationToken token)
     {
-        //var query = AllUsers.AsQueryable();
-        var query = await MainApiClient.GetAllUsersAsync();
+        var query = _allUsers.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(searchString))
         {
@@ -161,16 +237,19 @@
         {
             if (sortDef.SortBy == nameof(User.CreatedAt))
             {
-                query = query.OrderBy(u => u.CreatedAt);
+                query = sortDef.Descending
+                    ? query.OrderByDescending(u => u.CreatedAt)
+                    : query.OrderBy(u => u.CreatedAt);
             }
             else if (sortDef.SortBy == nameof(User.UserName))
             {
-                query = query.OrderBy(u => u.UserName);
+                query = sortDef.Descending
+                    ? query.OrderByDescending(u => u.UserName)
+                    : query.OrderBy(u => u.UserName);
             }
         }
         else
         {
-            // 默认按创建时间降序显示
             query = query.OrderByDescending(u => u.CreatedAt);
         }
 
@@ -181,55 +260,137 @@
         return new GridData<User> { TotalItems = total, Items = items };
     }
 
-    private void CreateUser()
+    private string GetDisplayName(User user)
     {
-        Snackbar.Add("创建用户（请实现实际跳转或弹窗）", Severity.Info);
+        var parts = new[] { user.FirstName, user.LastName }.Where(p => !string.IsNullOrWhiteSpace(p));
+        return parts.Any() ? string.Join(" ", parts) : "-";
     }
 
-    private void EditUser(User user)
+    private string GetDepartmentName(int? departmentId)
     {
-        Snackbar.Add($"编辑用户：{user.UserName}", Severity.Info);
+        if (!departmentId.HasValue) return "-";
+        var dept = _allDepartments.FirstOrDefault(d => d.Id == departmentId.Value);
+        return dept?.Name ?? "-";
+    }
+
+    private List<string> GetUserRoleNames(int userId)
+    {
+        return _userRolesCache.TryGetValue(userId, out var roles) ? roles : [];
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<CreateUserDialog>
+        {
+            { d => d.Departments, _allDepartments },
+            { d => d.Roles, _allRoles }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateUserDialog>("创建用户", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateUserRequest request)
+        {
+            try
+            {
+                var user = await UserApiClient.CreateUserAsync(request);
+                if (user != null)
+                {
+                    Snackbar.Add($"用户 \"{user.UserName}\" 创建成功", Severity.Success);
+                    await RefreshData();
+                }
+                else
+                {
+                    Snackbar.Add("创建用户失败，用户名或邮箱可能已存在", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建用户失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(User user)
+    {
+        var userRoles = GetUserRoleNames(user.Id);
+
+        var parameters = new DialogParameters<EditUserDialog>
+        {
+            { d => d.UserId, user.Id },
+            { d => d.UserName, user.UserName ?? "" },
+            { d => d.Email, user.Email },
+            { d => d.FirstName, user.FirstName },
+            { d => d.LastName, user.LastName },
+            { d => d.PhoneNumber, user.PhoneNumber },
+            { d => d.DepartmentId, user.DepartmentId },
+            { d => d.UserRoles, userRoles },
+            { d => d.Departments, _allDepartments },
+            { d => d.Roles, _allRoles }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditUserDialog>("编辑用户", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdateUserRequest request)
+        {
+            try
+            {
+                var updatedUser = await UserApiClient.UpdateUserAsync(request);
+                if (updatedUser != null)
+                {
+                    Snackbar.Add($"用户 \"{user.UserName}\" 更新成功", Severity.Success);
+                    await RefreshData();
+                }
+                else
+                {
+                    Snackbar.Add("更新用户失败", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新用户失败: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
     private async Task DeleteUser(User user)
     {
-        if (user != null)
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除用户 \"{user.UserName}\" 吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        try
         {
-            AllUsers.RemoveAll(u => u.Id == user.Id);
-            await dataGrid.ReloadServerData();
             Snackbar.Add($"已删除用户：{user.UserName}", Severity.Success);
+            await RefreshData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除用户失败: {ex.Message}", Severity.Error);
         }
     }
 
     private async Task DeleteSelectedUsers()
     {
-        foreach (var u in SelectedUsers.ToList())
+        if (SelectedUsers.Count == 0)
         {
-            AllUsers.RemoveAll(x => x.Id == u.Id);
+            Snackbar.Add("请先选择要删除的用户", Severity.Warning);
+            return;
         }
+
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认批量删除",
+            $"确定要删除选中的 {SelectedUsers.Count} 个用户吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
         SelectedUsers.Clear();
-        await dataGrid.ReloadServerData();
+        await RefreshData();
         Snackbar.Add("已删除所选用户", Severity.Success);
     }
-
-    private void ExportSelectedUsers()
-    {
-        Snackbar.Add("导出所选用户（请实现导出逻辑）", Severity.Info);
-    }
-
-    private void ResetPassword(User user)
-    {
-        Snackbar.Add($"已为 {user.UserName} 触发重置密码（请实现后端调用）", Severity.Success);
-    }
-
-    // 简单 DTO：页面内定义，避免引入未知外部类型
-    public class UserDto
-    {
-        public int Id { get; set; }
-        public string? UserName { get; set; }
-        public string? Email { get; set; }
-        public string? Role { get; set; }
-        public bool IsActive { get; set; } = true;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
-    }
-}}
+}

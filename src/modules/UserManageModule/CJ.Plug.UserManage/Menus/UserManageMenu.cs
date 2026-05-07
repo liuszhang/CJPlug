@@ -1,11 +1,6 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using MudBlazor;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProcessManageModule.Menus
 {
@@ -17,24 +12,10 @@ namespace ProcessManageModule.Menus
             {
                 new()
                 {
-                    Icon = Icons.Material.Filled.VerifiedUser,
-                    Href = "/UserManageList",
-                    Text = "人员管理",
-                    GroupName = MenuGroupEnum.调试.ToString(),
-                },
-                new()
-                {
-                    Icon = Icons.Material.Filled.VerifiedUser,
-                    Href = "/RoleManageList",
-                    Text = "角色管理",
-                    GroupName = MenuGroupEnum.调试.ToString(),
-                },
-                new()
-                {
-                    Icon = Icons.Material.Filled.DepartureBoard,
-                    Href = "/DepartmentManage",
-                    Text = "部门管理",
-                    GroupName = MenuGroupEnum.调试.ToString(),
+                    Icon = Icons.Material.Filled.Settings,
+                    Href = "/SystemManage",
+                    Text = "系统管理",
+                    GroupName = MenuGroupEnum.管理.ToString(),
                 }
             };
 

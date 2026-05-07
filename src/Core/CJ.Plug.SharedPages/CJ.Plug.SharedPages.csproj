@@ -29,7 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CJ.Plug.VariableUIHandler\CJ.Plug.VariableUIHandler.csproj" />
   </ItemGroup>
-
+  
   <ItemGroup>
     <Content Update="CustomePlugSettingLayout.razor">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>

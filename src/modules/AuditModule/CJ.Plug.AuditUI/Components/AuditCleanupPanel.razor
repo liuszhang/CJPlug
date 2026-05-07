@@ -1,0 +1,109 @@
+@using CJ.Plug.AuditApiClient
+@using MudBlazor
+
+@inject IAuditApiClient AuditApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+    <MudText Typo="Typo.h6">日志清理</MudText>
+</MudStack>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.body1" Class="mb-4">
+        清理指定天数之前的审计日志记录，以释放数据库空间。
+    </MudText>
+
+    <MudGrid>
+        <MudItem xs="4">
+            <MudNumericField @bind-Value="_daysToKeep" 
+                             Label="保留天数" 
+                             Variant="Variant.Outlined" 
+                             Margin="Margin.Dense"
+                             Min="1"
+                             Max="365"
+                             HelperText="将删除此天数之前的所有日志" />
+        </MudItem>
+        <MudItem xs="8" Class="d-flex align-center">
+            <MudButton OnClick="Cleanup" 
+                       StartIcon="@Icons.Material.Filled.CleaningServices" 
+                       Variant="Variant.Filled" 
+                       Color="Color.Warning"
+                       Disabled="_isCleaning">
+                @if (_isCleaning)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">清理中...</MudText>
+                }
+                else
+                {
+                    <MudText>清理日志</MudText>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (_lastCleanupResult.HasValue)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            上次清理结果：已删除 @_lastCleanupResult.Value 条日志记录
+        </MudAlert>
+    }
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-2">快速清理</MudText>
+    <MudStack Row Spacing="2">
+        <MudButton OnClick="@(() => QuickCleanup(7))" Variant="Variant.Outlined" Color="Color.Warning">清理7天前</MudButton>
+        <MudButton OnClick="@(() => QuickCleanup(30))" Variant="Variant.Outlined" Color="Color.Warning">清理30天前</MudButton>
+        <MudButton OnClick="@(() => QuickCleanup(90))" Variant="Variant.Outlined" Color="Color.Warning">清理90天前</MudButton>
+        <MudButton OnClick="@(() => QuickCleanup(180))" Variant="Variant.Outlined" Color="Color.Warning">清理180天前</MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private int _daysToKeep = 30;
+    private bool _isCleaning = false;
+    private int? _lastCleanupResult;
+
+    private async Task Cleanup()
+    {
+        await PerformCleanup(_daysToKeep);
+    }
+
+    private async Task QuickCleanup(int days)
+    {
+        _daysToKeep = days;
+        await PerformCleanup(days);
+    }
+
+    private async Task PerformCleanup(int days)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认清理",
+            $"确定要清理 {days} 天前的所有审计日志吗？此操作不可撤销。",
+            yesText: "确认清理",
+            cancelText: "取消");
+
+        if (confirm != true) return;
+
+        _isCleaning = true;
+        StateHasChanged();
+
+        try
+        {
+            var deletedCount = await AuditApiClient.CleanupAsync(days);
+            _lastCleanupResult = deletedCount;
+            Snackbar.Add($"已清理 {deletedCount} 条 {days} 天前的日志", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"清理失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCleaning = false;
+            StateHasChanged();
+        }
+    }
+}

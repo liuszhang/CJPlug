@@ -15,6 +15,9 @@ namespace CJ.Plug.Models.LogModels
         CompleteActivityContext,
         PDZUpdatedInfo,
         PlugUpdated,
-
+        /// <summary>
+        /// 图站开始执行通知 (用于触发 Guacamole 远程桌面)
+        /// </summary>
+        StationExecuting,
     }
 }

@@ -1,15 +1,13 @@
-﻿@page "/DepartmentManage"
+@page "/DepartmentManage"
 
-@using System
+@using CJ.Plug.UserManageModels
 @using MudBlazor
 @using System.Globalization
-@using System.Linq
-@using System.Collections.Generic
-@using System.Threading.Tasks
 
-@inject HttpClient Http
+@inject IDepartmentManageApiClient DepartmentApiClient
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>部门管理</PageTitle>
 
@@ -17,17 +15,16 @@
     <MudStack Row AlignItems="AlignItems.Center">
         <MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="部门操作" Color="Color.Default" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft">
             <MudMenuItem OnClick="@DeleteSelectedDepartments">删除</MudMenuItem>
-            <MudMenuItem OnClick="@ExportSelectedDepartments">导出</MudMenuItem>
         </MudMenu>
 
-        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateDepartment">创建部门</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建部门</MudButton>
         <MudButton OnClick="async ()=> await dataGrid.ReloadServerData()" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
     </MudStack>
 
     <MudSpacer />
 
     <MudDataGrid @ref="dataGrid"
-                 T="DepartmentDto"
+                 T="DepartmentManageDto"
                  ServerData="LoadData"
                  Dense="true"
                  Hover="true"
@@ -54,7 +51,7 @@
         </ToolBarContent>
 
         <Columns>
-            <SelectColumn T="DepartmentDto" />
+            <SelectColumn T="DepartmentManageDto" />
 
             <TemplateColumn Title="部门名称" Sortable="true">
                 <CellTemplate>
@@ -64,26 +61,43 @@
 
             <TemplateColumn Title="编码">
                 <CellTemplate>
-                    @context.Item.Code
+                    @(context.Item.Code ?? "-")
                 </CellTemplate>
             </TemplateColumn>
 
             <TemplateColumn Title="上级部门">
                 <CellTemplate>
-                    @context.Item.ParentName
+                    @(context.Item.ParentName ?? "-")
                 </CellTemplate>
             </TemplateColumn>
 
             <TemplateColumn Title="负责人">
                 <CellTemplate>
-                    @context.Item.Manager
+                    @(context.Item.Manager ?? "-")
                 </CellTemplate>
             </TemplateColumn>
 
-            <TemplateColumn Title="是否启用">
+            <TemplateColumn Title="状态">
                 <CellTemplate>
-                    <MudChip Color="@(context.Item.IsActive ? Color.Success : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
-                        @(context.Item.IsActive ? "启用" : "禁用")
+                    @{
+                        var status = context.Item.Status;
+                        var chipColor = status switch
+                        {
+                            DataStatus.Authorizing => Color.Warning,
+                            DataStatus.Disabled => Color.Default,
+                            DataStatus.Active => Color.Success,
+                            _ => Color.Default
+                        };
+                        var statusText = status switch
+                        {
+                            DataStatus.Authorizing => "授权中",
+                            DataStatus.Disabled => "禁用",
+                            DataStatus.Active => "启用",
+                            _ => "未知"
+                        };
+                    }
+                    <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
+                        @statusText
                     </MudChip>
                 </CellTemplate>
             </TemplateColumn>
@@ -97,9 +111,8 @@
             <TemplateColumn Style="text-align:right" Title="操作">
                 <CellTemplate>
                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                        <MudMenuItem OnClick="@(()=>EditDepartment(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                        <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
                         <MudMenuItem OnClick="@(()=>DeleteDepartment(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                        <MudMenuItem OnClick="@(()=>CloneDepartment(context.Item))" Icon="@Icons.Material.Outlined.ContentCopy">复制</MudMenuItem>
                     </MudMenu>
                 </CellTemplate>
             </TemplateColumn>
@@ -120,104 +133,200 @@
 </MudContainer>
 
 @code {
-    private MudDataGrid<DepartmentDto> dataGrid;
-    public HashSet<DepartmentDto> SelectedDepartments { get; set; } = new HashSet<DepartmentDto>();
+    private MudDataGrid<DepartmentManageDto> dataGrid = default!;
+    public HashSet<DepartmentManageDto> SelectedDepartments { get; set; } = new HashSet<DepartmentManageDto>();
     public string? searchString { get; set; }
+    private List<DepartmentManageDto> _allDepartments = [];
 
-    // 示例数据：替换为后端 API 调用
-    private List<DepartmentDto> AllDepartments { get; set; } = new List<DepartmentDto>()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        new DepartmentDto { Id = 1, Name = "研发部", Code = "RD", ParentId = null, ParentName = "-", Manager = "张三", IsActive = true, CreatedAt = DateTimeOffset.Now.AddYears(-2) },
-        new DepartmentDto { Id = 2, Name = "测试部", Code = "QA", ParentId = 1, ParentName = "研发部", Manager = "李四", IsActive = true, CreatedAt = DateTimeOffset.Now.AddYears(-1) },
-        new DepartmentDto { Id = 3, Name = "运营部", Code = "OP", ParentId = null, ParentName = "-", Manager = "王五", IsActive = false, CreatedAt = DateTimeOffset.Now.AddMonths(-8) }
-    };
+        if (firstRender)
+        {
+            await LoadDepartments();
+            StateHasChanged();
+        }
+    }
 
-    private async Task<GridData<DepartmentDto>> LoadData(GridState<DepartmentDto> state, CancellationToken token)
+    private async Task LoadDepartments()
     {
-        var query = AllDepartments.AsEnumerable();
+        try
+        {
+            _allDepartments = await DepartmentApiClient.GetAllDepartmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载部门失败: {ex.Message}", Severity.Error);
+            _allDepartments = [];
+        }
+    }
+
+    private async Task<GridData<DepartmentManageDto>> LoadData(GridState<DepartmentManageDto> state, CancellationToken token)
+    {
+        var query = _allDepartments.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(searchString))
         {
             var s = searchString.Trim();
-            query = query.Where(d => (d.Name != null && d.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
-                                     || (d.Code != null && d.Code.Contains(s, StringComparison.OrdinalIgnoreCase))
-                                     || (d.Manager != null && d.Manager.Contains(s, StringComparison.OrdinalIgnoreCase)));
+            query = query.Where(d =>
+                (!string.IsNullOrEmpty(d.Name) && d.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(d.Code) && d.Code.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(d.Manager) && d.Manager.Contains(s, StringComparison.OrdinalIgnoreCase))
+            );
         }
 
         var sortDef = state.SortDefinitions?.FirstOrDefault();
         if (sortDef != null)
         {
-            if (sortDef.SortBy == nameof(DepartmentDto.Name))
-                query = query.OrderBy(d => d.Name);
-            else if (sortDef.SortBy == nameof(DepartmentDto.CreatedAt))
-                query = query.OrderBy(d => d.CreatedAt);
+            if (sortDef.SortBy == nameof(DepartmentManageDto.Name))
+                query = sortDef.Descending
+                    ? query.OrderByDescending(d => d.Name)
+                    : query.OrderBy(d => d.Name);
+            else if (sortDef.SortBy == nameof(DepartmentManageDto.CreatedAt))
+                query = sortDef.Descending
+                    ? query.OrderByDescending(d => d.CreatedAt)
+                    : query.OrderBy(d => d.CreatedAt);
         }
         else
         {
-            query = query.OrderByDescending(d => d.CreatedAt);
+            query = query.OrderByDescending(d => d.Id);
         }
 
-        var total = query.Count();
-        var items = query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
-        await Task.CompletedTask;
-        return new GridData<DepartmentDto> { TotalItems = total, Items = items };
+        var items = query.ToList();
+        var total = items.Count;
+        var pageItems = items.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new GridData<DepartmentManageDto> { TotalItems = total, Items = pageItems };
     }
 
-    private void CreateDepartment()
+    private async Task OpenCreateDialog()
     {
-        var newId = (AllDepartments.Count == 0) ? 1 : AllDepartments.Max(x => x.Id) + 1;
-        AllDepartments.Insert(0, new DepartmentDto { Id = newId, Name = $"新部门{newId}", Code = $"D{newId:000}", ParentId = null, ParentName = "-", Manager = "请输入负责人", IsActive = true, CreatedAt = DateTimeOffset.Now });
-        _ = dataGrid.ReloadServerData();
-        Snackbar.Add("已创建新部门（请实现编辑弹窗）", Severity.Success);
+        var parameters = new DialogParameters<DepartmentDialog>
+        {
+            { d => d.IsEdit, false },
+            { d => d.DepartmentId, 0 },
+            { d => d.DepartmentName, "" },
+            { d => d.DepartmentCode, "" },
+            { d => d.ParentId, (int?)null },
+            { d => d.Manager, "" },
+            { d => d.Status, DataStatus.Authorizing },
+            { d => d.Departments, _allDepartments }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("创建部门", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateDepartmentRequest request)
+        {
+            try
+            {
+                await DepartmentApiClient.CreateDepartmentAsync(request);
+                Snackbar.Add($"部门 \"{request.Name}\" 创建成功", Severity.Success);
+                await LoadDepartments();
+                await dataGrid.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建部门失败: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
-    private void EditDepartment(DepartmentDto dept)
+    private async Task OpenEditDialog(DepartmentManageDto dept)
     {
-        Snackbar.Add($"编辑部门：{dept.Name}（请实现打开编辑对话框）", Severity.Info);
+        var parameters = new DialogParameters<DepartmentDialog>
+        {
+            { d => d.IsEdit, true },
+            { d => d.DepartmentId, dept.Id },
+            { d => d.DepartmentName, dept.Name ?? "" },
+            { d => d.DepartmentCode, dept.Code },
+            { d => d.ParentId, dept.ParentId },
+            { d => d.Manager, dept.Manager },
+            { d => d.Status, dept.Status },
+            { d => d.Departments, _allDepartments }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("编辑部门", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdateDepartmentRequest request)
+        {
+            try
+            {
+                await DepartmentApiClient.UpdateDepartmentAsync(request);
+                Snackbar.Add($"部门 \"{request.Name}\" 更新成功", Severity.Success);
+                await LoadDepartments();
+                await dataGrid.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新部门失败: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
-    private async Task DeleteDepartment(DepartmentDto dept)
+    private async Task DeleteDepartment(DepartmentManageDto dept)
     {
-        if (dept == null) return;
-        AllDepartments.RemoveAll(d => d.Id == dept.Id || d.ParentId == dept.Id);
-        await dataGrid.ReloadServerData();
-        Snackbar.Add($"已删除部门：{dept.Name}", Severity.Success);
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除部门 \"{dept.Name}\" 吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await DepartmentApiClient.DeleteDepartmentAsync(dept.Id);
+            if (success)
+            {
+                Snackbar.Add($"已删除部门：{dept.Name}", Severity.Success);
+                await LoadDepartments();
+                await dataGrid.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Add("删除部门失败：部门不存在", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除部门失败: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task DeleteSelectedDepartments()
     {
+        if (SelectedDepartments.Count == 0)
+        {
+            Snackbar.Add("请先选择要删除的部门", Severity.Warning);
+            return;
+        }
+
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认批量删除",
+            $"确定要删除选中的 {SelectedDepartments.Count} 个部门吗？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        var failedCount = 0;
         foreach (var d in SelectedDepartments.ToList())
-            AllDepartments.RemoveAll(x => x.Id == d.Id || x.ParentId == d.Id);
+        {
+            try
+            {
+                await DepartmentApiClient.DeleteDepartmentAsync(d.Id);
+            }
+            catch
+            {
+                failedCount++;
+            }
+        }
+
         SelectedDepartments.Clear();
+        await LoadDepartments();
         await dataGrid.ReloadServerData();
-        Snackbar.Add("已删除所选部门（及其子部门）", Severity.Success);
-    }
 
-    private void ExportSelectedDepartments()
-    {
-        Snackbar.Add("导出所选部门（请实现导出逻辑）", Severity.Info);
-    }
-
-    private void CloneDepartment(DepartmentDto dept)
-    {
-        if (dept == null) return;
-        var newId = (AllDepartments.Count == 0) ? 1 : AllDepartments.Max(x => x.Id) + 1;
-        var clone = new DepartmentDto { Id = newId, Name = dept.Name + " - 复制", Code = dept.Code + "_c", ParentId = dept.ParentId, ParentName = dept.ParentName, Manager = dept.Manager, IsActive = dept.IsActive, CreatedAt = DateTimeOffset.Now };
-        AllDepartments.Insert(0, clone);
-        _ = dataGrid.ReloadServerData();
-        Snackbar.Add($"已复制部门：{dept.Name}", Severity.Success);
-    }
-
-    public class DepartmentDto
-    {
-        public int Id { get; set; }
-        public string? Name { get; set; }
-        public string? Code { get; set; }
-        public int? ParentId { get; set; }
-        public string? ParentName { get; set; }
-        public string? Manager { get; set; }
-        public bool IsActive { get; set; } = true;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+        if (failedCount == 0)
+            Snackbar.Add("已删除所选部门", Severity.Success);
+        else
+            Snackbar.Add($"已删除 {SelectedDepartments.Count - failedCount} 个部门，{failedCount} 个删除失败", Severity.Warning);
     }
 }
-

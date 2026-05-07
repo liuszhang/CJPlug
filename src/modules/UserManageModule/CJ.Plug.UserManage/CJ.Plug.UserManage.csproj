@@ -1,11 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
-
 
   <ItemGroup>
     <SupportedPlatform Include="browser" />
@@ -16,12 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
-    
     <ProjectReference Include="..\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
-    
     <ProjectReference Include="..\CJ.Plug.UserManageApi\CJ.Plug.UserManageApi.csproj" />
+    <ProjectReference Include="..\..\AuthModule\CJ.Plug.AuthApiClient\CJ.Plug.AuthApiClient.csproj" />
+    <ProjectReference Include="..\..\AuthModule\CJ.Plug.AuthModels\CJ.Plug.AuthModels.csproj" />
   </ItemGroup>
 
 </Project>

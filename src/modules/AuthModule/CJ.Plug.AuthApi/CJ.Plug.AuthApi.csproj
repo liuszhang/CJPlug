@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
+    <ProjectReference Include="..\CJ.Plug.AuthModels\CJ.Plug.AuthModels.csproj" />
+    <ProjectReference Include="..\..\UserManageModule\CJ.Plug.UserManageApi\CJ.Plug.UserManageApi.csproj" />
+  </ItemGroup>
+
+</Project>

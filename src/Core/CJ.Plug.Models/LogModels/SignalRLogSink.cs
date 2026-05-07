@@ -69,6 +69,9 @@ public class SignalRLogSink : ILogEventSink
                 case nameof(LogTypeEnum.JobStatusUpdated):
                     await SendJobStatusUpdated(logEvent);
                     break;
+                case nameof(LogTypeEnum.StationExecuting):
+                    await SendStationExecuting(logEvent);
+                    break;
                 case nameof(LogTypeEnum.CommonLog):
                     await _hubConnection.InvokeAsync(logType, receiverId, JsonSerializer.Serialize(logModel));
                     break;
@@ -208,6 +211,32 @@ public class SignalRLogSink : ILogEventSink
 
         await _hubConnection.InvokeAsync(LogTypeEnum.JobStatusUpdated.ToString(), status);
 
+    }
+    private async Task SendStationExecuting(LogEvent logEvent)
+    {
+        logEvent.Properties.TryGetValue(LogContextEnum.Receiver.ToString(), out var receiverValue);
+        var PDZId = ExtractValue(receiverValue);
+        logEvent.Properties.TryGetValue(LogContextEnum.PlugDefinitionId.ToString(), out var plugDefValue);
+        var PlugDefinitionId = ExtractValue(plugDefValue);
+
+        // StationIp is inside the JSON data in the message
+        var rendered = logEvent.RenderMessage().ToString();
+        string StationIp = "";
+        try
+        {
+            var info = System.Text.Json.JsonSerializer.Deserialize<StationExecutingData>(rendered);
+            StationIp = info?.StationIp ?? "";
+        }
+        catch { StationIp = rendered; }
+
+        Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp}");
+        await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp);
+    }
+
+    private class StationExecutingData
+    {
+        public string? PlugDefinitionId { get; set; }
+        public string? StationIp { get; set; }
     }
 
 }

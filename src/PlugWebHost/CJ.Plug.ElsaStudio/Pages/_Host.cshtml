@@ -29,6 +29,9 @@
 
     <link href="/css/site.css" rel="stylesheet" />
 
+    <!-- xterm.js CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
 <body>
@@ -53,6 +56,19 @@
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_content/CodeBeam.MudBlazor.Extensions/MudExtensions.min.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+
+    <!-- noVNC (VNC 客户端) - 本地文件，CDN版本不可用 -->
+    <script src="_content/CJ.Plug.GuacamoleUI/lib/novnc/novnc.min.js"></script>
+
+    <!-- xterm.js (SSH 终端) -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+
+    <!-- 远程桌面 JS 互操作 -->
+    <script src="_content/CJ.Plug.GuacamoleUI/noVncInterop.js"></script>
+    <script src="_content/CJ.Plug.GuacamoleUI/xtermInterop.js"></script>
+
     <script src="_framework/blazor.server.js"></script>
 </body>
 </html>

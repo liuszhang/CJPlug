@@ -53,5 +53,18 @@ namespace CJ.Plug.Models.EventAggregator
         {
             CLog.Information(JobCorrelationId,null,null,null,null,LogTypeEnum.JobStatusUpdated);
         }
+
+        /// <summary>
+        /// 报告图站开始执行 (用于触发 Guacamole 远程桌面)
+        /// </summary>
+        /// <param name="plugDefinitionId">正在执行的插头 ID</param>
+        /// <param name="stationIp">图站 IP</param>
+        /// <param name="pdzId">PDZ ID</param>
+        public static void ReportStationExecuting(string? plugDefinitionId, string? stationIp, string? pdzId = "")
+        {
+            var data = System.Text.Json.JsonSerializer.Serialize(new { PlugDefinitionId = plugDefinitionId, StationIp = stationIp });
+            // Receiver 传 null，避免 CLog 对 Job1 类型 PDZ 的重复转发
+            CLog.Information(data, null, pdzId, plugDefinitionId, null, LogTypeEnum.StationExecuting);
+        }
     }
 }

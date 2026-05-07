@@ -1,0 +1,246 @@
+@page "/AuthManage"
+
+@using CJ.Plug.AuthModels
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+@using System.Globalization
+
+@inject IAuthApiClient AuthApiClient
+@inject IDomInteropService DomInteropService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>授权管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: calc(100vh - 64px);">
+    <MudGrid Style="height: 100%;" Spacing="0">
+        @* 左栏：导航 *@
+        <MudItem xs="2" Style="height: 100%; border-right: 1px solid var(--mud-palette-table-lines); overflow-y: auto;">
+            <MudNavMenu Rounded="true" Margin="Margin.Dense" Color="Color.Primary" Class="pa-2">
+                <MudText Typo="Typo.subtitle2" Class="px-4 py-2 mud-text-secondary">授权管理</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.PendingActions"
+                            OnClick="@(() => SwitchTab("pending"))"
+                            IsActive="@(_activeTab == "pending")">
+                    待审批 
+                    @if (_pendingCount > 0)
+                    {
+                        <MudBadge Content="@_pendingCount" Color="Color.Warning" Overlap="true" Class="ml-2" />
+                    }
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.CheckCircle"
+                            OnClick="@(() => SwitchTab("approved"))"
+                            IsActive="@(_activeTab == "approved")">已批准</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Cancel"
+                            OnClick="@(() => SwitchTab("rejected"))"
+                            IsActive="@(_activeTab == "rejected")">已拒绝</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.History"
+                            OnClick="@(() => SwitchTab("all"))"
+                            IsActive="@(_activeTab == "all")">全部记录</MudNavLink>
+            </MudNavMenu>
+        </MudItem>
+
+        @* 右栏：内容 *@
+        <MudItem xs="10" Style="height: 100%; overflow-y: auto;">
+            <div class="pa-4">
+                <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">@GetTabTitle()</MudText>
+                    <MudSpacer />
+                    <MudButton OnClick="RefreshData" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+                </MudStack>
+
+                <MudDataGrid @ref="_dataGrid"
+                             T="AuthRequestDto"
+                             ServerData="LoadData"
+                             Dense="true"
+                             Hover="true"
+                             Elevation="0"
+                             SortMode="SortMode.Single"
+                             RowStyle="cursor: default;">
+                    <ToolBarContent>
+                        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索目标、请求人"
+                                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
+                                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
+                    </ToolBarContent>
+                    <Columns>
+                        <TemplateColumn Title="操作类型">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetOperationColor(context.Item.OperationType)">@context.Item.OperationTypeName</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="操作目标">
+                            <CellTemplate><MudText>@context.Item.TargetDescription</MudText></CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="请求人">
+                            <CellTemplate>@context.Item.RequestedBy</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="请求时间">
+                            <CellTemplate>@context.Item.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="状态">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.StatusName</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="审批人">
+                            <CellTemplate>@(context.Item.ApprovedBy ?? "-")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="审批时间">
+                            <CellTemplate>@(context.Item.ApprovedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="备注">
+                            <CellTemplate>@(context.Item.Remark ?? "-")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Style="text-align:right" Title="操作">
+                            <CellTemplate>
+                                @if (context.Item.Status == AuthRequestStatus.Pending)
+                                {
+                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                        <MudMenuItem OnClick="@(() => OpenApproveDialog(context.Item, true))" Icon="@Icons.Material.Outlined.Check">批准</MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => OpenApproveDialog(context.Item, false))" Icon="@Icons.Material.Outlined.Close">拒绝</MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => CancelRequest(context.Item))" Icon="@Icons.Material.Outlined.Undo">撤回</MudMenuItem>
+                                    </MudMenu>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent><MudText>没有授权记录</MudText></NoRecordsContent>
+                    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
+                    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
+                </MudDataGrid>
+            </div>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private MudDataGrid<AuthRequestDto> _dataGrid = default!;
+    private string _activeTab = "pending";
+    private string? _searchString;
+    private int _pendingCount = 0;
+
+    private string GetTabTitle() => _activeTab switch
+    {
+        "pending" => "待审批请求",
+        "approved" => "已批准记录",
+        "rejected" => "已拒绝记录",
+        "all" => "全部授权记录",
+        _ => "授权管理"
+    };
+
+    private void SwitchTab(string tab)
+    {
+        _activeTab = tab;
+        _dataGrid.ReloadServerData();
+    }
+
+    private async Task RefreshData()
+    {
+        await _dataGrid.ReloadServerData();
+    }
+
+    private async Task<GridData<AuthRequestDto>> LoadData(GridState<AuthRequestDto> state, CancellationToken token)
+    {
+        AuthRequestStatus? statusFilter = _activeTab switch
+        {
+            "pending" => AuthRequestStatus.Pending,
+            "approved" => AuthRequestStatus.Approved,
+            "rejected" => AuthRequestStatus.Rejected,
+            _ => null
+        };
+
+        var data = await AuthApiClient.GetAllAsync(statusFilter, token);
+
+        // 更新待审批数量
+        var allData = await AuthApiClient.GetAllAsync(AuthRequestStatus.Pending, token);
+        _pendingCount = allData.Count;
+
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            var s = _searchString.Trim();
+            data = data.Where(x =>
+                x.TargetDescription.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                x.RequestedBy.Contains(s, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        var total = data.Count;
+        var items = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToList();
+
+        return new GridData<AuthRequestDto> { TotalItems = total, Items = items };
+    }
+
+    private Color GetOperationColor(AuthOperationType type) => type switch
+    {
+        AuthOperationType.CreateUser or AuthOperationType.CreateRole or AuthOperationType.CreateDepartment => Color.Success,
+        AuthOperationType.DeleteUser or AuthOperationType.DeleteRole or AuthOperationType.DeleteDepartment => Color.Error,
+        _ => Color.Info
+    };
+
+    private Color GetStatusColor(AuthRequestStatus status) => status switch
+    {
+        AuthRequestStatus.Pending => Color.Warning,
+        AuthRequestStatus.Approved => Color.Success,
+        AuthRequestStatus.Rejected => Color.Error,
+        AuthRequestStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    private async Task OpenApproveDialog(AuthRequestDto request, bool isApproved)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Request", request },
+            { "IsApproved", isApproved }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ApproveDialog>(isApproved ? "批准请求" : "拒绝请求", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ApproveAuthRequestDto approveDto)
+        {
+            // 从localStorage获取当前登录用户名
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            approveDto.ApprovedBy = currentUser ?? "admin";
+            
+            var response = await AuthApiClient.ApproveAsync(approveDto);
+            if (response != null)
+            {
+                if (isApproved)
+                {
+                    Snackbar.Add("已批准，数据状态已改为「启用」", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("已拒绝，数据已删除", Severity.Success);
+                }
+                await RefreshData();
+            }
+            else
+            {
+                Snackbar.Add("操作失败", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelRequest(AuthRequestDto request)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认撤回", $"确定要撤回该请求吗？", yesText: "撤回", cancelText: "取消");
+        if (confirm != true) return;
+
+        var result = await AuthApiClient.CancelAsync(request.Id, request.RequestedBy);
+        if (result != null)
+        {
+            Snackbar.Add("已撤回，数据已删除", Severity.Success);
+            await RefreshData();
+        }
+        else
+        {
+            Snackbar.Add("撤回失败，只有请求人可以撤回", Severity.Error);
+        }
+    }
+}

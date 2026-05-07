@@ -1,0 +1,57 @@
+@page "/remote/{StationIp}"
+@page "/remote/{StationIp}/{Protocol}"
+
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>@($"远程访问 - {StationIp}")</PageTitle>
+
+@* 根据协议类型重定向到对应的查看器 *@
+
+@code {
+    [Parameter]
+    public string StationIp { get; set; } = default!;
+
+    [Parameter]
+    public string? Protocol { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Port { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Username { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Password { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var protocol = Protocol?.ToLower() ?? "ssh";
+        var queryParams = new List<string>();
+
+        if (Port.HasValue)
+            queryParams.Add($"port={Port.Value}");
+        if (!string.IsNullOrEmpty(Username))
+            queryParams.Add($"username={Uri.EscapeDataString(Username)}");
+        if (!string.IsNullOrEmpty(Password))
+            queryParams.Add($"password={Uri.EscapeDataString(Password)}");
+        if (!string.IsNullOrEmpty(Username))
+            queryParams.Add("autoConnect=true");
+
+        var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
+
+        var targetUrl = protocol switch
+        {
+            "vnc" => $"/remote/vnc/{StationIp}{queryString}",
+            "ssh" => $"/remote/ssh/{StationIp}{queryString}",
+            _ => $"/remote/ssh/{StationIp}{queryString}"
+        };
+
+        NavigationManager.NavigateTo(targetUrl, replace: true);
+    }
+}

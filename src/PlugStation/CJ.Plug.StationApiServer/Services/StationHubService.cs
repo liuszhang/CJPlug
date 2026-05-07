@@ -1,9 +1,10 @@
-﻿
+
 using CJ.Plug_Aspire.StationApiService.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using System.Net.Sockets;
 using System.Net;
 using CJ.Plug.Models.LogModels;
+using CJ.Plug.Models.Shared;
 
 namespace CJ.Plug_Aspire.StationApiService.Services
 {
@@ -11,7 +12,8 @@ namespace CJ.Plug_Aspire.StationApiService.Services
     {
         private readonly HttpClient _httpClient = new HttpClient();
         private HubConnection _hubConnection;
-        private readonly string _webApiBaseUrl = StaticData.MainServerHostIp;
+        //private readonly string _webApiBaseUrl = StaticData.MainServerHostIp;
+        private readonly string _webApiBaseUrl = GlobalData.MainDispatcherServer;
         private volatile bool _isHubConnected;
 
         /// <summary>

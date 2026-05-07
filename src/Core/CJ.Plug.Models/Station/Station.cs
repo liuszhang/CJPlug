@@ -21,6 +21,38 @@ namespace CJ.Plug.Models.Station
         /// <summary>
         /// 图站存放数据的基础路径，可能是Windows的C:\PlugStation\或Linux的/home/plugstation/
         /// </summary>
-        public string? StationBasePath { get; set; } = @"C:\PlugStationData";
+        public string? StationBasePath { get; set; } = @"C:\\PlugStationData";
+
+        // ========== Guacamole 远程桌面配置 ==========
+
+        /// <summary>
+        /// Guacamole 连接 ID (Guacamole 内部标识)
+        /// </summary>
+        public string? GuacamoleConnectionId { get; set; }
+
+        /// <summary>
+        /// 远程桌面协议类型: rdp, vnc, ssh
+        /// </summary>
+        public string? GuacamoleProtocol { get; set; } = "rdp";
+
+        /// <summary>
+        /// 远程桌面端口 (RDP默认3389, VNC默认5900, SSH默认22)
+        /// </summary>
+        public int? GuacamolePort { get; set; }
+
+        /// <summary>
+        /// 远程登录用户名
+        /// </summary>
+        public string? GuacamoleUsername { get; set; }
+
+        /// <summary>
+        /// 远程登录密码 (建议加密存储)
+        /// </summary>
+        public string? GuacamolePassword { get; set; }
+
+        /// <summary>
+        /// 是否启用远程桌面监控
+        /// </summary>
+        public bool GuacamoleEnabled { get; set; } = false;
     }
 }

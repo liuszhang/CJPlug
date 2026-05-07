@@ -1,8 +1,10 @@
 //using Microsoft.AspNetCore.Http;
 //using Microsoft.AspNetCore.Mvc;
 using CJ.Plug.ApiClient.Contracts;
+using CJ.Plug.AuthApiClient;
 using CJ.Plug.DeekSeekIn;
 using CJ.Plug.FileManageApiClient;
+using CJ.Plug.GuacamoleApiClient;
 using CJ.Plug.JobManageApiClient;
 using CJ.Plug.LoginApiClient.ApiClients;
 using CJ.Plug.MCPToolApiClient;
@@ -17,6 +19,7 @@ using CJ.Plug.StationAndToolApiClient;
 using CJ.Plug.TASApiClient;
 using CJ.Plug.UserManageApiClient;
 using CJ.Plug.UserManageModels;
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -28,29 +31,35 @@ public partial class MainApiClient
 {
     private readonly IServiceProvider serviceProvider;
 
-    private readonly Lazy<IRelationApiClient> RelationApiClient;
-    private readonly Lazy<IPDZApiClient> PDZApiClient;
-    private readonly Lazy<ILoginApiClient> LoginApiClient;
-    private readonly Lazy<IExecuteApiClient> ExecuteApiClient;
-    private readonly Lazy<ITASApiClient> TASApiClient;
-    private readonly Lazy<IFileManageApiClient> FileManageApiClient;
-    private readonly Lazy<IJobManageApiClient> JobManageApiClient;
-    private readonly Lazy<IStationAndToolApiClient> StationAndToolApiClient;
-    private readonly Lazy<IPlugMarketApiClient> PlugMarketApiClient;
-    private readonly Lazy<IProcessManageApiClient> ProcessManageApiClient;
-    private readonly Lazy<IUserManageApiClient> UserManageApiClient;
-    private readonly Lazy<IRoleManageApiClient> RoleManageApiClient;
-    private readonly Lazy<IMCPToolApiClient> MCPToolApiClient;
-    //private readonly Lazy<IDeepSeekService> DeepSeekApiClient;
+    public readonly Lazy<IRelationApiClient> RelationApiClient;
+    public readonly Lazy<IPDZApiClient> PDZApiClient;
+    public readonly Lazy<ILoginApiClient> LoginApiClient;
+    public readonly Lazy<IExecuteApiClient> ExecuteApiClient;
+    public readonly Lazy<ITASApiClient> TASApiClient;
+    public readonly Lazy<IFileManageApiClient> FileManageApiClient;
+    public readonly Lazy<IJobManageApiClient> JobManageApiClient;
+    public readonly Lazy<IStationAndToolApiClient> StationAndToolApiClient;
+    public readonly Lazy<IPlugMarketApiClient> PlugMarketApiClient;
+    public readonly Lazy<IProcessManageApiClient> ProcessManageApiClient;
+    public readonly Lazy<IUserManageApiClient> UserManageApiClient;
+    public readonly Lazy<IRoleManageApiClient> RoleManageApiClient;
+    public readonly Lazy<IMCPToolApiClient> MCPToolApiClient;
+    public readonly Lazy<IDepartmentManageApiClient> DepartmentManageApiClient;
+    public readonly Lazy<IAuthApiClient> AuthApiClient;
+    public readonly Lazy<IGuacamoleApiClient> GuacamoleApiClient;
+    //public readonly Lazy<IDeepSeekService> DeepSeekApiClient;
+
+    /// <summary>
+    /// 审计日志辅助类
+    /// </summary>
+    public AuditLogHelper AuditLog { get; private set; }
 
     public MainApiClient(IServiceProvider _serviceProvider)
     {
-        // 锟斤拷式锟斤拷锟斤拷锟斤拷锟角凤拷为 null锟斤拷锟斤拷前锟斤拷锟斤拷锟斤拷锟斤拷确锟斤拷示
         serviceProvider = _serviceProvider ?? throw new ArgumentNullException(
             nameof(serviceProvider),
-            "IServiceProvider 锟斤拷锟斤拷注锟诫，锟斤拷锟斤拷为 null锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷注锟斤拷锟斤拷锟矫★拷"
+            "IServiceProvider 不能为 null，请检查依赖注入配置"
         );
-        this.serviceProvider = _serviceProvider;
 
         RelationApiClient = new Lazy<IRelationApiClient>(() => serviceProvider.GetRequiredService<IRelationApiClient>());
         PDZApiClient = new Lazy<IPDZApiClient>(() => serviceProvider.GetRequiredService<IPDZApiClient>());
@@ -65,11 +74,35 @@ public partial class MainApiClient
         UserManageApiClient = new Lazy<IUserManageApiClient>(() => serviceProvider.GetRequiredService<IUserManageApiClient>());
         RoleManageApiClient = new Lazy<IRoleManageApiClient>(() => serviceProvider.GetRequiredService<IRoleManageApiClient>());
         MCPToolApiClient = new Lazy<IMCPToolApiClient>(() => serviceProvider.GetRequiredService<IMCPToolApiClient>());
+        DepartmentManageApiClient = new Lazy<IDepartmentManageApiClient>(() => serviceProvider.GetRequiredService<IDepartmentManageApiClient>());
+        AuthApiClient = new Lazy<IAuthApiClient>(() => serviceProvider.GetRequiredService<IAuthApiClient>());
+        GuacamoleApiClient = new Lazy<IGuacamoleApiClient>(() => serviceProvider.GetRequiredService<IGuacamoleApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
+
+        // 初始化审计日志辅助类
+        var auditHttpClient = new HttpClient { BaseAddress = new Uri(GlobalData.MainApiServer) };
+        AuditLog = new AuditLogHelper(auditHttpClient, GetUserNameAsync);
     }
 
+    /// <summary>
+    /// 从localStorage获取当前用户名（通过IServiceProvider获取Scoped服务）
+    /// </summary>
+    private async Task<string> GetUserNameAsync()
+    {
+        try
+        {
+            // 使用IServiceProvider创建scope来获取Scoped服务
+            using var scope = serviceProvider.CreateScope();
+            var localStorage = scope.ServiceProvider.GetService<ILocalStorageService>();
+            if (localStorage != null)
+            {
+                return await localStorage.GetItemAsync<string>("userName") ?? "anonymous";
+            }
+            return "anonymous";
+        }
+        catch
+        {
+            return "anonymous";
+        }
+    }
 }
-
-
-
-

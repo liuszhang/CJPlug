@@ -1,0 +1,50 @@
+@page "/AuditManage"
+
+@using CJ.Plug.AuditUI.Components
+@using MudBlazor
+
+<PageTitle>审计管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: calc(100vh - 64px);">
+    <MudGrid Style="height: 100%;" Spacing="0">
+        @* 左栏：导航 *@
+        <MudItem xs="2" Style="height: 100%; border-right: 1px solid var(--mud-palette-table-lines); overflow-y: auto;">
+            <MudNavMenu Rounded="true" Margin="Margin.Dense" Color="Color.Primary" Class="pa-2">
+                <MudText Typo="Typo.subtitle2" Class="px-4 py-2 mud-text-secondary">审计管理</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.List"
+                            OnClick="@(() => SwitchTab("logs"))"
+                            IsActive="@(_activeTab == "logs")">操作日志</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.CleaningServices"
+                            OnClick="@(() => SwitchTab("cleanup"))"
+                            IsActive="@(_activeTab == "cleanup")">日志清理</MudNavLink>
+            </MudNavMenu>
+        </MudItem>
+
+        @* 右栏：内容 *@
+        <MudItem xs="10" Style="height: 100%; overflow-y: auto;">
+            <div class="pa-4">
+                @if (_activeTab == "logs")
+                {
+                    <AuditLogPanel />
+                }
+                else if (_activeTab == "cleanup")
+                {
+                    <AuditCleanupPanel />
+                }
+            </div>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private string _activeTab = "logs";
+
+    private void SwitchTab(string tab)
+    {
+        if (_activeTab != tab)
+        {
+            _activeTab = tab;
+            StateHasChanged();
+        }
+    }
+}

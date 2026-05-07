@@ -1,4 +1,4 @@
-﻿@using CJ.Plug.MainPageContent
+@using CJ.Plug.MainPageContent
 @using CJ.Plug.Models.Contracts
 @using Microsoft.AspNetCore.Components.Web
 @using Radzen.Blazor
@@ -90,6 +90,19 @@
             let amisScoped = amis.embed("#"+id, obj);
         };
     </script>
+
+    <!-- noVNC (VNC 客户端) -->
+    <script src="_content/CJ.Plug.GuacamoleUI/lib/novnc/novnc.min.js"></script>
+
+    <!-- xterm.js (SSH 终端) -->
+    <link rel="stylesheet" href="_content/CJ.Plug.GuacamoleUI/lib/xterm/xterm.css">
+    <script src="_content/CJ.Plug.GuacamoleUI/lib/xterm/xterm.js"></script>
+    <script src="_content/CJ.Plug.GuacamoleUI/lib/xterm/xterm-addon-fit.js"></script>
+
+    <!-- 远程桌面 JS 互操作 -->
+    <script src="_content/CJ.Plug.GuacamoleUI/noVncInterop.js"></script>
+    <script src="_content/CJ.Plug.GuacamoleUI/xtermInterop.js"></script>
+    <script src="_content/CJ.Plug.GuacamoleUI/captureInterop.js"></script>
 </body>
 
 </html>

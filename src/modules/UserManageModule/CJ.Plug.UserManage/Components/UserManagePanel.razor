@@ -1,0 +1,293 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManage.Pages
+@using CJ.Plug.AuthModels
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+@using System.Text.Json
+
+@inject IUserManageApiClient UserApiClient
+@inject IDepartmentManageApiClient DepartmentApiClient
+@inject IRoleManageApiClient RoleApiClient
+@inject IAuthApiClient AuthApiClient
+@inject IDomInteropService DomInteropService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+    <MudText Typo="Typo.h6">人员管理</MudText>
+    <MudSpacer />
+    <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建用户</MudButton>
+    <MudButton OnClick="Refresh" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+</MudStack>
+
+<MudDataGrid @ref="_dataGrid"
+             T="User"
+             ServerData="LoadData"
+             Dense="true"
+             Hover="true"
+             Elevation="0"
+             SortMode="SortMode.Single"
+             RowStyle="cursor: default;"
+             MultiSelection="true"
+             SelectedItems="_selectedUsers"
+             SelectOnRowClick="false">
+    <ToolBarContent>
+        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索用户名、邮箱"
+                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
+    </ToolBarContent>
+    <Columns>
+        <SelectColumn T="User" />
+        <TemplateColumn Title="用户名" Sortable="true">
+            <CellTemplate><MudText>@context.Item.UserName</MudText></CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Email" Title="邮箱" />
+        <TemplateColumn Title="姓名">
+            <CellTemplate>@GetDisplayName(context.Item)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="部门">
+            <CellTemplate>@GetDepartmentName(context.Item.DepartmentId)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="角色">
+            <CellTemplate>
+                @{
+                    var roles = GetUserRoleNames(context.Item.Id);
+                }
+                @if (roles.Count > 0)
+                {
+                    @foreach (var role in roles)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@role</MudChip>
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="状态">
+            <CellTemplate>
+                @{
+                    var status = (DataStatus)context.Item.Status;
+                    var chipColor = status switch
+                    {
+                        DataStatus.Authorizing => Color.Warning,
+                        DataStatus.Disabled => Color.Default,
+                        DataStatus.Active => Color.Success,
+                        _ => Color.Default
+                    };
+                    var statusText = status switch
+                    {
+                        DataStatus.Authorizing => "授权中",
+                        DataStatus.Disabled => "禁用",
+                        DataStatus.Active => "启用",
+                        _ => "未知"
+                    };
+                }
+                <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
+                    @statusText
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="创建时间" Sortable="true">
+            <CellTemplate>@context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Style="text-align:right" Title="操作">
+            <CellTemplate>
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                    <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                    <MudMenuItem OnClick="@(()=>DeleteUser(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                </MudMenu>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>没有用户数据</MudText></NoRecordsContent>
+    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
+    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<User> _dataGrid = default!;
+    private HashSet<User> _selectedUsers = new();
+    private string? _searchString;
+    private List<User> _allUsers = [];
+    private List<DepartmentManageDto> _allDepartments = [];
+    private List<string> _allRoles = [];
+    private Dictionary<int, List<string>> _userRolesCache = new();
+    private bool _isLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 在初始化时加载所有数据
+        await Task.WhenAll(LoadDepartments(), LoadRoles());
+        await LoadUsers();
+        await LoadUserRoles();
+        _isLoaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _isLoaded)
+        {
+            // 数据加载完成后，刷新DataGrid
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try { _allUsers = (await UserApiClient.GetAllUsersAsync())?.Where(u => u != null).Cast<User>().ToList() ?? []; }
+        catch { _allUsers = []; }
+    }
+
+    private async Task LoadUserRoles()
+    {
+        _userRolesCache.Clear();
+        foreach (var user in _allUsers)
+        {
+            try { _userRolesCache[user.Id] = await UserApiClient.GetUserRolesAsync(user.Id); }
+            catch { _userRolesCache[user.Id] = []; }
+        }
+    }
+
+    private async Task LoadDepartments()
+    {
+        try { _allDepartments = await DepartmentApiClient.GetAllDepartmentsAsync(); }
+        catch { _allDepartments = []; }
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+            var roles = await RoleApiClient.GetAllAsync();
+            _allRoles = roles.Select(r => r.Name).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
+        }
+        catch { _allRoles = []; }
+    }
+
+    public async Task Refresh()
+    {
+        await LoadUsers();
+        await LoadUserRoles();
+        await _dataGrid.ReloadServerData();
+    }
+
+    private async Task<GridData<User>> LoadData(GridState<User> state, CancellationToken token)
+    {
+        var query = _allUsers.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            var s = _searchString.Trim();
+            query = query.Where(u =>
+                (u.UserName != null && u.UserName.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (u.Email != null && u.Email.Contains(s, StringComparison.OrdinalIgnoreCase)));
+        }
+        var sortDef = state.SortDefinitions?.FirstOrDefault();
+        if (sortDef?.SortBy == nameof(User.UserName))
+            query = sortDef.Descending ? query.OrderByDescending(u => u.UserName) : query.OrderBy(u => u.UserName);
+        else if (sortDef?.SortBy == nameof(User.CreatedAt))
+            query = sortDef.Descending ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
+        else
+            query = query.OrderByDescending(u => u.CreatedAt);
+
+        var total = query.Count();
+        var items = query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new GridData<User> { TotalItems = total, Items = items };
+    }
+
+    private string GetDisplayName(User user)
+    {
+        var parts = new[] { user.FirstName, user.LastName }.Where(p => !string.IsNullOrWhiteSpace(p));
+        return parts.Any() ? string.Join(" ", parts) : "-";
+    }
+
+    private string GetDepartmentName(int? departmentId)
+    {
+        if (!departmentId.HasValue) return "-";
+        return _allDepartments.FirstOrDefault(d => d.Id == departmentId.Value)?.Name ?? "-";
+    }
+
+    private List<string> GetUserRoleNames(int userId) =>
+        _userRolesCache.TryGetValue(userId, out var roles) ? roles : [];
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Departments", _allDepartments },
+            { "Roles", _allRoles }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateUserDialog>("创建用户（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CreateUserRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.CreateUser, $"用户: {request.UserName}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task OpenEditDialog(User user)
+    {
+        var userRoles = GetUserRoleNames(user.Id);
+        var parameters = new DialogParameters
+        {
+            { "UserId", user.Id },
+            { "UserName", user.UserName ?? "" },
+            { "Email", user.Email },
+            { "FirstName", user.FirstName },
+            { "LastName", user.LastName },
+            { "PhoneNumber", user.PhoneNumber },
+            { "DepartmentId", user.DepartmentId },
+            { "UserRoles", userRoles },
+            { "Departments", _allDepartments },
+            { "Roles", _allRoles }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditUserDialog>("编辑用户（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is UpdateUserRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.UpdateUser, $"用户: {user.UserName}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task DeleteUser(User user)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要提交删除用户 \"{user.UserName}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
+        if (confirm != true) return;
+        await CreateAuthRequest(AuthOperationType.DeleteUser, $"用户: {user.UserName}", JsonSerializer.Serialize(new { UserId = user.Id, UserName = user.UserName }));
+    }
+
+    private async Task CreateAuthRequest(AuthOperationType operationType, string targetDescription, string operationData)
+    {
+        try
+        {
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            if (string.IsNullOrEmpty(currentUser))
+            {
+                currentUser = "anonymous";
+                Snackbar.Add("未检测到登录用户，请先登录", Severity.Warning);
+            }
+
+            var request = new CreateAuthRequestDto
+            {
+                OperationType = operationType,
+                TargetDescription = targetDescription,
+                OperationData = operationData,
+                RequestedBy = currentUser
+            };
+
+            await AuthApiClient.CreateAsync(request);
+            Snackbar.Add($"已创建{targetDescription}，状态为「授权中」，等待审批", Severity.Success);
+            await Refresh();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

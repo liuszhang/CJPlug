@@ -1,4 +1,4 @@
-﻿@using System.Text
+@using System.Text
 @using System.Text.Json
 @using System.Text.Json.Nodes
 @using System.Text.RegularExpressions
@@ -177,23 +177,68 @@
 
 
             PlugData = PlugDataZone.PlugDatas.FirstOrDefault(v =>v.PlugDefinitionId == Activity.GetId());
+            
+            // 如果 PDZ 中没有该插头的 PlugData，则自动创建一个
+            bool isNewPlugData = false;
+            if (PlugData == null)
+            {
+                CLog.Information($"PlugDataZone {PlugDataZone.Id} does not contain PlugData for Activity {Activity.GetId()}（{Activity?.GetTypeName()}）, creating a new one.");
+                PlugData = new PlugData()
+                {
+                    PlugDefinitionId = Activity.GetId(),
+                    Name = Activity.GetName(),
+                    PlugDataZoneId = PlugDataZone.Id,
+                    PlugType = Activity?.GetTypeName(),
+                };
+                PlugDataZone.PlugDatas.Add(PlugData);
+                isNewPlugData = true;
+            }
+
             SelectedPlugDefinitionId = PlugData?.PlugDefinitionId;
-            var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(PlugData?.PlugType);
+            var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(Activity?.GetTypeName());
+
+            // 如果是新建的 PlugData，同时根据根插头创建相应的插头参数到 PDZ
+            if (isNewPlugData)
+            {
+                if (rootPlug?.PlugVariables?.Count > 0)
+                {
+                    foreach (var v in rootPlug.PlugVariables)
+                    {
+                        PlugDataZone.PlugVariableDatas ??= new();
+                        PlugDataZone.PlugVariableDatas.Add(new PlugVariableData()
+                        {
+                            PlugDefinitionId = Activity.GetId(),
+                            Name = v.Name,
+                            Type = v.Type,
+                            Value = null,
+                            DefaultValue = null,
+                            IsInitVariable = v.IsInitVariable,
+                            IsBrowsable = v.IsBrowsable,
+                            IsArray = v.IsArray,
+                        });
+                    }
+                }
+                await PDZApiClient.CreateOrUpdatePDZ(PlugDataZone);
+            }
+
             ToolVersions = rootPlug?.ToolVersions ?? new();
             //Log.Information($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
-            Console.WriteLine($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
+            CLog.Information($"ROOT PLUG DEFINITION ID IS:{rootPlug?.DefinitionId}");
             RootPlugActions = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(rootPlug?.DefinitionId) ?? new();
             //PlugActionsToExecute = await MainApiClient.GetPlugActionsToExecuteByPlugId(Plug.Id) ?? new();
             //PlugActionsToExecute = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(PlugData.DefinitionId) ?? new();
             PlugActionsToExecute = PlugDataZone.ActionDatas.Where(a=>a.PlugDefinitionId==Activity.GetId()).ToList();
-            foreach (var pcsc in PlugCommonSettingContent)
+            if (PlugData != null)
             {
-                var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId);
-                var tmpContent = await pcsc.GetPlugCommonSettingContent(context);
-                if (tmpContent != null)
+                foreach (var pcsc in PlugCommonSettingContent)
                 {
-                    PlugCommonExecuteSettingContent = tmpContent;
-                    break;
+                    var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId);
+                    var tmpContent = await pcsc.GetPlugCommonSettingContent(context);
+                    if (tmpContent != null)
+                    {
+                        PlugCommonExecuteSettingContent = tmpContent;
+                        break;
+                    }
                 }
             }
             Loading = false;

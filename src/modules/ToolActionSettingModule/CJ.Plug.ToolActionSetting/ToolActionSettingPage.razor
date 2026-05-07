@@ -1,4 +1,4 @@
-﻿@page "/TAS"
+@page "/TAS"
 
 @using System.Text.Json
 @using System.Text.Json.Nodes
@@ -32,12 +32,12 @@
 
 
 @inject NavigationManager NavigationManager
-@inject ITASApiClient TASApiClient
 @inject IStationAndToolApiClient StationAndToolApiClient
 @inject IDialogService DialogService
 @inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 @inject IElsaStudioService ElsaEngineService
 @inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -261,7 +261,7 @@
             {
                 variable.Id = null;
             }
-            var result = await TASApiClient.CreateNewPlug(newPlug);
+            var result = await MainApiClient.CreateNewPlug(newPlug);
             Console.WriteLine(JsonSerializer.Serialize(result));
 
             var TmpSelectedPlug = SelectedPlug;
@@ -304,7 +304,7 @@
     private async Task GetUserCreatedRootPlugs()
     {
         //isItemLoading = true;
-        var AllPlugs = await TASApiClient.GetPlugs();
+        var AllPlugs = await MainApiClient.GetPlugs();
         //获取用户或管理员创建的源插头及源插头动作
         //var UserCreatedRootPlugs = AllPlugs.Where(t => t.IsRootPlug == true && t.IsSystemInitPlug == false).ToList();
         var UserCreatedRootPlugs = AllPlugs.Where(
@@ -322,7 +322,7 @@
 
     private async Task GetSysInitRootPlugs()
     {        
-        var AllPlugs = await TASApiClient.GetPlugs();
+        var AllPlugs = await MainApiClient.GetPlugs();
         //获取系统依赖注入的插头
         foreach (var pcsc in PlugCommonSettingContent)
         {
@@ -411,7 +411,7 @@
                 //更新插头信息但不更新插入状态、ID等信息
                 PlugFromSetting.DefinitionId = AlreadyExistPlug.DefinitionId;
                 PlugFromSetting.ShowInPlugLibrary = AlreadyExistPlug.ShowInPlugLibrary;
-                var result = await TASApiClient.UpdatePlugAsync(AlreadyExistPlug.Id, PlugFromSetting);
+                var result = await MainApiClient.UpdatePlugAsync(AlreadyExistPlug.Id, PlugFromSetting);
                 RootPlugs.Add(AlreadyExistPlug);
             }
             else
@@ -419,7 +419,7 @@
                 PlugFromSetting.DefinitionId = RandomLongIdentityGenerator.GenerateId();
                 Console.WriteLine("===============>>>>>>>>>create plug:" + JsonSerializer.Serialize(PlugFromSetting));
                 //创建插头
-                var result = await TASApiClient.CreateNewPlug(PlugFromSetting);
+                var result = await MainApiClient.CreateNewPlug(PlugFromSetting);
                 //Console.WriteLine(JsonSerializer.Serialize(result));
                 RootPlugs.Add(result);
             }
@@ -450,7 +450,7 @@
     {
         RootPlugs.Clear();
 
-        var AllPlugs = await TASApiClient.GetPlugs();
+        var AllPlugs = await MainApiClient.GetPlugs();
         //获取用户或管理员创建的源插头及源插头动作
         var _RootPlugs = AllPlugs.Where(t => 
             t.CreateType == PlugCreateTypeEnum.RootPlug.ToString() ||
@@ -491,7 +491,7 @@
             if (!p.ShowInPlugLibrary)
             {
                 p.ShowInPlugLibrary = true;
-                await TASApiClient.UpdatePlugAsync(p.Id, p);
+                await MainApiClient.UpdatePlugAsync(p.Id, p);
                 StateHasChanged();
             }
         }
@@ -504,7 +504,7 @@
             if (p.ShowInPlugLibrary)
             {
                 p.ShowInPlugLibrary = false;
-                await TASApiClient.UpdatePlugAsync(p.Id, p);
+                await MainApiClient.UpdatePlugAsync(p.Id, p);
                 StateHasChanged();
             }
         }
@@ -516,7 +516,7 @@
         try
         {
             RootPlugs?.Remove(toolItem);
-            await TASApiClient.DeletePlug(toolItem.Id);
+            await MainApiClient.DeletePlug(toolItem.Id);
             //await WorkflowDefinitionService.DeleteAsync(toolItem.DefinitionId);
             await ElsaEngineService.DeleteWorkflowByDefinitionId(toolItem.DefinitionId);
             _container.Refresh();
@@ -587,7 +587,7 @@
     private async void RemovePlugActionItem(Plug toolActionItem)
     {
         RootPlugs?.Remove(toolActionItem);
-        await TASApiClient.DeletePlug(toolActionItem.Id);
+        await MainApiClient.DeletePlug(toolActionItem.Id);
         StateHasChanged();
         //SelectedPlug.PlugActions.Remove(toolActionItem);
         //await MainApiClient.UpdatePlugAsync(SelectedPlug.Id, SelectedPlug);

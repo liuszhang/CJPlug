@@ -1,8 +1,11 @@
-﻿@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.Models.Job
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
 @using CJ.Plug.SharedPages.Layout
 @using Elsa.Api.Client.Extensions
 @using Elsa.Api.Client.Resources.ActivityExecutions.Models
+@using Elsa.Studio.DomInterop.Contracts
 @using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
 @using System.Net.Http.Json
@@ -13,6 +16,10 @@
 
 @inject IElsaStudioService ElsaStudioService
 @inject ElsaApiClient ElsaApiClient
+@inject MainApiClient MainApiClient
+@inject IFiles Files
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <VerticalWell ExtraPadding="6">
 
@@ -51,11 +58,7 @@
             </PropertyColumn>
               
             <PropertyColumn Property="x => x.Status" Title="状态" />
-            @* <PropertyColumn Property="x => x.WorkflowInstanceId" Title="作业号" /> *@
         </Columns>
-        @* <PagerContent>
-            <MudDataGridPager T="ActivityExecutionRecordSummary" />
-        </PagerContent> *@
     </MudDataGrid>
 
         <MudDataGrid @ref="dataGrid2" T="PlugVariableData" Items="PDZVariables" Filterable="false" SortMode="SortMode.None" ShowColumnOptions="false">
@@ -64,18 +67,66 @@
         </ToolBarContent>
         <Columns>
             <PropertyColumn Property="x => x.Name" Title="参数名" />
-            <PropertyColumn Property="x => x.Value" Title="参数值" />
-            @* <PropertyColumn Property="x => x.Type" Title="参数类型" /> *@
+            <TemplateColumn Title="参数值">
+                <CellTemplate>
+                    @if (context.Item.Type == VariableTypeEnum.File.ToString() && !string.IsNullOrEmpty(context.Item.Value))
+                    {
+                        var parts = context.Item.Value.Split(':');
+                        var fileName = parts.Length > 0 ? parts[0] : context.Item.Value;
+                        <MudTooltip Text="点击下载文件">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="MudBlazor.Variant.Outlined"
+                                     OnClick="@(() => DownloadFile(context.Item))">
+                                @fileName
+                            </MudChip>
+                        </MudTooltip>
+                    }
+                    else if (!string.IsNullOrEmpty(context.Item.DisplayValue))
+                    {
+                        <MudTooltip Text="@context.Item.DisplayValue">
+                            <MudText Typo="Typo.body2" Style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                @context.Item.DisplayValue
+                            </MudText>
+                        </MudTooltip>
+                    }
+                    else if (!string.IsNullOrEmpty(context.Item.Value))
+                    {
+                        <MudTooltip Text="@context.Item.Value">
+                            <MudText Typo="Typo.body2" Style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                @context.Item.Value
+                            </MudText>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default">
+                            <em>未设置</em>
+                        </MudText>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
             <TemplateColumn Title="类型">
                 <CellTemplate>
-                    <MudChip Color="Color.Info" Size="Size.Small">@context.Item.Type</MudChip>
+                    @{
+                        var typeName = VariableTypeConverter.GetTypeDisplayName(context.Item.Type ?? "");
+                        var chipColor = GetChipColor(context.Item.Type);
+                    }
+                    <MudChip Color="@chipColor" Size="Size.Small">@typeName</MudChip>
                 </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="操作">
                 <CellTemplate>
-                    <MudStack Row>
-                        <MudButton Color="Color.Primary" Size="Size.Small">查看</MudButton>
-                        <MudButton Color="Color.Primary" Size="Size.Small">下载</MudButton>
+                    <MudStack Row Spacing="1">
+                        <MudTooltip Text="查看值">
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                           OnClick="@(() => ShowValueDialog(context.Item))" />
+                        </MudTooltip>
+                        @if (context.Item.Type == VariableTypeEnum.File.ToString() && !string.IsNullOrEmpty(context.Item.Value))
+                        {
+                            <MudTooltip Text="下载文件">
+                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" Color="Color.Secondary"
+                                               OnClick="@(() => DownloadFile(context.Item))" />
+                            </MudTooltip>
+                        }
                     </MudStack>
                 </CellTemplate>
             </TemplateColumn>
@@ -100,22 +151,19 @@
 
     #nullable enable
     private bool _rightClick = true;
-    //private MudMenu _contextMenu = null!;
     MudDataGrid<PlugExecutionRecordSummary> dataGrid = default!;
     MudDataGrid<PlugVariableData> dataGrid2 = default!;
     string searchString = null;
-
-
-
 
     protected override async Task OnParametersSetAsync()
     {
         if (!string.IsNullOrEmpty(InstanceId))
         {
-            //Log.Information("准备获取执行数据");
             if (SelectedActivity == null)
             {
-                SelectedActivity=PlugDataZone?.GetFlowchartData(PlugDataZone.PlugDefinitionId);
+                // 流程图数据从插头获取，不再从 PDZ 获取
+                var plug = await MainApiClient.GetPlugByDefinitionIdAsync(PlugDataZone.PlugDefinitionId);
+                SelectedActivity = plug?.GetFlowchartJson() ?? PlugDataZone?.GetFlowchartData(PlugDataZone.PlugDefinitionId);
             }
             PDZVariables = PlugDataZone?.GetVariablesOfPlug(SelectedActivity?.GetId())??new();
             var executions = await ElsaApiClient.ListExecutionSummariesAsync(InstanceId, SelectedActivity?.GetNodeId(), null);
@@ -125,17 +173,63 @@
         }
     }
 
+    private Color GetChipColor(string? type)
+    {
+        return type switch
+        {
+            "String" => Color.Info,
+            "Int" => Color.Success,
+            "Float" => Color.Warning,
+            "Bool" => Color.Secondary,
+            "File" => Color.Primary,
+            _ => Color.Default
+        };
+    }
 
+    private async Task DownloadFile(PlugVariableData variable)
+    {
+        try
+        {
+            var parts = variable.Value?.Split(':');
+            if (parts == null || parts.Length < 2)
+            {
+                Snackbar.Add("文件信息无效", Severity.Warning);
+                return;
+            }
+            var fileName = parts[0];
+            var fileId = parts[1];
+            
+            using var stream = await MainApiClient.DownloadFileByFileId(fileId);
+            if (stream != null)
+            {
+                await Files.DownloadFileFromStreamAsync(fileName, stream);
+            }
+            else
+            {
+                Snackbar.Add("文件下载失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "下载文件失败");
+            Snackbar.Add($"下载失败: {ex.Message}", Severity.Error);
+        }
+    }
 
+    private async Task ShowValueDialog(PlugVariableData variable)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Variable", variable }
+        };
+        var options = new MudBlazor.DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<ValueDetailDialog>($"参数详情 - {variable.Name}", parameters, options);
+    }
 
-    /// <summary>
-    /// Here we simulate getting the paged, filtered and ordered data from the server
-    /// </summary>
     private async Task<GridData<PlugExecutionRecordSummary>> ServerReload(GridState<PlugExecutionRecordSummary> state)
     {
         if (!string.IsNullOrEmpty(SelectedActivity?.GetNodeId()) && !string.IsNullOrEmpty(InstanceId))
         {
-            //ExecutionRecords = await ElsaStudioService.GetActivityExecutionRecords(InstanceId, SelectedActivity?.GetId());
             var executions = await ElsaApiClient.ListExecutionSummariesAsync(InstanceId, SelectedActivity?.GetNodeId(),null);
             ExecutionRecords = executions.Items.ToList();
         }
@@ -153,6 +247,5 @@
     private async Task OnSearch(string text)
     {
         searchString = text;
-        //return dataGrid.ReloadServerData();
     }
 }

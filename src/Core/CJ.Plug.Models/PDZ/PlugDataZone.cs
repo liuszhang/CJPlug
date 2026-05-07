@@ -1,5 +1,6 @@
 ﻿using CJ.Plug.Models.DataFlow;
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Shared;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -8,7 +9,7 @@ public partial class PlugDataZone
     {        
 
         // 设置PDZ的参数值方便类
-        public PlugVariableData? SetVariableValue(string? PlugDefinitionId, string? VariableName, string? VariableValue)
+        public PlugVariableData? SetVariableValue(string? PlugDefinitionId, string? VariableName, string? VariableValue, string? VariableType = null)
         {
             var VariableExist = PlugVariableDatas?
                 .Where(p => p.PlugDefinitionId == PlugDefinitionId)
@@ -16,11 +17,15 @@ public partial class PlugDataZone
             if (VariableExist != null)
             {
                 VariableExist.Value = VariableValue;
+                if (!string.IsNullOrEmpty(VariableType))
+                {
+                    VariableExist.Type = VariableType;
+                }
                 return VariableExist;
             }
             else
             {
-            var newVariable = new PlugVariableData() { PlugDataZoneId = this.Id, PlugDefinitionId = PlugDefinitionId, Name = VariableName, Value = VariableValue };
+            var newVariable = new PlugVariableData() { PlugDataZoneId = this.Id, PlugDefinitionId = PlugDefinitionId, Name = VariableName, Value = VariableValue, Type = VariableType ?? CJ.Plug.Models.VariableType.VariableTypeEnum.String.ToString() };
             PlugVariableDatas.Add(newVariable);
             return newVariable;
         }
@@ -90,9 +95,10 @@ public partial class PlugDataZone
         {
             foreach (var v in plug.PlugVariables)
             {
-                SetVariableValue(plug.DefinitionId, v.Name, v.Value);
+                SetVariableValue(plug.DefinitionId, v.Name, v.Value, v.Type);
             }
-            SetFlowchartData(plug.DefinitionId, plug.ToActivityJson());
+            // 流程图数据已迁移至插头定义层，不再复制到 PDZ
+            // SetFlowchartData(plug.DefinitionId, plug.ToActivityJson());
         }
 
         //获取PDZ中指定插头的参数列表,PlugDefinitionId为空时获取所有参数
@@ -110,6 +116,56 @@ public partial class PlugDataZone
                 .ToList() ?? new List<PlugVariableData>();
         }
 
+        /// <summary>
+        /// 获取PDZ中指定插头的参数列表，如果PDZ中没有该插头的参数，则从插头定义中回退获取自带参数（值为空）
+        /// </summary>
+        public List<BaseVariable> GetVariablesOfPlugWithFallback(string? PlugDefinitionId, Plug? plug = null)
+        {
+            var pdzVariables = GetVariablesOfPlug(PlugDefinitionId);
+            if (pdzVariables.Count > 0)
+            {
+                return pdzVariables.Cast<BaseVariable>().ToList();
+            }
+
+            // PDZ中没有该插头的参数，从插头定义中获取自带参数
+            if (plug?.PlugVariables == null || plug.PlugVariables.Count == 0)
+            {
+                return new List<BaseVariable>();
+            }
+
+            return plug.PlugVariables
+                .Where(v => v.IsBrowsable != false)
+                .Cast<BaseVariable>()
+                .ToList();
+        }
+
+        /// <summary>
+        /// 将插头定义中的参数同步到PDZ中（仅同步PDZ中不存在的参数）
+        /// </summary>
+        public void SyncVariablesFromPlug(Plug plug)
+        {
+            if (plug?.PlugVariables == null) return;
+
+            foreach (var plugVar in plug.PlugVariables)
+            {
+                var existing = PlugVariableDatas?
+                    .FirstOrDefault(p => p.PlugDefinitionId == plug.DefinitionId && p.Name == plugVar.Name);
+                if (existing != null) continue;
+
+                var newPlugVariableData = new PlugVariableData()
+                {
+                    PlugDefinitionId = plug.DefinitionId,
+                    Name = plugVar.Name,
+                    Type = plugVar.Type,
+                    Value = null, // 值为空
+                    IsInitVariable = plugVar.IsInitVariable,
+                    IsBrowsable = plugVar.IsBrowsable,
+                };
+                PlugVariableDatas ??= new List<PlugVariableData>();
+                PlugVariableDatas.Add(newPlugVariableData);
+            }
+        }
+
         //获取PDZ中指定插头的动作数据
         public List<ActionData>? GetActionDatasOfPlug(string PlugDefinitionId)
         {
@@ -120,6 +176,7 @@ public partial class PlugDataZone
 
 
         //获取指定插头的流程图数据
+        [Obsolete("请使用 Plug.GetFlowchartJson() 代替。流程图数据已迁移至插头定义层。")]
         public JsonObject? GetFlowchartData(string PlugDefinitionId)
         {
             var ActivityJsonData = FlowchartDatas?
@@ -136,6 +193,7 @@ public partial class PlugDataZone
         }
 
         // 保存流程图数据
+        [Obsolete("请使用 Plug.SetFlowchartJson() 代替。流程图数据已迁移至插头定义层。")]
         public FlowchartData SetFlowchartData(string? PlugDefinitionId, JsonObject JsonData)
         {
             if (string.IsNullOrEmpty(PlugDefinitionId))
@@ -191,7 +249,15 @@ public partial class PlugDataZone
             newPDZ.PlugDefinitionId = PlugDefinitionId;
             newPDZ.Type = TargetPDZType ?? this.Type;
             newPDZ.JobDefinitionId = JobDefinitionId;
-            newPDZ.PDZId = UserName + PlugDefinitionId + TargetPDZType + JobDefinitionId;
+            // 与 GetOrCreatePDZFromPlugDefinitionId 保持一致的 PDZId 格式
+            if (newPDZ.Type == PDZTypeEnum.DesignPDZ.ToString() || newPDZ.Type == PDZTypeEnum.Desi.ToString())
+            {
+                newPDZ.PDZId = UserName + PlugDefinitionId + PDZTypeEnum.Desi.ToString();
+            }
+            else
+            {
+                newPDZ.PDZId = UserName + PlugDefinitionId + TargetPDZType + JobDefinitionId;
+            }
             newPDZ.TriggerPlugDefinitionId=this.TriggerPlugDefinitionId;
             //newPDZ.PDZWorkPath = Path.Combine(UserName, UserName + PlugDefinitionId + TargetPDZType + JobDefinitionId);
             foreach (var v in PDZVariables)
@@ -232,6 +298,7 @@ public partial class PlugDataZone
                     PlugDefinitionId = v.PlugDefinitionId,
                     Name = v.Name,
                     Value = v.Value,
+                    Type = v.Type,
                     DisplayValue = v.DisplayValue,
                     IsInitVariable = v.IsInitVariable,
                     IsBrowsable = v.IsBrowsable,
@@ -256,11 +323,15 @@ public partial class PlugDataZone
                     DisplayValue = v.DisplayValue,
                     IsBrowsable = v.IsBrowsable,
                     Type = v.Type,
+                    PlugType = v.PlugType,
                     PlugTypeKey = v.PlugTypeKey,
+                    OnlyExecuteAction = v.OnlyExecuteAction,
+                    ParentPlugDefinitionId = v.ParentPlugDefinitionId,
                     Creater = v.Creater,
                     Category = v.Category,
                     WorkPath = v.WorkPath,
                     Description = v.Description,
+                    PlugPosition = v.PlugPosition,
                 };
                 newPDZ.PlugDatas.Add(newPlugData);
             }
@@ -292,6 +363,7 @@ public partial class PlugDataZone
                     PlugDefinitionId = v.PlugDefinitionId,
                     Name = v.Name,
                     Value = v.Value,
+                    Type = v.Type,
                     DisplayValue = v.DisplayValue,
                     IsInitVariable = v.IsInitVariable,
                     IsBrowsable = v.IsBrowsable,
@@ -306,15 +378,16 @@ public partial class PlugDataZone
                 }
                 newPDZ.ActionVariableDatas.Add(newActionVariableData);
             }
-            foreach (var v in FlowchartDatas)
-            {
-                var newFlowchartData = new FlowchartData()
-                {
-                    PlugDefinitionId = v.PlugDefinitionId,
-                    Value = v.Value
-                };
-                newPDZ.FlowchartDatas.Add(newFlowchartData);
-            }
+            // 流程图数据已迁移至插头定义层，不再复制到 PDZ
+            // foreach (var v in FlowchartDatas)
+            // {
+            //     var newFlowchartData = new FlowchartData()
+            //     {
+            //         PlugDefinitionId = v.PlugDefinitionId,
+            //         Value = v.Value
+            //     };
+            //     newPDZ.FlowchartDatas.Add(newFlowchartData);
+            // }
             foreach (var v in DataFlowDatas)
             {
                 var newDataFlowData = new DataFlowData()

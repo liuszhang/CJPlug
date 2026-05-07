@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -12,7 +12,10 @@ namespace CJ.Plug.Models.Shared
         public int? ParentId { get; set; }
         public string? ParentName { get; set; }
         public string? Manager { get; set; }
-        public bool IsActive { get; set; } = true;
+        /// <summary>
+        /// 状态：-1=授权中，0=禁用，1=启用
+        /// </summary>
+        public int Status { get; set; } = 1;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     }
 }

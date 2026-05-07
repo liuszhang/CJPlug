@@ -62,13 +62,6 @@
             CLog.Information(">>>>>>>>>start new workflow");
             var process = new Process();
             process.DefinitionId = RandomLongIdentityGenerator.GenerateId();
-            // process.ActivityJsonData = new JsonObject(new Dictionary<string, JsonNode?>
-            //     {
-            //         ["id"] = process.DefinitionId,
-            //         ["definitionId"] = process.DefinitionId,
-            //         ["type"] = "Elsa.Flowchart",
-            //         ["name"] = process.Name
-            //     }).ToString();
             process.Name = Name;
             process.Description = Description;
             process.Version = 1;
@@ -78,10 +71,21 @@
             process.GroupName = PlugGroupEnum.我的流程.ToString();
             process.ShowInPlugLibrary = false;
             process.CreateType = PlugCreateTypeEnum.新建流程.ToString();
+
+            // 流程图直接存储在插头的 ActivityJsonData 中
+            process.ActivityJsonData = new JsonObject(new Dictionary<string, JsonNode?>
+                {
+                    ["id"] = process.DefinitionId,
+                    ["nodeId"] = process.DefinitionId,
+                    ["definitionId"] = process.DefinitionId,
+                    ["type"] = "Elsa.Flowchart",
+                    ["name"] = process.Name
+                }).ToJsonString();
+
             var result = await MainApiClient.CreateNewWorkflow(process);
             workflow1 = result;
             CLog.Information(result.WorkPath);
-            //同步创建相关PDZ
+            //同步创建相关PDZ（仅存储运行时参数数据，不再存储流程图）
             var newPDZ = new PlugDataZone();
             newPDZ.UserName = process.Creater;
             newPDZ.PlugDefinitionId = process.DefinitionId;
@@ -89,19 +93,6 @@
             newPDZ.PDZId = process.Creater + process.DefinitionId + PDZTypeEnum.Desi.ToString();
             newPDZ.PDZWorkPath = Path.Combine(newPDZ.UserName, newPDZ.PDZId);
 
-
-            newPDZ.FlowchartDatas.Add(new FlowchartData()
-                {
-                    PlugDefinitionId = process.DefinitionId,
-                    Value = new JsonObject(new Dictionary<string, JsonNode?>
-                    {
-                        ["id"] = process.DefinitionId,
-                        ["nodeId"] = process.DefinitionId,
-                        ["definitionId"] = process.DefinitionId,
-                        ["type"] = "Elsa.Flowchart",
-                        ["name"] = process.Name
-                    }).ToJsonString()
-                });
             newPDZ.PlugDatas.Add(new PlugData()
                 {
                     PlugDefinitionId = process.DefinitionId,
@@ -111,8 +102,6 @@
                 });
 
             await PDZApiClient.CreateOrUpdatePDZ(newPDZ);
-            //await MainApiClient.GetOrCreatePDZFromPlug(process,process.Creater);
-            //await MainApiClient.GetOrCreatePDZ(process.Creater, process.DefinitionId, PDZTypeEnum.Desi.ToString(),null);
 
         }
         else

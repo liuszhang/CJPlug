@@ -109,6 +109,31 @@ namespace CJ.Plug.Models.Plug
         }
 
         /// <summary>
+        /// 获取流程图数据（从插头自身的 ActivityJsonData）
+        /// </summary>
+        public JsonObject? GetFlowchartJson()
+        {
+            if (string.IsNullOrEmpty(ActivityJsonData))
+                return null;
+            try
+            {
+                return JsonNode.Parse(ActivityJsonData)?.AsObject();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 保存流程图数据到插头的 ActivityJsonData
+        /// </summary>
+        public void SetFlowchartJson(JsonObject flowchart)
+        {
+            ActivityJsonData = flowchart?.ToJsonString();
+        }
+
+        /// <summary>
         /// 序列化方式复制实例
         /// </summary>
         /// <returns></returns>

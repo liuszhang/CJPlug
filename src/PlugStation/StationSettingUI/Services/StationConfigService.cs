@@ -83,7 +83,7 @@ public class StationConfigService
 
             return new AppConfig
             {
-                MainServerUrl = dict.GetValueOrDefault("MainServerUrl") ?? "http://127.0.0.1:6660",
+                MainServerUrl = dict.GetValueOrDefault("MainServerUrl") ?? "http://127.0.0.1:8686",
                 StationApiFolder = dict.GetValueOrDefault("StationApiFolder") ?? "",
                 StationApiPort = int.TryParse(dict.GetValueOrDefault("StationApiPort"), out var p) ? p : 7660,
                 ToolsRootPath = dict.GetValueOrDefault("ToolsRootPath") ?? @"C:\Program Files\CJTools",

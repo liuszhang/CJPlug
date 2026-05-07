@@ -1,0 +1,61 @@
+@page "/SystemManage"
+
+@using CJ.Plug.UserManage.Components
+@using MudBlazor
+
+<PageTitle>系统管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: calc(100vh - 64px);">
+    <MudGrid Style="height: 100%;" Spacing="0">
+        @* 左栏：导航 *@
+        <MudItem xs="2" Style="height: 100%; border-right: 1px solid var(--mud-palette-table-lines); overflow-y: auto;">
+            <MudNavMenu Rounded="true" Margin="Margin.Dense" Color="Color.Primary" Class="pa-2">
+                <MudText Typo="Typo.subtitle2" Class="px-4 py-2 mud-text-secondary">系统管理</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.People"
+                            OnClick="@(() => SwitchTab("users"))"
+                            IsActive="@(_activeTab == "users")">人员管理</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Security"
+                            OnClick="@(() => SwitchTab("roles"))"
+                            IsActive="@(_activeTab == "roles")">角色管理</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Business"
+                            OnClick="@(() => SwitchTab("departments"))"
+                            IsActive="@(_activeTab == "departments")">部门管理</MudNavLink>
+            </MudNavMenu>
+        </MudItem>
+
+        @* 右栏：内容 *@
+        <MudItem xs="10" Style="height: 100%; overflow-y: auto;">
+            <div class="pa-4">
+                @if (_activeTab == "users")
+                {
+                    <UserManagePanel @ref="_userPanel" />
+                }
+                else if (_activeTab == "roles")
+                {
+                    <RoleManagePanel @ref="_rolePanel" />
+                }
+                else if (_activeTab == "departments")
+                {
+                    <DepartmentManagePanel @ref="_deptPanel" />
+                }
+            </div>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private string _activeTab = "users";
+    
+    private UserManagePanel? _userPanel;
+    private RoleManagePanel? _rolePanel;
+    private DepartmentManagePanel? _deptPanel;
+
+    private void SwitchTab(string tab)
+    {
+        if (_activeTab != tab)
+        {
+            _activeTab = tab;
+            StateHasChanged();
+        }
+    }
+}

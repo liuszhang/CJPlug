@@ -216,7 +216,9 @@ else
         {
             try
             {
-                Flowchart = PlugDataZone?.GetFlowchartData(ProcessDefinitionId);
+                // 流程图数据从插头获取，不再从 PDZ 获取
+                var plug = await MainApiClient.GetPlugByDefinitionIdAsync(ProcessDefinitionId);
+                Flowchart = plug?.GetFlowchartJson() ?? PlugDataZone?.GetFlowchartData(ProcessDefinitionId);
                 PlugData = PlugDataZone?.GetPlugData(ProcessDefinitionId);
                 //CLog.Information("获取流程数据成功", PlugDataZone.PDZId);
                 //CLog.Information(Flowchart?.ToJsonString(), PlugDataZone.PDZId);
@@ -332,7 +334,9 @@ else
                 CorrelationId = PDZId,
                 TriggerActivityId = TriggerActivityId,
         };
-        var FlowchartJson = PlugDataZone.GetFlowchartData(Process.DefinitionId);
+        // 流程图数据从插头获取，不再从 PDZ 获取
+        var plugForExecute = await MainApiClient.GetPlugByDefinitionIdAsync(Process.DefinitionId);
+        var FlowchartJson = plugForExecute?.GetFlowchartJson() ?? PlugDataZone.GetFlowchartData(Process.DefinitionId);
         var result = await ElsaApiClient.ExecuteWorkflowWithExecuteSetting(FlowchartJson, executeSetting);
         //Log.Information(JsonSerializer.Serialize(result));
 
@@ -346,7 +350,10 @@ else
 
     private async Task ExportWorkflow()
     {
-        await ElsaDomToolService.ExportFromJsonDataAsync(Process.Name+".json",PlugDataZone.GetFlowchartData(Process.DefinitionId).ToString());
+        // 流程图数据从插头获取，不再从 PDZ 获取
+        var plug = await MainApiClient.GetPlugByDefinitionIdAsync(Process.DefinitionId);
+        var flowchart = plug?.GetFlowchartJson() ?? PlugDataZone.GetFlowchartData(Process.DefinitionId);
+        await ElsaDomToolService.ExportFromJsonDataAsync(Process.Name+".json", flowchart.ToString());
     }
 
     private async Task ImportWorkflow(IBrowserFile? file)

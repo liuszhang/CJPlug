@@ -1,0 +1,49 @@
+@using CJ.Plug.AuthModels
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText><b>操作类型：</b>@Request.OperationTypeName</MudText>
+            <MudText><b>操作目标：</b>@Request.TargetDescription</MudText>
+            <MudText><b>请求人：</b>@Request.RequestedBy</MudText>
+            <MudText><b>请求时间：</b>@Request.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+            
+            <MudTextField @bind-Value="_remark"
+                          Label="备注（可选）"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Placeholder="@(IsApproved ? "批准备注..." : "拒绝原因...")" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" 
+                   Color="@(IsApproved ? Color.Success : Color.Error)" 
+                   OnClick="Submit">
+            @(IsApproved ? "批准" : "拒绝")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public AuthRequestDto Request { get; set; } = default!;
+    [Parameter] public bool IsApproved { get; set; }
+
+    private string? _remark;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new ApproveAuthRequestDto
+        {
+            RequestId = Request.Id,
+            IsApproved = IsApproved,
+            ApprovedBy = "", // 由调用方填充当前用户
+            Remark = _remark
+        }));
+    }
+}

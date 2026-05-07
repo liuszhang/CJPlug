@@ -1,0 +1,104 @@
+@page "/guacamole/{StationIp}"
+
+@using CJ.Plug.GuacamoleApiClient
+@using CJ.Plug.GuacamoleModels
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Microsoft.JSInterop
+
+@inject IGuacamoleApiClient GuacamoleApiClient
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<PageTitle>@($"远程桌面 - {StationIp}")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh;">
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 80vh;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" />
+            <MudText Typo="Typo.h6">正在连接远程桌面...</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@StationIp</MudText>
+        </MudStack>
+    }
+    else if (_error != null)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 80vh;">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+            <MudText Typo="Typo.h6" Color="Color.Error">连接失败</MudText>
+            <MudText Typo="Typo.body2">@_error</MudText>
+            <MudButton Variant="Variant.Outlined" OnClick="RetryAsync" Color="Color.Primary">
+                重试
+            </MudButton>
+        </MudStack>
+    }
+    else if (_embedUrl != null)
+    {
+        <div id="guacamole-container" style="width: 100%; height: 100vh; border: none;">
+            <iframe id="guacamole-iframe"
+                    src="@_embedUrl"
+                    style="width: 100%; height: 100%; border: none;"
+                    allowfullscreen>
+            </iframe>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string StationIp { get; set; } = default!;
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _embedUrl;
+    private GuacamoleConnectionTokenDto? _connectionToken;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadConnectionAsync();
+        }
+    }
+
+    private async Task LoadConnectionAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // 获取连接嵌入 Token
+            _connectionToken = await GuacamoleApiClient.GetConnectionEmbedTokenAsync(StationIp);
+
+            if (_connectionToken?.EmbedUrl != null)
+            {
+                _embedUrl = _connectionToken.EmbedUrl;
+
+                // 使用 JS Interop 设置 iframe
+                await JSRuntime.InvokeVoidAsync("guacamoleInterop.initialize", "guacamole-iframe", _embedUrl);
+            }
+            else
+            {
+                _error = $"未找到 Station {StationIp} 的 Guacamole 连接配置，请先在工作站管理中配置远程桌面连接。";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"连接 Guacamole 服务器失败: {ex.Message}";
+            Snackbar.Add(_error, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RetryAsync()
+    {
+        await LoadConnectionAsync();
+    }
+}

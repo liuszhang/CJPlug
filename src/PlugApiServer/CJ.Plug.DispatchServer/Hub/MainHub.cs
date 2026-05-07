@@ -88,9 +88,18 @@ public class MainHub(IStationService stationService):Hub
         await Clients.All.SendAsync(LogTypeEnum.PlugUpdated.ToString(), PlugDefiniitonId);
     }
 
-    public async Task JobStatusUpdated(string JobCorrelationId)
-    {
-        await Clients.All.SendAsync(LogTypeEnum.JobStatusUpdated.ToString(), JobCorrelationId);
+        public async Task JobStatusUpdated(string JobCorrelationId)
+        {
+            await Clients.All.SendAsync(LogTypeEnum.JobStatusUpdated.ToString(), JobCorrelationId);
+        }
+
+        /// <summary>
+        /// 图站开始执行通知 (用于触发 Guacamole 远程桌面)
+        /// </summary>
+        public async Task StationExecuting(string PDZId, string PlugDefinitionId, string StationIp)
+        {
+            Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp}");
+            await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp);
+        }
     }
-}
 

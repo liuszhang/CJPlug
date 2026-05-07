@@ -1,0 +1,118 @@
+@using CJ.Plug.UserManageModels
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField Value="@UserName"
+                          Label="用户名"
+                          Variant="Variant.Outlined"
+                          Disabled="true" />
+
+            <MudTextField @bind-Value="Model.Email"
+                          Label="邮箱"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email" />
+
+            <MudDivider />
+
+            <MudTextField @bind-Value="Model.FirstName"
+                          Label="姓"
+                          Variant="Variant.Outlined" />
+
+            <MudTextField @bind-Value="Model.LastName"
+                          Label="名"
+                          Variant="Variant.Outlined" />
+
+            <MudTextField @bind-Value="Model.PhoneNumber"
+                          Label="电话"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Telephone" />
+
+            <MudSelect T="int?"
+                       @bind-Value="Model.DepartmentId"
+                       Label="部门"
+                       Variant="Variant.Outlined"
+                       Clearable="true"
+                       Placeholder="请选择部门">
+                @foreach (var dept in Departments)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="string"
+                       @bind-SelectedValues="SelectedRoleNames"
+                       Label="角色"
+                       Variant="Variant.Outlined"
+                       MultiSelection="true"
+                       Clearable="true"
+                       Placeholder="请选择角色">
+                @foreach (var role in Roles)
+                {
+                    <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    [Parameter] public string? Email { get; set; }
+    [Parameter] public string? FirstName { get; set; }
+    [Parameter] public string? LastName { get; set; }
+    [Parameter] public string? PhoneNumber { get; set; }
+    [Parameter] public int? DepartmentId { get; set; }
+    [Parameter] public List<string> UserRoles { get; set; } = [];
+    [Parameter] public List<DepartmentManageDto> Departments { get; set; } = [];
+    [Parameter] public List<string> Roles { get; set; } = [];
+
+    private EditUserForm Model { get; set; } = new();
+    private IReadOnlyCollection<string> SelectedRoleNames { get; set; } = [];
+
+    protected override void OnInitialized()
+    {
+        Model = new EditUserForm
+        {
+            Email = Email,
+            FirstName = FirstName,
+            LastName = LastName,
+            PhoneNumber = PhoneNumber,
+            DepartmentId = DepartmentId
+        };
+        SelectedRoleNames = UserRoles.ToList();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new UpdateUserRequest
+        {
+            Id = UserId,
+            Email = Model.Email?.Trim(),
+            FirstName = Model.FirstName?.Trim(),
+            LastName = Model.LastName?.Trim(),
+            PhoneNumber = Model.PhoneNumber?.Trim(),
+            DepartmentId = Model.DepartmentId,
+            RoleNames = SelectedRoleNames.ToList()
+        }));
+    }
+
+    private class EditUserForm
+    {
+        public string? Email { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? PhoneNumber { get; set; }
+        public int? DepartmentId { get; set; }
+    }
+}

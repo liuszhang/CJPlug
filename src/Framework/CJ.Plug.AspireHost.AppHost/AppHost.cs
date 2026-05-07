@@ -120,7 +120,7 @@ builder.AddExecutable(
         command: "dotnet",
         workingDirectory: dispatchServerDirectory,
         args: dispatchServerDllName // DLL 文件名
-    ).WithUrl("http://localhost:6660");
+    ).WithUrl("http://localhost:8686");
 
 builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice");
 //builder.AddProject("apiservice", @"../PlugApiServer/CJ.Plug.ApiServer/CJ.Plug.ApiServer.csproj");
@@ -162,7 +162,6 @@ builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllNam
 
 
 builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithUrl("http://localhost:6274");
-
 
 //打开浏览器
 try

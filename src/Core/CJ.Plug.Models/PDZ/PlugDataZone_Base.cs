@@ -30,7 +30,10 @@
         public List<PlugStatusData>? PlugStatusDatas { get; set; } = new List<PlugStatusData>();
         public List<ActionData>? ActionDatas { get; set; } = new List<ActionData>();
         public List<ActionVariableData>? ActionVariableDatas { get; set; } = new List<ActionVariableData>();
+
+        [Obsolete("流程图数据已迁移至插头定义层（Plug.ActivityJsonData），请使用 Plug.GetFlowchartJson() 代替。")]
         public List<FlowchartData>? FlowchartDatas { get; set; } = new List<FlowchartData>();
+
         public List<DataFlowData>? DataFlowDatas { get; set; } = new List<DataFlowData>();
 
 

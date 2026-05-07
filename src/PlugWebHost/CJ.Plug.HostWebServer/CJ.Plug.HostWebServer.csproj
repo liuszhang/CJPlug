@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
     <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
     <ProjectReference Include="..\CJ.Plug.MainPageContent\CJ.Plug.MainPageContent.csproj" />
+    <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

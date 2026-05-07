@@ -7,6 +7,7 @@ namespace CJ.Plug.UserManageModels
         public string? Description { get; set; }
         public string? RoleType { get; set; }
         public bool IsSystem => RoleType == "系统角色";
+        public DataStatus Status { get; set; } = DataStatus.Active;
         public DateTimeOffset CreatedAt { get; set; }
     }
 
@@ -15,6 +16,7 @@ namespace CJ.Plug.UserManageModels
         public string? Name { get; set; }
         public string? Description { get; set; }
         public string? RoleType { get; set; }
+        public DataStatus Status { get; set; } = DataStatus.Active;
     }
 
     public class UpdateRoleRequest
@@ -23,5 +25,6 @@ namespace CJ.Plug.UserManageModels
         public string? Name { get; set; }
         public string? Description { get; set; }
         public string? RoleType { get; set; }
+        public DataStatus Status { get; set; } = DataStatus.Active;
     }
 }

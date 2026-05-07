@@ -1,4 +1,4 @@
-﻿@page "/ProcessEdit/{ProcessDefinitionId?}"
+@page "/ProcessEdit/{ProcessDefinitionId?}"
 <PageTitle>@($"流程编辑({MainProcess.Name})")</PageTitle>
 @using System.Text.Json
 @using System.Text.Json.Nodes
@@ -6,6 +6,7 @@
 @using CJ.Plug.ApiClient.Services
 @using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.ElsaIntegration.Pages
+@using CJ.Plug.Models.Extensions
 @using CJ.Plug.Models
 @using CJ.Plug.Models.EventAggregator
 @using CJ.Plug.Models.EventAggregator.Notifications
@@ -51,6 +52,8 @@
 
 
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
 
 
 
@@ -178,9 +181,81 @@
             //获取流程数据
             MainProcess = await MainApiClient.GetPlugByDefinitionIdAsync(ProcessDefinitionId);
 
+            //如果流程没有流程图数据，则初始化一个默认流程图
+            if (string.IsNullOrEmpty(MainProcess?.ActivityJsonData))
+            {
+                MainProcess.ActivityJsonData = new JsonObject(new Dictionary<string, JsonNode?>
+                {
+                    ["id"] = MainProcess.DefinitionId,
+                    ["nodeId"] = MainProcess.DefinitionId,
+                    ["definitionId"] = MainProcess.DefinitionId,
+                    ["type"] = "Elsa.Flowchart",
+                    ["name"] = MainProcess.Name
+                }).ToJsonString();
+                await MainApiClient.UpdatePlugAsync(MainProcess.Id, MainProcess);
+            }
+
             //获取PDZ数据
             var currentUser = await DomInteropService.GetCurrentUserName();
             PlugDataZone = await MainApiClient.GetOrCreatePDZFromPlugDefinitionId(ProcessDefinitionId, currentUser);
+
+            // 确保流程本身的 PlugData 存在
+            bool needSave = false;
+            if (PlugDataZone?.PlugDatas != null 
+                && !PlugDataZone.PlugDatas.Any(p => p.PlugDefinitionId == ProcessDefinitionId))
+            {
+                PlugDataZone.PlugDatas ??= new();
+                PlugDataZone.PlugDatas.Add(new PlugData()
+                {
+                    Id=MainProcess.Id,
+                    PlugDefinitionId = ProcessDefinitionId,
+                    Name = MainProcess?.Name,
+                    PlugType = MainProcess?.Type,
+                    PlugTypeKey = MainProcess?.PlugTypeKey,
+                    PlugDataZoneId = PlugDataZone.Id,
+                });
+                needSave = true;
+            }
+
+            // 通过 plugTypeKey 查询根插头，同步缺失的参数到 PDZ
+            if (PlugDataZone?.PlugDatas != null)
+            {
+                foreach (var plugData in PlugDataZone.PlugDatas)
+                {
+                    if (string.IsNullOrEmpty(plugData.PlugTypeKey)) continue;
+
+                    var existingVars = PlugDataZone.GetVariablesOfPlug(plugData.PlugDefinitionId);
+                    if (existingVars.Count == 0)
+                    {
+                        var rootPlug = await MainApiClient.GetRootPlugByTypeNameAsync(plugData.PlugTypeKey);
+                        if (rootPlug?.PlugVariables != null && rootPlug.PlugVariables.Count > 0)
+                        {
+                            foreach (var v in rootPlug.PlugVariables)
+                            {
+                                PlugDataZone.PlugVariableDatas ??= new();
+                                PlugDataZone.PlugVariableDatas.Add(new PlugVariableData()
+                                {
+                                    PlugDefinitionId = plugData.PlugDefinitionId,
+                                    Name = v.Name,
+                                    Type = v.Type,
+                                    // 只取参数定义，不带默认值；实际值从PDZ获取
+                                    Value = null,
+                                    DefaultValue = null,
+                                    IsInitVariable = v.IsInitVariable,
+                                    IsBrowsable = v.IsBrowsable,
+                                    IsArray = v.IsArray,
+                                });
+                            }
+                            needSave = true;
+                        }
+                    }
+                }
+                if (needSave)
+                {
+                    await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+                }
+            }
+
             await DomInteropService.SetItemValue("PDZId",PlugDataZone?.PDZId);
 
             //建立SignalR连接
@@ -299,6 +374,22 @@
                    StateHasChanged();
                });
            });
+
+        // 图站开始执行时，自动打开 VNC 远程桌面页签
+        HubConnectionManagerService._hubConnection.On<string, string, string>(
+            LogTypeEnum.StationExecuting.ToString(),
+            (pdzId, plugDefinitionId, stationIp) =>
+            {
+                if (string.IsNullOrEmpty(stationIp)) return;
+                InvokeAsync(async () =>
+                {
+                    // StationIp 格式为 "http://192.168.1.100:7660"，提取纯 IP/主机名
+                    var host = stationIp;
+                    try { host = new Uri(stationIp).Host; } catch { }
+                    Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面...", Severity.Info);
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/vnc/{host}", "_blank");
+                });
+            });
     }
 
     void OnResize(RadzenSplitterResizeEventArgs args)

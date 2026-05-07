@@ -24,6 +24,12 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
     <PackageReference Include="NSwag.AspNetCore" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="System.Drawing.Common" />
+  </ItemGroup>
+
+  <!-- UltraVNC portable 文件 (winvnc.exe, VNCHooks.dll) -->
+  <ItemGroup>
+    <Content Include="uvnc-portable\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

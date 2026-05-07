@@ -274,8 +274,14 @@ draggable="false"
     public async Task SaveAsync()
     {
         var root = await Designer.ReadFlowchartAsync();
-        var newFlowchartData = PlugDataZone?.SetFlowchartData(ProcessDefinitionId, root);
-        await PDZApiClient.UpdateFlowchartData(newFlowchartData);
+
+        // 流程图数据保存到插头的 ActivityJsonData
+        var plug = await TASApiClient.GetPlugByDefinitionIdAsync(ProcessDefinitionId);
+        if (plug != null)
+        {
+            plug.SetFlowchartJson(root);
+            await TASApiClient.UpdatePlugAsync(plug.Id, plug);
+        }
 
         //var oldActivityIds = PlugDataZone?.GetFlowchartData(ProcessDefinitionId)?.GetActivities().Select(a=>a.GetId()).ToList();
         var oldActivityIds = PlugDataZone?.PlugDatas?.Select(a=>a.PlugDefinitionId).ToList();
@@ -295,7 +301,8 @@ draggable="false"
                 PlugDataZone.PlugStatusDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头状态数据
                 PlugDataZone.ActionDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头动作数据
                 PlugDataZone.ActionVariableDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头动作参数数据
-                PlugDataZone.FlowchartDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头流程图数据
+                // 流程图数据已迁移至插头定义层，不再从 PDZ 删除
+                // PlugDataZone.FlowchartDatas.RemoveAll(x => x.PlugDefinitionId == activityId);   //删除相关插头流程图数据
                 PlugDataZone.DataFlowDatas.RemoveAll(x => x.SourcePlugDefinitionId == activityId || x.TargetPlugDefinitionId == activityId);   //删除相关数据流数据
 
                 //保存插头数据，由于要更新太多，就直接使用PDZ更新了

@@ -1,3 +1,4 @@
+using CJ.Plug.GuacamoleApi.Apis;
 using CJ.Plug.Login;
 using CJ.Plug.MainPageContent;
 using CJ.Plug.Models.Contracts;
@@ -79,6 +80,11 @@ builder.AddElsaServicesForWeb();
 builder.Services.AddScoped<CJ.Plug.Models.Contracts.IAppBarService, DefaultAppBarService>();
 builder.Services.ConfigModulePageServices();
 
+// VNC/SSH 远程桌面 WebSocket 代理服务
+builder.Services.AddSingleton<CJ.Plug.GuacamoleApi.Services.VncWebSocketProxy>();
+builder.Services.AddSingleton<CJ.Plug.GuacamoleApi.Services.SshWebSocketProxy>();
+builder.Services.AddSingleton<CJ.Plug.GuacamoleApi.Services.CaptureWebSocketProxy>();
+
 //添加插头前端集合包依赖
 builder.Services.AddPlugsBundle();
 builder.Services.AddXmlConfiguredServices();
@@ -126,6 +132,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseWebSockets(); // WebSocket 支持 (VNC/SSH 远程桌面代理) — 必须在 endpoint 之前
 //app.UseAuthentication(); // If you are using authentication
 //app.UseAuthorization();  // If you are using authorization
 app.UseAntiforgery();    // Add this line
@@ -168,6 +175,9 @@ app.MapRazorComponents<App_All>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(moduleAssemblies.ToArray());
+
+// VNC/SSH 远程桌面代理 API 端点
+app.MapRemoteDesktopApi();
 
 //app.UseAntiforgery();
 

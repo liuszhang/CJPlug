@@ -114,14 +114,18 @@
 </MudContainer>
 
 @code {
-    private MudDataGrid<RoleManageDto> dataGrid;
+    private MudDataGrid<RoleManageDto> dataGrid = default!;
     public HashSet<RoleManageDto> SelectedRoles { get; set; } = new HashSet<RoleManageDto>();
     public string? searchString { get; set; }
     private List<RoleManageDto> _allRoles = [];
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await LoadRoles();
+        if (firstRender)
+        {
+            await LoadRoles();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadRoles()

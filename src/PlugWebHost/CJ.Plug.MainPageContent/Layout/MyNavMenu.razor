@@ -1,4 +1,4 @@
-﻿
+
 @using CJ.Plug.Models.Contracts
 @using CJ.Plug.Models.Shared
 @using Microsoft.AspNetCore.Components.Routing
@@ -7,16 +7,31 @@
 @inject IEnumerable<IMenuService> MenuServices
 
 <MudNavMenu>
+    @* 管理分组 *@
+    @{
+        var manageItems = _menuItems.Where(x => x.GroupName == MenuGroupEnum.管理.ToString()).ToList();
+    }
+    @if (manageItems.Any())
+    {
+        <MudNavGroup Title="管理" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="true">
+            @foreach (var menu in manageItems)
+            {
+                <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
+            }
+        </MudNavGroup>
+    }
+
+    @* 其他非调试菜单 *@
     @foreach (var menu in _menuItems)
     {
-        if (menu.GroupName!=MenuGroupEnum.调试.ToString())
+        if (menu.GroupName != MenuGroupEnum.调试.ToString() && menu.GroupName != MenuGroupEnum.管理.ToString())
         {
             <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
         }
     }
-    
 
-    <MudNavGroup Title="调试" Icon="@Icons.Material.Filled.Settings" Expanded="true" >
+    @* 调试分组 *@
+    <MudNavGroup Title="调试" Icon="@Icons.Material.Filled.Settings" Expanded="true">
         <MudNavLink Match="NavLinkMatch.All" Href="/JobManageList2" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">作业列表2</MudNavLink>
 
         @foreach (var menu in _menuItems)
@@ -26,39 +41,21 @@
                 <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
             }
         }
-        @* <MudNavLink Match="NavLinkMatch.All" Href="/JobMonitor" Icon="@Icons.Material.Filled.TaskAlt" IconColor="Color.Primary">作业监控</MudNavLink> *@
-        @* <MudNavLink Match="NavLinkMatch.All" Href="/AIAgent" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">AIAgent</MudNavLink> *@
+        <MudNavLink Match="NavLinkMatch.All" Href="/remote/vnc/localhost" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">VNC测试</MudNavLink>
+        <MudNavLink Match="NavLinkMatch.All" Href="/remote/capture/localhost" Icon="@Icons.Material.Filled.Task" IconColor="Color.Primary">VNC测试（capture）</MudNavLink>
+
     </MudNavGroup>
-
-    
-
-    @* @foreach (var menuItemGroup in _menuItemsGroups.Values)
-    {
-        var menuItems = _menuItems.Where(x => x.GroupName == menuItemGroup.Name).ToList();
-
-        @if (menuItems.Any())
-        {
-            <MudText Typo="Typo.body2" Class="px-4 py-4 mud-text-secondary">@menuItemGroup.Text</MudText>
-
-            foreach (var menuItem in menuItems)
-            {
-                <NavMenuItem MenuItem="menuItem" />
-            }
-        }
-    } *@
 </MudNavMenu>
 
 
 @code
 {
-    // private IDictionary<string, MenuItemGroup> _menuItemsGroups = new Dictionary<string, MenuItemGroup>();
     private List<MenuItem> _menuItems = new List<MenuItem>();
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
-        // _menuItemsGroups = (await MenuService.GetMenuItemGroupsAsync()).ToDictionary(x => x.Name);
-        @foreach (var menu in MenuServices)
+        foreach (var menu in MenuServices)
         {
             var menuItems = await menu.GetMenuItemsAsync();
             _menuItems.AddRange(menuItems);

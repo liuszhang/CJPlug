@@ -1,4 +1,4 @@
-﻿@page "/process/{PlugDefinitionId}/execute/{JobDefinitionId?}"
+@page "/process/{PlugDefinitionId}/execute/{JobDefinitionId?}"
 
 
 <PageTitle>@($"流程执行")</PageTitle>
@@ -37,6 +37,7 @@
 @using Radzen.Blazor
 @using Serilog
 @using System.Timers
+@using Microsoft.JSInterop
 
 @layout BasicLayout
 
@@ -47,6 +48,7 @@
 @inject ISnackbar Snackbar
 @inject IDomInteropService DomInteropService
 @inject ElsaApiClient ElsaApiClient
+@inject IJSRuntime JSRuntime
 
 
 
@@ -239,7 +241,9 @@
             }
             //Log.Information($"PDZ:{PDZId}");
             PlugDataZone = await MainApiClient.GetPDZByPDZIdAsync(PDZId);
-            Flowchart = PlugDataZone?.GetFlowchartData(PlugDefinitionId);
+            // 流程图数据从插头获取，不再从 PDZ 获取
+            var plug = await MainApiClient.GetPlugByDefinitionIdAsync(PlugDefinitionId);
+            Flowchart = plug?.GetFlowchartJson() ?? PlugDataZone?.GetFlowchartData(PlugDefinitionId);
             PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
             userName = await DomInteropService.GetCurrentUserName();
 
@@ -340,6 +344,21 @@
                    //StateHasChanged();
                });
            });
+
+        // 监听图站执行事件 (用于打开远程桌面)
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
+        HubConnectionManagerService._hubConnection.On<string, string, string>(
+            LogTypeEnum.StationExecuting.ToString(),
+            (pdzId, plugDefinitionId, stationIp) =>
+            {
+                Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp}");
+                InvokeAsync(async () =>
+                {
+                    // 打开新的浏览器页签显示远程桌面 (默认 SSH)
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{stationIp}?protocol=ssh", "_blank");
+                    Snackbar.Add($"正在打开远程终端: {stationIp}", Severity.Info);
+                });
+            });
     }
 
 

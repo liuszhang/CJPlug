@@ -111,6 +111,7 @@ app.UseAuthentication();
 app.UseRouting();
 
 app.UseAntiforgery();
+app.UseWebSockets(); // 添加 WebSocket 支持 (VNC/SSH 代理)
 
 //添加各模块的注入端点
 app.ConfigModuleApis();

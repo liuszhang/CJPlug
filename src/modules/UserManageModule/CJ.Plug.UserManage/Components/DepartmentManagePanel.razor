@@ -1,0 +1,229 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManage.Pages
+@using CJ.Plug.AuthModels
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+@using System.Text.Json
+
+@inject IDepartmentManageApiClient DepartmentApiClient
+@inject IAuthApiClient AuthApiClient
+@inject IDomInteropService DomInteropService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+    <MudText Typo="Typo.h6">部门管理</MudText>
+    <MudSpacer />
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建部门</MudButton>
+    <MudButton OnClick="Refresh" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+</MudStack>
+
+<MudDataGrid @ref="_dataGrid"
+             T="DepartmentManageDto"
+             ServerData="LoadData"
+             Dense="true"
+             Hover="true"
+             Elevation="0"
+             SortMode="SortMode.Single"
+             RowStyle="cursor: default;"
+             MultiSelection="true"
+             SelectedItems="_selectedDepts"
+             SelectOnRowClick="false">
+    <ToolBarContent>
+        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索部门名、编码、负责人"
+                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
+    </ToolBarContent>
+    <Columns>
+        <SelectColumn T="DepartmentManageDto" />
+        <TemplateColumn Title="部门名称" Sortable="true">
+            <CellTemplate><MudText>@context.Item.Name</MudText></CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="编码">
+            <CellTemplate>@(context.Item.Code ?? "-")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="上级部门">
+            <CellTemplate>@(context.Item.ParentName ?? "-")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="负责人">
+            <CellTemplate>@(context.Item.Manager ?? "-")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="状态">
+            <CellTemplate>
+                @{
+                    var status = context.Item.Status;
+                    var chipColor = status switch
+                    {
+                        DataStatus.Authorizing => Color.Warning,
+                        DataStatus.Disabled => Color.Default,
+                        DataStatus.Active => Color.Success,
+                        _ => Color.Default
+                    };
+                    var statusText = status switch
+                    {
+                        DataStatus.Authorizing => "授权中",
+                        DataStatus.Disabled => "禁用",
+                        DataStatus.Active => "启用",
+                        _ => "未知"
+                    };
+                }
+                <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
+                    @statusText
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="创建时间" Sortable="true">
+            <CellTemplate>@context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Style="text-align:right" Title="操作">
+            <CellTemplate>
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                    <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
+                    <MudMenuItem OnClick="@(()=>DeleteDept(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                </MudMenu>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>没有部门数据</MudText></NoRecordsContent>
+    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
+    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<DepartmentManageDto> _dataGrid = default!;
+    private HashSet<DepartmentManageDto> _selectedDepts = new();
+    private string? _searchString;
+    private List<DepartmentManageDto> _allDepts = [];
+    private bool _isLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData_Internal();
+        _isLoaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _isLoaded)
+        {
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task LoadData_Internal()
+    {
+        try { _allDepts = await DepartmentApiClient.GetAllDepartmentsAsync(); }
+        catch { _allDepts = []; }
+    }
+
+    public async Task Refresh()
+    {
+        await LoadData_Internal();
+        await _dataGrid.ReloadServerData();
+    }
+
+    private async Task<GridData<DepartmentManageDto>> LoadData(GridState<DepartmentManageDto> state, CancellationToken token)
+    {
+        var query = _allDepts.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            var s = _searchString.Trim();
+            query = query.Where(d =>
+                (!string.IsNullOrEmpty(d.Name) && d.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(d.Code) && d.Code.Contains(s, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(d.Manager) && d.Manager.Contains(s, StringComparison.OrdinalIgnoreCase)));
+        }
+        var sortDef = state.SortDefinitions?.FirstOrDefault();
+        if (sortDef?.SortBy == nameof(DepartmentManageDto.Name))
+            query = sortDef.Descending ? query.OrderByDescending(d => d.Name) : query.OrderBy(d => d.Name);
+        else
+            query = query.OrderByDescending(d => d.Id);
+
+        var items = query.ToList();
+        var total = items.Count;
+        var pageItems = items.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        return new GridData<DepartmentManageDto> { TotalItems = total, Items = pageItems };
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", false },
+            { "DepartmentId", 0 },
+            { "DepartmentName", "" },
+            { "DepartmentCode", "" },
+            { "ParentId", (int?)null },
+            { "Manager", "" },
+            { "Status", DataStatus.Authorizing },
+            { "Departments", _allDepts }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("创建部门（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CreateDepartmentRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.CreateDepartment, $"部门: {request.Name}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task OpenEditDialog(DepartmentManageDto dept)
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", true },
+            { "DepartmentId", dept.Id },
+            { "DepartmentName", dept.Name ?? "" },
+            { "DepartmentCode", dept.Code },
+            { "ParentId", dept.ParentId },
+            { "Manager", dept.Manager },
+            { "Status", dept.Status },
+            { "Departments", _allDepts }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("编辑部门（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is UpdateDepartmentRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.UpdateDepartment, $"部门: {dept.Name}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task DeleteDept(DepartmentManageDto dept)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要提交删除部门 \"{dept.Name}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
+        if (confirm != true) return;
+        await CreateAuthRequest(AuthOperationType.DeleteDepartment, $"部门: {dept.Name}", JsonSerializer.Serialize(new { DepartmentId = dept.Id, DepartmentName = dept.Name }));
+    }
+
+    private async Task CreateAuthRequest(AuthOperationType operationType, string targetDescription, string operationData)
+    {
+        try
+        {
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            if (string.IsNullOrEmpty(currentUser))
+            {
+                currentUser = "anonymous";
+                Snackbar.Add("未检测到登录用户，请先登录", Severity.Warning);
+            }
+
+            var request = new CreateAuthRequestDto
+            {
+                OperationType = operationType,
+                TargetDescription = targetDescription,
+                OperationData = operationData,
+                RequestedBy = currentUser
+            };
+
+            await AuthApiClient.CreateAsync(request);
+            Snackbar.Add($"已创建{targetDescription}，状态为「授权中」，等待审批", Severity.Success);
+            await Refresh();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

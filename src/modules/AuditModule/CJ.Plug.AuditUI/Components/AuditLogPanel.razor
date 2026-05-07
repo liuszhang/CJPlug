@@ -1,0 +1,177 @@
+@using CJ.Plug.AuditModels
+@using CJ.Plug.AuditApiClient
+@using MudBlazor
+@using System.Globalization
+
+@inject IAuditApiClient AuditApiClient
+@inject ISnackbar Snackbar
+
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+    <MudText Typo="Typo.h6">操作日志</MudText>
+    <MudSpacer />
+    <MudButton OnClick="Refresh" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+</MudStack>
+
+@* 筛选条件 *@
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="3">
+            <MudTextField @bind-Value="_query.UserName" Label="操作人" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="3">
+            <MudSelect T="AuditModule?" @bind-Value="_query.Module" Label="操作模块" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                @foreach (var module in Enum.GetValues<AuditModule>())
+                {
+                    <MudSelectItem T="AuditModule?" Value="@((AuditModule?)module)">@GetModuleName(module)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="3">
+            <MudSelect T="AuditOperationType?" @bind-Value="_query.OperationType" Label="操作类型" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                @foreach (var type in Enum.GetValues<AuditOperationType>())
+                {
+                    <MudSelectItem T="AuditOperationType?" Value="@((AuditOperationType?)type)">@GetOperationTypeName(type)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="3">
+            <MudSelect T="bool?" @bind-Value="_query.IsSuccess" Label="操作结果" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="bool?" Value="@(true)">成功</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@(false)">失败</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="3">
+            <MudDatePicker @bind-Date="_startDate" Label="开始日期" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="3">
+            <MudDatePicker @bind-Date="_endDate" Label="结束日期" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="6" Class="d-flex align-center">
+            <MudButton OnClick="Search" StartIcon="@Icons.Material.Filled.Search" Variant="Variant.Filled" Color="Color.Primary" Class="mr-2">查询</MudButton>
+            <MudButton OnClick="Reset" StartIcon="@Icons.Material.Filled.Clear" Variant="Variant.Outlined">重置</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@* 日志列表 *@
+<MudDataGrid @ref="_dataGrid"
+             T="AuditLogDto"
+             ServerData="LoadData"
+             Dense="true"
+             Hover="true"
+             Elevation="0"
+             SortMode="SortMode.Single"
+             RowStyle="cursor: default;">
+    <Columns>
+        <TemplateColumn Title="操作时间" Sortable="true">
+            <CellTemplate>@context.Item.OperationTime.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作人">
+            <CellTemplate><MudText>@context.Item.UserName</MudText></CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作模块">
+            <CellTemplate>
+                <MudChip Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.Item.ModuleName</MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作类型">
+            <CellTemplate>
+                @{
+                    var typeColor = context.Item.OperationType switch
+                    {
+                        AuditOperationType.Create or AuditOperationType.Approve => Color.Success,
+                        AuditOperationType.Delete or AuditOperationType.Reject => Color.Error,
+                        AuditOperationType.Update or AuditOperationType.Cancel => Color.Warning,
+                        _ => Color.Default
+                    };
+                }
+                <MudChip Size="Size.Small" Color="@typeColor" Variant="Variant.Filled">@context.Item.OperationTypeName</MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作描述">
+            <CellTemplate><MudText Typo="Typo.body2">@context.Item.Description</MudText></CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="操作结果">
+            <CellTemplate>
+                <MudChip Size="Size.Small" Color="@(context.Item.IsSuccess ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                    @(context.Item.IsSuccess ? "成功" : "失败")
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="IP地址">
+            <CellTemplate>@(context.Item.IpAddress ?? "-")</CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>没有日志数据</MudText></NoRecordsContent>
+    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
+    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<AuditLogDto> _dataGrid = default!;
+    private AuditLogQueryRequest _query = new() { PageSize = 50 };
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+
+    private async Task<GridData<AuditLogDto>> LoadData(GridState<AuditLogDto> state, CancellationToken token)
+    {
+        _query.Page = state.Page + 1;
+        _query.PageSize = state.PageSize;
+        _query.StartTime = _startDate;
+        _query.EndTime = _endDate;
+
+        var result = await AuditApiClient.QueryAsync(_query, token);
+
+        return new GridData<AuditLogDto>
+        {
+            TotalItems = result.TotalCount,
+            Items = result.Items
+        };
+    }
+
+    private async Task Search()
+    {
+        await _dataGrid.ReloadServerData();
+    }
+
+    private async Task Reset()
+    {
+        _query = new AuditLogQueryRequest { PageSize = 50 };
+        _startDate = null;
+        _endDate = null;
+        await _dataGrid.ReloadServerData();
+    }
+
+    public async Task Refresh()
+    {
+        await _dataGrid.ReloadServerData();
+    }
+
+    private string GetModuleName(AuditModule module) => module switch
+    {
+        AuditModule.UserManage => "用户管理",
+        AuditModule.RoleManage => "角色管理",
+        AuditModule.DepartmentManage => "部门管理",
+        AuditModule.AuthManage => "授权管理",
+        AuditModule.ProcessManage => "流程管理",
+        AuditModule.PlugManage => "插件管理",
+        AuditModule.System => "系统设置",
+        AuditModule.Other => "其他",
+        _ => "未知"
+    };
+
+    private string GetOperationTypeName(AuditOperationType type) => type switch
+    {
+        AuditOperationType.Login => "登录",
+        AuditOperationType.Logout => "登出",
+        AuditOperationType.Create => "创建",
+        AuditOperationType.Update => "更新",
+        AuditOperationType.Delete => "删除",
+        AuditOperationType.Approve => "审批通过",
+        AuditOperationType.Reject => "审批拒绝",
+        AuditOperationType.Cancel => "撤回",
+        AuditOperationType.Execute => "执行",
+        AuditOperationType.Other => "其他",
+        _ => "未知"
+    };
+}

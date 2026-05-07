@@ -1,4 +1,5 @@
-﻿using CJ.Plug.JobManageApiClient;
+using CJ.Plug.AuthApiClient;
+using CJ.Plug.JobManageApiClient;
 using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
@@ -36,6 +37,19 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
+        services.AddHttpClient<IDepartmentManageApiClient, DepartmentManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        // 注册AuthApiClient用于授权管理
+        services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         return services;
     }
 
@@ -45,6 +59,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IUserManageService, UserManageService>();
         services.AddScoped<IRoleManageService, RoleManageService>();
+        services.AddScoped<IDepartmentManageService, DepartmentManageService>();
 
         services.AddHttpClient<IUserManageApiClient, UserManageApiClient>(client =>
         {
@@ -57,6 +72,13 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
             client.Timeout = TimeSpan.FromSeconds(60);
         });
+
+        services.AddHttpClient<IDepartmentManageApiClient, DepartmentManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         return services;
     }
 
@@ -66,11 +88,7 @@ public static class ServiceCollectionExtensions
         {
             endpoints.MapUserManageApi();
             endpoints.MapRoleManageApi();
+            endpoints.MapDepartmentManageApi();
         });
     }
-
-
-
-
 }
-

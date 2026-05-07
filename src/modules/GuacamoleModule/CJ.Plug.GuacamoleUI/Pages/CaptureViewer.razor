@@ -1,0 +1,226 @@
+@page "/remote/capture/{StationIp}"
+
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Microsoft.JSInterop
+@using CJ.Plug.SharedPages.Layout
+
+@layout BasicLayout
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>@($"远程捕获 - {StationIp}")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh; background: #1a1a1a; position: relative;">
+
+    <!-- 控制面板 (顶部) -->
+    <MudPaper Style="position: fixed; top: 0; left: 0; right: 0; padding: 8px 16px; z-index: 20; display: flex; align-items: center; gap: 16px; background: #2d2d2d;" Elevation="4">
+        <MudText Typo="Typo.subtitle1" Style="color: #fff;">@StationIp - 窗口捕获</MudText>
+
+        <MudSelect T="string" Label="选择窗口" @bind-Value="_selectedWindow" Dense="true"
+                   Style="min-width: 200px;" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Disabled="@(_isCapturing)">
+            @if (_windows != null)
+            {
+                @foreach (var w in _windows)
+                {
+                    <MudSelectItem Value="@w.processName">@(w.title ?? w.processName)</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        <MudNumericField T="int" Label="FPS" @bind-Value="_fps" Min="1" Max="30" Dense="true"
+                         Style="width: 80px;" Variant="Variant.Outlined" Margin="Margin.Dense"
+                         Disabled="@(_isCapturing)" />
+
+        @if (!_isCapturing)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartCapture"
+                       Disabled="@(string.IsNullOrEmpty(_selectedWindow) || _loading)">
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Class="mr-1" />
+                开始捕获
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopCapture">
+                <MudIcon Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Class="mr-1" />
+                停止
+            </MudButton>
+        }
+
+        <MudSpacer />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Fullscreen"
+                       OnClick="ToggleFullscreen"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       Title="全屏" />
+    </MudPaper>
+
+    <!-- 捕获画面 -->
+    <div id="capture-screen" style="width: 100%; height: 100%; padding-top: 56px; display: flex; align-items: center; justify-content: center;">
+        <img id="capture-image" src="" alt="" style="max-width: 100%; max-height: 100%; object-fit: contain; display: @(_isCapturing ? "block" : "none");" />
+    </div>
+
+    <!-- 加载遮罩 -->
+    @if (_loading)
+    {
+        <div style="position: absolute; top: 56px; left: 0; width: 100%; height: calc(100% - 56px); z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Style="color: white;">正在加载窗口列表...</MudText>
+            </MudStack>
+        </div>
+    }
+
+    <!-- 空闲提示 -->
+    @if (!_loading && !_isCapturing && _error == null)
+    {
+        <div style="position: absolute; top: 56px; left: 0; width: 100%; height: calc(100% - 56px); z-index: 5; display: flex; align-items: center; justify-content: center;">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudIcon Icon="@Icons.Material.Filled.ScreenShare" Size="Size.Large" Style="color: #666;" />
+                <MudText Typo="Typo.h6" Style="color: #666;">选择窗口并点击「开始捕获」</MudText>
+            </MudStack>
+        </div>
+    }
+
+    <!-- 错误状态 -->
+    @if (_error != null)
+    {
+        <div style="position: absolute; top: 56px; left: 0; width: 100%; height: calc(100% - 56px); z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+                <MudText Typo="Typo.h6" Color="Color.Error">加载失败</MudText>
+                <MudText Typo="Typo.body2" Style="color: #aaa;">@_error</MudText>
+                <MudButton Variant="Variant.Outlined" OnClick="LoadWindowsAsync" Color="Color.Primary">
+                    重试
+                </MudButton>
+            </MudStack>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string StationIp { get; set; } = default!;
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Port { get; set; }
+
+    private bool _loading = true;
+    private bool _isCapturing = false;
+    private string? _error;
+    private string? _selectedWindow;
+    private int _fps = 5;
+    private List<WindowInfo> _windows = new();
+
+    private class WindowInfo
+    {
+        public string? processName { get; set; }
+        public string? title { get; set; }
+        public string? handle { get; set; }
+        public int processId { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (Port.HasValue)
+                _fps = Port.Value;
+
+            await LoadWindowsAsync();
+        }
+    }
+
+    private async Task LoadWindowsAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var windows = await JSRuntime.InvokeAsync<List<WindowInfo>>("captureInterop.getWindows", StationIp);
+            _windows = windows ?? new List<WindowInfo>();
+            if (_windows.Count > 0)
+                _selectedWindow = _windows[0].processName;
+        }
+        catch (Exception ex)
+        {
+            _error = $"获取窗口列表失败: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartCapture()
+    {
+        if (string.IsNullOrEmpty(_selectedWindow))
+        {
+            Snackbar.Add("请先选择一个窗口", Severity.Warning);
+            return;
+        }
+
+        _error = null;
+        _isCapturing = true;
+        StateHasChanged();
+
+        try
+        {
+            var baseUri = NavigationManager.BaseUri;
+            var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
+            var wsUrl = $"{wsBase}/api/remote/capture?host={StationIp}&processName={Uri.EscapeDataString(_selectedWindow)}&fps={_fps}";
+
+            var success = await JSRuntime.InvokeAsync<bool>("captureInterop.connect", "capture-image", wsUrl);
+
+            if (!success)
+            {
+                _isCapturing = false;
+                _error = "无法连接到 Capture 服务，请检查 Station 是否在线";
+            }
+        }
+        catch (Exception ex)
+        {
+            _isCapturing = false;
+            _error = $"连接失败: {ex.Message}";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopCapture()
+    {
+        await JSRuntime.InvokeVoidAsync("captureInterop.disconnect");
+        _isCapturing = false;
+        StateHasChanged();
+    }
+
+    private async Task ToggleFullscreen()
+    {
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            (function() {
+                var el = document.getElementById('capture-screen');
+                if (!document.fullscreenElement) {
+                    el.requestFullscreen().catch(function(err) { console.error('Fullscreen error:', err); });
+                } else {
+                    document.exitFullscreen();
+                }
+            })();
+        ");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("captureInterop.disconnect");
+    }
+}

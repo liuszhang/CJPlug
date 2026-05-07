@@ -363,7 +363,114 @@ public class StationApiService
         }
     }
 
+    // ==================== 远程桌面 API (StationApiServer 本地) ====================
+
+    /// <summary>
+    /// 获取远程桌面服务状态
+    /// </summary>
+    public async Task<RemoteServiceStatus?> GetRemoteServiceStatusAsync()
+    {
+        try
+        {
+            var response = await _stationClient.GetAsync("/api/station/remote/status");
+            if (response.IsSuccessStatusCode)
+                return await response.Content.ReadFromJsonAsync<RemoteServiceStatus>(JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"获取远程桌面状态失败: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 部署 UltraVNC portable
+    /// </summary>
+    public async Task<(bool Success, string Message)> DeployUvncAsync()
+    {
+        try
+        {
+            var response = await _stationClient.PostAsync("/api/station/remote/uvnc/deploy", null);
+            var result = await response.Content.ReadFromJsonAsync<ApiResult>(JsonOptions);
+            return (response.IsSuccessStatusCode, result?.Message ?? "未知结果");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"请求失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 启动 VNC 服务
+    /// </summary>
+    public async Task<(bool Success, string Message)> StartVncAsync()
+    {
+        try
+        {
+            var response = await _stationClient.PostAsync("/api/station/remote/vnc/start", null);
+            var result = await response.Content.ReadFromJsonAsync<ApiResult>(JsonOptions);
+            return (response.IsSuccessStatusCode, result?.Message ?? "未知结果");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"请求失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 停止 VNC 服务
+    /// </summary>
+    public async Task<(bool Success, string Message)> StopVncAsync()
+    {
+        try
+        {
+            var response = await _stationClient.PostAsync("/api/station/remote/vnc/stop", null);
+            var result = await response.Content.ReadFromJsonAsync<ApiResult>(JsonOptions);
+            return (response.IsSuccessStatusCode, result?.Message ?? "未知结果");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"请求失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 启动 SSH 服务
+    /// </summary>
+    public async Task<(bool Success, string Message)> StartSshAsync()
+    {
+        try
+        {
+            var response = await _stationClient.PostAsync("/api/station/remote/ssh/start", null);
+            var result = await response.Content.ReadFromJsonAsync<ApiResult>(JsonOptions);
+            return (response.IsSuccessStatusCode, result?.Message ?? "未知结果");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"请求失败: {ex.Message}");
+        }
+    }
+
     // ==================== 内部辅助类型 ====================
+
+    private class ApiResult
+    {
+        public string? Message { get; set; }
+    }
+
+    public class RemoteServiceStatus
+    {
+        public bool VncInstalled { get; set; }
+        public bool VncRunning { get; set; }
+        public int VncPort { get; set; } = 5900;
+        public string? VncProcessName { get; set; }
+        public bool VncIsPortable { get; set; }
+        public bool SshInstalled { get; set; }
+        public bool SshRunning { get; set; }
+        public int SshPort { get; set; } = 22;
+        public string? SshProcessName { get; set; }
+        public bool IsWindows { get; set; }
+    }
 
     public class ConnectionStatusResponse
     {

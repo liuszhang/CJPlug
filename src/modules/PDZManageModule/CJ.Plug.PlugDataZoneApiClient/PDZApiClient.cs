@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.EventAggregator;
+using CJ.Plug.Models.EventAggregator;
 using CJ.Plug.Models.LogModels;
 using Serilog;
 using System.Net.Http.Json;
@@ -39,7 +39,9 @@ namespace CJ.Plug.PlugDataZoneApiClient
             var sourcePDZ = await GetPDZByFilter(filter, cancellationToken);
             if (sourcePDZ != null)
             {
-                return sourcePDZ.CopyPDZ(UserName, PDZTypeEnum.DesignPDZ.ToString(), null);
+                // 复制后必须保存到数据库，否则 PlugDataZoneId 为 0 会导致后续操作出错
+                var copiedPDZ = sourcePDZ.CopyPDZ(UserName, PDZTypeEnum.DesignPDZ.ToString(), null);
+                return await CreateOrUpdatePDZ(copiedPDZ);
             }
 
 
@@ -74,7 +76,9 @@ namespace CJ.Plug.PlugDataZoneApiClient
             var sourcePDZ = await GetPDZByFilter(filter, cancellationToken);
             if (sourcePDZ != null)
             {
-                return sourcePDZ.CopyPDZ(UserName, PDZTypeEnum.DesignPDZ.ToString(), null);
+                // 复制后必须保存到数据库，否则 PlugDataZoneId 为 0 会导致后续操作出错
+                var copiedPDZ = sourcePDZ.CopyPDZ(UserName, PDZTypeEnum.DesignPDZ.ToString(), null);
+                return await CreateOrUpdatePDZ(copiedPDZ);
             }
 
 
@@ -283,7 +287,7 @@ namespace CJ.Plug.PlugDataZoneApiClient
             {
                 return await result.Content.ReadFromJsonAsync<PlugDataZone>();
             }
-            Log.Information($"CreateJobPDZByCopyPDZ failed: {result.StatusCode}");
+            CLog.Information($"CreateJobPDZByCopyPDZ failed: {result.StatusCode}");
             return null;
         }
 
@@ -295,7 +299,7 @@ namespace CJ.Plug.PlugDataZoneApiClient
             {
                 return await response.Content.ReadFromJsonAsync<PlugDataZone>(cancellationToken: cancellationToken);
             }
-            Log.Information($"GetPDZByFilter failed: {response.StatusCode}");
+            CLog.Information($"GetPDZByFilter failed: {response.StatusCode}");
             return null;
         }
     }

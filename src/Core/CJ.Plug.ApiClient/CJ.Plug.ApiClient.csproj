@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\modules\AIModule\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
+    <ProjectReference Include="..\..\modules\AuditModule\CJ.Plug.AuditModels\CJ.Plug.AuditModels.csproj" />
+    <ProjectReference Include="..\..\modules\AuthModule\CJ.Plug.AuthApiClient\CJ.Plug.AuthApiClient.csproj" />
     <ProjectReference Include="..\..\modules\FileManageModule\CJ.Plug.FileManageApiClient\CJ.Plug.FileManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\JobManageModule\CJ.Plug.JobManageApiClient\CJ.Plug.JobManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\LoginModule\CJ.Plug.LoginApiClient\CJ.Plug.LoginApiClient.csproj" />
@@ -29,6 +31,7 @@
     <ProjectReference Include="..\..\modules\StationAndToolModule\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
     <ProjectReference Include="..\..\modules\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
     <ProjectReference Include="..\..\modules\UserManageModule\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj" />
   </ItemGroup>
 
 </Project>

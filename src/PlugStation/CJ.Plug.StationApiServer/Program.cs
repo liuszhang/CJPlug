@@ -1,8 +1,11 @@
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Login;
 using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Shared;
 using CJ.Plug.ModuleConfig;
+using CJ.Plug.StationApiServer.Apis;
 using CJ.Plug.StationApiServer.Contracts;
+using CJ.Plug.StationApiServer.Services;
 using CJ.Plug.StationApiService.Contracts;
 using CJ.Plug.StationApiService.Services;
 using CJ.Plug_Aspire.StationApiService.Models;
@@ -24,7 +27,8 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Sink(new SignalRLogSink("Station"))
     .CreateLogger();
 
-StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
+//StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
+StaticData.MainServerHostIp = GlobalData.MainDispatcherServer;
 Console.WriteLine("the main serverIp is:" + StaticData.MainServerHostIp);
 //StaticData.ToolAgentServerHttpsPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Https").GetSection("Url").Value.Split(':')[2];
 StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
@@ -59,6 +63,13 @@ builder.Services.AddSingleton<StationTaskStore>(sp =>
 builder.Services.AddScoped<IStationExecuteService, DefaultStationExecuteService>();
 builder.Services.AddScoped<IStationFileService, StationFileService>();
 
+// 远程桌面服务 (UltraVNC portable + SSH)
+builder.Services.AddSingleton<UltraVncService>();
+builder.Services.AddSingleton<RemoteDesktopService>();
+
+// 窗口捕获服务
+builder.Services.AddSingleton<WindowCaptureService>();
+
 builder.Services.ConfigModuleApiServices();
 
 
@@ -72,6 +83,8 @@ builder.Services.AddSingleton<MainApiClient>();
 
 
 var app = builder.Build();
+
+app.UseWebSockets();
 
 app.MapDefaultEndpoints();
 
@@ -101,5 +114,6 @@ if (app.Environment.IsDevelopment())
 
 
 app.MapConnectionApi();
+app.MapRemoteDesktopApi();
 
 app.Run();

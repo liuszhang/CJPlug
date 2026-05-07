@@ -58,6 +58,7 @@
     <PackageVersion Include="PDFsharp" Version="6.2.4" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageVersion Include="Serilog.Sinks.BrowserConsole" Version="8.0.0" />
+    <PackageVersion Include="SSH.NET" Version="2025.1.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="8.1.0" />
     <PackageVersion Include="Proto.Persistence.Sqlite" Version="1.7.0" />
     <PackageVersion Include="MudBlazor" Version="9.4.0" />
@@ -144,6 +145,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Http.Connections.Client" Version="8.0.10" />
     <PackageVersion Include="Microsoft.VisualStudio.Utilities" Version="17.11.40262" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="9.0.1" />
+    <PackageVersion Include="System.Drawing.Common" Version="10.0.0" />
     <PackageVersion Include="Microsoft.JSInterop" Version="8.0.10" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.2.3" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.1.0" />

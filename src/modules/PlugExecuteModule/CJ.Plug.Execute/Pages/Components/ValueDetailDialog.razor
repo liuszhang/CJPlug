@@ -1,0 +1,60 @@
+﻿@using CJ.Plug.Models.Shared
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudField Label="参数名" Variant="Variant.Outlined">
+                @Variable?.Name
+            </MudField>
+            <MudField Label="参数类型" Variant="Variant.Outlined">
+                @Variable?.Type
+            </MudField>
+            <MudField Label="参数值" Variant="Variant.Outlined">
+                @if (!string.IsNullOrEmpty(Variable?.Value))
+                {
+                    <MudText Typo="Typo.body2" Style="white-space:pre-wrap;word-break:break-all;">
+                        @Variable.Value
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">
+                        <em>未设置</em>
+                    </MudText>
+                }
+            </MudField>
+            @if (!string.IsNullOrEmpty(Variable?.DisplayValue))
+            {
+                <MudField Label="显示值" Variant="Variant.Outlined">
+                    <MudText Typo="Typo.body2" Style="white-space:pre-wrap;word-break:break-all;">
+                        @Variable.DisplayValue
+                    </MudText>
+                </MudField>
+            }
+            @if (Variable?.IsValueFromOtherVariable == true)
+            {
+                <MudField Label="数据来源" Variant="Variant.Outlined">
+                    <MudChipSet T="string">
+                        <MudChip Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            @($"来自: {Variable.SourceValuePlugDefinitionId} / {Variable.SourceValueVariableName}")
+                        </MudChip>
+                    </MudChipSet>
+                </MudField>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public BaseVariable? Variable { get; set; }
+
+    private void Close() => MudDialog.Close();
+}

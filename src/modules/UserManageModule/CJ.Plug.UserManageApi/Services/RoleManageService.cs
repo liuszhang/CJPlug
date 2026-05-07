@@ -28,6 +28,7 @@ namespace CJ.Plug.UserManageApi.Services
                 Name = r.Name,
                 Description = r.Description,
                 RoleType = r.RoleType,
+                Status = (DataStatus)r.Status,
                 CreatedAt = DateTimeOffset.MinValue
             }).ToList();
         }
@@ -43,6 +44,7 @@ namespace CJ.Plug.UserManageApi.Services
                 Name = role.Name,
                 Description = role.Description,
                 RoleType = role.RoleType,
+                Status = (DataStatus)role.Status,
                 CreatedAt = DateTimeOffset.MinValue
             };
         }
@@ -56,7 +58,8 @@ namespace CJ.Plug.UserManageApi.Services
             {
                 Name = request.Name,
                 Description = request.Description,
-                RoleType = string.IsNullOrEmpty(request.RoleType) ? "自定义角色" : request.RoleType
+                RoleType = string.IsNullOrEmpty(request.RoleType) ? "自定义角色" : request.RoleType,
+                Status = (int)request.Status
             };
 
             var result = await _roleManager.CreateAsync(role);
@@ -73,6 +76,7 @@ namespace CJ.Plug.UserManageApi.Services
                 Name = role.Name,
                 Description = role.Description,
                 RoleType = role.RoleType,
+                Status = (DataStatus)role.Status,
                 CreatedAt = DateTimeOffset.Now
             };
         }
@@ -88,6 +92,7 @@ namespace CJ.Plug.UserManageApi.Services
                 role.Description = request.Description;
             if (request.RoleType != null)
                 role.RoleType = request.RoleType;
+            role.Status = (int)request.Status;
 
             var result = await _roleManager.UpdateAsync(role);
             if (!result.Succeeded)
@@ -103,6 +108,7 @@ namespace CJ.Plug.UserManageApi.Services
                 Name = role.Name,
                 Description = role.Description,
                 RoleType = role.RoleType,
+                Status = (DataStatus)role.Status,
                 CreatedAt = DateTimeOffset.MinValue
             };
         }

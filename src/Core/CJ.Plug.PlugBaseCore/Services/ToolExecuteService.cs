@@ -1,4 +1,5 @@
-﻿using CJ.Plug.Models.Job;
+﻿using CJ.Plug.Models.EventAggregator;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Services;
@@ -115,7 +116,15 @@ namespace CJ.Plug.PlugBaseCore.Services
             //Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的执行命令为：{plugExecutionRequest.RequestCommand}");
 
             //3 执行工具，获取执行结果
-            return await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp,plugExecutionRequest);
+            var result = await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp, plugExecutionRequest);
+
+            // 通知前端：图站开始执行，可用于触发 VNC 远程桌面
+            StatusReporter.ReportStationExecuting(
+                plugExecutionRequest.ExecuteResultData?.Ids?.PlugDefinitionId,
+                StationToUse.StationIp,
+                plugExecutionRequest.ExecuteResultData?.Ids?.PDZId);
+
+            return result;
 
         }
     }

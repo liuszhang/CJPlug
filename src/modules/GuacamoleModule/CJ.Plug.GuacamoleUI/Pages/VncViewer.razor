@@ -1,0 +1,149 @@
+@page "/remote/vnc/{StationIp}"
+
+
+
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Microsoft.JSInterop
+@using CJ.Plug.SharedPages.Layout
+
+@layout BasicLayout
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>@($"VNC 远程桌面 - {StationIp}")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh; background: #1a1a1a; position: relative;">
+    <!-- noVNC 容器 - 始终可见 (RFB 会自动创建 canvas) -->
+    <div id="noVNC-screen" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
+
+    <!-- 加载遮罩 (叠在 noVNC 容器上方) -->
+    @if (_loading)
+    {
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Style="color: white;">正在连接 VNC...</MudText>
+                <MudText Typo="Typo.body2" Style="color: #aaa;">@StationIp:@_port</MudText>
+            </MudStack>
+        </div>
+    }
+    
+    <!-- 错误状态 -->
+    @if (_error != null)
+    {
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+                <MudText Typo="Typo.h6" Color="Color.Error">连接失败</MudText>
+                <MudText Typo="Typo.body2" Style="color: #aaa;">@_error</MudText>
+                <MudButton Variant="Variant.Outlined" OnClick="ConnectAsync" Color="Color.Primary">
+                    重试
+                </MudButton>
+            </MudStack>
+        </div>
+    }
+    
+    <!-- 工具栏 -->
+    @if (!_loading && _error == null)
+    {
+        <MudPaper Style="position: fixed; bottom: 16px; right: 16px; padding: 8px; z-index: 20;" Elevation="4">
+            <MudStack Row Spacing="2">
+                <MudIconButton Icon="@Icons.Material.Filled.FitScreen" 
+                               OnClick="FitToScreen" 
+                               Size="Size.Small" 
+                               Color="Color.Primary"
+                               Title="适应屏幕" />
+                <MudIconButton Icon="@Icons.Material.Filled.Fullscreen" 
+                               OnClick="ToggleFullscreen" 
+                               Size="Size.Small" 
+                               Color="Color.Primary"
+                               Title="全屏" />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                               OnClick="ConnectAsync" 
+                               Size="Size.Small" 
+                               Color="Color.Primary"
+                               Title="重新连接" />
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string StationIp { get; set; } = default!;
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Port { get; set; }
+
+    private bool _loading = true;
+    private string? _error;
+    private int _port = 5900;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (Port.HasValue)
+                _port = Port.Value;
+            
+            await ConnectAsync();
+        }
+    }
+
+    private async Task ConnectAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // WebSocket 连接到当前服务器 (与页面同源)
+            var baseUri = NavigationManager.BaseUri; // e.g. http://localhost:5066/
+            var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
+            var wsUrl = $"{wsBase}/api/remote/vnc?host={StationIp}&port={_port}";
+
+            // RFB 需要容器 div (不是 canvas)，它会自己创建 canvas
+            var success = await JSRuntime.InvokeAsync<bool>("noVncInterop.connect", "noVNC-screen", wsUrl);
+
+            if (!success)
+            {
+                _error = "无法连接到 VNC 服务器，请检查 Station 是否开启了 VNC 服务";
+            }
+            else
+            {
+                // 连接成功，隐藏加载遮罩
+                _loading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"连接失败: {ex.Message}";
+        }
+        finally
+        {
+            if (_error != null)
+                _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task FitToScreen()
+    {
+        await JSRuntime.InvokeVoidAsync("noVncInterop.fitToScreen");
+    }
+
+    private async Task ToggleFullscreen()
+    {
+        await JSRuntime.InvokeVoidAsync("noVncInterop.toggleFullscreen", "noVNC-screen");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("noVncInterop.disconnect");
+    }
+}

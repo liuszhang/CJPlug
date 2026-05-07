@@ -49,7 +49,8 @@ public class PDZManageService : IPDZManageService
             .Include(p => p.PlugStatusDatas)
             .Include(p => p.ActionDatas)
             .Include(p => p.ActionVariableDatas)
-            .Include(p => p.FlowchartDatas)
+            // 流程图数据已迁移至插头定义层，不再需要 Include
+            // .Include(p => p.FlowchartDatas)
             .Include(p => p.DataFlowDatas)
             .FirstOrDefaultAsync(p => p.PDZId == PDZ.PDZId, cancellationToken);
 
@@ -232,7 +233,8 @@ public class PDZManageService : IPDZManageService
             .Include(p => p.PlugStatusDatas)
             .Include(p => p.ActionDatas)
             .Include(p => p.ActionVariableDatas)
-            .Include(p => p.FlowchartDatas)
+            // 流程图数据已迁移至插头定义层，不再需要 Include
+            // .Include(p => p.FlowchartDatas)
             .Include(p => p.DataFlowDatas)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -241,9 +243,15 @@ public class PDZManageService : IPDZManageService
 
     public async Task<PlugDataZone?> GetByFilter(PDZFilter filter, CancellationToken cancellationToken = default)
     {
-        // 开始构建查询
+        // 开始构建查询（必须Include所有子集合，否则CopyPDZ会丢失数据）
         var query = _dbContext.Set<PlugDataZone>()
             .Include(p => p.PDZVariables)
+            .Include(p => p.PlugDatas)
+            .Include(p => p.PlugVariableDatas)
+            .Include(p => p.PlugStatusDatas)
+            .Include(p => p.ActionDatas)
+            .Include(p => p.ActionVariableDatas)
+            .Include(p => p.DataFlowDatas)
             .AsNoTracking();
 
         // 动态添加过滤条件
@@ -297,7 +305,8 @@ public class PDZManageService : IPDZManageService
             .Include(p => p.PlugStatusDatas)
             .Include(p => p.ActionDatas)
             .Include(p => p.ActionVariableDatas)
-            .Include(p => p.FlowchartDatas)
+            // 流程图数据已迁移至插头定义层，不再需要 Include
+            // .Include(p => p.FlowchartDatas)
             .Include(p => p.DataFlowDatas)
             .AsNoTracking()
             .Where(p => p.Id == Id)
@@ -321,7 +330,8 @@ public class PDZManageService : IPDZManageService
             .Include(p => p.PlugStatusDatas)
             .Include(p => p.ActionDatas)
             .Include(p => p.ActionVariableDatas)
-            .Include(p => p.FlowchartDatas)
+            // 流程图数据已迁移至插头定义层，不再需要 Include
+            // .Include(p => p.FlowchartDatas)
             .Include(p => p.DataFlowDatas)
             .AsNoTracking()
             .Where(p => p.PDZId == PDZId)
