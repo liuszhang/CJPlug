@@ -1,84 +1,144 @@
-﻿
+@using System.Text.Json
 @using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Shared
 @using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
 @using MudBlazor
 @using Radzen.Blazor
 @using Serilog
-@using System.Text.Json
-
+@using Elsa.Studio.DomInterop.Contracts
 @inject ISnackbar Snackbar
 @inject MainApiClient MainApiClient
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+@inject IFiles Files
 
-<MudDropContainer Style="height:100%" T="DropItem"
-Items="_items" ItemsSelector="@((item,dropzone) => item.Identifier == dropzone)" ItemDropped="ItemUpdated"
-CanDropClass="mud-border-error">
-    <ChildContent>
-
-        <Radzen.Blazor.RadzenSplitter>
-            <RadzenSplitterPane Size="30%" Min="200px">
-                <MudStack Style="height:100%;">
-                    <MudStack>
-                        <MudTextField T="string" Label="搜索" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" TextChanged="OnTextChanged" Immediate="true" Clearable="true" FullWidth />
-                        <MudTreeView Items="@_treeItemData" @ref="_treeView" FilterFunc="MatchesName" 
-                        @bind-SelectedValue="_selectedFolder">
-                            <ItemTemplate>
-                                <MudDropZone T="DropItem" Identifier="@context.Value" OnlyZone="true">
-                                    <MudTreeViewItem @bind-Expanded="@context.Expanded" Items="@context.Children" Value="@context.Value"
-                                    Icon="@context.Icon" IconColor="Color.Warning" Text="@context.Text" Visible="@context.Visible" />
-                                </MudDropZone>
-                            </ItemTemplate>
-                        </MudTreeView>
-                    </MudStack>
-                    <MudSpacer />
-                    <MudDropZone T="DropItem" Identifier="Deleted" OnlyZone="true"
-                    Class="rounded-lg border-2 border-dashed mud-border-lines-default">
-                        <MudPaper Height="100px" Width="100%">
-                            <MudStack Style="height:100%;" AlignItems="AlignItems.Center" Justify="Justify.Center">
-                                <MudIconButton OnClick="OpenDeletedFiles" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" />
-                            </MudStack>
-                        </MudPaper>
-                    </MudDropZone>
+<Radzen.Blazor.RadzenSplitter>
+    <RadzenSplitterPane Size="30%" Min="200px">
+        <MudStack Style="height:100%;">
+            <MudStack>
+                <MudTextField T="string" Label="搜索" Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Search" TextChanged="OnTextChanged"
+                    Immediate="true" Clearable="true" FullWidth />
+                <MudTreeView Items="@_treeItemData" @ref="_treeView" FilterFunc="MatchesName"
+                    SelectedValue="@_selectedFolder"
+                    SelectedValueChanged="@((string val) => OnFolderSelected(val))">
+                    <ItemTemplate>
+                        <MudTreeViewItem @bind-Expanded="@context.Expanded"
+                            Items="@context.Children" Value="@context.Value"
+                            Icon="@context.Icon" IconColor="Color.Warning"
+                            Text="@context.Text" Visible="@context.Visible" />
+                    </ItemTemplate>
+                </MudTreeView>
+            </MudStack>
+            <MudSpacer />
+            <MudPaper Height="60px" Width="100%"
+                      Class="rounded-lg border-2 border-dashed mud-border-lines-default">
+                <MudStack Style="height:100%;" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                    <MudIconButton OnClick="OpenDeletedFiles"
+                        Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                        Title="查看已删除文件" />
                 </MudStack>
-            </RadzenSplitterPane>
-            <RadzenSplitterPane Size="70%" Min="280px">
-                <MudTabs Style="height:100%;width:100%">
-                    <MudTabPanel Text="@($"文件清单({_selectedFolder})")" Style="height:100%">
-                        <MudStack Style="height:100%">
-                            <MudToolBar Gutters="false" Dense="true">
-                                @* <MudCheckBox @bind-Value="ToolbarCheckBox" /> *@
-                                <MudIconButton Icon="@Icons.Material.Filled.Download" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Refresh" />
-                                <MudIconButton Icon="@Icons.Material.Filled.MoreVert" />                                
-                                @* <MudText>(@_selectedFolder)</MudText> *@
-                                <MudSpacer />
-                                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" />
-                                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" />
-                            </MudToolBar>
-                            @* <MudDivider /> *@
-                            @if (Processing)
-                            {
-                                <MudProgressCircular Indeterminate="true" />
-                            }
-                            else
-                            {
-                                <MudDropZone T="DropItem" Identifier="@_selectedFolder" AllowReorder="true" Class="d-flex flex-wrap flex-grow-1 pa-2 rounded" />
-                            }
-                        </MudStack>
-                    </MudTabPanel>
-                </MudTabs>
-            </RadzenSplitterPane>
-        </Radzen.Blazor.RadzenSplitter>
+            </MudPaper>
+        </MudStack>
+    </RadzenSplitterPane>
 
-    </ChildContent>
-    <ItemRenderer>
-        <div Class="rounded mud-paper-outlined d-flex align-center pa-3 ma-2">
-            <MudIcon Icon="@(context.Identifier == "Folders" ? Icons.Custom.Uncategorized.Folder : Icons.Custom.FileFormats.FileDocument)" Color="Color.Inherit" Class="mr-2" />
-            @context.Name
-        </div>
-    </ItemRenderer>
-</MudDropContainer>
+    <RadzenSplitterPane Size="70%" Min="280px">
+        <MudTabs Style="height:100%;width:100%">
+            <MudTabPanel Text=@($"文件清单 ({GetDisplayPath()})") Style="height:100%">
+                <MudStack Style="height:100%">
+                    <MudToolBar Gutters="false" Dense="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                            OnClick="RefreshCurrentFolder"
+                            Title="刷新" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                            OnClick="NavigateToParent"
+                            Disabled="@(_currentFolderDepth <= 1)"
+                            Title="返回上级目录" />
+                        <MudSpacer />
+                        <MudTextField @bind-Value="_fileFilter"
+                                      Placeholder="筛选文件名..."
+                                      Immediate="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Margin="Margin.Dense"
+                                      Style="max-width:220px;" />
+                    </MudToolBar>
+                    @if (Processing)
+                    {
+                        <MudProgressLinear Indeterminate="true" />
+                    }
+                    else if (_items.Count == 0)
+                    {
+                        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:100%;opacity:0.6;">
+                            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Color="Color.Secondary">此文件夹为空</MudText>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudDataGrid @key="@_selectedFolder"
+                                     Items="@FilteredItems"
+                                     Hover="true"
+                                     Dense="true"
+                                     Striped="true"
+                                     Style="flex:1;overflow:auto;"
+                                     SelectedItem="@_selectedFile"
+                                     SelectedItemChanged="@((DropItem? item) => OnSelectedFileChanged(item))">
+                            <Columns>
+                                <TemplateColumn Title="文件名">
+                                    <CellTemplate>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <MudIcon Icon="@Icons.Custom.FileFormats.FileDocument"
+                                                     Color="Color.Inherit" Size="Size.Small" />
+                                            <MudText>@context.Item.Name</MudText>
+                                        </div>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="大小" CellStyle="white-space:nowrap;">
+                                    <CellTemplate>
+                                        <MudText Typo="Typo.caption">@context.Item.SizeDisplay</MudText>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="上传人">
+                                    <CellTemplate>
+                                        <MudText Typo="Typo.caption">@(context.Item.Creator ?? "—")</MudText>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="上传时间">
+                                    <CellTemplate>
+                                        <MudText Typo="Typo.caption">
+                                            @(context.Item.LastWriteTime?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                                        </MudText>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="操作" CellStyle="text-align:right;white-space:nowrap;">
+                                    <CellTemplate>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => DownloadFile(context.Item))"
+                                                       Title="下载文件" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => DeleteFile(context.Item))"
+                                                       Title="删除文件" />
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            </Columns>
+                            <PagerContent>
+                                <MudDataGridPager T="DropItem" />
+                            </PagerContent>
+                        </MudDataGrid>
+                    }
+                </MudStack>
+            </MudTabPanel>
+        </MudTabs>
+    </RadzenSplitterPane>
+</Radzen.Blazor.RadzenSplitter>
+
 @code {
     [Parameter]
     public PlugDataZone? PlugDataZone { get; set; }
@@ -86,14 +146,12 @@ CanDropClass="mud-border-error">
     public PlugData? PlugData { get; set; }
     public string? RootWorkPath { get; set; }
 
-    //public List<FileSystemNode>? ChildPlugs { get; set; } = new List<FileSystemNode>();
-    //public List<FileSystemNode>? Files { get; set; }
     private bool Processing { get; set; } = false;
     private List<DropItem> _items = new();
 
-    public bool ToolbarCheckBox { get; set; } = false;
-    string _selectedFolder = "Social";
-
+    private string _selectedFolder = "";
+    private DropItem? _selectedFile;
+    private int _currentFolderDepth = 1;
 
     private List<TreeItemData<string>> _treeItemData = new();
     private TreeItemData<string> RootItem = new();
@@ -101,15 +159,23 @@ CanDropClass="mud-border-error">
     private MudTreeView<string> _treeView;
 
     private string _searchPhrase;
+    private string _fileFilter = string.Empty;
 
-    public class TreeItemPresenter : TreeItemData<string>
+    private IEnumerable<DropItem> FilteredItems =>
+        string.IsNullOrWhiteSpace(_fileFilter)
+            ? _items
+            : _items.Where(i => i.Name.Contains(_fileFilter, StringComparison.OrdinalIgnoreCase));
+
+    private string GetDisplayPath()
     {
-        public TreeItemPresenter(string text, string icon) : base(text)
-        {
-            Text = text;
-            Icon = icon;
-        }
+        if (string.IsNullOrEmpty(_selectedFolder)) return "";
+        // 显示相对于用户根目录的路径
+        return _selectedFolder.Replace('\\', '/');
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  搜索 / 过滤
+    // ═══════════════════════════════════════════════════════════
 
     private async void OnTextChanged(string searchPhrase)
     {
@@ -120,22 +186,20 @@ CanDropClass="mud-border-error">
     private Task<bool> MatchesName(ITreeItemData<string> item)
     {
         if (string.IsNullOrEmpty(item.Text))
-        {
             return Task.FromResult(false);
-        }
-
         return Task.FromResult(item.Text.Contains(_searchPhrase, StringComparison.OrdinalIgnoreCase));
     }
 
-
+    // ═══════════════════════════════════════════════════════════
+    //  初始化
+    // ═══════════════════════════════════════════════════════════
 
     protected override async Task OnParametersSetAsync()
     {
         if (PlugDataZone != null)
         {
             PlugData = PlugDataZone.GetPlugData(PlugDataZone.PlugDefinitionId);
-            //WorkPath = PlugDataZone?.PDZWorkPath;
-            RootWorkPath = Path.Combine(PlugDataZone.UserName,PlugDataZone.PDZId);
+            RootWorkPath = Path.Combine(PlugDataZone.UserName, PlugDataZone.PDZId);
         }
     }
 
@@ -148,11 +212,28 @@ CanDropClass="mud-border-error">
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  目录树
+    // ═══════════════════════════════════════════════════════════
+
     private async Task LoadTreeFiles()
     {
         Processing = true;
-        RootItem = new TreeItemData<string>() { Text = PlugData?.Name, Value = RootWorkPath, Icon = Icons.Material.Filled.Folder, Expandable = true ,Expanded=true};
-        var DeletedItem = new TreeItemData<string>() { Text = "已删除文件", Value = "Deleted", Icon = Icons.Material.Filled.Delete, Visible=false};
+        RootItem = new TreeItemData<string>()
+        {
+            Text = PlugData?.Name,
+            Value = RootWorkPath,
+            Icon = Icons.Material.Filled.Folder,
+            Expandable = true,
+            Expanded = true
+        };
+        var DeletedItem = new TreeItemData<string>()
+        {
+            Text = "已删除文件",
+            Value = "Deleted",
+            Icon = Icons.Material.Filled.Delete,
+            Visible = false
+        };
         _treeItemData.Add(RootItem);
         _treeItemData.Add(DeletedItem);
         RootItem.Children = new List<TreeItemData<string>>();
@@ -162,25 +243,29 @@ CanDropClass="mud-border-error">
         StateHasChanged();
     }
 
-    private async Task<IReadOnlyCollection<ITreeItemData<string>>> LoadTreeChilds(FileSystemNode ParentFolder, TreeItemData<string> ParentTree)
+    private async Task<IReadOnlyCollection<ITreeItemData<string>>> LoadTreeChilds(
+        FileSystemNode ParentFolder, TreeItemData<string> ParentTree)
     {
-        //CLog.Information($"Loading tree child files of {ParentFolder.FullPath}");
-        // Build a concrete list then assign it to the ParentTree.Children property
         var children = new List<TreeItemData<string>>();
         var childContent = await GetChildFilesAsync(ParentFolder);
         foreach (var c in childContent ?? Enumerable.Empty<FileSystemNode>())
         {
             if (c.IsDirectory)
             {
-                var childTree = new TreeItemData<string>() { Text = c.Name, Value = c.FullPath, Icon = Icons.Material.Filled.Folder, Expandable = true, Expanded = true };
+                var childTree = new TreeItemData<string>()
+                {
+                    Text = c.Name,
+                    Value = c.FullPath,
+                    Icon = Icons.Material.Filled.Folder,
+                    Expandable = true,
+                    Expanded = true
+                };
                 var displayName = PlugDataZone?.GetPlugData(c.Name);
                 if (displayName != null)
                 {
                     childTree.Text = displayName.Name;
                 }
-                // Recursively load grandchildren
                 await LoadTreeChilds(c, childTree);
-                //CLog.Information($"Added folder {c.FullPath} to tree");
                 children.Add(childTree);
             }
         }
@@ -189,64 +274,170 @@ CanDropClass="mud-border-error">
         return ParentTree.Children;
     }
 
-
     private async Task<List<FileSystemNode>?> GetChildFilesAsync(FileSystemNode ParentFolder)
     {
-        //CLog.Information($"Loading child files of {ParentFolder.FullPath}");
-        var childContent = await MainApiClient.GetFolderFiles(ParentFolder,null,null);
-        foreach(var c in childContent)
+        _items.Clear();
+        var childContent = await MainApiClient.GetFolderFiles(ParentFolder, null, null);
+        foreach (var c in childContent)
         {
-            if (c.IsDirectory)
-            {         
-            }
-            else
+            if (!c.IsDirectory)
             {
-                _items.Add(new DropItem() { Name = c.Name, Identifier = ParentFolder.FullPath });
-                //CLog.Information($"Added {c.Name} to {ParentFolder.FullPath}");
+                _items.Add(new DropItem()
+                {
+                    Name = c.Name,
+                    Identifier = ParentFolder.FullPath,
+                    FullPath = c.FullPath,
+                    Size = c.Size,
+                    Creator = c.Creator,
+                    LastWriteTime = c.LastWriteTime
+                });
             }
         }
         return childContent;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  文件选中逻辑 (MudDataGrid SelectedItem)
+    // ═══════════════════════════════════════════════════════════
 
-    private async Task ItemUpdated(MudItemDropInfo<DropItem> dropItem)
+    private void OnSelectedFileChanged(DropItem? item)
     {
-        //CLog.Information(dropItem.Item.Identifier,PlugDataZone.PDZId);
-        var FilePath = dropItem.Item.Identifier;
-        dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
-        
-        if (dropItem.DropzoneIdentifier == "Deleted")
+        _selectedFile = item;
+        StateHasChanged();
+    }
+
+    private void ClearSelection()
+    {
+        _selectedFile = null;
+        StateHasChanged();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  工具栏操作
+    // ═══════════════════════════════════════════════════════════
+
+    private async Task DownloadSelectedFile()
+    {
+        await DownloadFile(_selectedFile);
+    }
+
+    private async Task DownloadFile(DropItem? item)
+    {
+        if (item == null) return;
+
+        try
         {
-            Snackbar.Add($"文件 {dropItem.Item.Name} {dropItem.DropzoneIdentifier} 成功。", Severity.Info, config =>
+            using var stream = await MainApiClient.DownloadFileByPath(item.FullPath ?? item.Name);
+            if (stream != null)
             {
-                config.OnClick = snackbar =>
-                {
-                    return Task.CompletedTask;
-                };
-            });
-        
-        //CLog.Information($"File {dropItem.Item.Name} moved to {dropItem.DropzoneIdentifier}.假装删除。",PlugDataZone.PDZId);
-        //CLog.Information($"{JsonSerializer.Serialize(dropItem)}",PlugDataZone.PDZId);
-        //CLog.Information($"{PlugDataZone.PDZWorkPath}",PlugDataZone.PDZId);
-        var file = await MainApiClient.DeleteFileWithRequest(new FileDeleteRequest()
+                await Files.DownloadFileFromStreamAsync(item.Name, stream);
+                Snackbar.Add($"下载完成: {item.Name}", Severity.Success);
+            }
+            else
             {
-                FilePath = FilePath,
-                FileName = dropItem.Item.Name
+                Snackbar.Add($"下载失败: 文件不存在或无权访问", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"下载异常: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RefreshCurrentFolder()
+    {
+        if (string.IsNullOrEmpty(_selectedFolder)) return;
+
+        Processing = true;
+        _selectedFile = null;
+        _fileFilter = string.Empty;
+        StateHasChanged();
+
+        var parentNode = new FileSystemNode(_selectedFolder, _selectedFolder);
+        await GetChildFilesAsync(parentNode);
+
+        Processing = false;
+        StateHasChanged();
+    }
+
+    private async Task OnFolderSelected(string folderPath)
+    {
+        if (folderPath == _selectedFolder) return;
+        _selectedFolder = folderPath;
+        await RefreshCurrentFolder();
+    }
+
+    private async Task NavigateToParent()
+    {
+        if (string.IsNullOrEmpty(_selectedFolder)) return;
+
+        var parent = Path.GetDirectoryName(_selectedFolder)?.Replace('\\', '/');
+        if (string.IsNullOrEmpty(parent) || parent == _selectedFolder) return;
+
+        Processing = true;
+        _selectedFile = null;
+        _selectedFolder = parent;
+        StateHasChanged();
+
+        var parentNode = new FileSystemNode(parent, parent);
+        await GetChildFilesAsync(parentNode);
+
+        Processing = false;
+        StateHasChanged();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  删除文件
+    // ═══════════════════════════════════════════════════════════
+
+    private async Task DeleteFile(DropItem item)
+    {
+        try
+        {
+            var result = await MainApiClient.DeleteFileWithRequest(new FileDeleteRequest()
+            {
+                FilePath = item.Identifier,
+                FileName = item.Name
             });
-            //CLog.Information($"删除文件 {dropItem.Item.Name} in {PlugDataZone.PDZId} with response: {JsonSerializer.Serialize(file)}");
+
+            Snackbar.Add($"文件 {item.Name} 已删除", Severity.Info);
+
+            // 如果删除的是当前选中的文件，清除选中
+            if (_selectedFile == item)
+            {
+                _selectedFile = null;
+            }
+
+            // 从列表中移除
+            _items.Remove(item);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
         }
     }
 
     private void OpenDeletedFiles()
     {
-        _selectedFolder = "Deleted"; 
+        _selectedFolder = "Deleted";
     }
 
-
-    
     public class DropItem
     {
         public string Name { get; init; }
         public string Identifier { get; set; }
+        public string? FullPath { get; set; }
+        public long Size { get; set; }
+        public string? Creator { get; set; }
+        public DateTime? LastWriteTime { get; set; }
+        
+        public string SizeDisplay => Size switch
+        {
+            < 1024 => $"{Size} B",
+            < 1024 * 1024 => $"{Size / 1024.0:F1} KB",
+            < 1024 * 1024 * 1024 => $"{Size / (1024.0 * 1024):F1} MB",
+            _ => $"{Size / (1024.0 * 1024 * 1024):F2} GB"
+        };
     }
 }

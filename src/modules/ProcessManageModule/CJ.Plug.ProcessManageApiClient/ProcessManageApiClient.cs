@@ -1,13 +1,14 @@
-﻿using CJ.Plug.Models.PlugProcess;
-using CJ.Plug.Models.Shared;
 using System.Net.Http.Json;
+using System.Text.Json;
+using CJ.Plug.Models.PlugProcess;
+using CJ.Plug.Models.Shared;
 
 namespace CJ.Plug.ProcessManageApiClient
 {
-    public class ProcessManageApiClient:BaseApiClient,IProcessManageApiClient
+    public class ProcessManageApiClient : BaseApiClient, IProcessManageApiClient
     {
 
-        public ProcessManageApiClient(HttpClient dispatcherClient):base(dispatcherClient) 
+        public ProcessManageApiClient(HttpClient dispatcherClient) : base(dispatcherClient)
         {
         }
 
@@ -63,5 +64,26 @@ namespace CJ.Plug.ProcessManageApiClient
             }
         }
 
+        public async Task<JsonElement> AiGenerateWorkflowAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync(
+                "/api/process/ai/generate",
+                new { prompt },
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<JsonElement>(json);
+        }
+
+        public async Task<JsonElement> AiSaveWorkflowAsync(JsonElement result, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync(
+                "/api/process/ai/save",
+                result,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<JsonElement>(json);
+        }
     }
 }

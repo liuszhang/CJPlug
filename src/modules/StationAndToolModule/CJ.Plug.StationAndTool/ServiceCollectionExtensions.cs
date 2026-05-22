@@ -1,8 +1,9 @@
-﻿using CJ.Plug.ApiClient.Contracts;
+using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.StationAndToolApi.DbContext;
+using CJ.Plug.StationAndToolApi.Services;
 using CJ.Plug.StationAndToolApiClient;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -31,6 +32,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddStationAndToolApiServices(this IServiceCollection services)
     {
         services.AddSingleton<IModuleDbConfig,StationAndToolDbConfig>();
+
+        // 种子数据：默认工具列表
+        services.AddSingleton<ISeedDataProvider, ToolSeedDataProvider>();
 
 
         services.AddScoped<IStationConfigService, StationConfigService>();

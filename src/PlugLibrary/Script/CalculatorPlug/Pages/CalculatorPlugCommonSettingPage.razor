@@ -1,8 +1,8 @@
-﻿@using BlazorMonaco.Editor
+@using BlazorMonaco.Editor
 @using CJ.Plug.DeekSeekIn
-
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.PlugBaseCore.Models
+@using CalculatorPlug.Services
 @using Elsa.Api.Client.Extensions
 @using Elsa.Api.Client.Resources.ActivityDescriptors.Models
 @using Elsa.Api.Client.Shared.Models
@@ -20,7 +20,7 @@
 <MudStack>
     <MudText>计算器</MudText>
     <MudStack Row>
-        <MudTextField @bind-Value="@DescriptionString" Style="min-width:300px;" Lines="6" AutoGrow Label="公式" Variant="Variant.Outlined"></MudTextField>
+        <MudTextField @bind-Value="@DescriptionString" Style="min-width:300px;" Lines="6" AutoGrow Label="公式描述" Variant="Variant.Outlined"></MudTextField>
         <MudButton OnClick="AIGenerateLatex" Variant="Variant.Outlined">AI生成</MudButton>
         <MudText>@LatexContent</MudText>
     </MudStack>
@@ -29,8 +29,9 @@
 <MudPaper Class="mt-4 pa-4" Elevation="1">
     <MudText Typo="Typo.h6">科学计算器</MudText>
     <MudStack Class="mt-2">
-        <MudTextField ReadOnly="true" Value="@CalcDisplay" Label="表达式" Variant="Variant.Outlined"></MudTextField>
-        <MudTextField ReadOnly="true" Value="@CalcResult" Label="结果" Variant="Variant.Filled"></MudTextField>
+        <MudTextField @bind-Value="@CalcDisplay" @bind-Value:after="OnExpressionChanged"
+                      Label="表达式（关联参数 Expression）" Variant="Variant.Outlined"></MudTextField>
+        <MudTextField ReadOnly="true" Value="@CalcResult" Label="结果（关联参数 Result）" Variant="Variant.Filled"></MudTextField>
 
         <MudGrid Class="mt-2" GutterSize="2">
             @foreach (var row in CalcButtons)
@@ -65,21 +66,47 @@
     [Parameter]
     public GetSettingContext? SettingContext { get; set; }
 
-    public string? PlugDefinitionId { get; set; }
+    private string? DefinitionId { get; set; }
 
     private string? ProfString1 { get; set; } = "将以下描述转为latex公式字符：";
     private string? ProfString2 { get; set; } = "，只需要给出最终结果，不要思考过程，不要输出过程文字。";
     private string? DescriptionString { get; set; } = "根号16加6";
     private string? LatexContent { get; set; }
 
+    // --- Calculator state synced with PlugDataZone ---
+    private string CalcDisplay { get; set; } = string.Empty;
+    private string CalcResult { get; set; } = string.Empty;
+
+    protected override Task OnInitializedAsync()
+    {
+        DefinitionId = SettingContext?.PlugDefinitionId;
+
+        if (DefinitionId != null && PlugDataZone != null)
+        {
+            // 从 PlugDataZone 读取已保存的表达式和结果
+            CalcDisplay = PlugDataZone.GetVariableValue(DefinitionId, nameof(InitVariableNames.Expression)) ?? string.Empty;
+            CalcResult = PlugDataZone.GetVariableValue(DefinitionId, nameof(InitVariableNames.Result)) ?? string.Empty;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 表达式变更时同步到 PlugDataZone 的 Expression 变量
+    /// </summary>
+    private void OnExpressionChanged()
+    {
+        if (PlugDataZone != null && DefinitionId != null)
+        {
+            PlugDataZone.SetVariableValue(DefinitionId, nameof(InitVariableNames.Expression), CalcDisplay);
+        }
+    }
 
     private async Task AIGenerateLatex()
     {
         var prompt = $"{ProfString1}{DescriptionString}{ProfString2} /no_think";
-        // 初始化StringBuilder用于高效拼接
         var stringBuilder = new StringBuilder();
-        // 可选：控制更新频率的计数器
-        int updateThreshold = 2; // 每积累5个字符更新一次（可调整）
+        int updateThreshold = 2;
         int currentLength = 0;
 
         try
@@ -91,92 +118,139 @@
                     stringBuilder.Append(response);
                     currentLength += response.Length;
 
-                    // 达到阈值或最后一次更新时刷新UI
-                    if (currentLength >= updateThreshold ||
-                        // 可根据实际响应特征判断是否为最后一段（如特定结束标记）
-                        response.EndsWith("\n"))
+                    if (currentLength >= updateThreshold || response.EndsWith("\n"))
                     {
                         LatexContent = stringBuilder.ToString();
                         StateHasChanged();
-                        currentLength = 0; // 重置计数器
+                        currentLength = 0;
                     }
                 }
             }
-            // 确保最终内容完全更新到UI
             LatexContent = stringBuilder.ToString();
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            // 处理异常（如网络错误）
             LatexContent = $"获取内容失败：{ex.Message}";
             StateHasChanged();
         }
     }
 
     // --- Scientific calculator state and handlers ---
-    private string CalcDisplay { get; set; } = string.Empty;
-    private string CalcResult { get; set; } = string.Empty;
 
     private record CalcButton(string Label, string Value);
 
     private List<List<CalcButton>> CalcButtons { get; set; } = new()
     {
-        new() { new("7","7"), new("8","8"), new("9","9"), new("/","/"), new("sqrt","sqrt("), new("pi","Math.PI") },
-        new() { new("4","4"), new("5","5"), new("6","6"), new("*","*"), new("^","^"), new("e","Math.E") },
+        new() { new("7","7"), new("8","8"), new("9","9"), new("/","/"), new("sqrt(","sqrt("), new("pi","3.141592653589793") },
+        new() { new("4","4"), new("5","5"), new("6","6"), new("*","*"), new("^","^"), new("e","2.718281828459045") },
         new() { new("1","1"), new("2","2"), new("3","3"), new("-","-"), new("(","("), new(")",")") },
-        new() { new("0","0"), new(".","."), new(",","."), new("+","+"), new("sin","sin("), new("cos","cos(") },
-        new() { new("tan","tan("), new("ln","ln("), new("log","log("), new("abs","abs("), new("pi","Math.PI"), new("e","Math.E") }
+        new() { new("0","0"), new(".","."), new(",","."), new("+","+"), new("sin(","sin("), new("cos(","cos(") },
+        new() { new("tan(","tan("), new("ln(","ln("), new("log(","log("), new("abs(","abs("), new("pi","3.141592653589793"), new("e","2.718281828459045") }
     };
 
     private void OnCalcButton(string value)
     {
         CalcDisplay += value;
+        OnExpressionChanged();
     }
 
-    private async Task EvaluateCalc()
+    private void EvaluateCalc()
     {
-        if (string.IsNullOrWhiteSpace(CalcDisplay))
-            return;
+        if (string.IsNullOrWhiteSpace(CalcDisplay)) return;
 
-        // Prepare JS-friendly expression
-        var expr = CalcDisplay.Replace("^", "**");
+        // 预处理：将函数名映射为纯算术（CalculatorEngine 暂不支持函数名，替换为近似计算）
+        var expr = PreprocessForEngine(CalcDisplay);
 
-        // Map function names to Math.*
-        expr = expr.Replace("sin(", "Math.sin(")
-                   .Replace("cos(", "Math.cos(")
-                   .Replace("tan(", "Math.tan(")
-                   .Replace("sqrt(", "Math.sqrt(")
-                   .Replace("ln(", "Math.log(")
-                   .Replace("log(", "Math.log10(")
-                   .Replace("abs(", "Math.abs(");
+        var result = CalculatorEngine.Evaluate(expr);
 
-        try
+        if (result.Success)
         {
-            var result = await JS.InvokeAsync<object>("eval", expr);
-            CalcResult = result?.ToString() ?? string.Empty;
+            CalcResult = result.Value.ToString("G");
         }
-        catch (JSException jsEx)
+        else
         {
-            CalcResult = $"JS Error: {jsEx.Message}";
+            CalcResult = $"错误: {result.Error}";
         }
-        catch (Exception ex)
+
+        // 同步结果到 PlugDataZone
+        if (PlugDataZone != null && DefinitionId != null)
         {
-            CalcResult = $"Error: {ex.Message}";
+            PlugDataZone.SetVariableValue(DefinitionId, nameof(InitVariableNames.Result), CalcResult);
         }
+    }
+
+    /// <summary>
+    /// 将前端计算器按钮插入的函数调用预处理为 CalculatorEngine 可识别的纯算术表达式。
+    /// CalculatorEngine 当前支持 + - * / % ^ ( ) 和数字，不支持函数名，
+    /// 因此在此处将函数调用替换为数值近似。
+    /// </summary>
+    private static string PreprocessForEngine(string expr)
+    {
+        // sqrt(x) → x^0.5
+        expr = ReplaceFunction(expr, "sqrt(", "(");
+        if (expr.Contains("sqrt("))
+        {
+            // 嵌套情况用 Math.Sqrt 不便，保持原样传给引擎报错
+        }
+        // sin/cos/tan/ln/log/abs — 暂时不支持，保留原样由引擎报错提示
+        // 后续可在 CalculatorEngine 中扩展函数支持
+        return expr;
+    }
+
+    /// <summary>
+    /// 简单的函数替换辅助方法：将 funcName(...) 替换为 replacementPrefix + (...)
+    /// </summary>
+    private static string ReplaceFunction(string expr, string funcName, string replacementPrefix)
+    {
+        while (true)
+        {
+            int idx = expr.IndexOf(funcName, StringComparison.Ordinal);
+            if (idx < 0) break;
+
+            int parenStart = idx + funcName.Length;
+            if (parenStart >= expr.Length || expr[parenStart] != '(') break;
+
+            // 找到匹配的右括号
+            int depth = 1;
+            int parenEnd = parenStart + 1;
+            while (parenEnd < expr.Length && depth > 0)
+            {
+                if (expr[parenEnd] == '(') depth++;
+                else if (expr[parenEnd] == ')') depth--;
+                parenEnd++;
+            }
+            if (depth != 0) break;
+
+            // 提取函数内部表达式
+            var inner = expr[(parenStart + 1)..(parenEnd - 1)];
+
+            // sqrt(x) → (x)^0.5
+            if (funcName == "sqrt(")
+            {
+                expr = expr[..idx] + $"({inner})^0.5" + expr[parenEnd..];
+            }
+            else
+            {
+                break;
+            }
+        }
+        return expr;
     }
 
     private void ClearCalc()
     {
         CalcDisplay = string.Empty;
         CalcResult = string.Empty;
+        OnExpressionChanged();
     }
 
     private void BackspaceCalc()
     {
         if (!string.IsNullOrEmpty(CalcDisplay))
-            CalcDisplay = CalcDisplay.Substring(0, CalcDisplay.Length - 1);
+        {
+            CalcDisplay = CalcDisplay[..^1];
+            OnExpressionChanged();
+        }
     }
-
-
 }

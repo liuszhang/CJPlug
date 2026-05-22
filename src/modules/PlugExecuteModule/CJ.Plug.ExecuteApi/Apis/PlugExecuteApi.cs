@@ -15,6 +15,8 @@ public static class PlugExecuteApi
         //统一使用PlugExecutionRequest进行执行
         api.MapPost("/executePlug", async (IPlugExecuteService service, PlugExecutionRequest? request) => await service.StartExecutePlug(request));
 
+        api.MapPost("/executeMcpWorkflow", async (IPlugExecuteService service, [FromBody] PlugExecutionRequest request) => await service.ExecuteMcpWorkflow(request));
+
         api.MapPost("/ReportExecuteResult", async (IPlugExecuteService service, [FromBody] ExecuteResultData executeReport) => await service.ReportExecuteResult(executeReport));
 
 

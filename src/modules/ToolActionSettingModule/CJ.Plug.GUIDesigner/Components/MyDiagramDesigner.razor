@@ -71,6 +71,9 @@ else
 
     private BaseGuiItemModel? SelectedNode;
 
+    private Plug? _lastSelectedPlug;
+    private bool _pendingGenerate = false;
+
     [Parameter]
     public EventCallback<BaseGuiItemModel?> OnSelectedNodeChanged { get; set; }
     [Parameter]
@@ -79,35 +82,43 @@ else
     //public IEnumerator<IOpenActivtySettingDialog> enumerator { get; set; } = default!;
     protected override void OnInitialized()
     {
-
-
         MyDiagram = new BlazorDiagram();
         MyDiagram.RegisterComponent<BaseGuiItemModel, BaseGuiItemWidget>();
-
-        // var node4 = MyDiagram.Nodes.Add(new BaseGuiItemModel("default", GuiItemHandlerService, position: new Point(150, 50))
-        // {
-        //     //Title = "测试控件"
-        // });
 
         MyDiagram.Changed += async () =>
         {
             await SaveGuiJsonData(MyDiagram);
         };
         //单纯拖动组件时，似乎不会触发Changed事件，所以这里额外添加鼠标移出事件来保存数据
-        MyDiagram.PointerLeave+= async(a,b) =>
+        MyDiagram.PointerLeave += async (a, b) =>
         {
             await SaveGuiJsonData(MyDiagram);
         };
-
 
         MyDiagram.SelectionChanged += (e) =>
         {
             SelectedNode = (BaseGuiItemModel)e;
             OnSelectedNodeChanged.InvokeAsync(SelectedNode);
         };
+    }
 
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_lastSelectedPlug, SelectedPlug))
+        {
+            _lastSelectedPlug = SelectedPlug;
+            _pendingGenerate = true;
+        }
+    }
 
-
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _pendingGenerate)
+        {
+            _pendingGenerate = false;
+            GenarateGuiJson();
+            StateHasChanged();
+        }
     }
 
     private void GenarateGuiJson()
@@ -119,7 +130,6 @@ else
             Console.WriteLine("SelectedPlug.GuiJsonData is null or empty.");
             return;
         }
-            ;
         //将JSON转换为BlazorDiagram对象，未完待续
         // 解析JSON
         var jsonNode = JsonNode.Parse(jsonData);
@@ -176,20 +186,6 @@ else
         }
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            GenarateGuiJson();
-        }
-
-
-        return base.OnAfterRenderAsync(firstRender);
-    }
-
-
-
-
     private void OnDrop(DragEventArgs e)
     {
         //Console.WriteLine("拖进去的是个："+_draggedType.Payload);
@@ -205,14 +201,14 @@ else
 
     private async Task SaveGuiJsonData(BlazorDiagram blazorDiagram)
     {
+        if (SelectedPlug?.Name == null) return;
         var options = new JsonSerializerOptions
             {
                 Converters = { new DiagramJsonConverter(SelectedPlug.Name) },
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
         var jsonData = JsonSerializer.Serialize(MyDiagram, options);
-        Console.WriteLine(">>>>>>>>>>>DiagramData Changed:{jsonData}");
+        Console.WriteLine($">>>>>>>>>>>DiagramData Changed:{jsonData}");
         await OnGuiChanged.InvokeAsync(jsonData);
     }
 }
-

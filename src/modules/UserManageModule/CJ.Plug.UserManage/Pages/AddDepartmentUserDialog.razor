@@ -1,0 +1,83 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.Models.Shared
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">选择要添加到「@DepartmentName」的人员</MudText>
+
+            <MudTextField T="string" @bind-Value="_searchString" Placeholder="搜索用户名、姓名"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          AdornmentIcon="@Icons.Material.Outlined.Search" Adornment="Adornment.End"
+                          Clearable="true" Immediate="true" DebounceInterval="300" />
+
+            <MudPaper Elevation="0" Style="max-height: 400px; overflow-y: auto;" Class="border-solid border-1 mud-border-lines-default rounded">
+                @if (FilteredUsers.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="pa-4 mud-text-secondary">没有可添加的用户</MudText>
+                }
+                else
+                {
+                    @foreach (var user in FilteredUsers)
+                    {
+                        var isSelected = _selectedUserIds.Contains(user.Id);
+                        <MudListItem T="DepartmentUserInfo" Dense="true" OnClick="@(() => ToggleUser(user.Id))">
+                            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                                <MudCheckBox T="bool" Value="@isSelected" Color="Color.Primary" />
+                                <MudText>@user.UserName</MudText>
+                                @if (!string.IsNullOrWhiteSpace(user.FirstName) || !string.IsNullOrWhiteSpace(user.LastName))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">(@($"{user.FirstName ?? ""}{user.LastName ?? ""}"))</MudText>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(user.PhoneNumber))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="margin-left: auto;">@user.PhoneNumber</MudText>
+                                }
+                            </div>
+                        </MudListItem>
+                    }
+                }
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">已选择 @_selectedUserIds.Count 人</MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit"
+                   Disabled="@(_selectedUserIds.Count == 0)">确定添加</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public List<DepartmentUserInfo> AvailableUsers { get; set; } = [];
+    [Parameter] public string DepartmentName { get; set; } = "";
+
+    private string? _searchString;
+    private HashSet<int> _selectedUserIds = new();
+
+    private List<DepartmentUserInfo> FilteredUsers => string.IsNullOrWhiteSpace(_searchString)
+        ? AvailableUsers
+        : AvailableUsers.Where(u =>
+            (u.UserName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+            || ((u.FirstName ?? "").Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            || ((u.LastName ?? "").Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+        ).ToList();
+
+    private void ToggleUser(int userId)
+    {
+        if (!_selectedUserIds.Add(userId))
+            _selectedUserIds.Remove(userId);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (_selectedUserIds.Count == 0) return;
+        MudDialog.Close(DialogResult.Ok(_selectedUserIds.ToList()));
+    }
+}

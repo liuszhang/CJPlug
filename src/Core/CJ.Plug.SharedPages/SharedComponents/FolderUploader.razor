@@ -1,0 +1,233 @@
+@using CJ.Plug.Models.LogModels
+@using Microsoft.JSInterop
+@using MudBlazor
+@inject IJSRuntime JsRuntime
+
+<input class="d-none" type="file" id="@_inputId" name="file" webkitdirectory @attributes="AdditionalAttributes" />
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CreateNewFolder" Size="Size.Small"
+           OnClick="OpenPicker" Disabled="@Disabled">
+    @ButtonText
+</MudButton>
+
+@if (!string.IsNullOrEmpty(_folderName))
+{
+    @* <MudPaper Class="pa-2 mt-2" Elevation="0">
+        <MudStack AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" Size="Size.Small" />
+            <MudText Typo="Typo.subtitle2">@_folderName</MudText>
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">@($"{_selectedEntries.Count} 个文件")</MudChip>
+        </MudStack>
+    </MudPaper> *@
+}
+
+@if (_selectedEntries.Count > 0 && ShowFileList)
+{
+    @* <MudPaper Class="pa-2 mt-1" Elevation="0" Style="max-height: 200px; overflow-y: auto;">
+        @foreach (var entry in _selectedEntries)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@entry.RelativePath (@FormatSize(entry.Size))</MudText>
+        }
+    </MudPaper> *@
+}
+
+@code {
+    /// <summary>按钮文本</summary>
+    [Parameter] public string ButtonText { get; set; } = "选择文件夹";
+
+    /// <summary>文件扩展名过滤，如 ".dll"</summary>
+    [Parameter] public string Accept { get; set; } = "";
+
+    /// <summary>是否禁用按钮</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>是否显示文件列表</summary>
+    [Parameter] public bool ShowFileList { get; set; } = true;
+
+    /// <summary>文件夹选择完成回调</summary>
+    [Parameter] public EventCallback<List<FolderFileEntry>> OnFilesSelected { get; set; }
+
+    /// <summary>附加 HTML 属性</summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
+
+    private readonly string _inputId = $"folderPicker_{Guid.NewGuid():N}";
+    private DotNetObjectReference<FolderUploader>? _dotNetRef;
+    private string? _folderName;
+    private List<FolderFileEntry> _selectedEntries = new();
+
+    public class FolderFileEntry
+    {
+        public string RelativePath { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public long Size { get; set; }
+    }
+
+    /// <summary>获取当前选中的文件条目列表</summary>
+    public List<FolderFileEntry> SelectedEntries => _selectedEntries;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Skip JS interop during static rendering (SSR or enhanced navigation)
+            if (!RendererInfo.IsInteractive) return;
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await InjectJs();
+            await JsRuntime.InvokeVoidAsync("window._folderUploaderInit", _inputId, _dotNetRef, Accept);
+        }
+    }
+
+    private async Task InjectJs()
+    {
+        const string js = @"
+if (!window._folderUploaderInit) {
+    window._folderUploaderInit = (inputId, dotNet, accept) => {
+        const el = document.getElementById(inputId);
+        if (!el || el.dataset.fuInit) return;
+        el.dataset.fuInit = '1';
+        if (accept) el.setAttribute('accept', accept);
+        el.addEventListener('change', async () => {
+            const files = el.files;
+            if (!files || files.length === 0) return;
+            const folder = files[0].webkitRelativePath.split('/')[0];
+
+            // Collect metadata only — NO file content reading here.
+            // Large files are read on demand via _folderUploaderGetChunk
+            // to avoid exceeding the SignalR message size limit (default 32KB).
+            const entries = [];
+            for (const f of files) {
+                entries.push({ RelativePath: f.webkitRelativePath, FileName: f.name, Size: f.size });
+            }
+            dotNet.invokeMethodAsync('OnFolderSelected', folder, entries);
+        });
+    };
+}
+if (!window._folderUploaderGetFile) {
+    window._folderUploaderGetFile = (inputId, relativePath) => {
+        return new Promise((resolve, reject) => {
+            const el = document.getElementById(inputId);
+            if (!el) { reject('input not found'); return; }
+            const files = el.files;
+            let found = null;
+            for (const f of files) {
+                if (f.webkitRelativePath === relativePath) { found = f; break; }
+            }
+            if (!found) { reject('file not found: ' + relativePath); return; }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(found);
+        });
+    };
+}
+if (!window._folderUploaderGetChunk) {
+    window._folderUploaderGetChunk = (inputId, relativePath, offset, length) => {
+        return new Promise((resolve, reject) => {
+            const el = document.getElementById(inputId);
+            if (!el) { reject('input not found'); return; }
+            const files = el.files;
+            let found = null;
+            for (const f of files) {
+                if (f.webkitRelativePath === relativePath) { found = f; break; }
+            }
+            if (!found) { reject('file not found: ' + relativePath); return; }
+
+            // Beyond file size → return empty to signal end
+            if (offset >= found.size) { resolve(''); return; }
+
+            const blob = found.slice(offset, offset + length);
+            const reader = new FileReader();
+            reader.onload = () => {
+                const b64 = reader.result.split(',')[1];
+                resolve(b64);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+        });
+    };
+}
+";
+        await JsRuntime.InvokeVoidAsync("eval", js);
+    }
+
+    private async Task OpenPicker()
+    {
+        _selectedEntries.Clear();
+        await JsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{_inputId}').click()");
+    }
+
+    [JSInvokable]
+    public async Task OnFolderSelected(string folderName, List<FolderFileEntry> entries)
+    {
+        _folderName = folderName;
+        _selectedEntries = entries;
+        StateHasChanged();
+
+        if (OnFilesSelected.HasDelegate)
+        {
+            await OnFilesSelected.InvokeAsync(entries);
+        }
+    }
+
+    /// <summary>读取指定文件的字节内容（分块传输，避免 SignalR 32KB 消息限制）</summary>
+    public async Task<byte[]?> GetFileBytesAsync(string relativePath)
+    {
+        try
+        {
+            const int chunkSize = 16384; // 16KB raw → ~21.3KB base64, well under 32KB SignalR limit
+
+            var allBytes = new List<byte>();
+            long offset = 0;
+
+            while (true)
+            {
+                var chunkB64 = await JsRuntime.InvokeAsync<string>(
+                    "window._folderUploaderGetChunk", _inputId, relativePath, offset, chunkSize);
+
+                if (string.IsNullOrEmpty(chunkB64))
+                    break;
+
+                var chunk = Convert.FromBase64String(chunkB64);
+                if (chunk.Length == 0)
+                    break;
+
+                allBytes.AddRange(chunk);
+                offset += chunkSize;
+
+                if (chunk.Length < chunkSize)
+                    break; // Last (partial) chunk
+            }
+
+            return allBytes.Count > 0 ? allBytes.ToArray() : null;
+        }
+        catch (Exception ex)
+        {
+            CLog.Warning($"读取文件失败: {relativePath}, {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>清空当前选择</summary>
+    public async Task ClearSelectionAsync()
+    {
+        _folderName = null;
+        _selectedEntries.Clear();
+        await JsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{_inputId}').value = ''");
+        StateHasChanged();
+    }
+
+    private static string FormatSize(long size)
+    {
+        return $"{(size / 1024.0):F1} KB";
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+    }
+}

@@ -9,6 +9,7 @@ namespace CJ.Plug.FileManageApiClient
         Task<string?> GetFileContent(string filePath);
         Task<string?> GetFileContentByFileId(string fileId);
         Task<Stream?> GetFileStreamByFileId(string fileId);
+        Task<Stream?> DownloadFileByPath(string filePath);
         Task<List<FileSystemNode>?> GetFolderFiles(FileSystemNode? parentNode, string? userName, string? toolAgentHostIp);
         Task<List<FileSystemNode>?> GetWorkPathFiles(Models.Plug.Plug Plug);
         Task<string?> UploadFileStreamToWorkPath(Func<Stream, Task> streamWriter, string fileName, Models.Plug.Plug plug);

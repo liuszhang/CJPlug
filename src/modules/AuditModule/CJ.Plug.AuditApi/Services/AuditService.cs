@@ -17,18 +17,7 @@ namespace CJ.Plug.AuditApi.Services
 
         public async Task<AuditLogDto> LogAsync(CreateAuditLogRequest request, CancellationToken cancellationToken = default)
         {
-            var entity = new AuditLogEntity
-            {
-                OperationTime = DateTime.UtcNow,
-                UserName = request.UserName,
-                OperationType = (int)request.OperationType,
-                Module = (int)request.Module,
-                Description = request.Description,
-                Detail = request.Detail,
-                IpAddress = request.IpAddress,
-                IsSuccess = request.IsSuccess,
-                ErrorMessage = request.ErrorMessage
-            };
+            var entity = MapToEntity(request);
 
             _dbContext.Set<AuditLogEntity>().Add(entity);
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -108,7 +97,26 @@ namespace CJ.Plug.AuditApi.Services
             return deletedCount;
         }
 
-        private static AuditLogDto MapToDto(AuditLogEntity entity)
+        /// <summary>
+        /// Map CreateAuditLogRequest to AuditLogEntity
+        /// </summary>
+        public static AuditLogEntity MapToEntity(CreateAuditLogRequest request)
+        {
+            return new AuditLogEntity
+            {
+                OperationTime = DateTime.Now,
+                UserName = request.UserName,
+                OperationType = (int)request.OperationType,
+                Module = (int)request.Module,
+                Description = request.Description,
+                Detail = request.Detail,
+                IpAddress = request.IpAddress,
+                IsSuccess = request.IsSuccess,
+                ErrorMessage = request.ErrorMessage
+            };
+        }
+
+        public static AuditLogDto MapToDto(AuditLogEntity entity)
         {
             return new AuditLogDto
             {

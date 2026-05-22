@@ -1,0 +1,165 @@
+@using CJ.Plug.ProcessManageApiClient
+@using System.Net.Http.Json
+@using System.Text.Json
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">🤖 AI 生成工作流</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                用自然语言描述你需要的工具或工作流，AI 将自动编排插件生成工作流定义。
+            </MudText>
+
+            <MudTextField @bind-Value="_prompt"
+                          Label="描述你的需求"
+                          Variant="Variant.Outlined"
+                          Lines="4"
+                          Immediate
+                          Placeholder="例如：输入一个 GitHub PR 链接，自动获取代码变更并用 AI 进行代码审查，返回 Markdown 格式的审查报告"
+                          Disabled="_isGenerating" />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+
+            @if (_result != null)
+            {
+                var r = _result.Value;
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle1">
+                        <strong>@r.GetProperty("name").GetString()</strong>
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mt-1">
+                        @r.GetProperty("description").GetString()
+                    </MudText>
+
+                    @if (r.TryGetProperty("inputs", out var inputs) && inputs.ValueKind == JsonValueKind.Array)
+                    {
+                        <MudText Typo="Typo.caption" Class="mt-2"><strong>入口参数:</strong></MudText>
+                        @foreach (var input in inputs.EnumerateArray())
+                        {
+                            <MudText Typo="Typo.caption" Class="mr-2" Inline="true">
+                                <strong>@input.GetProperty("name").GetString()</strong>
+                                (@input.GetProperty("type").GetString())
+                            </MudText>
+                        }
+                    }
+
+                    @if (r.TryGetProperty("activities", out var activities) && activities.ValueKind == JsonValueKind.Array)
+                    {
+                        var idx = 1;
+                        <MudText Typo="Typo.caption" Class="mt-2"><strong>步骤:</strong></MudText>
+                        @foreach (var activity in activities.EnumerateArray())
+                        {
+                            <MudText Typo="Typo.caption">
+                                @idx. @activity.GetProperty("plugin").GetString()
+                                — @(activity.TryGetProperty("description", out var desc) ? desc.GetString() : "")
+                            </MudText>
+                            idx++;
+                        }
+                    }
+                </MudPaper>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Default" Disabled="_isGenerating">取消</MudButton>
+
+        @if (_result == null)
+        {
+            <MudButton OnClick="Generate"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="_isGenerating || string.IsNullOrWhiteSpace(_prompt)"
+                       StartIcon="@Icons.Material.Filled.AutoAwesome">
+                @(_isGenerating ? "生成中..." : "AI 生成")
+            </MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Regenerate"
+                       Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Disabled="_isGenerating"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                重新生成
+            </MudButton>
+            <MudButton OnClick="Save"
+                       Variant="Variant.Filled"
+                       Color="Color.Success"
+                       Disabled="_isSaving"
+                       StartIcon="@Icons.Material.Filled.Save">
+                @(_isSaving ? "保存中..." : "保存工作流")
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] MainApiClient ApiClient { get; set; } = default!;
+
+    private string _prompt = "";
+    private JsonElement? _result;
+    private string? _error;
+    private bool _isGenerating;
+    private bool _isSaving;
+
+    private async Task Generate()
+    {
+        _isGenerating = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiClient.AiGenerateWorkflowAsync(_prompt);
+            _result = json;
+        }
+        catch (Exception ex)
+        {
+            _error = $"请求失败: {ex.Message}";
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Regenerate()
+    {
+        _result = null;
+        await Generate();
+    }
+
+    private async Task Save()
+    {
+        if (_result == null) return;
+
+        _isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            var saved = await ApiClient.AiSaveWorkflowAsync(_result.Value);
+            var name = saved.GetProperty("name").GetString();
+            MudDialog.Close(DialogResult.Ok(name ?? "saved"));
+        }
+        catch (Exception ex)
+        {
+            _error = $"保存失败: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

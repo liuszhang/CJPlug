@@ -21,6 +21,46 @@ namespace CJ.Plug.UserManageApi.Services
             _userManager = userManager;
         }
 
+        // ---- Public Static Mapping Methods ----
+
+        /// <summary>
+        /// Map CreateUserRequest to User entity
+        /// </summary>
+        public static User MapToEntity(CreateUserRequest request)
+        {
+            return new User
+            {
+                UserName = request.UserName,
+                Email = request.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                PhoneNumber = request.PhoneNumber,
+                DepartmentId = request.DepartmentId,
+                Status = (int)request.Status,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
+        /// Apply UpdateUserRequest fields to User entity
+        /// </summary>
+        public static void ApplyUpdate(User user, UpdateUserRequest request)
+        {
+            if (request.Email != null)
+                user.Email = request.Email;
+            if (request.FirstName != null)
+                user.FirstName = request.FirstName;
+            if (request.LastName != null)
+                user.LastName = request.LastName;
+            if (request.PhoneNumber != null)
+                user.PhoneNumber = request.PhoneNumber;
+            if (request.DepartmentId.HasValue)
+                user.DepartmentId = request.DepartmentId;
+            user.Status = (int)request.Status;
+        }
+
+        // ---- Service Methods ----
+
         public async Task<List<User>> GetAllUsersAsync(CancellationToken cancellationToken = default)
         {
             return await _userManager.Users.ToListAsync(cancellationToken);
@@ -46,17 +86,7 @@ namespace CJ.Plug.UserManageApi.Services
                     return null;
                 }
 
-                var user = new User
-                {
-                    UserName = request.UserName,
-                    Email = request.Email,
-                    FirstName = request.FirstName,
-                    LastName = request.LastName,
-                    PhoneNumber = request.PhoneNumber,
-                    DepartmentId = request.DepartmentId,
-                    Status = (int)request.Status,
-                    CreatedAt = DateTime.UtcNow
-                };
+                var user = MapToEntity(request);
 
                 var result = await _userManager.CreateAsync(user, request.Password);
                 if (!result.Succeeded)
@@ -99,17 +129,14 @@ namespace CJ.Plug.UserManageApi.Services
                     return null;
                 }
 
-                if (request.Email != null)
-                    user.Email = request.Email;
-                if (request.FirstName != null)
-                    user.FirstName = request.FirstName;
-                if (request.LastName != null)
-                    user.LastName = request.LastName;
-                if (request.PhoneNumber != null)
-                    user.PhoneNumber = request.PhoneNumber;
-                if (request.DepartmentId.HasValue)
-                    user.DepartmentId = request.DepartmentId;
-                user.Status = (int)request.Status;
+                // 系统用户不允许编辑
+                if (user.IsSystem)
+                {
+                    Log.Warning("系统用户 {UserName} 不允许编辑", user.UserName);
+                    throw new InvalidOperationException($"系统用户 \"{user.UserName}\" 不允许编辑");
+                }
+
+                ApplyUpdate(user, request);
 
                 var result = await _userManager.UpdateAsync(user);
                 if (!result.Succeeded)

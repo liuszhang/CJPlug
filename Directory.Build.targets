@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    自动将 Utf8ConsoleInit.cs 注入所有 Exe 项目（AppHost、ApiServer、DispatchServer 等）
+    [ModuleInitializer] 在 Main() 之前执行，确保 Console.Out 创建时已经是 UTF-8 编码
+    
+    <ItemGroup Condition="'$(OutputType)' == 'Exe' AND '$(MSBuildProjectExtension)' == '.csproj'">
+    <Compile Include="$(MSBuildThisFileDirectory)01.Scripts\Utf8ConsoleInit.cs" Link="Utf8ConsoleInit.cs" />
+  </ItemGroup>
+  -->
+  
+</Project>

@@ -156,8 +156,9 @@
         AuditModule.ProcessManage => "流程管理",
         AuditModule.PlugManage => "插件管理",
         AuditModule.System => "系统设置",
+        AuditModule.UserGroupManage => "用户组管理",
         AuditModule.Other => "其他",
-        _ => "未知"
+        _ => module.ToString()
     };
 
     private string GetOperationTypeName(AuditOperationType type) => type switch

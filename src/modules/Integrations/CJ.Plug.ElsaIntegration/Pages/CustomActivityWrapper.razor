@@ -1,4 +1,4 @@
-﻿@using System.Text.Json.Nodes
+@using System.Text.Json.Nodes
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.ElsaIntegration.Pages.Components
 @using CJ.Plug.Models.LogModels
@@ -131,7 +131,7 @@
                         {
                             <MudText Typo="Typo.caption" Style="@colorStyle">@_description</MudText>
                         }
-                        <MudText Typo="Typo.body2">(@ActivityCategory)</MudText>
+                        @* <MudText Typo="Typo.body2">(@ActivityCategory)</MudText> *@
                     </MudStack>
                 </MudStack>
             }

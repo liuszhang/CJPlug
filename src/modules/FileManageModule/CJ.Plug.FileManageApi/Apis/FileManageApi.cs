@@ -71,6 +71,7 @@ namespace CJ.Plug.FileManageApi.Apis
             api.MapPost("/getContent", async (IFileManageService service, string filePath) => await service.GetFileContent(filePath));
             api.MapGet("/getContentByFileId/{fileId}", async (IFileManageService service, string fileId) => await service.GetFileContentByFileId(fileId));
             api.MapGet("/getStreamByFileId/{fileId}", async (IFileManageService service, string fileId) => await service.GetFileStreamByFileId(fileId));
+            api.MapGet("/download/{**filePath}", async (IFileManageService service, string filePath) => await service.DownloadFileByPath(filePath));
 
 
             api.MapGet("/GetPlugWorkpathFiles/{plugDefinitionId}", async (IFileManageService service, string plugDefinitionId) => await service.GetPlugWorkpathFiles(plugDefinitionId));

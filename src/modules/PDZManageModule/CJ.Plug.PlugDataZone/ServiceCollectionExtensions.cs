@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using PDZManageModule.Permissions;
 
 
 public static class ServiceCollectionExtensions
@@ -47,6 +48,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDataFlowDataService, DataFlowDataService>();
         services.AddScoped<IPlugVariableDataService, PlugVariableDataService>();
 
+        // 注册功能权限提供者
+        services.AddSingleton<IFunctionPermissionProvider, PDZManagePermissionProvider>();
 
         services.AddHttpClient<IPDZApiClient, PDZApiClient>(client =>
         {

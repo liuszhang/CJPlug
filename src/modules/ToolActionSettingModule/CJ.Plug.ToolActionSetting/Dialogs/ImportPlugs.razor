@@ -1,0 +1,179 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.Models.Plug
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle1" Color="Color.Primary">导入插头</MudText>
+
+            <MudText>从JSON文件导入插头配置：</MudText>
+
+            <MudFileUpload T="IBrowserFile" FilesChanged="OnFileSelected" Accept=".json">
+                <CustomContent>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" OnClick="@context.OpenFilePickerAsync">
+                        选择JSON文件
+                    </MudButton>
+                </CustomContent>
+                <SelectedTemplate></SelectedTemplate>
+            </MudFileUpload>
+
+            @if (!string.IsNullOrEmpty(SelectedFileName))
+            {
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                    @SelectedFileName
+                </MudChip>
+                <MudText>文件大小: @SelectedFileSize bytes</MudText>
+            }
+
+            <MudTextField T="string" Label="导入模式" Value="@("覆盖同名插头")" ReadOnly Variant="Variant.Filled"></MudTextField>
+
+            @if (!string.IsNullOrEmpty(ImportResult))
+            {
+                <MudAlert Severity="ImportSuccess ? Severity.Success : Severity.Info">@ImportResult</MudAlert>
+            }
+
+            @if (ImportErrors?.Count > 0)
+            {
+                <MudAlert Severity="Severity.Error">
+                    <MudText>导入失败：</MudText>
+                    <MudText>@string.Join("; ", ImportErrors)</MudText>
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Import" Disabled="string.IsNullOrEmpty(SelectedFileName)">导入</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private string? SelectedFileName { get; set; }
+    private long SelectedFileSize { get; set; }
+    private IBrowserFile? SelectedFile { get; set; }
+    private string ImportResult { get; set; } = "";
+    private bool ImportSuccess { get; set; } = true;
+    private List<string>? ImportErrors { get; set; } = new();
+    private JsonObject? ImportedData { get; set; }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task OnFileSelected(IBrowserFile file)
+    {
+        if (file == null)
+        {
+            SelectedFileName = null;
+            SelectedFileSize = 0;
+            SelectedFile = null;
+            StateHasChanged();
+            return;
+        }
+
+        SelectedFile = file;
+        SelectedFileName = file.Name;
+        SelectedFileSize = file.Size;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 最大10MB
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+
+            // 验证JSON格式
+            ImportedData = JsonNode.Parse(content)?.AsObject();
+            if (ImportedData == null)
+            {
+                ImportErrors = new List<string> { "无效的JSON格式" };
+                ImportSuccess = false;
+            }
+            else
+            {
+                ImportErrors?.Clear();
+                ImportSuccess = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            ImportErrors = new List<string> { $"读取文件失败: {ex.Message}" };
+            ImportSuccess = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task Import()
+    {
+        if (ImportedData == null)
+        {
+            ImportErrors = new List<string> { "请先选择有效的JSON文件" };
+            ImportSuccess = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            // 解析导入的数据
+            var plugCount = ImportedData["PlugCount"]?.GetValue<int>() ?? 0;
+            var plugsNode = ImportedData["Plugs"];
+
+            if (plugsNode == null)
+            {
+                ImportErrors = new List<string> { "JSON格式错误：缺少Plugs字段" };
+                ImportSuccess = false;
+                StateHasChanged();
+                return;
+            }
+
+            var plugs = JsonSerializer.Deserialize<List<Plug>>(plugsNode.ToString());
+            if (plugs == null || plugs.Count == 0)
+            {
+                ImportResult = "没有找到可导入的插头数据";
+                ImportSuccess = false;
+                StateHasChanged();
+                return;
+            }
+
+            // 验证每个插头的基本信息
+            var validPlugs = new List<Plug>();
+            var invalidCount = 0;
+
+            foreach (var plug in plugs)
+            {
+                if (string.IsNullOrEmpty(plug.Name) || string.IsNullOrEmpty(plug.Type))
+                {
+                    invalidCount++;
+                    continue;
+                }
+                validPlugs.Add(plug);
+            }
+
+            if (validPlugs.Count == 0)
+            {
+                ImportResult = "没有有效的插头数据可以导入";
+                ImportSuccess = false;
+                StateHasChanged();
+                return;
+            }
+
+            ImportResult = $"即将导入 {validPlugs.Count} 个插头（跳过 {invalidCount} 个无效数据）";
+            ImportSuccess = true;
+            StateHasChanged();
+
+            // 返回导入的插头列表给父组件处理
+            MudDialog.Close(DialogResult.Ok(validPlugs));
+        }
+        catch (Exception ex)
+        {
+            ImportErrors = new List<string> { $"导入失败: {ex.Message}" };
+            ImportSuccess = false;
+            StateHasChanged();
+        }
+    }
+}

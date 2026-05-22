@@ -95,11 +95,11 @@
                             <CellTemplate>
                                 @if (context.Item.Status == AuthRequestStatus.Pending)
                                 {
-                                    <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                                        <MudMenuItem OnClick="@(() => OpenApproveDialog(context.Item, true))" Icon="@Icons.Material.Outlined.Check">批准</MudMenuItem>
-                                        <MudMenuItem OnClick="@(() => OpenApproveDialog(context.Item, false))" Icon="@Icons.Material.Outlined.Close">拒绝</MudMenuItem>
-                                        <MudMenuItem OnClick="@(() => CancelRequest(context.Item))" Icon="@Icons.Material.Outlined.Undo">撤回</MudMenuItem>
-                                    </MudMenu>
+                                    
+                                        <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, true))" Icon="@Icons.Material.Outlined.Check">批准</MudIconButton>
+                                    <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, false))" Icon="@Icons.Material.Outlined.Close">拒绝</MudIconButton>
+                                    <MudIconButton Size="Size.Small" OnClick="@(() => CancelRequest(context.Item))" Icon="@Icons.Material.Outlined.Undo">撤回</MudIconButton>
+                                   
                                 }
                                 else
                                 {
@@ -153,10 +153,10 @@
             _ => null
         };
 
-        var data = await AuthApiClient.GetAllAsync(statusFilter, token);
+        var data = await AuthApiClient.GetAllAuthRequestAsync(statusFilter, token);
 
         // 更新待审批数量
-        var allData = await AuthApiClient.GetAllAsync(AuthRequestStatus.Pending, token);
+        var allData = await AuthApiClient.GetAllAuthRequestAsync(AuthRequestStatus.Pending, token);
         _pendingCount = allData.Count;
 
         if (!string.IsNullOrWhiteSpace(_searchString))
@@ -176,8 +176,8 @@
 
     private Color GetOperationColor(AuthOperationType type) => type switch
     {
-        AuthOperationType.CreateUser or AuthOperationType.CreateRole or AuthOperationType.CreateDepartment => Color.Success,
-        AuthOperationType.DeleteUser or AuthOperationType.DeleteRole or AuthOperationType.DeleteDepartment => Color.Error,
+        AuthOperationType.CreateUser or AuthOperationType.CreateRole or AuthOperationType.CreateDepartment or AuthOperationType.CreateGroup => Color.Success,
+        AuthOperationType.DeleteUser or AuthOperationType.DeleteRole or AuthOperationType.DeleteDepartment or AuthOperationType.DeleteGroup => Color.Error,
         _ => Color.Info
     };
 

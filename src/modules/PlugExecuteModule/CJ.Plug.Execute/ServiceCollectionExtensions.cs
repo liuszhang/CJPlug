@@ -5,6 +5,7 @@ using CJ.Plug.PlugBaseCore.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using PlugExecuteModule.Permissions;
 
 
 public static class ServiceCollectionExtensions
@@ -33,6 +34,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlugCommonExecute>(sp => new DefaultPlugExecuteService(sp, sp.GetRequiredService<IToolExecuteService>()));
 
         services.AddScoped<IPlugExecuteService, PlugExecuteService>();
+
+        // 注册功能权限提供者
+        services.AddSingleton<IFunctionPermissionProvider, PlugExecutePermissionProvider>();
 
         services.AddHttpClient<IExecuteApiClient,ExecuteApiClient>(client =>
         {

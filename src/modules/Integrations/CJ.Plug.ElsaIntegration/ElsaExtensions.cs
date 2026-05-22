@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ElsaIntegration;
 using CJ.Plug.ElsaIntegration.Services;
 using CJ.Plug.ElsaIntegration.Pages;
@@ -22,13 +22,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using CJ.Plug.ElsaIntegration.Contracts;
-using Elsa.Studio.Agents.UI.Pages;
-using Elsa.Workflows.Runtime;
-using Elsa.EntityFrameworkCore.Modules.Management;
-using Elsa.EntityFrameworkCore.Extensions;
-using Elsa.EntityFrameworkCore.Modules.Runtime;
 using CJ.Plug.ElsaIntegration.Notifications;
 using CJ.Plug.ElsaIntegration.ApiClient;
+using Elsa.Persistence.EFCore.Modules.Management;
+using Elsa.Persistence.EFCore.Extensions;
+using Elsa.Persistence.EFCore.Modules.Runtime;
 
 public static class ElsaExtensions
 {
@@ -108,6 +106,55 @@ public static class ElsaExtensions
 
         return builder;
     }
+
+    public static IServiceCollection ConfigElsaServicesWithOutDB(this IServiceCollection services)
+    {
+        services.AddElsa(elsa =>
+        {            
+            // Default Identity features for authentication/authorization.
+            elsa.UseIdentity(identity =>
+            {
+                identity.TokenOptions = options => options.SigningKey = "sufficiently-large-secret-signing-key"; // This key needs to be at least 256 bits long.
+                identity.UseAdminUserProvider();
+            });
+
+            // Configure ASP.NET authentication/authorization.
+            elsa.UseDefaultAuthentication(auth => auth.UseAdminApiKey());
+
+            // Expose Elsa API endpoints.
+            elsa.UseWorkflowsApi();
+
+            // Enable JavaScript workflow expressions.
+            //elsa.UseJavaScript();
+
+            // Enable C# workflow expressions.
+            elsa.UseCSharp();
+
+            // Enable Liquid workflow expressions.
+            elsa.UseLiquid();
+
+            // Enable HTTP activities.
+            //elsa.UseHttp();
+
+            // Use timer activities.
+            elsa.UseScheduling();
+
+            elsa.UseWebhooks();
+
+            //elsa.RemoveActivity<WriteLine>();
+
+            //注册自定义插头
+            //elsa.AddActivity<CommonCorePlugActivity>();
+
+
+        });
+
+        services.AddScoped<IElsaEngineService, ElsaEngineService>();
+
+        services.AddScoped<IElsaApiClient, ElsaApiClient>();
+        return services;
+    }
+
 
     public static WebApplicationBuilder AddElsaServicesForWeb(this WebApplicationBuilder builder)
     {

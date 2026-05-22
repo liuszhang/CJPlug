@@ -11,33 +11,34 @@
         <MudItem xs="2" Style="height: 100%; border-right: 1px solid var(--mud-palette-table-lines); overflow-y: auto;">
             <MudNavMenu Rounded="true" Margin="Margin.Dense" Color="Color.Primary" Class="pa-2">
                 <MudText Typo="Typo.subtitle2" Class="px-4 py-2 mud-text-secondary">系统管理</MudText>
-                <MudNavLink Icon="@Icons.Material.Filled.People"
-                            OnClick="@(() => SwitchTab("users"))"
+                <MudNavLink Icon="@(Icons.Material.Filled.People)"
+                            OnClick="@(async () => await SwitchTabAsync("users"))"
                             IsActive="@(_activeTab == "users")">人员管理</MudNavLink>
-                <MudNavLink Icon="@Icons.Material.Filled.Security"
-                            OnClick="@(() => SwitchTab("roles"))"
+                <MudNavLink Icon="@(Icons.Material.Filled.Groups)"
+                            OnClick="@(async () => await SwitchTabAsync("groups"))"
+                            IsActive="@(_activeTab == "groups")">用户组管理</MudNavLink>
+                <MudNavLink Icon="@(Icons.Material.Filled.Security)"
+                            OnClick="@(async () => await SwitchTabAsync("roles"))"
                             IsActive="@(_activeTab == "roles")">角色管理</MudNavLink>
-                <MudNavLink Icon="@Icons.Material.Filled.Business"
-                            OnClick="@(() => SwitchTab("departments"))"
+                <MudNavLink Icon="@(Icons.Material.Filled.Business)"
+                            OnClick="@(async () => await SwitchTabAsync("departments"))"
                             IsActive="@(_activeTab == "departments")">部门管理</MudNavLink>
             </MudNavMenu>
         </MudItem>
 
-        @* 右栏：内容 *@
+        @* 右栏：内容（用 display:none 避免切换 tab 时销毁重建组件） *@
         <MudItem xs="10" Style="height: 100%; overflow-y: auto;">
-            <div class="pa-4">
-                @if (_activeTab == "users")
-                {
-                    <UserManagePanel @ref="_userPanel" />
-                }
-                else if (_activeTab == "roles")
-                {
-                    <RoleManagePanel @ref="_rolePanel" />
-                }
-                else if (_activeTab == "departments")
-                {
-                    <DepartmentManagePanel @ref="_deptPanel" />
-                }
+            <div class="pa-4" style="@( _activeTab == "users" ? "" : "display:none")">
+                <UserManagePanel @ref="_userPanel" />
+            </div>
+            <div class="pa-4" style="@( _activeTab == "groups" ? "" : "display:none")">
+                <GroupManagePanel @ref="_groupPanel" />
+            </div>
+            <div class="pa-4" style="@( _activeTab == "roles" ? "" : "display:none")">
+                <RoleManagePanel @ref="_rolePanel" />
+            </div>
+            <div class="pa-4" style="@( _activeTab == "departments" ? "" : "display:none")">
+                <DepartmentManagePanel @ref="_deptPanel" />
             </div>
         </MudItem>
     </MudGrid>
@@ -47,15 +48,16 @@
     private string _activeTab = "users";
     
     private UserManagePanel? _userPanel;
+    private GroupManagePanel? _groupPanel;
     private RoleManagePanel? _rolePanel;
     private DepartmentManagePanel? _deptPanel;
 
-    private void SwitchTab(string tab)
+    private async Task SwitchTabAsync(string tab)
     {
         if (_activeTab != tab)
         {
             _activeTab = tab;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 }

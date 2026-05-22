@@ -1,0 +1,203 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JsRuntime
+@inject ISnackbar Snackbar
+
+@* 隐藏的文件夹选择器 — 使用 webkitdirectory 实现直接选择文件夹 *@
+<input class="d-none" type="file" id="@_inputId" name="file" webkitdirectory />
+
+<MudStack>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">上传包含执行入口程序的文件夹</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">点击下方按钮直接选择整个文件夹，系统将保持目录结构上传</MudText>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" OnClick="TriggerFolderPicker">
+        选择文件夹
+    </MudButton>
+
+    @if (!string.IsNullOrEmpty(_selectedFolderName))
+    {
+        <MudPaper Class="pa-2" Elevation="0">
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" />
+                <MudText Typo="Typo.subtitle2">@_selectedFolderName</MudText>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">@($"{_selectedFileCount} 个文件")</MudChip>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_fileList.Count > 0)
+    {
+        <MudPaper Class="pa-2" Elevation="0" Style="max-height: 200px; overflow-y: auto;">
+            <MudText Typo="Typo.subtitle2">文件列表：</MudText>
+            @foreach (var fileInfo in _fileList)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@fileInfo</MudText>
+            }
+        </MudPaper>
+    }
+
+    @if (_uploading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+        <MudText Typo="Typo.body2" Color="Color.Primary">正在上传文件...</MudText>
+    }
+</MudStack>
+
+@code {
+    /// <summary>服务器 API 基地址（如 http://192.168.1.100:7660）</summary>
+    [Parameter] public string ServerBaseUrl { get; set; } = "";
+
+    /// <summary>上传目标子文件夹（如 plugDefinitionId）</summary>
+    [Parameter] public string PlugFolder { get; set; } = "";
+
+    /// <summary>当前用户名</summary>
+    [Parameter] public string Username { get; set; } = "";
+
+    /// <summary>文件夹选择完成回调，返回 (根文件夹名, 文件数量)</summary>
+    [Parameter] public EventCallback<(string FolderName, int FileCount)> OnFolderSelected { get; set; }
+
+    private readonly string _inputId = $"folderPicker_{Guid.NewGuid():N}";
+    private DotNetObjectReference<FolderUploader>? _dotNetRef;
+
+    private string? _selectedFolderName;
+    private int _selectedFileCount;
+    private List<string> _fileList = new();
+    private bool _uploading;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Skip JS interop during static rendering (SSR or enhanced navigation)
+            if (!RendererInfo.IsInteractive) return;
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+            // 将 JS 注入到全局 window 上（幂等，重复调用无副作用）
+            await InjectFolderUploaderJs();
+            await JsRuntime.InvokeVoidAsync("window._folderUploaderInit", _inputId, _dotNetRef);
+        }
+    }
+
+    private async Task InjectFolderUploaderJs()
+    {
+        const string js = @"
+            if (!window._folderUploaderInit) {
+                window._folderUploaderInit = (inputId, dotNet) => {
+                    const el = document.getElementById(inputId);
+                    if (!el || el.dataset.initialized) return;
+                    el.dataset.initialized = 'true';
+                    el.addEventListener('change', (event) => {
+                        const files = event.target.files;
+                        if (files.length === 0) return;
+                        const rootFolder = files[0].webkitRelativePath.split('/')[0];
+                        dotNet.invokeMethodAsync('OnFolderPickerChanged', rootFolder, files.length);
+                        for (const file of files) {
+                            dotNet.invokeMethodAsync('OnFolderFileEnumerated', file.webkitRelativePath, file.size);
+                        }
+                        dotNet.invokeMethodAsync('OnFolderEnumerationDone', files.length);
+                    }, false);
+                };
+            }
+            if (!window._folderUploaderUpload) {
+                window._folderUploaderUpload = async (inputId, serverBase, uploadPath) => {
+                    const input = document.getElementById(inputId);
+                    const files = input.files;
+                    if (!files || files.length === 0) return 0;
+                    let successCount = 0;
+                    for (const file of files) {
+                        try {
+                            const formData = new FormData();
+                            formData.append('UploadPath', uploadPath);
+                            formData.append('FileName', file.webkitRelativePath);
+                            formData.append('FileStream', file);
+                            await fetch(serverBase + '/api/file/Upload', {
+                                method: 'POST',
+                                body: formData,
+                                headers: { 'Accept': 'application/json' },
+                                mode: 'no-cors'
+                            });
+                            successCount++;
+                        } catch (error) {
+                            console.error('上传文件失败: ' + file.webkitRelativePath, error);
+                        }
+                    }
+                    return successCount;
+                };
+            }
+        ";
+        await JsRuntime.InvokeVoidAsync("eval", js);
+    }
+
+    private async Task TriggerFolderPicker()
+    {
+        await JsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{_inputId}').click()");
+    }
+
+    [JSInvokable]
+    public void OnFolderPickerChanged(string folderName, int fileCount)
+    {
+        _selectedFolderName = folderName;
+        _selectedFileCount = fileCount;
+        _fileList.Clear();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnFolderFileEnumerated(string relativePath, long fileSize)
+    {
+        _fileList.Add($"{relativePath} ({fileSize / 1024.0:F1} KB)");
+    }
+
+    [JSInvokable]
+    public async Task OnFolderEnumerationDone(int fileCount)
+    {
+        Snackbar.Add($"已选择文件夹 [{_selectedFolderName}]，包含 {fileCount} 个文件", Severity.Info);
+        if (OnFolderSelected.HasDelegate)
+        {
+            await OnFolderSelected.InvokeAsync((_selectedFolderName ?? "", fileCount));
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// 上传已选择的文件夹中的所有文件到服务器。返回成功上传的文件数。
+    /// </summary>
+    public async Task<int> UploadAsync()
+    {
+        if (_selectedFileCount == 0) return 0;
+
+        _uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var uploadPath = $"{Username}//Plugs//{PlugFolder}";
+            var count = await JsRuntime.InvokeAsync<int>(
+                "window._folderUploaderUpload", _inputId, ServerBaseUrl, uploadPath);
+
+            if (count > 0)
+                Snackbar.Add($"成功上传 {count} 个文件", Severity.Success);
+            else
+                Snackbar.Add("没有文件被上传", Severity.Warning);
+
+            return count;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"上传文件夹失败: {ex.Message}", Severity.Error);
+            return 0;
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>是否有选中的文件</summary>
+    public bool HasSelection => _selectedFileCount > 0;
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+    }
+}

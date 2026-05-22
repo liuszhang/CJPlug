@@ -1,0 +1,223 @@
+@using CJ.Plug.Models.Plug
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using Microsoft.JSInterop
+
+@inject IJSRuntime JSRuntime
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle1" Color="Color.Primary">导出插头</MudText>
+            <MudText>选择导出范围：</MudText>
+
+            <MudRadioGroup T="string" @bind-Value="@ExportScope" Variant="Variant.Outlined">
+                <MudRadio T="string" Value="@("selected")">选中的插头</MudRadio>
+                <MudRadio T="string" Value="@("all")">所有插头</MudRadio>
+                <MudRadio T="string" Value="@("user")">用户创建的插头</MudRadio>
+            </MudRadioGroup>
+
+            <MudTextField T="string" Label="文件名" @bind-Value="@FileName" Variant="Variant.Outlined" HelperText="默认导出日期时间"></MudTextField>
+
+            @if (!string.IsNullOrEmpty(ExportResult))
+            {
+                <MudAlert Severity="Severity.Info">@ExportResult</MudAlert>
+            }
+
+            @if (ExportErrors?.Count > 0)
+            {
+                <MudAlert Severity="Severity.Error">
+                    <MudText>导出失败：</MudText>
+                    <MudText>@string.Join("; ", ExportErrors)</MudText>
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Export">导出</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<script>
+    window.downloadFile = (fileName, contentType, content) => {
+        const blob = new Blob([content], { type: contentType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+</script>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public List<Plug>? AllPlugs { get; set; }
+
+    [Parameter]
+    public Plug? SelectedPlug { get; set; }
+
+    private string ExportScope { get; set; } = "all";
+    private string FileName { get; set; } = "";
+    private string ExportResult { get; set; } = "";
+    private List<string>? ExportErrors { get; set; } = new();
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrEmpty(FileName))
+        {
+            FileName = $"PlugsExport_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        }
+
+        // 如果没有指定导出范围，默认使用"all"
+        if (string.IsNullOrEmpty(ExportScope))
+        {
+            ExportScope = "all";
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Export()
+    {
+        // 确保 AllPlugs 不为 null
+        if (AllPlugs == null)
+        {
+            AllPlugs = new List<Plug>();
+        }
+
+        if (AllPlugs.Count == 0)
+        {
+            ExportResult = "没有可导出的插头（数据未加载）";
+            StateHasChanged();
+            return;
+        }
+
+        ExportErrors?.Clear();
+        ExportResult = "";
+
+        List<Plug> plugsToExport = new();
+
+        try
+        {
+            switch (ExportScope)
+            {
+                case "selected":
+                    if (SelectedPlug != null)
+                    {
+                        plugsToExport.Add(SelectedPlug);
+                    }
+                    else
+                    {
+                        ExportResult = "请先在列表中选择一个插头";
+                        StateHasChanged();
+                        return;
+                    }
+                    break;
+                case "all":
+                    plugsToExport = AllPlugs.ToList();
+                    break;
+                case "user":
+                    plugsToExport = AllPlugs.Where(p =>
+                        p.CreateType != "SystemInitPlug" &&
+                        p.CreateType != "SystemInitActionPlug").ToList();
+                    break;
+            }
+
+            if (plugsToExport.Count == 0)
+            {
+                ExportResult = "没有找到符合条件的插头";
+                StateHasChanged();
+                return;
+            }
+
+            // 准备导出数据
+            var exportData = new
+            {
+                ExportTime = DateTime.Now.ToString("o"),
+                PlugCount = plugsToExport.Count,
+                Plugs = plugsToExport.Select(p => new
+                {
+                    p.Id,
+                    p.DefinitionId,
+                    p.ProcessId,
+                    p.ParentPlugDefinitionId,
+                    p.Description,
+                    p.Name,
+                    p.Type,
+                    p.PlugTypeKey,
+                    p.Category,
+                    p.GroupName,
+                    p.Value,
+                    p.RealValuePath,
+                    p.WorkPath,
+                    p.Status,
+                    p.OnlyExecuteAction,
+                    p.Tag,
+                    p.PlugSettingsJson,
+                    p.IsRootPlug,
+                    p.IsContainerPlug,
+                    p.CreateType,
+                    p.ShowInPlugLibrary,
+                    p.ActivityNodeId,
+                    p.ActivityVersion,
+                    p.ActivityJsonData,
+                    p.ActivityMetaData,
+                    p.GuiJsonData,
+                    p.ToolId,
+                    p.ToolName,
+                    p.ToolDisplayName,
+                    p.ToolCommandLineShema,
+                    p.ToolVersion,
+                    p.ToolVersionPath,
+                    p.ToolVersions,
+                    PlugVariables = p.PlugVariables?.Select(v => new
+                    {
+                        v.Id,
+                        v.Name,
+                        v.Type,
+                        v.DefaultValue,
+                        v.Value,
+                        v.IsInitVariable,
+                        v.IsBrowsable,
+                        v.IsArray,
+                        v.IsInput,
+                        v.IsOutput
+                    }).ToList()
+                }).ToList()
+            };
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
+            var json = JsonSerializer.Serialize(exportData, jsonOptions);
+
+            // 使用JS下载文件
+            await JSRuntime.InvokeVoidAsync("downloadFile",
+                FileName,
+                "application/json",
+                json);
+
+            ExportResult = $"成功导出 {plugsToExport.Count} 个插头";
+            StateHasChanged();
+
+            // 2秒后关闭对话框
+            await Task.Delay(2000);
+            MudDialog.Close(DialogResult.Ok(plugsToExport.Count));
+        }
+        catch (Exception ex)
+        {
+            ExportErrors?.Add(ex.Message);
+            StateHasChanged();
+        }
+    }
+}

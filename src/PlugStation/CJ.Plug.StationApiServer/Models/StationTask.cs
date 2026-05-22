@@ -10,6 +10,15 @@ public class StationTask
     /// <summary>任务关联 ID (ToolJobCorrelationId)</summary>
     public string? CorrelationId { get; set; }
 
+    /// <summary>作业关联 ID (JobCorrelationId)，用于向引擎汇报</summary>
+    public string? JobCorrelationId { get; set; }
+
+    /// <summary>插头定义 ID，用于向流程引擎汇报</summary>
+    public string? PlugDefinitionId { get; set; }
+
+    /// <summary>数据空间 ID，用于向流程引擎汇报</summary>
+    public string? PDZId { get; set; }
+
     /// <summary>插件类型 Key</summary>
     public string? PlugTypeKey { get; set; }
 
@@ -36,4 +45,7 @@ public class StationTask
 
     /// <summary>完成时间</summary>
     public string? CompletedAt { get; set; }
+
+    /// <summary>启动的进程 ID（用于手动停止任务）</summary>
+    public int? ProcessId { get; set; }
 }

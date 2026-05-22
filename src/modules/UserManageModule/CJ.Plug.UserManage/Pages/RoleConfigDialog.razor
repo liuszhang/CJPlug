@@ -1,0 +1,301 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManageApiClient
+@using CJ.Plug.Models.Shared
+@using MudBlazor
+
+@inject IRolePermissionApiClient RolePermissionApiClient
+@inject IUserManageApiClient UserApiClient
+@inject IRoleManageApiClient RoleApiClient
+@inject IDepartmentManageApiClient DepartmentApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Style="min-height: 500px;">
+            @* ===== Tab 1: 角色成员 ===== *@
+            <MudTabPanel Text="角色成员" Icon="@Icons.Material.Filled.People">
+                <MudStack>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">选择属于该角色的用户</MudText>
+                    <MudTextField @bind-Value="_memberSearch" Placeholder="搜索用户..." Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Clearable="true" Immediate="true" DebounceInterval="300"
+                                  AdornmentIcon="@Icons.Material.Outlined.Search" Adornment="Adornment.End" />
+                    <div Style="max-height: 400px; overflow-y: auto;">
+                        @foreach (var user in FilteredUsers)
+                        {
+                            <MudCheckBox T="bool" Value="@(_selectedUserIds.Contains(user.Id))"
+                                         ValueChanged="@((bool val) => ToggleUser(user.Id, val))"
+                                         Label="@($"{user.UserName} ({user.Email ?? ""})")"
+                                         Color="Color.Primary" Dense="true" />
+                        }
+                        @if (!FilteredUsers.Any())
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Default" Class="pa-4 text-center">没有找到用户</MudText>
+                        }
+                    </div>
+                </MudStack>
+            </MudTabPanel>
+
+            @* ===== Tab 2: 功能权限 ===== *@
+            <MudTabPanel Text="功能权限" Icon="@Icons.Material.Filled.Security">
+                <MudStack>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">配置角色的功能操作权限</MudText>
+                    @if (_loadingPermissions)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+                    }
+                    else if (_permissionDefinitions.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default">暂无可用的功能权限定义</MudText>
+                    }
+                    else
+                    {
+                        <div Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var module in _permissionDefinitions)
+                            {
+                                <MudPaper Elevation="1" Class="pa-3 mb-3">
+                                    <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+                                        @if (!string.IsNullOrEmpty(module.ModuleIcon))
+                                        {
+                                            <MudIcon Icon="@module.ModuleIcon" Size="Size.Small" />
+                                        }
+                                        <MudText Typo="Typo.subtitle1"><b>@module.ModuleName</b></MudText>
+                                        <MudSpacer />
+                                        <MudCheckBox T="bool" Value="@IsModuleAllSelected(module)"
+                                                     ValueChanged="@((bool val) => ToggleModule(module, val))"
+                                                     Label="全选" Color="Color.Primary" Dense="true" />
+                                    </MudStack>
+                                    <MudDivider Class="mb-2" />
+                                    @foreach (var perm in module.Permissions)
+                                    {
+                                        <MudCheckBox T="bool" Value="@(_selectedPermissionKeys.Contains(perm.Key))"
+                                                     ValueChanged="@((bool val) => TogglePermission(perm.Key, val))"
+                                                     Label="@perm.Name"
+                                                     HelperText="@perm.Description"
+                                                     Color="Color.Primary" Dense="true" />
+                                    }
+                                </MudPaper>
+                            }
+                        </div>
+                    }
+                </MudStack>
+            </MudTabPanel>
+
+            @* ===== Tab 3: 数据权限 ===== *@
+            <MudTabPanel Text="数据权限" Icon="@Icons.Material.Filled.DataUsage">
+                <MudStack>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">配置角色的数据访问范围</MudText>
+                    @foreach (var resourceType in _dataResourceTypes)
+                    {
+                        <MudPaper Elevation="1" Class="pa-3 mb-3">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2"><b>@GetResourceDisplayName(resourceType)</b></MudText>
+                            <MudRadioGroup T="string" Value="@GetDataScope(resourceType)"
+                                           ValueChanged="@((string val) => SetDataScope(resourceType, val))">
+                                <MudRadio T="string" Value="@("All")" Color="Color.Primary">全部数据</MudRadio>
+                                <MudRadio T="string" Value="@("Department")" Color="Color.Primary">本部门数据</MudRadio>
+                                <MudRadio T="string" Value="@("Self")" Color="Color.Primary">仅本人数据</MudRadio>
+                            </MudRadioGroup>
+                        </MudPaper>
+                    }
+                </MudStack>
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+            }
+            保存
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public int RoleId { get; set; }
+    [Parameter] public string RoleName { get; set; } = string.Empty;
+
+    // 成员相关
+    private List<User> _allUsers = [];
+    private HashSet<int> _selectedUserIds = [];
+    private string _memberSearch = string.Empty;
+
+    // 功能权限相关
+    private List<FunctionPermissionDefinitionDto> _permissionDefinitions = [];
+    private HashSet<string> _selectedPermissionKeys = [];
+    private bool _loadingPermissions = true;
+
+    // 数据权限相关
+    private List<RoleDataPermissionDto> _dataPermissions = [];
+    private readonly string[] _dataResourceTypes = ["Process", "Job", "PDZ"];
+    private Dictionary<string, string> _dataScopeMap = new();
+
+    private bool _saving = false;
+
+    private IEnumerable<User> FilteredUsers =>
+        string.IsNullOrWhiteSpace(_memberSearch)
+            ? _allUsers
+            : _allUsers.Where(u =>
+                (u.UserName?.Contains(_memberSearch, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (u.Email?.Contains(_memberSearch, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // 并行加载数据
+            var usersTask = UserApiClient.GetAllUsersAsync();
+            var permissionsTask = RolePermissionApiClient.GetAllPermissionDefinitionsAsync();
+            var memberIdsTask = RolePermissionApiClient.GetRoleMemberIdsAsync(RoleId);
+            var funcPermsTask = RolePermissionApiClient.GetRoleFunctionPermissionsAsync(RoleId);
+            var dataPermsTask = RolePermissionApiClient.GetRoleDataPermissionsAsync(RoleId);
+
+            await Task.WhenAll(usersTask, permissionsTask, memberIdsTask, funcPermsTask, dataPermsTask);
+
+            _allUsers = (await usersTask).Where(u => u != null).Cast<User>().ToList();
+            _permissionDefinitions = await permissionsTask;
+            _selectedUserIds = new HashSet<int>(await memberIdsTask);
+            _selectedPermissionKeys = new HashSet<string>((await funcPermsTask).Select(p => p.PermissionKey));
+            _dataPermissions = await dataPermsTask;
+
+            // 初始化数据权限范围
+            foreach (var rt in _dataResourceTypes)
+            {
+                var existing = _dataPermissions.FirstOrDefault(p => p.ResourceType == rt);
+                _dataScopeMap[rt] = existing?.DataScope ?? "Self";
+            }
+
+            _loadingPermissions = false;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载数据失败: {ex.Message}", Severity.Error);
+            _loadingPermissions = false;
+        }
+    }
+
+    // ========== 成员操作 ==========
+
+    private void ToggleUser(int userId, bool selected)
+    {
+        if (selected)
+            _selectedUserIds.Add(userId);
+        else
+            _selectedUserIds.Remove(userId);
+    }
+
+    // ========== 功能权限操作 ==========
+
+    private bool IsModuleAllSelected(FunctionPermissionDefinitionDto module)
+    {
+        return module.Permissions.All(p => _selectedPermissionKeys.Contains(p.Key));
+    }
+
+    private void ToggleModule(FunctionPermissionDefinitionDto module, bool selected)
+    {
+        foreach (var perm in module.Permissions)
+        {
+            if (selected)
+                _selectedPermissionKeys.Add(perm.Key);
+            else
+                _selectedPermissionKeys.Remove(perm.Key);
+        }
+    }
+
+    private void TogglePermission(string key, bool selected)
+    {
+        if (selected)
+            _selectedPermissionKeys.Add(key);
+        else
+            _selectedPermissionKeys.Remove(key);
+    }
+
+    // ========== 数据权限操作 ==========
+
+    private string GetDataScope(string resourceType)
+    {
+        return _dataScopeMap.TryGetValue(resourceType, out var scope) ? scope : "Self";
+    }
+
+    private void SetDataScope(string resourceType, string scope)
+    {
+        _dataScopeMap[resourceType] = scope;
+    }
+
+    private string GetResourceDisplayName(string resourceType) => resourceType switch
+    {
+        "Process" => "流程数据",
+        "Job" => "作业数据",
+        "PDZ" => "数据空间",
+        _ => resourceType
+    };
+
+    // ========== 保存 ==========
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            // 保存角色成员
+            var memberResult = await RolePermissionApiClient.SaveRoleMembersAsync(new SaveRoleMembersRequest
+            {
+                RoleId = RoleId,
+                UserIds = _selectedUserIds.ToList()
+            });
+
+            // 保存功能权限
+            var funcResult = await RolePermissionApiClient.SaveRoleFunctionPermissionsAsync(new SaveRoleFunctionPermissionsRequest
+            {
+                RoleId = RoleId,
+                PermissionKeys = _selectedPermissionKeys.ToList()
+            });
+
+            // 保存数据权限
+            var dataPerms = _dataScopeMap.Select(kv => new RoleDataPermissionDto
+            {
+                RoleId = RoleId,
+                ResourceType = kv.Key,
+                DataScope = kv.Value
+            }).ToList();
+
+            var dataResult = await RolePermissionApiClient.SaveRoleDataPermissionsAsync(new SaveRoleDataPermissionsRequest
+            {
+                RoleId = RoleId,
+                Permissions = dataPerms
+            });
+
+            if (memberResult && funcResult && dataResult)
+            {
+                Snackbar.Add($"角色 \"{RoleName}\" 配置保存成功", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("部分配置保存失败，请重试", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

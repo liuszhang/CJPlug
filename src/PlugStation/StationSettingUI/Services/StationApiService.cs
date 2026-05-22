@@ -363,6 +363,23 @@ public class StationApiService
         }
     }
 
+    /// <summary>
+    /// 停止指定任务（终止对应进程）
+    /// </summary>
+    public async Task<bool> StopTaskAsync(int taskId)
+    {
+        try
+        {
+            var response = await _stationClient.PostAsync($"/api/station/tasks/{taskId}/stop", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"停止任务失败: {ex.Message}");
+            return false;
+        }
+    }
+
     // ==================== 远程桌面 API (StationApiServer 本地) ====================
 
     /// <summary>

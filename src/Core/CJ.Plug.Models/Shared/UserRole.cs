@@ -15,5 +15,10 @@ namespace CJ.Plug.Models.Shared
         /// 状态：-1=授权中，0=禁用，1=启用
         /// </summary>
         public int Status { get; set; } = 1;
+
+        /// <summary>
+        /// 是否系统内置角色（不可删除和编辑）
+        /// </summary>
+        public bool IsSystem { get; set; } = false;
     }
 }

@@ -49,6 +49,13 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
             // 图站任务详情
             api.MapGet("/tasks/{id}", GetTaskById);
 
+            // 手动停止任务
+            api.MapPost("/tasks/{id}/stop", async (IStationExecuteService service, int id) =>
+            {
+                await service.StopTask(id);
+                return TypedResults.Ok(new { message = "已发送停止指令" });
+            });
+
             api.MapGet("/test", () => TypedResults.Ok("pong!"));
 
 
@@ -116,6 +123,7 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
 
         private static IResult GetTasks(StationTaskStore taskStore)
         {
+            taskStore.FixStaleRunningTasks();
             var tasks = taskStore.GetAll(200);
             return TypedResults.Ok(tasks);
         }

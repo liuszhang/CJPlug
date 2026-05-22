@@ -36,6 +36,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "00.Docs", "00.Docs", "{03BF
 		00.Docs\APP插座平台-功能框架及功能介绍-V1.pptx = 00.Docs\APP插座平台-功能框架及功能介绍-V1.pptx
 		00.Docs\APP插座平台-功能框架及功能介绍-V2.pptx = 00.Docs\APP插座平台-功能框架及功能介绍-V2.pptx
 		00.Docs\APP插座平台-功能框架及功能介绍.pptx = 00.Docs\APP插座平台-功能框架及功能介绍.pptx
+		docs\草稿.md = docs\草稿.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PlugToolIntegrations", "PlugToolIntegrations", "{AD8B504C-3CDC-4276-B7BC-5A191F7632B3}"
@@ -342,6 +343,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CJ.Plug.GuacamoleApiClient", "src\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj", "{F964F13D-2CDA-4759-B955-008D8D2A0D29}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CJ.Plug.GuacamoleUI", "src\modules\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj", "{E1EF4B12-E102-4092-A9B0-F2936FE2FF79}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PlugToolIntegrations", "PlugToolIntegrations", "{C1262302-9E11-471F-6313-C0D3ACB6FEB7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetCoreBridgeToDotnetFramework", "src\PlugToolIntegrations\DotnetCoreBridgeToDotnetFramework\DotnetCoreBridgeToDotnetFramework.csproj", "{3569896A-5768-443B-9553-FD8CA9AC4602}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -1853,6 +1858,18 @@ Global
 		{E1EF4B12-E102-4092-A9B0-F2936FE2FF79}.Release|x64.Build.0 = Release|Any CPU
 		{E1EF4B12-E102-4092-A9B0-F2936FE2FF79}.Release|x86.ActiveCfg = Release|Any CPU
 		{E1EF4B12-E102-4092-A9B0-F2936FE2FF79}.Release|x86.Build.0 = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|x64.Build.0 = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Debug|x86.Build.0 = Debug|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|x64.ActiveCfg = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|x64.Build.0 = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|x86.ActiveCfg = Release|Any CPU
+		{3569896A-5768-443B-9553-FD8CA9AC4602}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2019,6 +2036,7 @@ Global
 		{BE47F7E0-77DF-4783-8FB3-45427576336F} = {DFC3AF47-8638-0581-0EC9-2520C679B529}
 		{F964F13D-2CDA-4759-B955-008D8D2A0D29} = {DFC3AF47-8638-0581-0EC9-2520C679B529}
 		{E1EF4B12-E102-4092-A9B0-F2936FE2FF79} = {DFC3AF47-8638-0581-0EC9-2520C679B529}
+		{3569896A-5768-443B-9553-FD8CA9AC4602} = {AD8B504C-3CDC-4276-B7BC-5A191F7632B3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {26448C6D-8AEA-4E29-B524-3FC10B6B9CE7}

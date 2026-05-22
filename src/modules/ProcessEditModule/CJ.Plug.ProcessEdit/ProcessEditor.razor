@@ -181,6 +181,8 @@
             //获取流程数据
             MainProcess = await MainApiClient.GetPlugByDefinitionIdAsync(ProcessDefinitionId);
 
+            //CLog.Information("MainProcess:" + MainProcess?.ActivityJsonData);
+
             //如果流程没有流程图数据，则初始化一个默认流程图
             if (string.IsNullOrEmpty(MainProcess?.ActivityJsonData))
             {
@@ -345,6 +347,8 @@
     {
         HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.ActivityStatusNow.ToString()+PDZId);
         HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.PDZUpdatedInfo.ToString());
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
+
         //通过长连接添加活动状态监听
         HubConnectionManagerService._hubConnection.On<string, string, string>(LogTypeEnum.ActivityStatusNow.ToString() + PDZId,            
             (PDZId, DefinitionId, status) =>

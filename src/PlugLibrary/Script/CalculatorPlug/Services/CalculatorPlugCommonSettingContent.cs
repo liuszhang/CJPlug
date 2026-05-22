@@ -1,4 +1,4 @@
-﻿
+
 using CalculatorPlug.Pages;
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
@@ -47,13 +47,18 @@ namespace CalculatorPlug.Services
             var InitVariables = new List<BaseVariable>();
             InitVariables.Add(new BaseVariable()
             {
-                Name = InitVariableNames.ConditionExpression.ToString(),
-                Type = VariableTypeEnum.ConditionExpression.ToString(),
+                Name = InitVariableNames.Expression.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = true
+            });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.Result.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
 
-            settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-                JsonSerializer.Serialize(InitVariables));
+            settings.SetSetting(PlugSettingKey.InitVariables.ToString(),JsonSerializer.Serialize(InitVariables));
 
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.脚本执行.ToString());
 

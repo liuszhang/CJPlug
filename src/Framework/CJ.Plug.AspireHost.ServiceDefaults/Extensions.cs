@@ -7,6 +7,7 @@ using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using System.Text;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -20,6 +21,18 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        // 强制每个子服务进程的控制台输出为 UTF-8，解决 Aspire Dashboard 中文乱码
+        // 必须在子进程内部设置，仅靠 AppHost 的环境变量传递在 Windows 上不够可靠
+        try
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+        }
+        catch
+        {
+            // 非交互式终端可能不支持修改编码，忽略异常
+        }
+
         builder.ConfigureOpenTelemetry();
 
         builder.AddDefaultHealthChecks();

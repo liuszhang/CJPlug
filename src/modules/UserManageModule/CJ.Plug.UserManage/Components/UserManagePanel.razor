@@ -7,7 +7,7 @@
 @using MudBlazor
 @using System.Text.Json
 
-@inject IUserManageApiClient UserApiClient
+@inject MainApiClient UserApiClient
 @inject IDepartmentManageApiClient DepartmentApiClient
 @inject IRoleManageApiClient RoleApiClient
 @inject IAuthApiClient AuthApiClient
@@ -97,10 +97,19 @@
         </TemplateColumn>
         <TemplateColumn Style="text-align:right" Title="操作">
             <CellTemplate>
-                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
-                    <MudMenuItem OnClick="@(()=>DeleteUser(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                </MudMenu>
+                @if (context.Item.IsSystem)
+                {
+                    <MudTooltip Text="系统内置用户，不可编辑和删除">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" Disabled="true" />
+                    </MudTooltip>
+                }
+                else
+                {
+
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" OnClick="@(() => OpenEditDialog(context.Item))" Size="Size.Small"/>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" OnClick="@(() => DeleteUser(context.Item))" Size="Size.Small" Color="Color.Error"/>
+
+                }
             </CellTemplate>
         </TemplateColumn>
     </Columns>
@@ -118,6 +127,7 @@
     private List<string> _allRoles = [];
     private Dictionary<int, List<string>> _userRolesCache = new();
     private bool _isLoaded = false;
+    private bool _pendingReload = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,13 +136,14 @@
         await LoadUsers();
         await LoadUserRoles();
         _isLoaded = true;
+        _pendingReload = true; // 数据就绪，标记需要刷新 DataGrid
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _isLoaded)
+        if (_pendingReload && _dataGrid is not null)
         {
-            // 数据加载完成后，刷新DataGrid
+            _pendingReload = false;
             await _dataGrid.ReloadServerData();
         }
     }
@@ -224,8 +235,14 @@
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
         var dialog = await DialogService.ShowAsync<CreateUserDialog>("创建用户（需授权）", parameters, options);
         var result = await dialog.Result;
-        if (!result.Canceled && result.Data is CreateUserRequest request)
+        
+        if (!result.Canceled && result.Data is CreateUserRequest request)            
         {
+            if (request.DepartmentId == null)
+            {
+                Snackbar.Add("请选择部门", Severity.Warning);
+                return;
+            }
             await CreateAuthRequest(AuthOperationType.CreateUser, $"用户: {request.UserName}", JsonSerializer.Serialize(request));
         }
     }
@@ -251,9 +268,15 @@
         var result = await dialog.Result;
         if (!result.Canceled && result.Data is UpdateUserRequest request)
         {
+            if (request.DepartmentId == null)
+            {
+                Snackbar.Add("请选择部门", Severity.Warning);
+                return;
+            }
             await CreateAuthRequest(AuthOperationType.UpdateUser, $"用户: {user.UserName}", JsonSerializer.Serialize(request));
         }
     }
+            
 
     private async Task DeleteUser(User user)
     {

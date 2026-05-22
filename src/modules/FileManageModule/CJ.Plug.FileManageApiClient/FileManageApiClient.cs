@@ -448,13 +448,7 @@ namespace CJ.Plug.FileManageApiClient
 
                     var response2 = await httpClient.PostAsync("api/file/completeupload", completeForm);
                     response2.EnsureSuccessStatusCode();
-                    //return await response2.Content.ReadAsStringAsync();
-                    // 读取响应内容
-                    var jsonString = await response2.Content.ReadAsStringAsync();
-
-                    // 解析JSON对象
-                    var jsonDoc = JsonDocument.Parse(jsonString);
-                    var filePath = jsonDoc.RootElement.GetProperty("content").GetString();
+                    var filePath = await response2.Content.ReadAsStringAsync();
                     return filePath;
                 }
                 catch (Exception ex)
@@ -520,6 +514,20 @@ namespace CJ.Plug.FileManageApiClient
                 else
                 {
                     Log.Information($"Failed to download file. Status code: {response.StatusCode}");
+                    return null;
+                }
+            }
+
+            public async Task<Stream?> DownloadFileByPath(string filePath)
+            {
+                var response = await httpClient.GetAsync("api/file/download/" + Uri.EscapeDataString(filePath));
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadAsStreamAsync();
+                }
+                else
+                {
+                    Log.Information($"Failed to download file by path. Status code: {response.StatusCode}");
                     return null;
                 }
             }

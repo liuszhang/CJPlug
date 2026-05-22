@@ -186,21 +186,79 @@ public partial class MainApiClient : IUserManageApiClient, IDepartmentManageApiC
             var result = await DepartmentManageApiClient.Value.DeleteDepartmentAsync(id, cancellationToken);
             if (result)
             {
-                await AuditLog.LogSuccessAsync(AuditModule.DepartmentManage, AuditOperationType.Delete, 
+                await AuditLog.LogSuccessAsync(AuditModule.DepartmentManage, AuditOperationType.Delete,
                     $"删除部门ID: {id}");
             }
             else
             {
-                await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Delete, 
+                await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Delete,
                     $"删除部门失败ID: {id}", "部门不存在");
             }
             return result;
         }
         catch (Exception ex)
         {
-            await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Delete, 
+            await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Delete,
                 $"删除部门异常ID: {id}", ex.Message);
             throw;
         }
     }
+
+    // 部门人员管理
+    public async Task<List<DepartmentUserInfo>> GetDepartmentUsersAsync(int departmentId, CancellationToken cancellationToken = default)
+    {
+        var result = await DepartmentManageApiClient.Value.GetDepartmentUsersAsync(departmentId, cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.DepartmentManage, AuditOperationType.Other, $"查询部门人员ID: {departmentId}");
+        return result;
+    }
+
+    public async Task<bool> AddUserToDepartmentAsync(int departmentId, int userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await DepartmentManageApiClient.Value.AddUserToDepartmentAsync(departmentId, userId, cancellationToken);
+            if (result)
+            {
+                await AuditLog.LogSuccessAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                    $"将用户ID: {userId} 添加到部门ID: {departmentId}");
+            }
+            else
+            {
+                await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                    $"添加用户到部门失败", "用户不存在");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                $"添加用户到部门异常", ex.Message);
+            throw;
+        }
+    }
+
+    public async Task<bool> RemoveUserFromDepartmentAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await DepartmentManageApiClient.Value.RemoveUserFromDepartmentAsync(userId, cancellationToken);
+            if (result)
+            {
+                await AuditLog.LogSuccessAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                    $"将用户ID: {userId} 从部门移除");
+            }
+            else
+            {
+                await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                    $"从部门移除用户失败", "用户不存在");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.DepartmentManage, AuditOperationType.Update,
+                $"从部门移除用户异常", ex.Message);
+            throw;
+        }
+    }    
 }

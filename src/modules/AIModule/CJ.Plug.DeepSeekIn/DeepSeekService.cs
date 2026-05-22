@@ -355,5 +355,42 @@ namespace CJ.Plug.DeekSeekIn
             }
         }
 
+        /// <summary>
+        /// Non-streaming chat completion for workflow generation etc.
+        /// Sends system + user prompts to OpenRouter and returns the full response text.
+        /// </summary>
+        public async Task<string> ChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
+        {
+            var messages = new List<(string role, string content)>
+            {
+                ("system", systemPrompt),
+                ("user", userPrompt)
+            };
+
+            var responseJson = await CallOpenRouterChatAsync(
+                messages,
+                apiKey: "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",
+                model: "openrouter/free",
+                maxTokens: 4096,
+                temperature: 0.3);
+
+            using var doc = JsonDocument.Parse(responseJson);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var choice in choices.EnumerateArray())
+                {
+                    if (choice.TryGetProperty("message", out var message) &&
+                        message.TryGetProperty("content", out var contentEl))
+                    {
+                        return contentEl.GetString() ?? string.Empty;
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
     }
 }

@@ -41,5 +41,24 @@ namespace CJ.Plug.UserManageApiClient
             var response = await httpClient.DeleteAsync($"/api/role/delete/{id}", cancellationToken);
             return response.IsSuccessStatusCode;
         }
+
+        public async Task<bool> AddRoleToUserAsync(AddRoleToUserRequest request, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/role/addRoleToUser", request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<List<RoleUserInfo>> GetRoleUsersAsync(int roleId, CancellationToken cancellationToken = default)
+        {
+            var result = await httpClient.GetFromJsonAsync<List<RoleUserInfo>>(
+                $"/api/role/getRoleUsers/{roleId}", cancellationToken);
+            return result ?? [];
+        }
+
+        public async Task<bool> RemoveRoleFromUserAsync(RemoveRoleUserRequest request, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/role/removeRoleFromUser", request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
     }
 }

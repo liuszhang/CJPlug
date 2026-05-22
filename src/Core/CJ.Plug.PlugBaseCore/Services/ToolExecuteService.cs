@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.EventAggregator;
+using CJ.Plug.Models.EventAggregator;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
@@ -118,11 +118,30 @@ namespace CJ.Plug.PlugBaseCore.Services
             //3 执行工具，获取执行结果
             var result = await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp, plugExecutionRequest);
 
+
+            CLog.Information($"准备启动远程桌面");
             // 通知前端：图站开始执行，可用于触发 VNC 远程桌面
-            StatusReporter.ReportStationExecuting(
-                plugExecutionRequest.ExecuteResultData?.Ids?.PlugDefinitionId,
-                StationToUse.StationIp,
-                plugExecutionRequest.ExecuteResultData?.Ids?.PDZId);
+            //StatusReporter.ReportStationExecuting(
+            //        result?.Ids?.PlugDefinitionId,
+            //        StationToUse.StationIp,
+            //        result?.Ids?.PDZId);
+            var pdz = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
+            var plugData = pdz?.GetPlugData(result?.Ids?.PlugDefinitionId);
+            var plugTypeKey = plugData.PlugTypeKey;
+            CLog.Information($"插头result?.Ids?.PlugDefinitionId：{result?.Ids?.PlugDefinitionId}");
+            CLog.Information($"插头plugExecutionRequest?.PlugType：{plugTypeKey}");
+            var plug = await MainApiClient.GetRootPlugByTypeNameAsync(plugTypeKey);
+            //var plug = await MainApiClient.GetPlugByDefinitionIdAsync(result?.Ids?.PlugDefinitionId);
+            var plugSetting = plug?.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
+            CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
+            if (plugSetting == "true")
+            {
+                //CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
+                StatusReporter.ReportStationExecuting(
+                    result?.Ids?.PlugDefinitionId,
+                    StationToUse.StationIp,
+                    result?.Ids?.PDZId);
+            }
 
             return result;
 

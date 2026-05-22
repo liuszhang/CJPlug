@@ -1,70 +1,546 @@
-﻿@using BlazorMonaco.Editor
-
+@using System.Text.Json
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
+@using CJ.Plug.PlugBaseCore.Models
 @using CJ.Plug.SharedPages.SharedComponents
 @using CSharpPlug.Services
-@using Elsa.Api.Client.Extensions
-@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
-@using Elsa.Api.Client.Shared.Models
-@using Humanizer
 @using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.JSInterop
 @using MudBlazor
-@using System.Text.Json.Nodes
-@using System.Text.Json
-@using System.Text
 @using Serilog
 
+@inject MainApiClient MainApiClient
 
-<MonacoEditorWrapper @ref="editor" Id="@PlugDefinitionId" Language="csharp" InitValue="@initValue"></MonacoEditorWrapper>
+<div style="display:flex; gap:16px; flex-wrap:nowrap;">
+    <div style="flex:1; min-width:300px;">
+        <MudStack>
+            <MonacoEditorWrapper @ref="editor" Id="@PlugDefinitionId" Language="csharp"
+                                 OnDidChangeModelContent="TextChanged"></MonacoEditorWrapper>
 
-<MudStack Row AlignItems="AlignItems.Center">
-    <MudButton Disabled="Processing" OnClick="TestCode" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RunCircle">
-        @if (Processing)
-        {
-            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
-        }
-        else
-        {
-            <MudText Typo="Typo.body2">测试</MudText>
-        }
-        
-        </MudButton>
-    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"><MudText Typo="Typo.body2">重置</MudText></MudButton>
-    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"><MudText Typo="Typo.body2">保存</MudText></MudButton>
-</MudStack>
-<MudTextField Lines="3" @bind-Value="codeResult" Variant="Variant.Outlined" Label="结果预览"></MudTextField>
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudButton Disabled="Processing" OnClick="TestCode" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RunCircle">
+                    @if (Processing)
+                    {
+                        <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">测试</MudText>
+                    }
+                </MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset" OnClick="ResetCode"><MudText Typo="Typo.body2">重置</MudText></MudButton>
+                <MudCheckBox @bind-Value="AutoSaveCode" T="bool" Size="Size.Small" Color="Color.Primary">自动保存</MudCheckBox>
+                <MudCheckBox @bind-Value="UseDotNetFramework" T="bool" Size="Size.Small" Color="Color.Warning"
+                             CheckedChanged="OnFrameworkFlagChanged">依赖 .NET Framework 环境</MudCheckBox>
+                <MudIconButton OnClick="SaveCode" Disabled="AutoSaveCode" Icon="@Icons.Material.Filled.Save" Size="Size.Small" Color="Color.Primary"></MudIconButton>
+            </MudStack>
+            <MudTextField Lines="3" @bind-Value="codeResult" Variant="Variant.Outlined" Label="结果预览"></MudTextField>
+        </MudStack>
+    </div>
 
+    <div style="width:400px; min-width:200px; border-left:1px solid #ccc; padding-left:12px;">
+        <MudStack>
+            <MudText Typo="Typo.h6">依赖 DLL 管理</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">上传编译所需的第三方 DLL 库（添加/删除自动保存）</MudText>
 
-@code{
+            <MudStack Row>
+                <MudFileUpload T="IBrowserFile" Multiple FilesChanged="@((f) => OnDllFilesChanged(f))">
+                    <CustomContent>
+                        <MudButton OnClick="@context.OpenFilePickerAsync" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Disabled="@isUploading">
+                            <MudText Typo="Typo.body2">上传 DLL</MudText>
+                        </MudButton>
+                    </CustomContent>
+                    <SelectedTemplate />
+                </MudFileUpload>
+
+                <FolderUploader @ref="folderUploader" ButtonText="上传文件夹"
+                                OnFilesSelected="OnFolderFilesSelected" Disabled="@isUploading" />
+            </MudStack>
+
+            <MudDivider></MudDivider>
+
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.body2">
+                    已添加 DLL (@dllReferences.Count)
+                </MudText>
+                @if (isUploading)
+                {
+                    <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
+                }
+            </MudStack>
+
+            <MudPaper Height="300px" Style="overflow:auto; padding: 4px;">
+                @if (dllReferences.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default" Class="pa-2">暂无依赖 DLL，请上传</MudText>
+                }
+                else
+                {
+                    <MudTreeView Items="@_treeData" Hover="true" Dense="true">
+                        <ItemTemplate Context="item">
+                            @{ var node = (DllTreeNode)item; }
+                            <MudTreeViewItem Items="@node.Children" Icon="@node.Icon"
+                                             IconColor="@(node.IsFolder ? Color.Warning : Color.Primary)"
+                                             Expanded="true">
+                                <BodyContent>
+                                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudText>@node.Text</MudText>
+                                        
+                                            @if (!node.IsFolder)
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                               Color="Color.Error" OnClick="@(() => RemoveDll(node.Dll!))" />
+                                            }
+                                        
+                                    </MudStack>
+                                </BodyContent>
+                            </MudTreeViewItem>
+                        </ItemTemplate>
+                    </MudTreeView>
+                }
+            </MudPaper>
+        </MudStack>
+    </div>
+</div>
+
+@code {
     [CascadingParameter]
     public PlugDataZone? PlugDataZone { get; set; }
-    [Parameter]
+    //[Parameter]
     public string? PlugDefinitionId { get; set; } = "test-csharp-plug";
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = null!;
 
     private MonacoEditorWrapper? editor { get; set; }
+    private FolderUploader? folderUploader { get; set; }
     private bool Processing { get; set; } = false;
+    private bool isUploading { get; set; } = false;
 
-    private string? initValue = "int a = 10; int b = 20; return a + b;";
+    private string csharpCode = "int a = 10; int b = 20; return a + b;";
     private string? codeResult = "";
+    private bool AutoSaveCode = true;
+    private bool UseDotNetFramework = false;
+    private bool _isDirty = false;
+    private string? _lastPlugDefinitionId;
+
+    private List<DllItem> dllReferences = new();
+
+    // ── Tree data binding ──
+    private class DllTreeNode : TreeItemData<DllTreeNode>
+    {
+        public bool IsFolder { get; set; }
+        public DllItem? Dll { get; set; }
+    }
+
+    private List<TreeItemData<DllTreeNode>> _treeData = [];
+
+    private void RebuildTree()
+    {
+        var roots = new List<TreeItemData<DllTreeNode>>();
+        var folderItems = dllReferences.Where(d => !string.IsNullOrEmpty(d.RelativePath)).ToList();
+        var rootItems = dllReferences.Where(d => string.IsNullOrEmpty(d.RelativePath)).ToList();
+
+        // Group by folder
+        var folderGroups = folderItems
+            .GroupBy(d => Path.GetDirectoryName(d.RelativePath!)?.Replace('\\', '/') ?? "/")
+            .OrderBy(g => g.Key);
+
+        foreach (var fg in folderGroups)
+        {
+            var folderNode = new DllTreeNode
+            {
+                Text = $"{fg.Key} ({fg.Count()})",
+                Icon = Icons.Material.Filled.FolderOpen,
+                IsFolder = true,
+                Expanded = true
+                // Children = fg.OrderBy(d => d.FileName).Select(d => (TreeItemData<DllTreeNode>)new DllTreeNode
+                // {
+                //     Text = d.FileName,
+                //     Icon = Icons.Material.Filled.InsertDriveFile,
+                //     Dll = d
+                // }).ToHashSet()
+            };
+            List<TreeItemData<DllTreeNode>> folderChildren = new();
+            foreach (var dll in fg.OrderBy(d => d.FileName))
+            {
+                folderChildren.Add(new DllTreeNode
+                {
+                    Text = dll.FileName,
+                    Icon = Icons.Material.Filled.InsertDriveFile,
+                    Dll = dll
+                });
+            }
+            folderNode.Children = folderChildren;
+            roots.Add(folderNode);
+        }
+
+        // Root-level files
+        foreach (var dll in rootItems.OrderBy(d => d.FileName))
+        {
+            roots.Add(new DllTreeNode
+            {
+                Text = dll.FileName,
+                Icon = Icons.Material.Filled.InsertDriveFile,
+                Dll = dll
+            });
+        }
+
+        _treeData = roots;
+    }
+
+    public class DllItem
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string? FileId { get; set; }
+        public string? LocalPath { get; set; }
+        public string? RelativePath { get; set; }
+        public long Size { get; set; }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var newPlugDefinitionId = SettingContext?.PlugDefinitionId;
+
+        if (newPlugDefinitionId != _lastPlugDefinitionId)
+        {
+            _lastPlugDefinitionId = newPlugDefinitionId;
+            PlugDefinitionId = newPlugDefinitionId;
+
+            if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+            {
+                var savedCode = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.CSharpCode.ToString());
+                if (!string.IsNullOrWhiteSpace(savedCode))
+                {
+                    csharpCode = savedCode;
+                }
+
+                await LoadDllReferences();
+
+                var savedFlag = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.UseDotNetFramework.ToString());
+                UseDotNetFramework = string.Equals(savedFlag, "true", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        await base.OnParametersSetAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(500);
+            await EditorOnDidInit();
+        }
+    }
+
+    private async Task EditorOnDidInit()
+    {
+        if (!string.IsNullOrEmpty(csharpCode))
+        {
+            await editor!.SetValue(csharpCode);
+        }
+    }
+
+    private async Task TextChanged()
+    {
+        _isDirty = true;
+        if (AutoSaveCode)
+        {
+            await SaveCode();
+        }
+    }
+
+    private async Task LoadDllReferences()
+    {
+        try
+        {
+            if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+            {
+                var json = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.DllReferences.ToString());
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var refs = JsonSerializer.Deserialize<List<DllItem>>(json);
+                    if (refs != null)
+                    {
+                        dllReferences = refs;
+                        RebuildTree();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"加载 DLL 引用失败: {ex.Message}");
+        }
+    }
+
+    private async Task<string?> DownloadDllToLocal(string fileId, string fileName)
+    {
+        try
+        {
+            var stream = await MainApiClient.DownloadFileByFileId(fileId);
+            if (stream == null) return null;
+
+            var tempDir = Path.Combine(Path.GetTempPath(), "CSharpPlug_Dlls");
+            Directory.CreateDirectory(tempDir);
+            var localPath = Path.Combine(tempDir, $"{Guid.NewGuid()}_{fileName}");
+
+            await using (stream)
+            await using (var fs = File.Create(localPath))
+            {
+                await stream.CopyToAsync(fs);
+            }
+            return localPath;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"下载 DLL {fileName} 失败: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task OnDllFilesChanged(IBrowserFile file)
+    {
+        if (file == null) return;
+        //if (!file.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) return;
+
+        // 移除同名旧文件（覆盖上传）
+        var existing = dllReferences.FirstOrDefault(d => d.FileName == file.Name && string.IsNullOrEmpty(d.RelativePath));
+        if (existing != null) RemoveDllInternal(existing);
+
+        isUploading = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            using var ms = new MemoryStream();
+            await using var stream = file.OpenReadStream(long.MaxValue);
+            await stream.CopyToAsync(ms);
+            await SaveDllFile(file.Name, ms.ToArray(), null);
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"上传 DLL 失败: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnFolderFilesSelected(List<FolderUploader.FolderFileEntry> entries)
+    {
+        isUploading = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            foreach (var entry in entries)
+            {
+                // 移除同名旧文件（覆盖上传）
+                var existing = dllReferences.FirstOrDefault(d => d.RelativePath == entry.RelativePath);
+                if (existing != null) RemoveDllInternal(existing);
+
+                var data = await folderUploader!.GetFileBytesAsync(entry.RelativePath);
+                if (data == null)
+                {
+                    codeResult = $"读取文件失败: {entry.RelativePath}";
+                    continue;
+                }
+
+                await SaveDllFile(entry.FileName, data, entry.RelativePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"上传文件夹失败: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task SaveDllFile(string fileName, byte[] data, string? relativePath)
+    {
+        string? fileId = null;
+        try
+        {
+            if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+            {
+                var plugData = PlugDataZone.GetPlugData(PlugDefinitionId);
+                var uploadName = relativePath ?? fileName;
+                using var ms = new MemoryStream(data);
+                var result = await MainApiClient.UploadFileStreamToWorkPathInChunks(ms, uploadName, plugData);
+                fileId = result.Item2;
+            }
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"上传 DLL 失败: {ex.Message}";
+            return;
+        }
+
+        dllReferences.Add(new DllItem
+        {
+            FileName = fileName,
+            FileId = fileId,
+            RelativePath = relativePath,
+            Size = data.Length
+        });
+
+        codeResult = $"已添加 DLL: {(string.IsNullOrEmpty(relativePath) ? fileName : relativePath)}";
+        RebuildTree();
+        await AutoSaveDllReferences();
+    }
+
+        private async Task AutoSaveDllReferences()
+        {
+            try
+            {
+                if (PlugDataZone == null || string.IsNullOrEmpty(PlugDefinitionId))
+                    return;
+
+                var saveData = dllReferences.Select(d => new
+                {
+                    d.FileName,
+                    d.FileId,
+                    d.LocalPath,
+                    d.RelativePath,
+                    d.Size
+                });
+                var json = JsonSerializer.Serialize(saveData);
+                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.DllReferences.ToString(), json);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"自动保存 DLL 引用失败: {ex.Message}");
+            }
+        }
+
+        private async Task SaveFrameworkFlag()
+        {
+            try
+            {
+                if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+                {
+                    PlugDataZone.SetVariableValue(PlugDefinitionId,
+                        InitVariableNames.UseDotNetFramework.ToString(),
+                        UseDotNetFramework ? "true" : "false");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"保存 Framework 标志失败: {ex.Message}");
+            }
+        }
+
+    private void RemoveDllInternal(DllItem dll)
+    {
+        dllReferences.Remove(dll);
+        if (!string.IsNullOrEmpty(dll.LocalPath) && File.Exists(dll.LocalPath))
+        {
+            try { File.Delete(dll.LocalPath); } catch { }
+        }
+    }
+
+    private void RemoveDll(DllItem dll)
+    {
+        RemoveDllInternal(dll);
+        RebuildTree();
+        _ = AutoSaveDllReferences();
+    }
+
+    private async Task SaveCode()
+    {
+        try
+        {
+            if (editor != null && PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+            {
+                var model = await editor.GetModel();
+                csharpCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.CSharpCode.ToString(), csharpCode);
+                _isDirty = false;
+                codeResult = "代码已保存";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            codeResult = $"保存代码失败: {ex.Message}";
+        }
+    }
+
+    private async Task ResetCode()
+    {
+        csharpCode = "int a = 10; int b = 20; return a + b;";
+        if (editor != null)
+        {
+            await editor.SetValue(csharpCode);
+        }
+    }
+
+    private async Task OnFrameworkFlagChanged(bool value)
+    {
+        await SaveFrameworkFlag();
+    }
+
+    private async Task EnsureDllLocalPathsAsync()
+    {
+        foreach (var dll in dllReferences)
+        {
+            if (!string.IsNullOrEmpty(dll.LocalPath) && File.Exists(dll.LocalPath))
+                continue;
+            if (!string.IsNullOrEmpty(dll.FileId))
+            {
+                var path = await DownloadDllToLocal(dll.FileId, dll.FileName);
+                if (path != null) dll.LocalPath = path;
+            }
+        }
+    }
 
     private async Task TestCode()
     {
         Processing = true;
-        if (editor != null)
+        await InvokeAsync(StateHasChanged);
+        try
         {
-            //var code = initValue;
-            var references = new[]
+            if (editor != null)
             {
-                "System.Runtime.dll",          // 基础库
-                //"path/to/your/sdk.dll"         // 自定义 SDK
-            };
-            var model = await editor.GetModel();
-            var code = await model.GetValue(EndOfLinePreference.CRLF, default);
-            //Log.Information($"执行代码：{code}");
-            codeResult = await CodeRunner.RunCSharpCodeAsync(code, references);
-        }
-        Processing = false;
-    }
+                var model = await editor.GetModel();
+                var code = await model.GetValue(EndOfLinePreference.CRLF, default);
 
+                await EnsureDllLocalPathsAsync();
+
+                var dllPaths = dllReferences
+                    .Where(d => !string.IsNullOrEmpty(d.LocalPath) && File.Exists(d.LocalPath))
+                    .Select(d => d.LocalPath!)
+                    .ToList();
+
+                if (dllPaths.Count > 0)
+                {
+                    if (UseDotNetFramework)
+                    {
+                        codeResult = await CodeRunner.RunCSharpCodeViaBridgeAsync(code, dllPaths);
+                    }
+                    else
+                    {
+                        codeResult = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths);
+                    }
+                }
+                else
+                {
+                    codeResult = await CodeRunner.RunCSharpCodeAsync(code, ["System.Runtime.dll"]);
+                }
+            }
+        }
+        finally
+        {
+            Processing = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
 }

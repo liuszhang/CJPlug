@@ -7,147 +7,423 @@
 @using MudBlazor
 @using System.Text.Json
 
-@inject IDepartmentManageApiClient DepartmentApiClient
-@inject IAuthApiClient AuthApiClient
+@inject MainApiClient DepartmentApiClient
+@inject MainApiClient UserApiClient
+@inject MainApiClient AuthApiClient
 @inject IDomInteropService DomInteropService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
-    <MudText Typo="Typo.h6">部门管理</MudText>
-    <MudSpacer />
-    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建部门</MudButton>
-    <MudButton OnClick="Refresh" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
-</MudStack>
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    @* ===== Tab 1: 部门管理（表格树） ===== *@
+    <MudTabPanel Text="部门管理" Icon="@Icons.Material.Filled.Business">
+        <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">部门结构</MudText>
+            <MudSpacer />
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OpenCreateDialog())">创建部门</MudButton>
+            <MudButton OnClick="@LoadDepartments" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+        </MudStack>
 
-<MudDataGrid @ref="_dataGrid"
-             T="DepartmentManageDto"
-             ServerData="LoadData"
-             Dense="true"
-             Hover="true"
-             Elevation="0"
-             SortMode="SortMode.Single"
-             RowStyle="cursor: default;"
-             MultiSelection="true"
-             SelectedItems="_selectedDepts"
-             SelectOnRowClick="false">
-    <ToolBarContent>
-        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索部门名、编码、负责人"
-                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
-                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
-    </ToolBarContent>
-    <Columns>
-        <SelectColumn T="DepartmentManageDto" />
-        <TemplateColumn Title="部门名称" Sortable="true">
-            <CellTemplate><MudText>@context.Item.Name</MudText></CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="编码">
-            <CellTemplate>@(context.Item.Code ?? "-")</CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="上级部门">
-            <CellTemplate>@(context.Item.ParentName ?? "-")</CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="负责人">
-            <CellTemplate>@(context.Item.Manager ?? "-")</CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="状态">
-            <CellTemplate>
-                @{
-                    var status = context.Item.Status;
-                    var chipColor = status switch
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_tableRows.Count == 0)
+        {
+            <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                <MudText Typo="Typo.body1" Class="mud-text-secondary">暂无部门数据，点击「创建部门」添加</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Elevation="1">
+                <MudTable Items="@_tableRows" Dense="true" Hover="true" Elevation="0" Style="width:100%">
+                    <HeaderContent>
+                        <MudTh Style="width: 40px"></MudTh>
+                        <MudTh>部门名称</MudTh>
+                        <MudTh>编码</MudTh>
+                        <MudTh>负责人</MudTh>
+                        <MudTh Style="width: 100px">创建人</MudTh>
+                        <MudTh Style="width: 220px">创建时间</MudTh>
+                        <MudTh Style="width: 100px">状态</MudTh>
+                        <MudTh Style="width: 120px">操作</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Style="padding: 0 4px;">
+                            @if (context.HasChildren)
+                            {
+                                <MudIconButton
+                                    Icon="@(context.IsExpanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)"
+                                    Size="Size.Small"
+                                    OnClick="@(() => ToggleExpand(context))" />
+                            }
+                        </MudTd>
+                        <MudTd Style="@($"padding-left: {context.Depth * 24 + 8}px;")">
+                            <MudStack Row AlignItems="AlignItems.Center" Style="width:100%">
+                                <MudIcon Icon="@(context.Depth == 0 ? Icons.Material.Filled.Business : Icons.Material.Filled.SubdirectoryArrowRight)"
+                                         Size="Size.Small" Class="me-2" Color="Color.Primary" />
+                                <MudText>@context.Name</MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Class="mud-text-secondary">@(context.Code ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@(context.Manager ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@(context.Creator ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            @{
+                                var status = context.Status;
+                                var chipColor = status switch
+                                {
+                                    DataStatus.Authorizing => Color.Warning,
+                                    DataStatus.Disabled => Color.Default,
+                                    DataStatus.Active => Color.Success,
+                                    _ => Color.Default
+                                };
+                                var statusText = status switch
+                                {
+                                    DataStatus.Authorizing => "授权中",
+                                    DataStatus.Disabled => "禁用",
+                                    DataStatus.Active => "启用",
+                                    _ => "未知"
+                                };
+                            }
+                            <MudChip T="string" Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">@statusText</MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <div style="white-space: nowrap;">
+                                <MudTooltip Text="添加子部门">
+                                    <MudIconButton Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small"
+                                                   Color="Color.Primary" OnClick="@(() => OpenCreateDialog(context.Dto))" />
+                                </MudTooltip>
+                                <MudTooltip Text="编辑">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                                   Color="Color.Default" OnClick="@(() => OpenEditDialog(context.Dto))" />
+                                </MudTooltip>
+                                <MudTooltip Text="删除">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="@(() => DeleteDept(context.Dto))" />
+                                </MudTooltip>
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    @* ===== Tab 2: 部门人员管理 ===== *@
+    <MudTabPanel Text="部门人员管理" Icon="@Icons.Material.Filled.People">
+        <MudGrid Style="height: calc(100vh - 220px);" Spacing="2">
+            @* 左栏：部门树（保留树形选择） *@
+            <MudItem xs="3">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    <MudText Typo="Typo.subtitle2" Class="px-2 py-1 mud-text-secondary">选择部门</MudText>
+                    @if (_treeItemsForSelect.Count > 0)
                     {
-                        DataStatus.Authorizing => Color.Warning,
-                        DataStatus.Disabled => Color.Default,
-                        DataStatus.Active => Color.Success,
-                        _ => Color.Default
-                    };
-                    var statusText = status switch
+                        <MudTreeView T="DepartmentManageDto" AutoExpand Items="@_treeItemsForSelect" Hover="true" @bind-SelectedValue="_selectedDeptForUsers">
+                            <ItemTemplate Context="item">
+                                <MudTreeViewItem T="DepartmentManageDto" Value="@item.Value" Items="@item.Children" Icon="@item.Icon" Expanded
+                                                 Text="@item.Text" />
+                            </ItemTemplate>
+                        </MudTreeView>
+                    }
+                    else
                     {
-                        DataStatus.Authorizing => "授权中",
-                        DataStatus.Disabled => "禁用",
-                        DataStatus.Active => "启用",
-                        _ => "未知"
-                    };
-                }
-                <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
-                    @statusText
-                </MudChip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="创建时间" Sortable="true">
-            <CellTemplate>@context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Style="text-align:right" Title="操作">
-            <CellTemplate>
-                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
-                    <MudMenuItem OnClick="@(()=>DeleteDept(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                </MudMenu>
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-    <NoRecordsContent><MudText>没有部门数据</MudText></NoRecordsContent>
-    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
-    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
-</MudDataGrid>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary pa-2">暂无部门数据</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            @* 右栏：人员列表 *@
+            <MudItem xs="9">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    @if (_selectedDeptForUsers != null)
+                    {
+                        <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.h6">@_selectedDeptForUsers.Name 的人员</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">（@_deptUsers.Count 人）</MudText>
+                            <MudSpacer />
+                            <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@OpenAddUserDialog">添加人员</MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@LoadDeptUsers">刷新</MudButton>
+                        </MudStack>
+
+                        <MudDataGrid T="DepartmentUserInfo" Items="@_deptUsers" Dense="true" Hover="true" Elevation="0"
+                                     ReadOnly="true" SortMode="SortMode.Single">
+                            <Columns>
+                                <TemplateColumn Title="用户名">
+                                    <CellTemplate>@context.Item.UserName</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="姓名">
+                                    <CellTemplate>@($"{context.Item.FirstName ?? ""}{context.Item.LastName ?? ""}")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="电话">
+                                    <CellTemplate>@(context.Item.PhoneNumber ?? "-")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="状态">
+                                    <CellTemplate>
+                                        @{
+                                            var userStatus = context.Item.Status;
+                                            var userChipColor = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => Color.Warning,
+                                                DataStatus.Disabled => Color.Default,
+                                                DataStatus.Active => Color.Success,
+                                                _ => Color.Default
+                                            };
+                                            var userStatusText = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => "授权中",
+                                                DataStatus.Disabled => "禁用",
+                                                DataStatus.Active => "启用",
+                                                _ => "未知"
+                                            };
+                                        }
+                                        <MudChip Color="@userChipColor" Variant="Variant.Filled" Size="Size.Small">@userStatusText</MudChip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Style="text-align:right" Title="操作">
+                                    <CellTemplate>
+                                        <MudTooltip Text="从部门移除">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.PersonRemove" Size="Size.Small"
+                                                           Color="Color.Error" OnClick="@(() => RemoveUser(context.Item))" />
+                                        </MudTooltip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            </Columns>
+                            <NoRecordsContent>
+                                <MudText>该部门暂无人员，点击「添加人员」</MudText>
+                            </NoRecordsContent>
+                        </MudDataGrid>
+                    }
+                    else
+                    {
+                        <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                            <MudText Typo="Typo.body1" Class="mud-text-secondary">← 请先在左侧选择一个部门</MudText>
+                        </MudPaper>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+</MudTabs>
 
 @code {
-    private MudDataGrid<DepartmentManageDto> _dataGrid = default!;
-    private HashSet<DepartmentManageDto> _selectedDepts = new();
-    private string? _searchString;
-    private List<DepartmentManageDto> _allDepts = [];
-    private bool _isLoaded = false;
-
-    protected override async Task OnInitializedAsync()
+    // ===== 表格树行模型 =====
+    private class DepartmentTreeRow
     {
-        await LoadData_Internal();
-        _isLoaded = true;
+        public DepartmentManageDto Dto { get; init; } = default!;
+        public string Name => Dto.Name ?? "";
+        public string? Code => Dto.Code;
+        public string? Manager => Dto.Manager;
+        public string? Creator => Dto.Creator;
+        public DateTimeOffset CreatedAt => Dto.CreatedAt;
+        public DataStatus Status => Dto.Status;
+        public int Id => Dto.Id;
+        public int? ParentId => Dto.ParentId;
+        public int Depth { get; set; }
+        public bool IsExpanded { get; set; } = true;
+        public bool HasChildren => Children.Count > 0;
+        public List<DepartmentTreeRow> Children { get; set; } = [];
     }
+
+    // ===== 状态 =====
+    private bool _loading = true;
+    private List<DepartmentManageDto> _allDepts = [];
+    private List<DepartmentTreeRow> _tableRows = [];
+
+    // Tab 2: 部门人员管理（保留树形选择器）
+    private List<TreeItemData<DepartmentManageDto>> _treeItemsForSelect = [];
+    private DepartmentManageDto? _selectedDeptForUsers;
+    private List<DepartmentUserInfo> _deptUsers = [];
+    private DepartmentManageDto? _prevSelectedDeptForUsers;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _isLoaded)
+        if (firstRender)
         {
-            await _dataGrid.ReloadServerData();
+            await LoadDepartments();
+            StateHasChanged();
+        }
+        else if (_selectedDeptForUsers != null && _selectedDeptForUsers != _prevSelectedDeptForUsers)
+        {
+            _prevSelectedDeptForUsers = _selectedDeptForUsers;
+            await LoadDeptUsers();
+            StateHasChanged();
         }
     }
 
-    private async Task LoadData_Internal()
+    // ===== 数据加载 =====
+    private async Task LoadDepartments()
     {
-        try { _allDepts = await DepartmentApiClient.GetAllDepartmentsAsync(); }
-        catch { _allDepts = []; }
-    }
-
-    public async Task Refresh()
-    {
-        await LoadData_Internal();
-        await _dataGrid.ReloadServerData();
-    }
-
-    private async Task<GridData<DepartmentManageDto>> LoadData(GridState<DepartmentManageDto> state, CancellationToken token)
-    {
-        var query = _allDepts.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(_searchString))
+        _loading = true;
+        try
         {
-            var s = _searchString.Trim();
-            query = query.Where(d =>
-                (!string.IsNullOrEmpty(d.Name) && d.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(d.Code) && d.Code.Contains(s, StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(d.Manager) && d.Manager.Contains(s, StringComparison.OrdinalIgnoreCase)));
+            _allDepts = await DepartmentApiClient.GetAllDepartmentsAsync();
+            BuildTableTree();
+            BuildSelectTree();
         }
-        var sortDef = state.SortDefinitions?.FirstOrDefault();
-        if (sortDef?.SortBy == nameof(DepartmentManageDto.Name))
-            query = sortDef.Descending ? query.OrderByDescending(d => d.Name) : query.OrderBy(d => d.Name);
-        else
-            query = query.OrderByDescending(d => d.Id);
-
-        var items = query.ToList();
-        var total = items.Count;
-        var pageItems = items.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
-        return new GridData<DepartmentManageDto> { TotalItems = total, Items = pageItems };
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载部门失败: {ex.Message}", Severity.Error);
+            _allDepts = [];
+            _tableRows = [];
+            _treeItemsForSelect = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
-    private async Task OpenCreateDialog()
+    private readonly Dictionary<int, bool> _expandedState = new();
+
+    /// <summary>
+    /// 构建表格树：将扁平部门列表转为树结构，再展平为可见行列表
+    /// </summary>
+    private void BuildTableTree()
+    {
+        _tableRows = [];
+
+        // 1. 创建所有节点
+        var nodeMap = new Dictionary<int, DepartmentTreeRow>();
+        var rootNodes = new List<DepartmentTreeRow>();
+
+        foreach (var d in _allDepts)
+        {
+            var row = new DepartmentTreeRow
+            {
+                Dto = d,
+                IsExpanded = !_expandedState.ContainsKey(d.Id) || _expandedState[d.Id]
+            };
+            nodeMap[d.Id] = row;
+        }
+
+        // 2. 建立父子关系（先不计算深度，因为遍历顺序不保证父在前）
+        foreach (var d in _allDepts)
+        {
+            var node = nodeMap[d.Id];
+            if (d.ParentId.HasValue && nodeMap.TryGetValue(d.ParentId.Value, out var parent))
+            {
+                parent.Children.Add(node);
+            }
+            else
+            {
+                rootNodes.Add(node);
+            }
+        }
+
+        // 3. 从根节点递归设置深度（保证多层级正确缩进）
+        AssignDepth(rootNodes, 0);
+
+        // 4. DFS展平为可见行
+        FlattenVisible(rootNodes);
+    }
+
+    private static void AssignDepth(List<DepartmentTreeRow> nodes, int depth)
+    {
+        foreach (var node in nodes)
+        {
+            node.Depth = depth;
+            if (node.HasChildren)
+                AssignDepth(node.Children, depth + 1);
+        }
+    }
+
+    private void FlattenVisible(List<DepartmentTreeRow> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            _tableRows.Add(node);
+            if (node.IsExpanded && node.HasChildren)
+            {
+                FlattenVisible(node.Children);
+            }
+        }
+    }
+
+    private void ToggleExpand(DepartmentTreeRow row)
+    {
+        _expandedState[row.Id] = !row.IsExpanded;
+        BuildTableTree(); // 重建整个展平列表，使用保存的展开状态
+    }
+
+    /// <summary>
+    /// 构建 Tab2 部门人员选择的树形选择器
+    /// </summary>
+    private void BuildSelectTree()
+    {
+        _treeItemsForSelect = [];
+
+        var lookup = new Dictionary<int, TreeItemData<DepartmentManageDto>>();
+        var childrenMap = new Dictionary<int, List<TreeItemData<DepartmentManageDto>>>();
+        var parentIds = new HashSet<int>();
+
+        foreach (var d in _allDepts)
+        {
+            var node = new TreeItemData<DepartmentManageDto>
+            {
+                Value = d,
+                Text = d.Name ?? "",
+                Icon = Icons.Material.Filled.Business,
+                Expandable = true,
+                Expanded = true
+            };
+            lookup[d.Id] = node;
+
+            if (d.ParentId.HasValue)
+            {
+                parentIds.Add(d.ParentId.Value);
+                if (!childrenMap.ContainsKey(d.ParentId.Value))
+                    childrenMap[d.ParentId.Value] = [];
+                childrenMap[d.ParentId.Value].Add(node);
+            }
+        }
+
+        // 为每个父节点设置 Children
+        foreach (var (parentId, children) in childrenMap)
+        {
+            if (lookup.TryGetValue(parentId, out var parent))
+            {
+                parent.Children = children;
+            }
+        }
+
+        // 收集根节点
+        foreach (var d in _allDepts)
+        {
+            if (!d.ParentId.HasValue || !lookup.ContainsKey(d.ParentId.Value))
+            {
+                _treeItemsForSelect.Add(lookup[d.Id]);
+            }
+        }
+    }
+
+    private async Task LoadDeptUsers()
+    {
+        if (_selectedDeptForUsers == null) return;
+        try
+        {
+            _deptUsers = await DepartmentApiClient.GetDepartmentUsersAsync(_selectedDeptForUsers.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载人员失败: {ex.Message}", Severity.Error);
+            _deptUsers = [];
+        }
+    }
+
+    // ===== 部门 CRUD（通过授权流程） =====
+    private async Task OpenCreateDialog(DepartmentManageDto? parentDept = null)
     {
         var parameters = new DialogParameters
         {
@@ -155,7 +431,7 @@
             { "DepartmentId", 0 },
             { "DepartmentName", "" },
             { "DepartmentCode", "" },
-            { "ParentId", (int?)null },
+            { "ParentId", parentDept?.Id },
             { "Manager", "" },
             { "Status", DataStatus.Authorizing },
             { "Departments", _allDepts }
@@ -219,11 +495,99 @@
 
             await AuthApiClient.CreateAsync(request);
             Snackbar.Add($"已创建{targetDescription}，状态为「授权中」，等待审批", Severity.Success);
-            await Refresh();
+            await LoadDepartments();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ===== 人员管理 =====
+    private async Task OpenAddUserDialog()
+    {
+        if (_selectedDeptForUsers == null) return;
+
+        List<User?> allUsers;
+        try
+        {
+            allUsers = (await UserApiClient.GetAllUsersAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户列表失败: {ex.Message}", Severity.Error);
+            return;
+        }
+
+        var deptUserIds = _deptUsers.Select(u => u.Id).ToHashSet();
+        var availableUsers = allUsers
+            .Where(u => u != null && !deptUserIds.Contains(u.Id))
+            .Select(u => new DepartmentUserInfo
+            {
+                Id = u!.Id,
+                UserName = u.UserName,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                PhoneNumber = u.PhoneNumber,
+                DepartmentId = u.DepartmentId,
+                Status = (DataStatus)u.Status
+            })
+            .ToList();
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableUsers", availableUsers },
+            { "DepartmentName", _selectedDeptForUsers.Name ?? "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddDepartmentUserDialog>("添加人员到部门", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is List<int> userIds)
+        {
+            var successCount = 0;
+            foreach (var userId in userIds)
+            {
+                try
+                {
+                    var success = await DepartmentApiClient.AddUserToDepartmentAsync(_selectedDeptForUsers.Id, userId);
+                    if (success) successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"添加用户ID {userId} 失败: {ex.Message}", Severity.Error);
+                }
+            }
+            if (successCount > 0)
+            {
+                Snackbar.Add($"成功添加 {successCount} 人到部门", Severity.Success);
+                await LoadDeptUsers();
+            }
+        }
+    }
+
+    private async Task RemoveUser(DepartmentUserInfo user)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认移除",
+            $"确定要将 \"{user.UserName}\" 从部门 \"{_selectedDeptForUsers?.Name}\" 移除吗？",
+            yesText: "移除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await DepartmentApiClient.RemoveUserFromDepartmentAsync(user.Id);
+            if (success)
+            {
+                Snackbar.Add($"已将 {user.UserName} 从部门移除", Severity.Success);
+                await LoadDeptUsers();
+            }
+            else
+            {
+                Snackbar.Add("移除失败：用户不存在", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"移除失败: {ex.Message}", Severity.Error);
         }
     }
 }

@@ -95,6 +95,11 @@ namespace CJ.Plug.AuditModels
         /// 系统设置
         /// </summary>
         System = 9,
+
+        /// <summary>
+        /// 用户组管理
+        /// </summary>
+        UserGroupManage= 10,
         
         /// <summary>
         /// 其他
@@ -139,7 +144,7 @@ namespace CJ.Plug.AuditModels
             AuditOperationType.Cancel => "撤回",
             AuditOperationType.Execute => "执行",
             AuditOperationType.Other => "其他",
-            _ => "未知"
+            _ => OperationType.ToString()
         };
         
         /// <summary>
@@ -159,8 +164,9 @@ namespace CJ.Plug.AuditModels
             AuditModule.ProcessManage => "流程管理",
             AuditModule.PlugManage => "插件管理",
             AuditModule.System => "系统设置",
+            AuditModule.UserGroupManage => "用户组管理",
             AuditModule.Other => "其他",
-            _ => "未知"
+            _ => Module.ToString()
         };
         
         /// <summary>

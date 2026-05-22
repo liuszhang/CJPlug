@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ProcessManageModule.Menus;
+using UserManageModule.Permissions;
 
 
 public static class ServiceCollectionExtensions
@@ -43,6 +44,18 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
+        services.AddHttpClient<IRolePermissionApiClient, RolePermissionApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.AddHttpClient<IGroupManageApiClient, GroupManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         // 注册AuthApiClient用于授权管理
         services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
         {
@@ -60,6 +73,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserManageService, UserManageService>();
         services.AddScoped<IRoleManageService, RoleManageService>();
         services.AddScoped<IDepartmentManageService, DepartmentManageService>();
+        services.AddScoped<IRolePermissionService, RolePermissionService>();
+        services.AddScoped<IGroupManageService, GroupManageService>();
+
+        // 注册功能权限提供者
+        services.AddSingleton<IFunctionPermissionProvider, UserManagePermissionProvider>();
+
+        // 注册种子数据提供者
+        services.AddSingleton<ISeedDataProvider, UserManageSeedDataProvider>();
 
         services.AddHttpClient<IUserManageApiClient, UserManageApiClient>(client =>
         {
@@ -79,6 +100,18 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
+        services.AddHttpClient<IRolePermissionApiClient, RolePermissionApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.AddHttpClient<IGroupManageApiClient, GroupManageApiClient>(client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
         return services;
     }
 
@@ -89,6 +122,8 @@ public static class ServiceCollectionExtensions
             endpoints.MapUserManageApi();
             endpoints.MapRoleManageApi();
             endpoints.MapDepartmentManageApi();
+            endpoints.MapRolePermissionApi();
+            endpoints.MapGroupManageApi();
         });
     }
 }

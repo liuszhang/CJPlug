@@ -16,6 +16,7 @@ namespace CJ.Plug.Models.Shared
         /// 状态：-1=授权中，0=禁用，1=启用
         /// </summary>
         public int Status { get; set; } = 1;
+        public string? Creator { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     }
 }

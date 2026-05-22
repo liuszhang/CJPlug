@@ -29,6 +29,7 @@
 @using AlignItems=MudBlazor.AlignItems
 @using Variant=MudBlazor.Variant
 @using DialogOptions=MudBlazor.DialogOptions
+@using CJ.Plug.SharedPages.Contracts
 
 
 @inject NavigationManager NavigationManager
@@ -38,6 +39,7 @@
 @inject IElsaStudioService ElsaEngineService
 @inject ISnackbar Snackbar
 @inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -54,8 +56,8 @@
 
         @* <MudButton StartIcon="@Icons.Material.Filled.NewReleases" Variant="Variant.Filled" Color="Color.Primary">创建接口类插头</MudButton>
         <MudButton StartIcon="@Icons.Material.Filled.Javascript" Variant="Variant.Filled" Color="Color.Primary">创建脚本类插头</MudButton> *@
-        <MudButton StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" Color="Color.Primary">导入</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" Color="Color.Primary">导出</MudButton>
+        <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" Color="Color.Primary">导入</MudButton>
+        <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" Color="Color.Primary">导出</MudButton>
         <MudButton OnClick="GetSysInitRootPlugs" StartIcon="@Icons.Material.Filled.DevicesFold" Variant="Variant.Outlined" Color="Color.Primary">重置默认插头</MudButton>
         <MudSpacer></MudSpacer>
         <MudTextField T="string"
@@ -65,26 +67,26 @@
         AdornmentIcon="@Icons.Material.Outlined.Search"
         Adornment="Adornment.End"
         Clearable="true"
-        DebounceInterval="1500"
         Immediate="true"
-        Class="me-3" />
+        Class="me-3"
+        @bind-Value="Search" />
     </MudStack>
 
     <MudDivider />
 
-    <MudDropContainer T="Plug" Items="RootPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemDropped="ItemDroped">
+    <MudDropContainer T="Plug" Items="RootPlugsToShow" @key="RootPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
 
 
         <ChildContent>
             <CascadingValue Value="SelectedPlug">
 
-                <RadzenSplitter>
+                <RadzenSplitter Style="height: 100%;">
                     <RadzenSplitterPane Size="25%" Min="200px" Collapsed="PlugListPanelCollapsed">
 
                         <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
                             <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键插入</MudButton>
                             <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键拔出</MudButton>
-                            <MudCheckBox Dense @bind-Value="IsShowSystemTool" @bind-Value:after="RefreshContainer" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
+                            <MudCheckBox T="bool" Dense Value="IsShowSystemTool" ValueChanged="OnShowSystemToolChanged" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
 
                         </MudStack>
                         <VerticalWell ExtraPadding="100">
@@ -98,7 +100,7 @@
                                 }
                                 else
                                 {
-                                    <MudList T="Plug" @bind-SelectedValue="SelectedPlug" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
+                                    <MudList T="Plug" SelectedValue="SelectedPlug" SelectedValueChanged="OnPlugSelected" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
                                         <MudDropZone T="Plug" Identifier="@("Plug")" AllowReorder="true">
 
                                         </MudDropZone>
@@ -109,9 +111,9 @@
                         </VerticalWell>
                     </RadzenSplitterPane>
                     <RadzenSplitterPane Size="75%" Min="200px">
-                        <RadzenSplitter Orientation="Orientation.Vertical" Resize="OnResize">
+                        <RadzenSplitter Style="height: 100%;" Orientation="Orientation.Vertical" Resize="OnResize">
                             <RadzenSplitterPane Size="65%" Min="100px">
-                                <RadzenSplitter>
+                                <RadzenSplitter Style="height: 100%;">
                                     <RadzenSplitterPane Size="70%" Min="100px">
                                         <MudStack Style="height:100%">                                            
                                             @* <MudStack Row>
@@ -136,17 +138,17 @@
                                                 {
                                                     <MudProgressLinear Indeterminate="true"></MudProgressLinear>
                                                 }
-                                                <MudList T="Plug" @bind-SelectedValue="SelectedToolActionItem" Color="Color.Success" CheckBoxColor="Color.Tertiary">
-                                                    <MudDropZone Style="height:100%" T="Plug" Identifier="@(SelectedPlug?.DefinitionId + "Action")" AllowReorder="true">
+                                            <MudList T="Plug" @bind-SelectedValue="SelectedToolActionItem" Color="Color.Success" CheckBoxColor="Color.Tertiary">
+                                                    <MudDropZone Style="height:100%" T="Plug" Identifier="@(_actionPanelPlug?.DefinitionId + "Action")" AllowReorder="true">
                                                         <MudStack Spacing="0" Justify="Justify.Center" AlignItems="AlignItems.Center">
                                                             <MudStack Row>
-                                                                <MudButton OnClick="CreatePlugActionItem" Disabled="@(SelectedPlug == null)" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建动作</MudButton>
-                                                                <MudButton OnClick="CreatePlugActionItem" Disabled="@(SelectedPlug == null)" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">关联现有</MudButton>
+                                                                <MudButton OnClick="CreatePlugActionItem" Disabled="@(_actionPanelPlug == null)" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建动作</MudButton>
+                                                                <MudButton OnClick="CreatePlugActionItem" Disabled="@(_actionPanelPlug == null)" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">关联现有</MudButton>
                                                             </MudStack>
-                                                            @if (SelectedPlug != null)
+                                                            @if (_actionPanelPlug != null)
                                                             {
-                                                                <MudText Typo="Typo.body2">---@SelectedPlug.Name @SelectedPlug.ToolVersion 动作清单---</MudText>
-                                                                <MudText Typo="Typo.body2" Color="Color.Info">(拖动插头至此处添加动作)</MudText>
+                                                                <MudText Typo="Typo.body2">---@_actionPanelPlug.Name @_actionPanelPlug.ToolVersion 动作清单---</MudText>
+                                                                <MudText Typo="Typo.body2" Color="Color.Info">@( _isDragging ? "(拖拽中...)" : "(拖动插头至此处添加动作)" )</MudText>
                                                             }
                                                         </MudStack>
                                                     </MudDropZone>
@@ -207,9 +209,21 @@
 @code {
 
     private MudDropContainer<Plug> _container;
+    private Plug? _actionPanelPlug;
+    private bool _isDragging = false;
+    private CancellationTokenSource? _selectionUpdateCts;
     public double? Amount { get; set; }
     public int? Weight { get; set; }
-    public string Search { get; set; }
+    private string _search;
+    public string Search
+    {
+        get => _search;
+        set
+        {
+            _search = value;
+            UpdateFilteredPlugs();
+        }
+    }
     public bool isItemLoading { get; set; } = true;
     public bool isActionLoading { get; set; } = false;
     public bool IsShowSystemTool { get; set; } = true;
@@ -218,17 +232,7 @@
     public bool ReadOnly;
 
     private List<Plug>? RootPlugs { get; set; } = new();
-    private List<Plug>? RootPlugsToShow
-    {
-        get
-        {
-            if (!IsShowSystemTool)
-            {
-                return RootPlugs?.Where(p => p.CreateType != PlugCreateTypeEnum.SystemInitPlug.ToString()).ToList();
-            }
-            return RootPlugs;
-        }
-    }
+    private List<Plug>? RootPlugsToShow { get; set; } = new();
     private List<Plug>? ShadowPlugActions { get; set; } = new();
     private Plug? SelectedPlug { get; set; }
     private Plug? SelectedToolActionItem { get; set; }
@@ -246,11 +250,12 @@
         SplitterPanelPercent = 100 - args.NewSize;
     }
 
-
     private async Task ItemDroped(MudItemDropInfo<Plug> dropItem)
     {
-        //Console.WriteLine(JsonSerializer.Serialize(dropItem));
+        // _isDragging 保持 true，防止 drop 后 MudBlazor 的 SelectedValueChanged 选中被拖拽插头
         Console.WriteLine(dropItem.DropzoneIdentifier);
+        var prevPlugId = _actionPanelPlug?.Id;
+
         if (dropItem.DropzoneIdentifier.Contains("Action") && dropItem.Item.Tag == "Plug")
         {
             var newPlug = dropItem.Item;
@@ -264,14 +269,48 @@
             var result = await MainApiClient.CreateNewPlug(newPlug);
             Console.WriteLine(JsonSerializer.Serialize(result));
 
-            var TmpSelectedPlug = SelectedPlug;
             await GetAllRootPlugs();
-            if (TmpSelectedPlug != null)
-                SelectedPlug = TmpSelectedPlug;
-            StateHasChanged();
         }
-        //dropItem.Item.IsPicked = true;
-        //dropItem.Item.Tag = dropItem.DropzoneIdentifier;
+
+        // 用 Id 从刷新后的列表中找回新对象引用，保证 MudList 能匹配高亮
+        if (prevPlugId != null)
+        {
+            var fresh = RootPlugs.FirstOrDefault(p => p.Id == prevPlugId);
+            if (fresh != null)
+            {
+                SelectedPlug = fresh;
+                _actionPanelPlug = fresh;
+            }
+        }
+
+        _isDragging = false;
+        StateHasChanged();
+    }
+
+    private async Task OnPlugSelected(Plug? plug)
+    {
+        SelectedPlug = plug;
+
+        if (_isDragging)
+        {
+            // 正在拖拽中，不更新动作面板
+            return;
+        }
+
+        // 延迟100ms更新，如果在100ms内进入了拖拽状态则取消更新
+        _selectionUpdateCts?.Cancel();
+        _selectionUpdateCts = new CancellationTokenSource();
+        var token = _selectionUpdateCts.Token;
+        try
+        {
+            await Task.Delay(100, token);
+            if (!token.IsCancellationRequested)
+            {
+                _actionPanelPlug = plug;
+                StateHasChanged();
+            }
+        }
+        catch (TaskCanceledException) { }
     }
 
     protected override async Task OnInitializedAsync()
@@ -286,6 +325,8 @@
         if (firstRender)
         {
             await GetAllRootPlugs();
+            _actionPanelPlug = SelectedPlug;
+            StateHasChanged();
         }
     }
 
@@ -316,6 +357,7 @@
         RootPlugs.AddRange(UserCreatedRootPlugs);
         isItemLoading = false;
         Console.WriteLine("load user root plug data done");
+        UpdateFilteredPlugs();
         RefreshContainer();
 
     }
@@ -384,6 +426,8 @@
                     CLog.Information(ex.Message);
                 }
             }
+            var varListFromSetting = EachPlugSetting.InitVariables;
+            varList?.AddRange(varListFromSetting ?? []);
 
 
             if (varList != null)
@@ -397,6 +441,8 @@
                         Type = v.Type,
                         IsBrowsable = v.IsBrowsable,
                         IsArray = v.IsArray,
+                        DefaultValue = v.DefaultValue,
+                        Value = v.DefaultValue,  //将插头中定义的默认值作为值，因为前端参数表格渲染时，使用的是值字段
                         IsInitVariable = true
                     });
                 }
@@ -412,7 +458,7 @@
                 PlugFromSetting.DefinitionId = AlreadyExistPlug.DefinitionId;
                 PlugFromSetting.ShowInPlugLibrary = AlreadyExistPlug.ShowInPlugLibrary;
                 var result = await MainApiClient.UpdatePlugAsync(AlreadyExistPlug.Id, PlugFromSetting);
-                RootPlugs.Add(AlreadyExistPlug);
+                //RootPlugs.Add(AlreadyExistPlug);
             }
             else
             {
@@ -441,6 +487,7 @@
         // ).ToList();
         isItemLoading = false;
         Console.WriteLine("load sys init plug data done");
+        UpdateFilteredPlugs();
         RefreshContainer();
 
     }
@@ -463,25 +510,73 @@
             t.CreateType == PlugCreateTypeEnum.SystemInitActionPlug.ToString()
         ).ToList();
         RootPlugs.AddRange(_RootPlugs);
+
+        // 同步 _actionPanelPlug：如果 SelectedPlug 仍有效则保持，否则重置
+        if (SelectedPlug != null)
+        {
+            var fresh = RootPlugs.FirstOrDefault(p => p.Id == SelectedPlug.Id);
+            if (fresh != null)
+            {
+                SelectedPlug = fresh;
+                _actionPanelPlug = fresh;
+            }
+            else
+            {
+                SelectedPlug = null;
+                _actionPanelPlug = null;
+            }
+        }
+
         isItemLoading = false;
         Console.WriteLine("load all root plug data done");
+        UpdateFilteredPlugs();
         RefreshContainer();
 
     }
-    private async Task RefreshContainer()
+    private async Task OnShowSystemToolChanged(bool value)
     {
-        if (RootPlugs.Count > 0 && SelectedPlug is not null)
+        IsShowSystemTool = value;
+        UpdateFilteredPlugs();
+        RefreshContainer();
+    }
+
+    private void RefreshContainer()
+    {
+        if (RootPlugs.Count > 0 && SelectedPlug is null)
         {
             SelectedPlug = RootPlugs[0];
+            _actionPanelPlug = RootPlugs[0];
         }
-        //update the binding to the container
-        StateHasChanged();
+        // StateHasChanged is called by UpdateFilteredPlugs
+    }
 
-        //the container refreshes the internal state
+    private void UpdateFilteredPlugs()
+    {
+        var query = RootPlugs ?? new List<Plug>();
+
+        // 根据显示系统插头选项过滤
+        if (!IsShowSystemTool)
+        {
+            query = query.Where(p => p.CreateType != PlugCreateTypeEnum.SystemInitPlug.ToString()).ToList();
+        }
+
+        // 根据搜索关键字过滤
+        if (!string.IsNullOrEmpty(Search))
+        {
+            var searchLower = Search.ToLower();
+            query = query.Where(p =>
+                (p.Name?.ToLower().Contains(searchLower) == true) ||
+                (p.Type?.ToLower().Contains(searchLower) == true) ||
+                (p.Id?.ToString().ToLower().Contains(searchLower) == true) ||
+                (p.ToolVersion?.ToLower().Contains(searchLower) == true) ||
+                (p.GroupName?.ToLower().Contains(searchLower) == true) ||
+                (p.Description?.ToLower().Contains(searchLower) == true)
+            ).ToList();
+        }
+
+        RootPlugsToShow = query.ToList(); // 确保创建新的列表引用
+        StateHasChanged();
         _container.Refresh();
-
-        StateHasChanged();
-
     }
 
     private async Task PlugInAll()
@@ -492,9 +587,10 @@
             {
                 p.ShowInPlugLibrary = true;
                 await MainApiClient.UpdatePlugAsync(p.Id, p);
-                StateHasChanged();
             }
         }
+        UpdateFilteredPlugs();
+        RefreshContainer();
         Snackbar.Add("已插入所有插头", Severity.Success);
     }
     private async Task PlugOutAll()
@@ -505,9 +601,10 @@
             {
                 p.ShowInPlugLibrary = false;
                 await MainApiClient.UpdatePlugAsync(p.Id, p);
-                StateHasChanged();
             }
         }
+        UpdateFilteredPlugs();
+        RefreshContainer();
         Snackbar.Add("已拔出所有插头", Severity.Success);
     }
 
@@ -516,9 +613,11 @@
         try
         {
             RootPlugs?.Remove(toolItem);
+            RootPlugsToShow?.Remove(toolItem);
             await MainApiClient.DeletePlug(toolItem.Id);
             //await WorkflowDefinitionService.DeleteAsync(toolItem.DefinitionId);
             await ElsaEngineService.DeleteWorkflowByDefinitionId(toolItem.DefinitionId);
+            UpdateFilteredPlugs();
             _container.Refresh();
             StateHasChanged();
             //await GetRootPlugs();
@@ -543,7 +642,7 @@
         if (!result.Canceled)
         {
             //Console.WriteLine("succuse create plug:" + result.Data.ToString());
-            await GetAllRootPlugs();
+            GetAllRootPlugs();
         }
     }
 
@@ -572,7 +671,7 @@
     {
         var parameters = new DialogParameters<NewPlugAction>
         {
-            { x => x.SelectedPlug, SelectedPlug }
+            { x => x.SelectedPlug, _actionPanelPlug }
         };
         var dialog = await DialogService.ShowAsync<NewPlugAction>("新建动作", parameters);
         var result = await dialog.Result;
@@ -587,7 +686,9 @@
     private async void RemovePlugActionItem(Plug toolActionItem)
     {
         RootPlugs?.Remove(toolActionItem);
+        RootPlugsToShow?.Remove(toolActionItem);
         await MainApiClient.DeletePlug(toolActionItem.Id);
+        UpdateFilteredPlugs();
         StateHasChanged();
         //SelectedPlug.PlugActions.Remove(toolActionItem);
         //await MainApiClient.UpdatePlugAsync(SelectedPlug.Id, SelectedPlug);
@@ -595,5 +696,111 @@
         //StateHasChanged();
         //await GetRootPlugs();
     }
-}
 
+    private async Task ShowImportDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = false, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ImportPlugs>("导入插头", options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is List<Plug> plugs)
+        {
+            await ImportPlugs(plugs);
+        }
+    }
+
+    private async Task ImportPlugs(List<Plug> importPlugs)
+    {
+        try
+        {
+            // 获取所有现有插头用于匹配
+            var allExistingPlugs = await MainApiClient.GetPlugs();
+            var importCount = 0;
+            var updateCount = 0;
+            var createCount = 0;
+
+            foreach (var importPlug in importPlugs)
+            {
+                // 根据 Type 查找现有插头
+                var existingPlug = allExistingPlugs.FirstOrDefault(p => p.Type == importPlug.Type);
+
+                if (existingPlug != null)
+                {
+                    // 插头已存在，更新它
+                    // 保留一些关键属性
+                    var plugId = existingPlug.Id;
+                    var definitionId = existingPlug.DefinitionId;
+
+                    // 更新插头数据
+                    existingPlug.Name = importPlug.Name;
+                    existingPlug.Description = importPlug.Description;
+                    existingPlug.GroupName = importPlug.GroupName;
+                    existingPlug.PlugSettingsJson = importPlug.PlugSettingsJson;
+                    existingPlug.PlugVariables = importPlug.PlugVariables;
+                    existingPlug.Value = importPlug.Value;
+                    existingPlug.RealValuePath = importPlug.RealValuePath;
+                    existingPlug.WorkPath = importPlug.WorkPath;
+                    existingPlug.ToolId = importPlug.ToolId;
+                    existingPlug.ToolName = importPlug.ToolName;
+                    existingPlug.ToolDisplayName = importPlug.ToolDisplayName;
+                    existingPlug.ToolCommandLineShema = importPlug.ToolCommandLineShema;
+                    existingPlug.ToolVersion = importPlug.ToolVersion;
+                    existingPlug.ToolVersions = importPlug.ToolVersions;
+                    existingPlug.IsContainerPlug = importPlug.IsContainerPlug;
+                    existingPlug.ShowInPlugLibrary = importPlug.ShowInPlugLibrary;
+                    existingPlug.OnlyExecuteAction = importPlug.OnlyExecuteAction;
+                    existingPlug.ActivityJsonData = importPlug.ActivityJsonData;
+                    existingPlug.GuiJsonData = importPlug.GuiJsonData;
+
+                    // 保留 ID 和 DefinitionId
+                    existingPlug.Id = plugId;
+                    existingPlug.DefinitionId = definitionId;
+
+                    await MainApiClient.UpdatePlugAsync(existingPlug.Id, existingPlug);
+                    updateCount++;
+                }
+                else
+                {
+                    // 新插头，创建它
+                    importPlug.DefinitionId = RandomLongIdentityGenerator.GenerateId();
+                    importPlug.Id = null;
+
+                    // 设置为用户创建的插头
+                    importPlug.CreateType = PlugCreateTypeEnum.RootPlug.ToString();
+                    importPlug.Creater = await DomInteropService.GetCurrentUserName();
+
+                    await MainApiClient.CreateNewPlug(importPlug);
+                    createCount++;
+                }
+                importCount++;
+            }
+
+            await GetAllRootPlugs();
+            var message = $"导入完成: 新建 {createCount} 个, 更新 {updateCount} 个, 共 {importCount} 个";
+            Snackbar.Add(message, Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"导入失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ShowExportDialog()
+    {
+        // 确保插头数据已加载
+        if (RootPlugs == null || RootPlugs.Count == 0)
+        {
+            Snackbar.Add("正在加载插头数据，请稍后重试", Severity.Warning);
+            await GetAllRootPlugs();
+        }
+
+        var parameters = new DialogParameters<ExportPlugs>
+        {
+            { x => x.AllPlugs, RootPlugs },
+            { x => x.SelectedPlug, SelectedPlug }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = false, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ExportPlugs>("导出插头", parameters, options);
+        await dialog.Result;
+    }
+
+}

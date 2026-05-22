@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using StationSettingUI.Services;
 
 namespace StationSettingUI;
 
@@ -8,6 +9,10 @@ namespace StationSettingUI;
 /// </summary>
 public partial class App : Application
 {
+    /// <summary>
+    /// 全局共享的日志服务（供各组件订阅 StationApiServer 的控制台输出）
+    /// </summary>
+    public ConsoleLogService LogService { get; } = new();
     /// <summary>
     /// 全局未处理异常捕获
     /// </summary>

@@ -146,16 +146,7 @@ namespace CJ.Plug.FileManageApi.Services
                     await fur.FileStream?.OpenReadStream()?.CopyToAsync(stream);
                 }
 
-                var fileInfo = new FileInformation
-                {
-                    FileId = fur.FileId,
-                    FilePath = filePath,
-                    FileName = fur.FileName,
-                    FileUploadPath = fur.UploadPath,
-                    FileUploadType = fur.FileUploadType,
-                    FileUploader = fur.FileCreator,
-                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                };
+                var fileInfo = MapToEntity(fur, filePath);
                 await CreateFileInformation(fileInfo);
 
                 return filePath;
@@ -221,6 +212,7 @@ namespace CJ.Plug.FileManageApi.Services
                     foreach (var subItem in subItems)
                     {
                         var item = new FileSystemNode(Path.GetFullPath(subItem), Path.GetFileName(subItem), Directory.Exists(subItem));
+                        PopulateFileMetadata(item, subItem);
                         //Console.WriteLine(subItem);
                         driverItem.Children.Add(item);
                     }
@@ -244,6 +236,7 @@ namespace CJ.Plug.FileManageApi.Services
                         Path.GetRelativePath(GlobalData.MainFileServerPathRoot, subItem),   //返回相对路径
                         Path.GetFileName(subItem),
                         Directory.Exists(subItem));
+                    PopulateFileMetadata(item, subItem);
                     item.FolderDisplayName = Path.GetFileName(subItem);
                     rootNode.Children.Add(item);
                 }
@@ -470,6 +463,32 @@ namespace CJ.Plug.FileManageApi.Services
 
 
 
+        /// <summary>
+        /// 通过相对路径下载文件（供文件浏览器下载使用）
+        /// </summary>
+        public async Task<IResult> DownloadFileByPath(string filePath)
+        {
+            try
+            {
+                var fullPath = Path.Combine(GlobalData.MainFileServerPathRoot, filePath.TrimStart('/', '\\'));
+                if (!File.Exists(fullPath))
+                {
+                    return Results.NotFound($"文件不存在: {fullPath}");
+                }
+
+                var fileInfo = new FileInfo(fullPath);
+                var contentType = GetContentType(fileInfo.Extension);
+                var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                return Results.File(fileStream, contentType, fileInfo.Name);
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"下载文件失败: {ex.Message}");
+                return Results.StatusCode(500);
+            }
+        }
+
+
         public async Task<FileSystemNode?> GetPlugWorkpathFiles(string? plugDefinitionId)
         {
             if (plugDefinitionId == "all")
@@ -571,8 +590,9 @@ namespace CJ.Plug.FileManageApi.Services
                 var fileContent = request.FileStream;
                 if (fileContent == null)
                     return new BadRequestResult();
-                // 构建临时文件路径
-                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{fileName}.temp");
+                // 构建临时文件路径（将路径分隔符替换为_，避免子目录不存在导致创建失败）
+                var safeFileName = fileName.Replace('/', '_').Replace('\\', '_');
+                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{safeFileName}.temp");
 
                 // 以追加模式打开文件流，写入当前块
                 using (var fileStream = new FileStream(tempFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 8192, true))
@@ -610,8 +630,9 @@ namespace CJ.Plug.FileManageApi.Services
                 if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(fileId))
                     return new BadRequestResult();
 
-                // 临时文件路径和最终文件路径
-                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{fileName}.temp");
+                // 临时文件路径和最终文件路径（将路径分隔符替换为_，避免子目录不存在导致创建失败）
+                var safeFileName = fileName.Replace('/', '_').Replace('\\', '_');
+                var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{safeFileName}.temp");
                 var finalFilePath = Path.Combine(GlobalData.MainFileServerPathRoot, request.UploadPath, request.FileName);
 
                 // 检查临时文件是否存在
@@ -631,16 +652,7 @@ namespace CJ.Plug.FileManageApi.Services
                 // 这里可以添加文件合并后的处理逻辑，如记录文件信息到数据库
                 Log.Information($"文件 {finalFilePath} 上传完成");
 
-                var fileInfo = new FileInformation
-                {
-                    FileId = request.FileId,
-                    FilePath = finalFilePath,
-                    FileName = request.FileName,
-                    FileUploadPath = request.UploadPath,
-                    FileUploadType = request.FileUploadType,
-                    FileUploader = request.FileCreator,
-                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                };
+                var fileInfo = MapToEntity(request, finalFilePath);
                 await CreateFileInformation(fileInfo);
 
                 //return new OkObjectResult(finalFilePath);            
@@ -710,6 +722,54 @@ namespace CJ.Plug.FileManageApi.Services
             {
                 CLog.Error($"An error occurred while deleting file: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Map FileUploadRequest to FileInformation entity
+        /// </summary>
+        public static FileInformation MapToEntity(FileUploadRequest request, string filePath)
+        {
+            return new FileInformation
+            {
+                FileId = request.FileId,
+                FilePath = filePath,
+                FileName = request.FileName,
+                FileUploadPath = request.UploadPath,
+                FileUploadType = request.FileUploadType,
+                FileUploader = request.FileCreator,
+                FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+        }
+
+        /// <summary>
+        /// 为 FileSystemNode 填充文件元数据（大小、上传人、最后修改时间）
+        /// </summary>
+        private static void PopulateFileMetadata(FileSystemNode node, string physicalPath)
+        {
+            if (node.IsDirectory) return;
+            try
+            {
+                var fileInfo = new FileInfo(physicalPath);
+                if (fileInfo.Exists)
+                {
+                    node.Size = fileInfo.Length;
+                    node.LastWriteTime = fileInfo.LastWriteTime;
+                    // 尝试获取文件所有者（Windows 特有，跨平台时忽略）
+                    try
+                    {
+                        var acl = fileInfo.GetAccessControl();
+                        node.Creator = acl.GetOwner(typeof(System.Security.Principal.NTAccount)).Value;
+                    }
+                    catch
+                    {
+                        // 非 Windows 或无权限时忽略
+                    }
+                }
+            }
+            catch
+            {
+                // 忽略读取元数据失败
             }
         }
     }

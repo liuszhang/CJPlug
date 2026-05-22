@@ -177,7 +177,7 @@
 
 
             PlugData = PlugDataZone.PlugDatas.FirstOrDefault(v =>v.PlugDefinitionId == Activity.GetId());
-            
+
             // 如果 PDZ 中没有该插头的 PlugData，则自动创建一个
             bool isNewPlugData = false;
             if (PlugData == null)
@@ -240,14 +240,52 @@
                         break;
                     }
                 }
+                if (PlugCommonExecuteSettingContent == null)
+                {
+                    CLog.Warning($"No common setting content found for PlugType {PlugData.PlugType}, trying to match by type keyword.");
+                    foreach (var pcsc in PlugCommonSettingContent)
+                    {
+                        //如果没有程序预设的插头设置内容，则按照类型自动匹配一个相应的设置内容
+                        if (PlugData.PlugType.Contains("桌面类"))
+                        {
+                            CLog.Information($"PlugType {PlugData.PlugType} contains '桌面类', trying to get common setting content for CMDPlug");
+                            var context2 = new GetSettingContext("CMDPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
+                            PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
+                            if (PlugCommonExecuteSettingContent != null)
+                            {
+                                break;
+                            }
+                        }
+                        else if (PlugData.PlugType.Contains("接口类"))
+                        {
+                            CLog.Information($"PlugType {PlugData.PlugType} contains '接口类', trying to get common setting content for RESTPlug");
+                            var context2 = new GetSettingContext("RESTPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
+                            PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
+                            if (PlugCommonExecuteSettingContent != null)
+                            {
+                                break;
+                            }
+                        }
+                        else if (PlugData.PlugType.Contains("脚本类"))
+                        {
+                            CLog.Information($"PlugType {PlugData.PlugType} contains '脚本类', trying to get common setting content for PythonPlug");
+                            var context2 = new GetSettingContext("PythonPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
+                            PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
+                            if (PlugCommonExecuteSettingContent != null)
+                            {
+                                break;
+                            }
+                        }                        
+                    }
+                }
             }
             Loading = false;
-            Console.WriteLine("first loading data done");
+            CLog.Information("first loading data done");
 
             StateHasChanged();
         }
         //Loading = false;
-        Console.WriteLine("loading data done");
+        CLog.Information("loading data done");
         //StateHasChanged();
     }
 

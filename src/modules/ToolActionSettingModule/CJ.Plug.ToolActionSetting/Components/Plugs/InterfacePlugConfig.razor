@@ -1,0 +1,115 @@
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+
+<MudDivider Class="my-2"></MudDivider>
+<MudText Typo="Typo.subtitle2" Color="Color.Primary">接口配置</MudText>
+
+<MudStack Row>
+    <MudSelect T="string" @bind-Value="@HttpMethod" Label="请求方式" Style="width:180px;"
+               Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        <MudSelectItem Value="@("GET")">GET</MudSelectItem>
+        <MudSelectItem Value="@("POST")">POST</MudSelectItem>
+        <MudSelectItem Value="@("PUT")">PUT</MudSelectItem>
+        <MudSelectItem Value="@("DELETE")">DELETE</MudSelectItem>
+        <MudSelectItem Value="@("HEAD")">HEAD</MudSelectItem>
+        <MudSelectItem Value="@("OPTIONS")">OPTIONS</MudSelectItem>
+        <MudSelectItem Value="@("PATCH")">PATCH</MudSelectItem>
+    </MudSelect>
+    <MudTextField T="string" @bind-Value="@InterfaceUrl" Margin="Margin.Dense" Label="请求地址"
+                  Placeholder="例如：http://api.example.com/v1/resource" Variant="Variant.Outlined"
+                  HelperText="输入完整的接口URL地址"></MudTextField>
+</MudStack>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Style="padding:0">
+    <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+        <MudText Typo="Typo.subtitle2">服务参数</MudText>
+        <MudButton StartIcon="@Icons.Material.Outlined.Add"
+                   Variant="Variant.Filled" Size="Size.Small"
+                   OnClick="AddServiceParam"
+                   Color="Color.Primary">添加服务参数</MudButton>
+    </MudStack>
+
+    <MudDataGrid T="PDZVariable" Items="@ServiceParams" ReadOnly="false"
+                 EditMode="MudBlazor.DataGridEditMode.Cell" Dense="true"
+                 EditTrigger="@(DataGridEditTrigger.Manual)">
+        <Columns>
+            <PropertyColumn Property="x => x.Type" Title="类型">
+                <EditTemplate>
+                    <MudSelect @bind-Value="context.Item.Type" Required Dense Margin="@Margin.Dense">
+                        <MudSelectItem Value="@("Header")">Header(请求头参数)</MudSelectItem>
+                        <MudSelectItem Value="@("Path")">Path(路径参数)</MudSelectItem>
+                        <MudSelectItem Value="@("Query")">Query(查询参数)</MudSelectItem>
+                        <MudSelectItem Value="@("Body")">Body(请求体参数)</MudSelectItem>
+                        <MudSelectItem Value="@("Form")">Form(表单参数)</MudSelectItem>
+                    </MudSelect>
+                </EditTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Name" Title="名称"></PropertyColumn>
+            <PropertyColumn Property="x => x.DefaultValue" Title="默认值"></PropertyColumn>
+            <PropertyColumn Property="x => x.IsRequired" Title="必需">
+                <EditTemplate>
+                    <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary"
+                               Label="@context.Item.IsRequired.ToString()"></MudSwitch>
+                </EditTemplate>
+            </PropertyColumn>
+            <TemplateColumn Title="操作">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                   Color="Color.Error" OnClick="@(() => RemoveServiceParam(context.Item))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</MudContainer>
+
+@code {
+    private string? InterfaceUrl { get; set; }
+    private string HttpMethod { get; set; } = "GET";
+    private List<PDZVariable> ServiceParams { get; set; } = new();
+
+    private void AddServiceParam()
+    {
+        ServiceParams.Add(new PDZVariable { Type = "Header", Name = "header1" });
+    }
+
+    private void RemoveServiceParam(PDZVariable param)
+    {
+        ServiceParams.Remove(param);
+    }
+
+    /// <summary>
+    /// 将接口类配置写入 Plug 对象。
+    /// </summary>
+    public void ApplyToPlug(Plug plug)
+    {
+        plug.PlugTypeKey = "RESTPlug";
+        plug.Value = InterfaceUrl;
+
+        // 添加接口类默认参数（与REST插头一致）
+        plug.AddVariable("Url", VariableTypeEnum.String.ToString());
+        plug.AddVariable("Method", VariableTypeEnum.String.ToString());
+        plug.AddVariable("RequestHeaders", VariableTypeEnum.RequestHeader.ToString());
+        plug.AddVariable("OutputMappings", VariableTypeEnum.DefaultOutputMapping.ToString());
+
+        // 设置URL默认值
+        if (!string.IsNullOrEmpty(InterfaceUrl))
+        {
+            plug.SetVariableValue("Url", InterfaceUrl);
+        }
+        plug.SetVariableValue("Method", HttpMethod);
+
+        // 将用户配置的服务参数序列化为 JSON 存入 RequestHeaders 变量
+        if (ServiceParams.Count > 0)
+        {
+            var paramsJson = System.Text.Json.JsonSerializer.Serialize(ServiceParams.Select(p => new
+            {
+                p.Type,
+                p.Name,
+                p.DefaultValue,
+                p.IsRequired
+            }));
+            plug.SetVariableValue("RequestHeaders", paramsJson);
+        }
+    }
+}

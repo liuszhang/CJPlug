@@ -5,9 +5,9 @@ using System.Text.Json;
 
 public partial class MainApiClient : IAuthApiClient
 {
-    public async Task<List<AuthRequestDto>> GetAllAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default)
+    public async Task<List<AuthRequestDto>> GetAllAuthRequestAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default)
     {
-        var result = await AuthApiClient.Value.GetAllAsync(status, cancellationToken);
+        var result = await AuthApiClient.Value.GetAllAuthRequestAsync(status, cancellationToken);
         await AuditLog.LogSuccessAsync(AuditModule.AuthManage, AuditOperationType.Other, "查询授权请求列表");
         return result;
     }

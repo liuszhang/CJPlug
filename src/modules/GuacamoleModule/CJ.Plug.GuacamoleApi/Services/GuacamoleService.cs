@@ -76,14 +76,9 @@ namespace CJ.Plug.GuacamoleApi.Services
                 if (result != null)
                 {
                     _cachedToken = result.AuthToken;
-                    _tokenExpiry = DateTime.Now.AddHours(1); // Token 通常 1 小时过期
+                    _tokenExpiry = DateTime.Now.AddHours(1);
 
-                    return new GuacamoleTokenDto
-                    {
-                        AuthToken = result.AuthToken,
-                        DataSource = result.DataSource ?? _config.DataSource,
-                        ExpiresAt = _tokenExpiry
-                    };
+                    return MapToTokenDto(result);
                 }
             }
             catch (Exception ex)
@@ -112,16 +107,7 @@ namespace CJ.Plug.GuacamoleApi.Services
                 var connections = await response.Content.ReadFromJsonAsync<Dictionary<string, GuacamoleConnectionResponse>>(cancellationToken: cancellationToken);
                 if (connections == null) return null;
 
-                return connections.Select(c => new GuacamoleConnectionDto
-                {
-                    ConnectionId = c.Value.Identifier,
-                    Name = c.Value.Name,
-                    Protocol = c.Value.Protocol,
-                    Hostname = c.Value.GetParameter("hostname"),
-                    Port = int.TryParse(c.Value.GetParameter("port"), out var port) ? port : 3389,
-                    Username = c.Value.GetParameter("username"),
-                    Domain = c.Value.GetParameter("domain")
-                }).ToList();
+                return connections.Select(c => MapToConnectionDto(c.Value)).ToList();
             }
             catch (Exception ex)
             {
@@ -318,6 +304,30 @@ namespace CJ.Plug.GuacamoleApi.Services
             {
                 return Parameters?.GetValueOrDefault(name);
             }
+        }
+
+        private GuacamoleTokenDto MapToTokenDto(GuacamoleTokenResponse response)
+        {
+            return new GuacamoleTokenDto
+            {
+                AuthToken = response.AuthToken,
+                DataSource = response.DataSource ?? _config.DataSource,
+                ExpiresAt = _tokenExpiry
+            };
+        }
+
+        private static GuacamoleConnectionDto MapToConnectionDto(GuacamoleConnectionResponse response)
+        {
+            return new GuacamoleConnectionDto
+            {
+                ConnectionId = response.Identifier,
+                Name = response.Name,
+                Protocol = response.Protocol,
+                Hostname = response.GetParameter("hostname"),
+                Port = int.TryParse(response.GetParameter("port"), out var port) ? port : 3389,
+                Username = response.GetParameter("username"),
+                Domain = response.GetParameter("domain")
+            };
         }
 
         #endregion

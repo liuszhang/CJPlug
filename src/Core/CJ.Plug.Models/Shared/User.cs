@@ -26,5 +26,20 @@ namespace CJ.Plug.Models.Shared
         /// </summary>
         public int Status { get; set; } = 1;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// 是否系统内置数据（不可删除和编辑）
+        /// </summary>
+        public bool IsSystem { get; set; } = false;
+
+        /// <summary>
+        /// 用户组成员列表（导航属性）
+        /// </summary>
+        public virtual ICollection<UserGroupMember> GroupMembers { get; set; } = new List<UserGroupMember>();
+
+        /// <summary>
+        /// 用户组列表（通过 UserGroupMember 导航）
+        /// </summary>
+        public virtual ICollection<UserGroup> Groups => GroupMembers.Select(m => m.UserGroup).ToList();
     }
 }

@@ -13,6 +13,13 @@ public partial class MainApiClient : IFileManageApiClient
         return result;
     }
 
+    public async Task<Stream?> DownloadFileByPath(string filePath)
+    {
+        var result = await FileManageApiClient.Value.DownloadFileByPath(filePath);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"下载文件: {filePath}");
+        return result;
+    }
+
     public async Task<string?> GetFileContent(string filePath)
     {
         var result = await FileManageApiClient.Value.GetFileContent(filePath);

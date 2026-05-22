@@ -7,159 +7,310 @@
 @using MudBlazor
 @using System.Text.Json
 
-@inject IRoleManageApiClient RoleApiClient
-@inject IAuthApiClient AuthApiClient
+@inject MainApiClient RoleApiClient
+@inject MainApiClient UserApiClient
+@inject MainApiClient AuthApiClient
 @inject IDomInteropService DomInteropService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
-    <MudText Typo="Typo.h6">角色管理</MudText>
-    <MudSpacer />
-    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建角色</MudButton>
-    <MudButton OnClick="Refresh" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
-</MudStack>
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    @* ===== Tab 1: 角色管理 ===== *@
+    <MudTabPanel Text="角色管理" Icon="@Icons.Material.Filled.ManageAccounts">
+        <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">角色列表</MudText>
+            <MudSpacer />
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建角色</MudButton>
+            <MudButton OnClick="@LoadRoles" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+        </MudStack>
 
-<MudDataGrid @ref="_dataGrid"
-             T="RoleManageDto"
-             ServerData="LoadData"
-             Dense="true"
-             Hover="true"
-             Elevation="0"
-             SortMode="SortMode.Single"
-             RowStyle="cursor: default;"
-             MultiSelection="true"
-             SelectedItems="_selectedRoles"
-             SelectOnRowClick="false">
-    <ToolBarContent>
-        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索角色名、描述"
-                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
-                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
-    </ToolBarContent>
-    <Columns>
-        <SelectColumn T="RoleManageDto" />
-        <TemplateColumn Title="角色名" Sortable="true">
-            <CellTemplate><MudText>@context.Item.Name</MudText></CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="描述">
-            <CellTemplate><MudText Typo="Typo.body2">@context.Item.Description</MudText></CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="角色类型">
-            <CellTemplate>
-                <MudChip Color="@(context.Item.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
-                    @(context.Item.RoleType ?? "自定义角色")
-                </MudChip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="系统角色">
-            <CellTemplate>
-                <MudChip Color="@(context.Item.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
-                    @(context.Item.IsSystem ? "是" : "否")
-                </MudChip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="状态">
-            <CellTemplate>
-                @{
-                    var status = context.Item.Status;
-                    var chipColor = status switch
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_allRoles.Count == 0)
+        {
+            <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                <MudText Typo="Typo.body1" Class="mud-text-secondary">暂无角色数据，点击「创建角色」添加</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Elevation="1">
+                <MudTable Items="@_allRoles" Dense="true" Hover="true" Elevation="0" Style="width:100%">
+                    <HeaderContent>
+                        <MudTh>角色名</MudTh>
+                        <MudTh>描述</MudTh>
+                        <MudTh>角色类型</MudTh>
+                        <MudTh Style="width: 80px">系统</MudTh>
+                        <MudTh Style="width: 80px">状态</MudTh>
+                        <MudTh Style="width: 220px">创建时间</MudTh>
+                        <MudTh Style="width: 160px">操作</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudText>@context.Name</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@(context.Description ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Color="@(context.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                                @(context.RoleType ?? "自定义角色")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Color="@(context.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                                @(context.IsSystem ? "是" : "否")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            @{
+                                var status = context.Status;
+                                var chipColor = status switch
+                                {
+                                    DataStatus.Authorizing => Color.Warning,
+                                    DataStatus.Disabled => Color.Default,
+                                    DataStatus.Active => Color.Success,
+                                    _ => Color.Default
+                                };
+                                var statusText = status switch
+                                {
+                                    DataStatus.Authorizing => "授权中",
+                                    DataStatus.Disabled => "禁用",
+                                    DataStatus.Active => "启用",
+                                    _ => "未知"
+                                };
+                            }
+                            <MudChip T="string" Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">@statusText</MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@(context.CreatedAt > DateTimeOffset.MinValue ? context.CreatedAt.ToString("yyyy-MM-dd HH:mm") : "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <div style="white-space: nowrap;">
+                                @if (context.IsSystem)
+                                {                                    
+                                    <MudTooltip Text="配置角色权限">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Settings" Size="Size.Small"
+                                                       Color="Color.Default" OnClick="@(() => OpenConfigDialog(context))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="系统内置角色，不可编辑和删除">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" Disabled="true" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="配置角色权限">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Settings" Size="Size.Small"
+                                                       Color="Color.Default" OnClick="@(() => OpenConfigDialog(context))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="编辑">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                                       Color="Color.Default" OnClick="@(() => OpenEditDialog(context))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="删除">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                       Color="Color.Error" OnClick="@(() => DeleteRole(context))" />
+                                    </MudTooltip>
+                                }
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    @* ===== Tab 2: 角色人员管理 ===== *@
+    <MudTabPanel Text="角色人员管理" Icon="@Icons.Material.Filled.People">
+        <MudGrid Style="height: calc(100vh - 220px);" Spacing="2">
+            @* 左栏：角色列表（用于选择） *@
+            <MudItem xs="3">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    <MudText Typo="Typo.subtitle2" Class="px-2 py-1 mud-text-secondary">选择角色</MudText>
+                    @if (_allRoles.Count > 0)
                     {
-                        DataStatus.Authorizing => Color.Warning,
-                        DataStatus.Disabled => Color.Default,
-                        DataStatus.Active => Color.Success,
-                        _ => Color.Default
-                    };
-                    var statusText = status switch
+                        @foreach (var role in _allRoles)
+                        {
+                            var isSelected = _selectedRole?.Id == role.Id;
+                            <MudListItem T="RoleManageDto" Dense="true" OnClick="@(() => SelectRole(role))"
+                                         Class="@(isSelected ? "mud-primary-text mud-primary-hover" : "")"
+                                         Style="@(isSelected ? "background-color: var(--mud-palette-action-default-hover);" : "")">
+                                <MudStack Row AlignItems="AlignItems.Center" Style="width:100%">
+                                    <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Size="Size.Small" Class="me-2" Color="Color.Primary" />
+                                    <MudText>@role.Name</MudText>
+                                    <MudSpacer />
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@(_roleUserCounts.GetValueOrDefault(role.Id, 0))</MudText>
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    }
+                    else
                     {
-                        DataStatus.Authorizing => "授权中",
-                        DataStatus.Disabled => "禁用",
-                        DataStatus.Active => "启用",
-                        _ => "未知"
-                    };
-                }
-                <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
-                    @statusText
-                </MudChip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="创建时间" Sortable="true">
-            <CellTemplate>
-                @(context.Item.CreatedAt > DateTimeOffset.MinValue
-                    ? context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
-                    : "-")
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Style="text-align:right" Title="操作">
-            <CellTemplate>
-                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem OnClick="@(()=>OpenEditDialog(context.Item))" Icon="@Icons.Material.Outlined.Edit">编辑</MudMenuItem>
-                    <MudMenuItem OnClick="@(()=>DeleteRole(context.Item))" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
-                </MudMenu>
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-    <NoRecordsContent><MudText>没有角色数据</MudText></NoRecordsContent>
-    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
-    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
-</MudDataGrid>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary pa-2">暂无角色数据</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            @* 右栏：人员列表 *@
+            <MudItem xs="9">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    @if (_selectedRole != null)
+                    {
+                        <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.h6">@_selectedRole.Name 的人员</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">（@_roleUsers.Count 人）</MudText>
+                            <MudSpacer />
+                            <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@OpenAddUserDialog">添加人员</MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@LoadRoleUsers">刷新</MudButton>
+                        </MudStack>
+
+                        <MudDataGrid T="RoleUserInfo" Items="@_roleUsers" Dense="true" Hover="true" Elevation="0"
+                                     ReadOnly="true" SortMode="SortMode.Single">
+                            <Columns>
+                                <TemplateColumn Title="用户名">
+                                    <CellTemplate>@context.Item.UserName</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="姓名">
+                                    <CellTemplate>@($"{context.Item.FirstName ?? ""}{context.Item.LastName ?? ""}")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="邮箱">
+                                    <CellTemplate>@(context.Item.Email ?? "-")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="电话">
+                                    <CellTemplate>@(context.Item.PhoneNumber ?? "-")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="状态">
+                                    <CellTemplate>
+                                        @{
+                                            var userStatus = context.Item.Status;
+                                            var userChipColor = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => Color.Warning,
+                                                DataStatus.Disabled => Color.Default,
+                                                DataStatus.Active => Color.Success,
+                                                _ => Color.Default
+                                            };
+                                            var userStatusText = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => "授权中",
+                                                DataStatus.Disabled => "禁用",
+                                                DataStatus.Active => "启用",
+                                                _ => "未知"
+                                            };
+                                        }
+                                        <MudChip T="string" Color="@userChipColor" Variant="Variant.Filled" Size="Size.Small">@userStatusText</MudChip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Style="text-align:right" Title="操作">
+                                    <CellTemplate>
+                                        <MudTooltip Text="从角色移除">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.PersonRemove" Size="Size.Small"
+                                                           Color="Color.Error" OnClick="@(() => RemoveUser(context.Item))" />
+                                        </MudTooltip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            </Columns>
+                            <NoRecordsContent>
+                                <MudText>该角色暂无人员，点击「添加人员」</MudText>
+                            </NoRecordsContent>
+                        </MudDataGrid>
+                    }
+                    else
+                    {
+                        <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                            <MudText Typo="Typo.body1" Class="mud-text-secondary">← 请先在左侧选择一个角色</MudText>
+                        </MudPaper>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+</MudTabs>
 
 @code {
-    private MudDataGrid<RoleManageDto> _dataGrid = default!;
-    private HashSet<RoleManageDto> _selectedRoles = new();
-    private string? _searchString;
+    // ===== 状态 =====
+    private bool _loading = true;
     private List<RoleManageDto> _allRoles = [];
-    private bool _isLoaded = false;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadData_Internal();
-        _isLoaded = true;
-    }
+    // Tab 2: 角色人员管理
+    private RoleManageDto? _selectedRole;
+    private RoleManageDto? _prevSelectedRole;
+    private List<RoleUserInfo> _roleUsers = [];
+    private Dictionary<int, int> _roleUserCounts = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _isLoaded)
+        if (firstRender)
         {
-            await _dataGrid.ReloadServerData();
+            await LoadRoles();
+            StateHasChanged();
+        }
+        else if (_selectedRole != null && _selectedRole != _prevSelectedRole)
+        {
+            _prevSelectedRole = _selectedRole;
+            await LoadRoleUsers();
+            StateHasChanged();
         }
     }
 
-    private async Task LoadData_Internal()
+    // ===== 数据加载 =====
+    private async Task LoadRoles()
     {
-        try { _allRoles = await RoleApiClient.GetAllAsync(); }
-        catch { _allRoles = []; }
-    }
-
-    public async Task Refresh()
-    {
-        await LoadData_Internal();
-        await _dataGrid.ReloadServerData();
-    }
-
-    private async Task<GridData<RoleManageDto>> LoadData(GridState<RoleManageDto> state, CancellationToken token)
-    {
-        var query = _allRoles.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(_searchString))
+        _loading = true;
+        try
         {
-            var s = _searchString.Trim();
-            query = query.Where(r =>
-                (!string.IsNullOrEmpty(r.Name) && r.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(r.Description) && r.Description.Contains(s, StringComparison.OrdinalIgnoreCase)));
+            _allRoles = await RoleApiClient.GetAllAsync();
+            // 预加载所有角色的人员数量
+            _roleUserCounts = [];
+            foreach (var role in _allRoles)
+            {
+                try
+                {
+                    var users = await RoleApiClient.GetRoleUsersAsync(role.Id);
+                    _roleUserCounts[role.Id] = users.Count;
+                }
+                catch
+                {
+                    _roleUserCounts[role.Id] = 0;
+                }
+            }
         }
-        var sortDef = state.SortDefinitions?.FirstOrDefault();
-        if (sortDef?.SortBy == "Name")
-            query = sortDef.Descending ? query.OrderByDescending(r => r.Name) : query.OrderBy(r => r.Name);
-        else if (sortDef?.SortBy == "CreatedAt")
-            query = sortDef.Descending ? query.OrderByDescending(r => r.CreatedAt) : query.OrderBy(r => r.CreatedAt);
-        else
-            query = query.OrderByDescending(r => r.Id);
-
-        var items = query.ToList();
-        var total = items.Count;
-        var pageItems = items.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
-        return new GridData<RoleManageDto> { TotalItems = total, Items = pageItems };
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载角色失败: {ex.Message}", Severity.Error);
+            _allRoles = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
+    private async Task SelectRole(RoleManageDto role)
+    {
+        _selectedRole = role;
+    }
+
+    private async Task LoadRoleUsers()
+    {
+        if (_selectedRole == null) return;
+        try
+        {
+            _roleUsers = await RoleApiClient.GetRoleUsersAsync(_selectedRole.Id);
+            _roleUserCounts[_selectedRole.Id] = _roleUsers.Count;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载人员失败: {ex.Message}", Severity.Error);
+            _roleUsers = [];
+        }
+    }
+
+    // ===== 角色 CRUD（通过授权流程） =====
     private async Task OpenCreateDialog()
     {
         var parameters = new DialogParameters
@@ -195,6 +346,22 @@
         }
     }
 
+    private async Task OpenConfigDialog(RoleManageDto role)
+    {
+        var parameters = new DialogParameters
+        {
+            { "RoleId", role.Id },
+            { "RoleName", role.Name ?? "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RoleConfigDialog>($"配置角色 - {role.Name}", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadRoles();
+        }
+    }
+
     private async Task DeleteRole(RoleManageDto role)
     {
         var confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要提交删除角色 \"{role.Name}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
@@ -223,11 +390,109 @@
 
             await AuthApiClient.CreateAsync(request);
             Snackbar.Add($"已创建{targetDescription}，状态为「授权中」，等待审批", Severity.Success);
-            await Refresh();
+            await LoadRoles();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ===== 人员管理 =====
+    private async Task OpenAddUserDialog()
+    {
+        if (_selectedRole == null) return;
+
+        List<User?> allUsers;
+        try
+        {
+            allUsers = (await UserApiClient.GetAllUsersAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户列表失败: {ex.Message}", Severity.Error);
+            return;
+        }
+
+        var roleUserIds = _roleUsers.Select(u => u.UserId).ToHashSet();
+        var availableUsers = allUsers
+            .Where(u => u != null && !roleUserIds.Contains(u.Id))
+            .Select(u => new RoleUserInfo
+            {
+                UserId = u!.Id,
+                UserName = u.UserName,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Email = u.Email,
+                PhoneNumber = u.PhoneNumber,
+                Status = (DataStatus)u.Status
+            })
+            .ToList();
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableUsers", availableUsers },
+            { "RoleName", _selectedRole.Name ?? "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddRoleUserDialog>("添加人员到角色", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is List<int> userIds)
+        {
+            var successCount = 0;
+            foreach (var userId in userIds)
+            {
+                try
+                {
+                    var success = await RoleApiClient.AddRoleToUserAsync(new AddRoleToUserRequest
+                    {
+                        RoleId = _selectedRole.Id,
+                        UserId = userId
+                    });
+                    if (success) successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"添加用户ID {userId} 失败: {ex.Message}", Severity.Error);
+                }
+            }
+            if (successCount > 0)
+            {
+                Snackbar.Add($"成功添加 {successCount} 人到角色", Severity.Success);
+                await LoadRoleUsers();
+                _roleUserCounts[_selectedRole.Id] = _roleUsers.Count;
+            }
+        }
+    }
+
+    private async Task RemoveUser(RoleUserInfo user)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认移除",
+            $"确定要将 \"{user.UserName}\" 从角色 \"{_selectedRole?.Name}\" 移除吗？",
+            yesText: "移除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await RoleApiClient.RemoveRoleFromUserAsync(new RemoveRoleUserRequest
+            {
+                RoleId = _selectedRole!.Id,
+                UserId = user.UserId
+            });
+            if (success)
+            {
+                Snackbar.Add($"已将 {user.UserName} 从角色移除", Severity.Success);
+                await LoadRoleUsers();
+                _roleUserCounts[_selectedRole.Id] = _roleUsers.Count;
+            }
+            else
+            {
+                Snackbar.Add("移除失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"移除失败: {ex.Message}", Severity.Error);
         }
     }
 }

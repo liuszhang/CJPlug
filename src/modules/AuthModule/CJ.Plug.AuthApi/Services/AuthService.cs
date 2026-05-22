@@ -15,17 +15,20 @@ namespace CJ.Plug.AuthApi.Services
         private readonly IUserManageService _userManageService;
         private readonly IRoleManageService _roleManageService;
         private readonly IDepartmentManageService _departmentManageService;
+        private readonly IGroupManageService _groupManageService;
 
         public AuthService(
             MainDbContext dbContext,
             IUserManageService userManageService,
             IRoleManageService roleManageService,
-            IDepartmentManageService departmentManageService)
+            IDepartmentManageService departmentManageService,
+            IGroupManageService groupManageService)
         {
             _dbContext = dbContext;
             _userManageService = userManageService;
             _roleManageService = roleManageService;
             _departmentManageService = departmentManageService;
+            _groupManageService = groupManageService;
         }
 
         public async Task<List<AuthRequestDto>> GetAllAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default)
@@ -49,21 +52,13 @@ namespace CJ.Plug.AuthApi.Services
 
         public async Task<AuthRequestDto> CreateAsync(CreateAuthRequestDto request, CancellationToken cancellationToken = default)
         {
-            var entity = new AuthRequestEntity
-            {
-                OperationType = (int)request.OperationType,
-                TargetDescription = request.TargetDescription,
-                OperationData = request.OperationData,
-                RequestedBy = request.RequestedBy,
-                RequestedAt = DateTime.UtcNow,
-                Status = 0 // Pending
-            };
+            var entity = MapToEntity(request);
 
             // 创建操作：立即创建数据（状态=授权中），并记录TargetId
             var operationType = request.OperationType;
             if (IsCreateOperation(operationType))
             {
-                var targetId = await CreateTargetDataAsync(operationType, request.OperationData, cancellationToken);
+                var targetId = await CreateTargetDataAsync(operationType, request.OperationData, request.RequestedBy, cancellationToken);
                 if (targetId > 0)
                 {
                     entity.TargetId = targetId;
@@ -157,15 +152,16 @@ namespace CJ.Plug.AuthApi.Services
         /// </summary>
         private static bool IsCreateOperation(AuthOperationType operationType)
         {
-            return operationType is AuthOperationType.CreateUser 
-                or AuthOperationType.CreateRole 
-                or AuthOperationType.CreateDepartment;
+            return operationType is AuthOperationType.CreateUser
+                or AuthOperationType.CreateRole
+                or AuthOperationType.CreateDepartment
+                or AuthOperationType.CreateGroup;
         }
 
         /// <summary>
         /// 创建目标数据（状态=授权中）
         /// </summary>
-        private async Task<int> CreateTargetDataAsync(AuthOperationType operationType, string operationData, CancellationToken cancellationToken)
+        private async Task<int> CreateTargetDataAsync(AuthOperationType operationType, string operationData, string creator, CancellationToken cancellationToken)
         {
             try
             {
@@ -176,7 +172,9 @@ namespace CJ.Plug.AuthApi.Services
                     case AuthOperationType.CreateRole:
                         return await CreateRoleDataAsync(operationData, cancellationToken);
                     case AuthOperationType.CreateDepartment:
-                        return await CreateDepartmentDataAsync(operationData, cancellationToken);
+                        return await CreateDepartmentDataAsync(operationData, creator, cancellationToken);
+                    case AuthOperationType.CreateGroup:
+                        return await CreateGroupDataAsync(operationData, creator, cancellationToken);
                     default:
                         return 0;
                 }
@@ -210,15 +208,27 @@ namespace CJ.Plug.AuthApi.Services
             return role?.Id ?? 0;
         }
 
-        private async Task<int> CreateDepartmentDataAsync(string operationData, CancellationToken cancellationToken)
+        private async Task<int> CreateDepartmentDataAsync(string operationData, string creator, CancellationToken cancellationToken)
         {
             var request = JsonSerializer.Deserialize<CreateDepartmentRequest>(operationData);
             if (request == null) return 0;
             
-            // 设置状态为授权中
+            // 设置状态为授权中，创建人从 RequestedBy 传入
             request.Status = DataStatus.Authorizing;
+            request.Creator = creator;
             var dept = await _departmentManageService.CreateAsync(request, cancellationToken);
             return dept?.Id ?? 0;
+        }
+
+        private async Task<int> CreateGroupDataAsync(string operationData, string creator, CancellationToken cancellationToken)
+        {
+            var request = JsonSerializer.Deserialize<CreateGroupRequest>(operationData);
+            if (request == null) return 0;
+
+            request.Status = DataStatus.Authorizing;
+            request.Creator = creator;
+            var group = await _groupManageService.CreateAsync(request);
+            return group?.Id ?? 0;
         }
 
         /// <summary>
@@ -236,14 +246,18 @@ namespace CJ.Plug.AuthApi.Services
                         return await ActivateRoleAsync(targetId, cancellationToken);
                     case AuthOperationType.CreateDepartment:
                         return await ActivateDepartmentAsync(targetId, cancellationToken);
+                    case AuthOperationType.CreateGroup:
+                        return await ActivateGroupAsync(targetId, cancellationToken);
                     case AuthOperationType.UpdateUser:
                     case AuthOperationType.UpdateRole:
                     case AuthOperationType.UpdateDepartment:
+                    case AuthOperationType.UpdateGroup:
                         // 更新操作直接执行
                         return await ExecuteUpdateOperationAsync(operationType, targetId, cancellationToken);
                     case AuthOperationType.DeleteUser:
                     case AuthOperationType.DeleteRole:
                     case AuthOperationType.DeleteDepartment:
+                    case AuthOperationType.DeleteGroup:
                         // 删除操作直接执行
                         return await ExecuteDeleteOperationAsync(operationType, targetId, cancellationToken);
                     default:
@@ -259,10 +273,19 @@ namespace CJ.Plug.AuthApi.Services
 
         private async Task<bool> ActivateUserAsync(int userId, CancellationToken cancellationToken)
         {
+            // 加载现有用户，保留所有字段
+            var existingUser = await _userManageService.GetByIdAsync(userId, cancellationToken);
+            if (existingUser == null) return false;
+
             var updateRequest = new UpdateUserRequest
             {
                 Id = userId,
-                Status = DataStatus.Active
+                Status = DataStatus.Active,
+                Email = existingUser.Email,
+                FirstName = existingUser.FirstName,
+                LastName = existingUser.LastName,
+                PhoneNumber = existingUser.PhoneNumber,
+                DepartmentId = existingUser.DepartmentId
             };
             var user = await _userManageService.UpdateUserAsync(updateRequest, cancellationToken);
             return user != null;
@@ -270,9 +293,16 @@ namespace CJ.Plug.AuthApi.Services
 
         private async Task<bool> ActivateRoleAsync(int roleId, CancellationToken cancellationToken)
         {
+            // 加载现有角色，保留所有字段
+            var existingRole = await _roleManageService.GetByIdAsync(roleId);
+            if (existingRole == null) return false;
+
             var updateRequest = new UpdateRoleRequest
             {
                 Id = roleId,
+                Name = existingRole.Name,
+                Description = existingRole.Description,
+                RoleType = existingRole.RoleType,
                 Status = DataStatus.Active
             };
             var role = await _roleManageService.UpdateAsync(updateRequest);
@@ -281,13 +311,37 @@ namespace CJ.Plug.AuthApi.Services
 
         private async Task<bool> ActivateDepartmentAsync(int deptId, CancellationToken cancellationToken)
         {
+            // 加载现有部门，保留所有字段（特别是 ParentId，否则树结构会被破坏）
+            var existingDept = await _departmentManageService.GetByIdAsync(deptId, cancellationToken);
+            if (existingDept == null) return false;
+
             var updateRequest = new UpdateDepartmentRequest
             {
                 Id = deptId,
+                Name = existingDept.Name,
+                Code = existingDept.Code,
+                ParentId = existingDept.ParentId,
+                Manager = existingDept.Manager,
                 Status = DataStatus.Active
             };
             var dept = await _departmentManageService.UpdateAsync(updateRequest, cancellationToken);
             return dept != null;
+        }
+
+        private async Task<bool> ActivateGroupAsync(int groupId, CancellationToken cancellationToken)
+        {
+            var existingGroup = await _groupManageService.GetByIdAsync(groupId);
+            if (existingGroup == null) return false;
+
+            var updateRequest = new UpdateGroupRequest
+            {
+                Id = groupId,
+                Name = existingGroup.Name,
+                Description = existingGroup.Description,
+                Status = DataStatus.Active
+            };
+            var group = await _groupManageService.UpdateAsync(updateRequest);
+            return group != null;
         }
 
         /// <summary>
@@ -301,12 +355,14 @@ namespace CJ.Plug.AuthApi.Services
 
                 return operationType switch
                 {
-                    AuthOperationType.CreateUser or AuthOperationType.DeleteUser 
+                    AuthOperationType.CreateUser or AuthOperationType.DeleteUser
                         => await _userManageService.DeleteAsync(targetId, cancellationToken),
-                    AuthOperationType.CreateRole or AuthOperationType.DeleteRole 
+                    AuthOperationType.CreateRole or AuthOperationType.DeleteRole
                         => await _roleManageService.DeleteAsync(targetId),
-                    AuthOperationType.CreateDepartment or AuthOperationType.DeleteDepartment 
+                    AuthOperationType.CreateDepartment or AuthOperationType.DeleteDepartment
                         => await _departmentManageService.DeleteAsync(targetId, cancellationToken),
+                    AuthOperationType.CreateGroup or AuthOperationType.DeleteGroup
+                        => await _groupManageService.DeleteAsync(targetId),
                     _ => true
                 };
             }
@@ -336,11 +392,28 @@ namespace CJ.Plug.AuthApi.Services
                 AuthOperationType.DeleteUser => await _userManageService.DeleteAsync(targetId, cancellationToken),
                 AuthOperationType.DeleteRole => await _roleManageService.DeleteAsync(targetId),
                 AuthOperationType.DeleteDepartment => await _departmentManageService.DeleteAsync(targetId, cancellationToken),
+                AuthOperationType.DeleteGroup => await _groupManageService.DeleteAsync(targetId),
                 _ => false
             };
         }
 
-        private static AuthRequestDto MapToDto(AuthRequestEntity entity)
+        /// <summary>
+        /// Map CreateAuthRequestDto to AuthRequestEntity
+        /// </summary>
+        public static AuthRequestEntity MapToEntity(CreateAuthRequestDto request)
+        {
+            return new AuthRequestEntity
+            {
+                OperationType = (int)request.OperationType,
+                TargetDescription = request.TargetDescription,
+                OperationData = request.OperationData,
+                RequestedBy = request.RequestedBy,
+                RequestedAt = DateTime.UtcNow,
+                Status = 0 // Pending
+            };
+        }
+
+        public static AuthRequestDto MapToDto(AuthRequestEntity entity)
         {
             return new AuthRequestDto
             {

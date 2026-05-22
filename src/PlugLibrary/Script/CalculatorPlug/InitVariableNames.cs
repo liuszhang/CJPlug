@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,9 +8,7 @@ namespace CalculatorPlug
 {
     public enum InitVariableNames
     {
-        ConditionExpression,
-        From,
-        To,
-        Step
+        Expression,
+        Result
     }
 }

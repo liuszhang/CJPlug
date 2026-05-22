@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Shared;
@@ -24,7 +24,7 @@ namespace CSharpPlug.Services
                 {
 
                     builder.OpenComponent<CSharpPlugCommonSettingPage>(sequence++);
-                    //builder.AddAttribute(sequence++, nameof(CSharpPlugCommonSettingPage.), context);
+                    builder.AddAttribute(sequence++, nameof(CSharpPlugCommonSettingPage.SettingContext), context);
 
                     builder.CloseComponent();
 
@@ -42,17 +42,23 @@ namespace CSharpPlug.Services
             settings.PlugDisplayName = "C#组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
-            var InitVariables = new List<BaseVariable>();
-            InitVariables.Add(new BaseVariable()
+            //var InitVariables = new List<BaseVariable>();
+            settings.InitVariables.Add(new BaseVariable()
             {
                 Name = InitVariableNames.CSharpCode.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
-            
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.DllReferences.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
 
-            settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-                JsonSerializer.Serialize(InitVariables));
+            //settings.InitVariables = InitVariables;
+
+            //settings.SetSetting(PlugSettingKey.InitVariables.ToString(),JsonSerializer.Serialize(InitVariables));
 
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.脚本执行.ToString());
 

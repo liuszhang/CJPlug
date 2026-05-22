@@ -241,6 +241,115 @@ public partial class PlugDataZone
             }
         }
 
+        //获取指定插头的状态数据
+        public PlugStatus? GetPlugStatus(string PlugDefinitionId)
+        {
+            // 优先从 PlugStatusDatas 导航属性查找
+            var statusData = PlugStatusDatas?
+                .FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId);
+            if (statusData?.Value != null)
+                return JsonSerializer.Deserialize<PlugStatus>(statusData.Value);
+
+            // 回退到 PDZVariables 查找
+            var variable = PDZVariables?
+                .Where(p => p.PlugDefinitionId == PlugDefinitionId)
+                .FirstOrDefault(p => p.Tag == PDZVariableTagEnum.PlugStatusTag.ToString());
+            if (variable?.Value != null)
+                return JsonSerializer.Deserialize<PlugStatus>(variable.Value);
+
+            return null;
+        }
+
+        //判断指定插头是否已完成（无阻塞 且 已完成或出错）
+        public bool IsPlugCompleted(string PlugDefinitionId)
+        {
+            var status = GetPlugStatus(PlugDefinitionId);
+            if (status == null) return false;
+            return !status.Blocked && (status.Completed > 0 || status.Faulted);
+        }
+
+        /// <summary>
+        /// 存储插头完成时的 Outcome（供书签恢复时读取）
+        /// </summary>
+        public void SetActivityOutcome(string PlugDefinitionId, string outcomes)
+        {
+            var variable = PDZVariables?
+                .Where(p => p.PlugDefinitionId == PlugDefinitionId)
+                .FirstOrDefault(p => p.Tag == "_Outcome");
+            if (variable != null)
+            {
+                variable.Value = outcomes;
+            }
+            else
+            {
+                PDZVariables?.Add(new PDZVariable()
+                {
+                    PlugDefinitionId = PlugDefinitionId,
+                    Name = "_Outcome",
+                    Tag = "_Outcome",
+                    Value = outcomes
+                });
+            }
+        }
+
+        /// <summary>
+        /// 读取插头完成时的 Outcome
+        /// </summary>
+        public string? GetActivityOutcome(string PlugDefinitionId)
+        {
+            return PDZVariables?
+                .Where(p => p.PlugDefinitionId == PlugDefinitionId)
+                .FirstOrDefault(p => p.Tag == "_Outcome")?.Value;
+        }
+
+        /// <summary>
+        /// 获取当前 PDZ 中所有等待汇聚的插头 ID（即有多个上游连接的插头），
+        /// 并且其全部上游已完成。用于 AndPlug 等汇聚型插头的执行唤醒。
+        /// </summary>
+        public List<string> GetReadyConvergencePlugIds()
+        {
+            var readyIds = new List<string>();
+            var dataFlows = GetDataFlowData();
+            if (dataFlows == null || dataFlows.Count == 0) return readyIds;
+
+            // 构建 目标插头ID → 上游插头ID列表 的映射
+            var convergenceMap = new Dictionary<string, List<string>>();
+            foreach (var flowJson in dataFlows)
+            {
+                if (string.IsNullOrEmpty(flowJson)) continue;
+                try
+                {
+                    var flow = JsonSerializer.Deserialize<PortLinkModel>(flowJson);
+                    if (flow?.TargetPort?.PlugDefinitionId == null || flow?.SourcePort?.PlugDefinitionId == null)
+                        continue;
+
+                    var targetId = flow.TargetPort.PlugDefinitionId;
+                    if (!convergenceMap.ContainsKey(targetId))
+                        convergenceMap[targetId] = new List<string>();
+                    convergenceMap[targetId].Add(flow.SourcePort.PlugDefinitionId);
+                }
+                catch (JsonException) { }
+            }
+
+            // 检查每个汇聚插头的上游是否全部完成
+            foreach (var kvp in convergenceMap)
+            {
+                var targetId = kvp.Key;
+                var upstreamIds = kvp.Value.Distinct().ToList();
+
+                // 只有多个上游才算汇聚
+                if (upstreamIds.Count <= 1) continue;
+
+                var allDone = upstreamIds.All(upId => IsPlugCompleted(upId));
+                if (allDone && !IsPlugCompleted(targetId)) // 自己还没完成
+                {
+                    readyIds.Add(targetId);
+                }
+            }
+
+            return readyIds;
+        }
+
         //复制PDZ，根据目标PDZ类型不同可能会有不同的处理逻辑
         public PlugDataZone CopyPDZ(string? UserName, string? TargetPDZType, string? JobDefinitionId)
         {

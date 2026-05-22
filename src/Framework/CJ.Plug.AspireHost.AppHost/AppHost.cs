@@ -6,6 +6,30 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
+// ============ 中文乱码修复 (三层编码设置) ============
+
+// 第1层: 注册 CodePages 编码提供程序，让 .NET 运行时能正确处理各种编码（含 UTF-8）
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+// 第2层: 设置 .NET Console 编码为 UTF-8
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+
+// 第3层: 通过 P/Invoke 设置 Windows 原生控制台代码页为 UTF-8 (65001)
+// 这是最关键的一步——Serilog.Sinks.Console 和底层 Windows API 走的是原生代码页，
+// 不受 Console.OutputEncoding 影响，必须同时设置才能彻底解决中文乱码
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
+}
+
+[DllImport("kernel32.dll")]
+static extern bool SetConsoleOutputCP(uint wCodePageId);
+
+[DllImport("kernel32.dll")]
+static extern bool SetConsoleCP(uint wCodePageId);
+
 // 设置 Environment
 Environment.SetEnvironmentVariable("ASPNETCORE_URLS", "http://localhost:15288");
 Environment.SetEnvironmentVariable("DOTNET_DASHBOARD_OTLP_ENDPOINT_URL", "http://localhost:19275");
@@ -13,6 +37,14 @@ Environment.SetEnvironmentVariable("DOTNET_RESOURCE_SERVICE_ENDPOINT_URL", "http
 Environment.SetEnvironmentVariable("ASPIRE_ALLOW_UNSECURED_TRANSPORT", "true");
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
+
+// 强制所有子进程 (dotnet xxx.dll) 的控制台输出使用 UTF-8 编码
+// Aspire Dashboard 日志收集管道按 UTF-8 解码，不设置的话 Windows 默认 GBK 会导致中文乱码
+Environment.SetEnvironmentVariable("DOTNET_SYSTEM_CONSOLE_DEFAULT_ENCODING", "utf-8");
+
+// UTF-8 编码环境变量，通过 .WithEnvironment 传递给各 AddExecutable 资源
+const string Utf8EnvKey = "DOTNET_SYSTEM_CONSOLE_DEFAULT_ENCODING";
+const string Utf8EnvVal = "utf-8";
 Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); ;
 
 
@@ -67,6 +99,9 @@ if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// 重新设置 Console.OutputEncoding — CreateBuilder 内部可能重置了编码
+Console.OutputEncoding = Encoding.UTF8;
+
 //获取当前运行程序的路径
 var currentDirectory = Directory.GetCurrentDirectory();
 Console.WriteLine($"currentDirectory: {currentDirectory}");
@@ -120,9 +155,11 @@ builder.AddExecutable(
         command: "dotnet",
         workingDirectory: dispatchServerDirectory,
         args: dispatchServerDllName // DLL 文件名
-    ).WithUrl("http://localhost:8686");
+    ).WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+     .WithUrl("http://localhost:8686");
 
-builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice");
+builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice")
+    .WithEnvironment(Utf8EnvKey, Utf8EnvVal);
 //builder.AddProject("apiservice", @"../PlugApiServer/CJ.Plug.ApiServer/CJ.Plug.ApiServer.csproj");
 //builder.AddProject("apiservice", apiServer);
 //builder.AddExecutable("apiservice", "dotnet", apiServerDirectory, apiServerDllName).WithUrl("http://localhost:6661");
@@ -130,20 +167,20 @@ builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice");
 //builder.AddProject<Projects.CJ_Plug_StationApiServer>("stationapi");
 //builder.AddProject("stationapi", @"../PlugStation/CJ.Plug.StationApiServer/CJ.Plug.StationApiServer.csproj");
 //builder.AddProject("stationapi", stationApiServer);
-builder.AddExecutable("stationapi", "dotnet", stationApiServerDirectory, stationApiServerDllName).WithUrl("http://localhost:7660");
+//builder.AddExecutable("stationapi", "dotnet", stationApiServerDirectory, stationApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:7660");
 
 
 //builder.AddProject<Projects.CJ_Plug_ElsaApiServer>("elsaapiserver");
 //builder.AddProject("elsaapiserver", @"../PlugApiServer/CJ.Plug.ElsaApiServer/CJ.Plug.ElsaApiServer.csproj");
 //builder.AddProject("elsaapiserver", elsaApiServer);
-builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApiServerDllName).WithUrl("http://localhost:5001");
+builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5001");
 
 //builder.AddProject<Projects.CJ_Plug_ElsaStudio>("elsastudio");
 //builder.AddProject("elsastudio", @"../PlugWebHost/CJ.Plug.ElsaStudio/CJ.Plug.ElsaStudio.csproj");
 //builder.AddProject("elsastudio", elsaStudio);
-builder.AddExecutable("elsastudio", "dotnet", elsaStudioDirectory, elsaStudioDllName).WithUrl("http://localhost:5010");
+builder.AddExecutable("elsastudio", "dotnet", elsaStudioDirectory, elsaStudioDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5010");
 
-builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend");
+builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal);
 //builder.AddProject("webfrontend", @"../PlugWebHost/CJ.Plug.HostWebServer/CJ.Plug.HostWebServer.csproj");
 //builder.AddProject("webfrontend", webFrontend);
 //builder.AddExecutable("webfrontend", "dotnet", webFrontendDirectory, webFrontendDllName).WithUrl("http://localhost:5066");
@@ -157,11 +194,11 @@ builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend");
 //builder.AddProject<Projects.CJ_Plug_McpServer>("cj-plug-mcpserver");
 //builder.AddProject("cj-plug-mcpserver", @"../PlugApiServer/CJ.Plug.McpServer/CJ.Plug.McpServer.csproj");
 //builder.AddProject("cj-plug-mcpserver", mcpServer);
-builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllName).WithUrl("http://localhost:3001");
+builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:3001");
 
 
 
-builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithUrl("http://localhost:6274");
+builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:6274");
 
 //打开浏览器
 try
@@ -179,5 +216,10 @@ catch (Exception ex)
     Console.WriteLine($"Error opening browser. {ex.Message}");
     Console.WriteLine($"Please manually open this URL");
 }
+
+// 最后一次确保 Console.OutputEncoding 为 UTF-8
+// Aspire hosting 内部的 Logger 创建、gRPC 启动等可能重置编码
+Console.OutputEncoding = Encoding.UTF8;
+Console.WriteLine("Console.OutputEncoding = " + Console.OutputEncoding.EncodingName);
 
 builder.Build().Run();

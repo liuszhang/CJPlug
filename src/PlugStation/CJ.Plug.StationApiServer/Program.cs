@@ -13,6 +13,11 @@ using CJ.Plug_Aspire.StationApiService.Services;
 using CJ.Plug_Aspire.StationApiService.StationApi;
 using Microsoft.AspNetCore.Builder;
 using Serilog;
+using System.Text;
+
+// 设置 .NET Console 编码为 UTF-8
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
@@ -66,6 +71,9 @@ builder.Services.AddScoped<IStationFileService, StationFileService>();
 // 远程桌面服务 (UltraVNC portable + SSH)
 builder.Services.AddSingleton<UltraVncService>();
 builder.Services.AddSingleton<RemoteDesktopService>();
+
+// VNC 自启动服务：StationApiServer 启动时自动部署并启动 UltraVNC
+builder.Services.AddHostedService<VncAutoStartService>();
 
 // 窗口捕获服务
 builder.Services.AddSingleton<WindowCaptureService>();

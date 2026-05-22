@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    中文乱码根因修复：嵌入 Windows Application Manifest 到所有 Exe 项目
+    
+    <activeCodePage>UTF-8</activeCodePage> 使 Encoding.Default 返回 UTF-8，
+    而非中文 Windows 默认的 GBK/936。这样：
+    - Process.StandardOutput 默认用 UTF-8 解码（修复 Aspire Dashboard 日志）
+    - Console.Out 默认用 UTF-8（修复 Serilog/Console 输出）
+    - 所有依赖 Encoding.Default 的 .NET API 都用 UTF-8
+  -->
+  <PropertyGroup Condition="'$(OutputType)' == 'Exe'">
+    <ApplicationManifest>$(MSBuildThisFileDirectory)app.manifest</ApplicationManifest>
+  </PropertyGroup>
+</Project>

@@ -30,12 +30,11 @@ namespace CJ.Plug.Models.EventAggregator
             Log.Information("ResumeElsaProcess:" + InstanceId + "-" + DefinitionId+"-"+ CorrelationId);
         }
 
-        public static void CompleteActivityContext(string? CorrelationId, string? DefinitionId)
-        {
-            //Log.Information("CompleteActivityContext:" + CorrelationId + DefinitionId);
-            CLog.Information(CorrelationId + DefinitionId, null, null, null, null, LogTypeEnum.CompleteActivityContext);
-            //Log.Information("ResumeElsaProcess:" + CorrelationId + "-" + DefinitionId);
-        }
+    public static void CompleteActivityContext(string? CorrelationId, string? DefinitionId)
+    {
+        // 管道符分隔，供 ElsaApiServer 解析 correlationId|plugId
+        CLog.Information(CorrelationId + "|" + DefinitionId, null, null, null, null, LogTypeEnum.CompleteActivityContext);
+    }
 
         // PDZ更新通知器，通知其他页面进行数据的重加载
         public static void PDZUpdated(string? PDZId)

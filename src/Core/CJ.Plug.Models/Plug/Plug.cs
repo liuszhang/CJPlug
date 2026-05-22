@@ -1,4 +1,5 @@
-﻿using CJ.Plug.Models.PlugAction;
+using CJ.Plug.Models.PlugAction;
+using CJ.Plug.Models.Station;
 using CJ.Plug.Models.VariableType;
 using System;
 using System.Collections.Generic;
@@ -24,7 +25,7 @@ namespace CJ.Plug.Models.Plug
         public string? Type { get; set; }
         //用于匹配自定义配置界面和执行方法的类型唯一Key，默认为Type,由插头开发者手动配置
         public string? PlugTypeKey { get; set; }
-        public string? Category { get; set; } = ""; //记录插头的种类，如桌面类，接口类，脚本类等
+        public string? Category { get; set; } = ToolTypeEnum.桌面类_自研.ToString(); //记录插头的种类，如桌面类，接口类，脚本类等
         public string? GroupName { get; set; }   //记录插头在插头库中的分组名称，对应引擎中的Category
         public string? Value { get; set; } //用于保存插头重要的值，以简化从PlugSetting中取值的操作
         public string? RealValuePath { get; set; } //如果有文件操作，保存文件在文件服务器的真实路径，便于后续数据处理，也是为了简化从PlugSetting中取值的操作
@@ -34,8 +35,10 @@ namespace CJ.Plug.Models.Plug
         //public bool IsPlugIning { get; set; } = false;
         //执行时是否只执行动作而忽略插头本身执行
         public bool OnlyExecuteAction { get; set; } = false;
-        //当作为流程执行时的触发活动ID
+        //当作为流程执行时的触发活动ID,已经转移到PDZ中，弃用
+        [Obsolete]
         public string? TriggerPlugDefinitionId { get; set; }
+        [Obsolete]
         public string? TriggerPlugId { get; set; }
         public string? Creater { get; set; }
 
@@ -89,7 +92,7 @@ namespace CJ.Plug.Models.Plug
         public List<string>? ToolVersions { get; set; } = new(); //工具版本列表，暂时不用
 
         //public List<PlugAction.PlugAction>? PlugActions { get; set; }= new List<PlugAction.PlugAction>();
-
+        //用于储存插头本身的参数，使用时可能会作为PDZ中插头参数创建的依据
         public List<PlugVariable>? PlugVariables { get; set; } = new List<PlugVariable>();
 
         /// <summary>
@@ -159,6 +162,7 @@ namespace CJ.Plug.Models.Plug
             var settings = JsonSerializer.Deserialize<PlugSettings>(PlugSettingsJson);            
             return settings;
         }
+        
         /// <summary>
         /// 设置插头配置的方便类
         /// </summary>
@@ -170,6 +174,7 @@ namespace CJ.Plug.Models.Plug
             PlugSettings.SetSetting(key,value);
             PlugSettingsJson = PlugSettings.GetSettingsJson();
         }
+        
         /// <summary>
         /// 获取插头配置的方便类
         /// </summary>

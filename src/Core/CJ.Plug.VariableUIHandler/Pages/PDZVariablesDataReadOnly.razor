@@ -17,12 +17,12 @@
         <SelectColumn T="PlugVariableData" />
         <PropertyColumn Property="x => x.Name" Title="名称" />
         <PropertyColumn Property="x => x.Type" Title="类型" />
-        <TemplateColumn>
+        <TemplateColumn Title="值预览">
             <CellTemplate>
                 <MudTextField T="string" ReadOnly Style="max-width:300px" Size="@Size.Small" Text="@context.Item.Value" Lines="1" AutoGrow></MudTextField>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出"/>
+        @* <PropertyColumn Property="x => x.InputAndOutput" Title="输入输出"/> *@
         @if (_enableGrouping)
         {
             <TemplateColumn Title="所属插头" Groupable="true" Grouping="true" GroupBy="@((PlugVariableData x) => GetPlugName(x.PlugDefinitionId))">

@@ -115,42 +115,42 @@ public partial class MainApiClient : ITASApiClient
     public async Task<Plug?> GetPlugByDefinitionIdAsync(string definitionId, CancellationToken cancellationToken = default)
     {
         var result = await TASApiClient.Value.GetPlugByDefinitionIdAsync(definitionId, cancellationToken);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"查询插件定义ID: {definitionId}");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"通过定义ID查询插头: {definitionId}");
         return result;
     }
 
     public async Task<Plug?> GetPlugById(int? Id, CancellationToken cancellationToken = default)
     {
         var result = await TASApiClient.Value.GetPlugById(Id, cancellationToken);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"查询插件ID: {Id}");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"通过ID查询插头: {Id}");
         return result;
     }
 
     public async Task<List<Plug>> GetPlugs(CancellationToken cancellationToken = default)
     {
         var result = await TASApiClient.Value.GetPlugs(cancellationToken);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, "查询所有插件");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, "查询所有插头");
         return result;
     }
 
     public async Task<string?> GetPlugVariableValueAsync(int plugId, string variableName)
     {
         var result = await TASApiClient.Value.GetPlugVariableValueAsync(plugId, variableName);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"获取插件变量值: {plugId}.{variableName}");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"获取插头变量值: {plugId}.{variableName}");
         return result;
     }
 
     public async Task<string?> GetPlugVariableValueAsync(string plugDefinitionId, string variableName)
     {
         var result = await TASApiClient.Value.GetPlugVariableValueAsync(plugDefinitionId, variableName);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"获取插件变量值: {plugDefinitionId}.{variableName}");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"获取插头变量值: {plugDefinitionId}.{variableName}");
         return result;
     }
 
     public async Task<Plug?> GetRootPlugByTypeNameAsync(string typeName, CancellationToken cancellationToken = default)
     {
         var result = await TASApiClient.Value.GetRootPlugByTypeNameAsync(typeName, cancellationToken);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"查询根插件类型: {typeName}");
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, $"查询根插头类型: {typeName}");
         return result;
     }
 

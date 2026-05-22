@@ -354,9 +354,11 @@
                 Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp}");
                 InvokeAsync(async () =>
                 {
+                    // 从完整 URL 中提取纯 IP（stationIp 可能是 "http://192.168.161.237:7660"）
+                    var pureIp = ExtractHost(stationIp);
                     // 打开新的浏览器页签显示远程桌面 (默认 SSH)
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{stationIp}?protocol=ssh", "_blank");
-                    Snackbar.Add($"正在打开远程终端: {stationIp}", Severity.Info);
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}?protocol=ssh", "_blank");
+                    Snackbar.Add($"正在打开远程终端: {pureIp}", Severity.Info);
                 });
             });
     }
@@ -367,5 +369,33 @@
 
         NavigationManager.NavigateTo($"/ProcessEdit/{PlugData?.PlugDefinitionId}");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 从可能的完整 URL 中提取纯 IP/主机名
+    /// e.g. "http://192.168.161.237:7660" → "192.168.161.237"
+    /// </summary>
+    private static string ExtractHost(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return "localhost";
+
+        // 尝试解析为 URI
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        // 如果解析失败，尝试去掉协议前缀
+        var stripped = raw;
+        if (stripped.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[7..];
+        else if (stripped.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[8..];
+
+        // 去掉端口号
+        var colonIdx = stripped.IndexOf(':');
+        if (colonIdx > 0)
+            stripped = stripped[..colonIdx];
+
+        return stripped;
     }
 }

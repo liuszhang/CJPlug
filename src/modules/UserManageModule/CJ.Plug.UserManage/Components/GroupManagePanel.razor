@@ -1,0 +1,458 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManage.Pages
+@using CJ.Plug.AuthModels
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+@using System.Text.Json
+
+@inject MainApiClient GroupApiClient
+@inject MainApiClient UserApiClient
+@inject MainApiClient AuthApiClient
+@inject IDomInteropService DomInteropService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    @* ===== Tab 1: 用户组管理 ===== *@
+    <MudTabPanel Text="用户组管理" Icon="@Icons.Material.Filled.Groups">
+        <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">用户组列表</MudText>
+            <MudSpacer />
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog">创建用户组</MudButton>
+            <MudButton OnClick="@LoadGroups" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_allGroups.Count == 0)
+        {
+            <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                <MudText Typo="Typo.body1" Class="mud-text-secondary">暂无用户组数据，点击「创建用户组」添加</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Elevation="1">
+                <MudTable Items="@_allGroups" Dense="true" Hover="true" Elevation="0" Style="width:100%">
+                    <HeaderContent>
+                        <MudTh>用户组名</MudTh>
+                        <MudTh>描述</MudTh>
+                        <MudTh Style="width: 80px">成员数</MudTh>
+                        <MudTh Style="width: 80px">系统</MudTh>
+                        <MudTh Style="width: 80px">状态</MudTh>
+                        <MudTh Style="width: 100px">创建人</MudTh>
+                        <MudTh Style="width: 220px">创建时间</MudTh>
+                        <MudTh Style="width: 120px">操作</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudText>@context.Name</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@(context.Description ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@context.MemberCount</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Color="@(context.IsSystem ? Color.Info : Color.Default)" Variant="Variant.Filled" Size="Size.Small">
+                                @(context.IsSystem ? "是" : "否")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            @{
+                                var status = context.Status;
+                                var chipColor = status switch
+                                {
+                                    DataStatus.Authorizing => Color.Warning,
+                                    DataStatus.Disabled => Color.Default,
+                                    DataStatus.Active => Color.Success,
+                                    _ => Color.Default
+                                };
+                                var statusText = status switch
+                                {
+                                    DataStatus.Authorizing => "授权中",
+                                    DataStatus.Disabled => "禁用",
+                                    DataStatus.Active => "启用",
+                                    _ => "未知"
+                                };
+                            }
+                            <MudChip T="string" Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">@statusText</MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@(context.Creator ?? "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText>@(context.CreatedAt > DateTimeOffset.MinValue ? context.CreatedAt.ToString("yyyy-MM-dd HH:mm") : "-")</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <div style="white-space: nowrap;">
+                                @if (context.IsSystem)
+                                {
+                                    <MudTooltip Text="系统内置用户组，不可编辑和删除">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" Disabled="true" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="编辑">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                                       Color="Color.Default" OnClick="@(() => OpenEditDialog(context))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="删除">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                       Color="Color.Error" OnClick="@(() => DeleteGroup(context))" />
+                                    </MudTooltip>
+                                }
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    @* ===== Tab 2: 用户组人员管理 ===== *@
+    <MudTabPanel Text="用户组人员管理" Icon="@Icons.Material.Filled.People">
+        <MudGrid Style="height: calc(100vh - 220px);" Spacing="2">
+            @* 左栏：用户组列表（用于选择） *@
+            <MudItem xs="3">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    <MudText Typo="Typo.subtitle2" Class="px-2 py-1 mud-text-secondary">选择用户组</MudText>
+                    @if (_allGroups.Count > 0)
+                    {
+                        @foreach (var group in _allGroups)
+                        {
+                            var isSelected = _selectedGroup?.Id == group.Id;
+                            <MudListItem T="GroupManageDto" Dense="true" OnClick="@(() => SelectGroup(group))"
+                                         Class="@(isSelected ? "mud-primary-text mud-primary-hover" : "")"
+                                         Style="@(isSelected ? "background-color: var(--mud-palette-action-default-hover);" : "")">
+                                <MudStack Row AlignItems="AlignItems.Center" Style="width:100%">
+                                    <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Class="me-2" Color="Color.Primary" />
+                                    <MudText>@group.Name</MudText>
+                                    <MudSpacer />
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@group.MemberCount</MudText>
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary pa-2">暂无用户组数据</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            @* 右栏：人员列表 *@
+            <MudItem xs="9">
+                <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; overflow-y: auto;">
+                    @if (_selectedGroup != null)
+                    {
+                        <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.h6">@_selectedGroup.Name 的人员</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">（@_groupUsers.Count 人）</MudText>
+                            <MudSpacer />
+                            <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@OpenAddUserDialog">添加人员</MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined"
+                                       Color="Color.Primary" Size="Size.Small" OnClick="@LoadGroupUsers">刷新</MudButton>
+                        </MudStack>
+
+                        <MudDataGrid T="GroupUserInfo" Items="@_groupUsers" Dense="true" Hover="true" Elevation="0"
+                                     ReadOnly="true" SortMode="SortMode.Single">
+                            <Columns>
+                                <TemplateColumn Title="用户名">
+                                    <CellTemplate>@context.Item.UserName</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="姓名">
+                                    <CellTemplate>@($"{context.Item.FirstName ?? ""}{context.Item.LastName ?? ""}")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="邮箱">
+                                    <CellTemplate>@(context.Item.Email ?? "-")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="电话">
+                                    <CellTemplate>@(context.Item.PhoneNumber ?? "-")</CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Title="状态">
+                                    <CellTemplate>
+                                        @{
+                                            var userStatus = context.Item.Status;
+                                            var userChipColor = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => Color.Warning,
+                                                DataStatus.Disabled => Color.Default,
+                                                DataStatus.Active => Color.Success,
+                                                _ => Color.Default
+                                            };
+                                            var userStatusText = userStatus switch
+                                            {
+                                                DataStatus.Authorizing => "授权中",
+                                                DataStatus.Disabled => "禁用",
+                                                DataStatus.Active => "启用",
+                                                _ => "未知"
+                                            };
+                                        }
+                                        <MudChip T="string" Color="@userChipColor" Variant="Variant.Filled" Size="Size.Small">@userStatusText</MudChip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                                <TemplateColumn Style="text-align:right" Title="操作">
+                                    <CellTemplate>
+                                        <MudTooltip Text="从用户组移除">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.PersonRemove" Size="Size.Small"
+                                                           Color="Color.Error" OnClick="@(() => RemoveUser(context.Item))" />
+                                        </MudTooltip>
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            </Columns>
+                            <NoRecordsContent>
+                                <MudText>该用户组暂无人员，点击「添加人员」</MudText>
+                            </NoRecordsContent>
+                        </MudDataGrid>
+                    }
+                    else
+                    {
+                        <MudPaper Class="pa-8 d-flex align-center justify-center" Elevation="0">
+                            <MudText Typo="Typo.body1" Class="mud-text-secondary">← 请先在左侧选择一个用户组</MudText>
+                        </MudPaper>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    // ===== 状态 =====
+    private bool _loading = true;
+    private List<GroupManageDto> _allGroups = [];
+
+    // Tab 2: 用户组人员管理
+    private GroupManageDto? _selectedGroup;
+    private GroupManageDto? _prevSelectedGroup;
+    private List<GroupUserInfo> _groupUsers = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadGroups();
+            StateHasChanged();
+        }
+        else if (_selectedGroup != null && _selectedGroup != _prevSelectedGroup)
+        {
+            _prevSelectedGroup = _selectedGroup;
+            await LoadGroupUsers();
+            StateHasChanged();
+        }
+    }
+
+    // ===== 数据加载 =====
+    private async Task LoadGroups()
+    {
+        _loading = true;
+        try
+        {
+            _allGroups = await GroupApiClient.GetAllUserGroupAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户组失败: {ex.Message}", Severity.Error);
+            _allGroups = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SelectGroup(GroupManageDto group)
+    {
+        _selectedGroup = group;
+    }
+
+    private async Task LoadGroupUsers()
+    {
+        if (_selectedGroup == null) return;
+        try
+        {
+            _groupUsers = await GroupApiClient.GetGroupMembersAsync(_selectedGroup.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载人员失败: {ex.Message}", Severity.Error);
+            _groupUsers = [];
+        }
+    }
+
+    // ===== 用户组 CRUD（通过授权流程） =====
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "GroupName", "" },
+            { "GroupDescription", "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateGroupDialog>("创建用户组（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CreateGroupRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.CreateGroup, $"用户组: {request.Name}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task OpenEditDialog(GroupManageDto group)
+    {
+        var parameters = new DialogParameters
+        {
+            { "GroupId", group.Id },
+            { "GroupName", group.Name ?? "" },
+            { "GroupDescription", group.Description ?? "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditGroupDialog>("编辑用户组（需授权）", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is UpdateGroupRequest request)
+        {
+            await CreateAuthRequest(AuthOperationType.UpdateGroup, $"用户组: {group.Name}", JsonSerializer.Serialize(request));
+        }
+    }
+
+    private async Task DeleteGroup(GroupManageDto group)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要提交删除用户组 \"{group.Name}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
+        if (confirm != true) return;
+        await CreateAuthRequest(AuthOperationType.DeleteGroup, $"用户组: {group.Name}", JsonSerializer.Serialize(new { GroupId = group.Id, GroupName = group.Name }));
+    }
+
+    private async Task CreateAuthRequest(AuthOperationType operationType, string targetDescription, string operationData)
+    {
+        try
+        {
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            if (string.IsNullOrEmpty(currentUser))
+            {
+                currentUser = "anonymous";
+                Snackbar.Add("未检测到登录用户，请先登录", Severity.Warning);
+            }
+
+            var request = new CreateAuthRequestDto
+            {
+                OperationType = operationType,
+                TargetDescription = targetDescription,
+                OperationData = operationData,
+                RequestedBy = currentUser
+            };
+
+            await AuthApiClient.CreateAsync(request);
+            Snackbar.Add($"已创建{targetDescription}，状态为「授权中」，等待审批", Severity.Success);
+            await LoadGroups();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ===== 人员管理 =====
+    private async Task OpenAddUserDialog()
+    {
+        if (_selectedGroup == null) return;
+
+        List<CJ.Plug.Models.Shared.User?> allUsers;
+        try
+        {
+            allUsers = (await UserApiClient.GetAllUsersAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载用户列表失败: {ex.Message}", Severity.Error);
+            return;
+        }
+
+        var groupUserIds = _groupUsers.Select(u => u.UserId).ToHashSet();
+        var availableUsers = allUsers
+            .Where(u => u != null && !groupUserIds.Contains(u.Id))
+            .Select(u => new GroupUserInfo
+            {
+                UserId = u!.Id,
+                UserName = u.UserName,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Email = u.Email,
+                PhoneNumber = u.PhoneNumber,
+                Status = (DataStatus)u.Status
+            })
+            .ToList();
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableUsers", availableUsers },
+            { "GroupName", _selectedGroup.Name ?? "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddGroupUserDialog>("添加人员到用户组", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is List<int> userIds)
+        {
+            var successCount = 0;
+            foreach (var userId in userIds)
+            {
+                try
+                {
+                    var success = await GroupApiClient.AddGroupUserAsync(new AddGroupUserRequest
+                    {
+                        GroupId = _selectedGroup.Id,
+                        UserId = userId
+                    });
+                    if (success) successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"添加用户ID {userId} 失败: {ex.Message}", Severity.Error);
+                }
+            }
+            if (successCount > 0)
+            {
+                Snackbar.Add($"成功添加 {successCount} 人到用户组", Severity.Success);
+                await LoadGroupUsers();
+                await LoadGroups();
+            }
+        }
+    }
+
+    private async Task RemoveUser(GroupUserInfo user)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认移除",
+            $"确定要将 \"{user.UserName}\" 从用户组 \"{_selectedGroup?.Name}\" 移除吗？",
+            yesText: "移除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await GroupApiClient.RemoveGroupUserAsync(new RemoveGroupUserRequest
+            {
+                GroupId = _selectedGroup!.Id,
+                UserId = user.UserId
+            });
+            if (success)
+            {
+                Snackbar.Add($"已将 {user.UserName} 从用户组移除", Severity.Success);
+                await LoadGroupUsers();
+                await LoadGroups();
+            }
+            else
+            {
+                Snackbar.Add("移除失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"移除失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

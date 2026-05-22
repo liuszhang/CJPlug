@@ -47,6 +47,8 @@ public partial class MainApiClient
     public readonly Lazy<IDepartmentManageApiClient> DepartmentManageApiClient;
     public readonly Lazy<IAuthApiClient> AuthApiClient;
     public readonly Lazy<IGuacamoleApiClient> GuacamoleApiClient;
+    public readonly Lazy<IRolePermissionApiClient> RolePermissionApiClient;
+    public readonly Lazy<IGroupManageApiClient> GroupManageApiClient;
     //public readonly Lazy<IDeepSeekService> DeepSeekApiClient;
 
     /// <summary>
@@ -77,6 +79,8 @@ public partial class MainApiClient
         DepartmentManageApiClient = new Lazy<IDepartmentManageApiClient>(() => serviceProvider.GetRequiredService<IDepartmentManageApiClient>());
         AuthApiClient = new Lazy<IAuthApiClient>(() => serviceProvider.GetRequiredService<IAuthApiClient>());
         GuacamoleApiClient = new Lazy<IGuacamoleApiClient>(() => serviceProvider.GetRequiredService<IGuacamoleApiClient>());
+        RolePermissionApiClient = new Lazy<IRolePermissionApiClient>(() => serviceProvider.GetRequiredService<IRolePermissionApiClient>());
+        GroupManageApiClient = new Lazy<IGroupManageApiClient>(() => serviceProvider.GetRequiredService<IGroupManageApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
 
         // 初始化审计日志辅助类
@@ -94,9 +98,10 @@ public partial class MainApiClient
             // 使用IServiceProvider创建scope来获取Scoped服务
             using var scope = serviceProvider.CreateScope();
             var localStorage = scope.ServiceProvider.GetService<ILocalStorageService>();
+            //var localStorage = serviceProvider.GetRequiredService<ILocalStorageService>();
             if (localStorage != null)
             {
-                return await localStorage.GetItemAsync<string>("userName") ?? "anonymous";
+                return await localStorage.GetItemAsync<string>("username") ?? "anonymous";
             }
             return "anonymous";
         }

@@ -1,4 +1,4 @@
-﻿using CJ.Plug.ElsaIntegration.Services;
+using CJ.Plug.ElsaIntegration.Services;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
@@ -12,160 +12,93 @@ using Elsa.Workflows.Memory;
 using Elsa.Workflows.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR.Client;
 using Serilog;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using YamlDotNet.Core.Tokens;
 
-//[Activity("Demo6666", "Demo6666", "Simple activity6666666666666 ")]
-//[Activity(Namespace = "Demo", Category = "Demo", DisplayName = "测试活动", Description = "A simple activity that writes \"Hello World!\" to the console.")]
-//[Activity(Namespace ="CJ",Description ="核心插头活动",Category ="商业软件")]
 [Activity("CJ", "商业软件", "核心插头活动")]
-//[FlowNode("Pass", "Fail")]
 public class CommonCorePlugActivity : CodeActivity
 {
-    //[Input(IsBrowsable = false, Description = "输入插头ID")]
-    //public Input<string?> PlugDefinitionId { get; set; }
-
     protected override async ValueTask ExecuteAsync(ActivityExecutionContext context)
     {
         try
         {
-            // 从活动上下文获取 IServiceProvider
             var serviceProvider = context.GetRequiredService<IServiceProvider>();
-
-            bool IsCompleted = false;
-
-            var client = new HttpClient
-            {
-                //BaseAddress = new Uri(GlobalData.MainApiServer)
-                //修改为通过调度层分配API服务器
-                BaseAddress = new Uri(GlobalData.MainDispatcherServer)
-            };
             var MainApiClient = new MainApiClient(serviceProvider);
 
-            var HubConnectionManagerService = new HubConnectionManagerService();
-            await HubConnectionManagerService.ConnectAsync();
-            //Log.Information("Hub链接成功");
-            HubConnectionManagerService._hubConnection.Remove("CompleteActivityContext");
-            HubConnectionManagerService._hubConnection.On<string>("CompleteActivityContext", async (ActivityContext) =>
-            {
-                ActivityContext= ActivityContext.Split(':')[1];
-                if (ActivityContext== context.WorkflowExecutionContext.CorrelationId+ context.Activity.Id)
-                {
-                    //Log.Information($"receive ActivityContext:{ActivityContext}");
-                    //await OnResumeAsync(context);
-                    //await context.CompleteActivityAsync();
-                    CLog.Information($"组件执行完成：{context.IsCompleted}");
-                    //Log.Information($"1组件执行完成：{context.Activity.Name}");
-                    IsCompleted = true;
-                    
-                }
-                else
-                {
-                    CLog.Information($"receive ActivityContext:{ActivityContext},but not current ID:{context.WorkflowExecutionContext.CorrelationId + context.Activity.Id}");
-                }
-            });
-
-            CLog.Information($"开始执行插头：{context.Activity.Name}", context.WorkflowExecutionContext.CorrelationId);
-
-            //Console.WriteLine("----------------------666666666666,prepare to execute :" + JsonSerializer.Serialize(context.Activity.Id));
-            //Console.WriteLine("----------------------666666666666,prepare to execute :" + JsonSerializer.Serialize(context.WorkflowExecutionContext.CorrelationId));
             var jobCorrelationId = context.WorkflowExecutionContext.CorrelationId;
-            var bookmarkId = context.WorkflowExecutionContext.CorrelationId+context.Activity.Id;
-            
-            
-            var request=new PlugExecutionRequest
-            {                
+            var bookmarkId = jobCorrelationId + context.Activity.Id;
+
+            CLog.Information($"开始执行插头：{context.Activity.Name}", jobCorrelationId);
+
+            var request = new PlugExecutionRequest
+            {
                 ExecuteMode = ExecuteMode.Plug,
             };
             request.ExecuteResultData.Ids = new ExecuteIdsBundle
             {
-                JobCorrelationId = context.WorkflowExecutionContext.CorrelationId,
-                PDZId = context.WorkflowExecutionContext.CorrelationId.EndsWith("Child")? context.WorkflowExecutionContext.CorrelationId.Replace("Child",""): context.WorkflowExecutionContext.CorrelationId,
+                JobCorrelationId = jobCorrelationId,
+                PDZId = jobCorrelationId.EndsWith("Child") ? jobCorrelationId.Replace("Child", "") : jobCorrelationId,
                 PlugDefinitionId = context.Activity.Id
             };
 
-
-
             CLog.Information("============CREATE BOOKMARK,WAIT FOR EXECUTING...============");
 
-            //await MainApiClient.ExecutePlug(request);
-
-
-            CreateBookmarkArgs createBookmarkArgs = new CreateBookmarkArgs();
-            createBookmarkArgs.BookmarkId = bookmarkId;
-            createBookmarkArgs.Callback=OnResumeAsync;
-            //createBookmarkArgs.Stimulus = bookmarkId;
-            //createBookmarkArgs.BookmarkName = bookmarkId;
-            //createBookmarkArgs.IncludeActivityInstanceId = false;
-            //createBookmarkArgs.AutoComplete = true;
-            //暂时先不创建书签，目前引擎恢复书签时有BUG
-            //context.CreateBookmark(createBookmarkArgs);
-            //context.CreateBookmark();
-            
-
-
-            foreach (var b in context.Bookmarks)
-            {
-                //Log.Information($"书签:{b.Id}");
-                //Log.Information(JsonSerializer.Serialize(b));
-            }
-
             var erd = await MainApiClient.ExecutePlug(request);
-            CLog.Information($"执行输出：{string.Join("|",erd?.Outcome)}", jobCorrelationId);
-            //await MainApiClient.SyncJournalData(erd.Ids.JobCorrelationId);
+            CLog.Information($"执行输出：{string.Join("|", erd?.Outcome)}", jobCorrelationId);
 
-            if (erd.Outcome.Length > 0)
+            // 判断同步/异步：ExecuteStatus == 完成 → 同步完成，否则 → 创建书签等待
+            // 注意：不能基于 Outcome.Length 判断，因为默认值 ["Done"] 会导致异步插头也走同步分支
+            if (erd?.ExecuteStatus == JobStatus.完成)
             {
-                CLog.Information("直接根据输出结束组件执行。", jobCorrelationId);
-                await context.CompleteActivityWithOutcomesAsync(erd?.Outcome);
+                var outcomes = (erd.Outcome?.Length > 0) ? erd.Outcome : ["Done"];
+                CLog.Information($"插头同步执行完成，Outcome: {string.Join(",", outcomes)}", jobCorrelationId);
+                await context.CompleteActivityWithOutcomesAsync(outcomes);
                 return;
             }
-            //无限循环等待执行完成
-            while (!IsCompleted)
+
+            // 异步执行：创建 Elsa 书签，释放线程，等待外部唤醒
+            var bookmarkArgs = new CreateBookmarkArgs
             {
-                //Log.Information($"等待组件执行完成，当前书签数量：{context.Bookmarks.Count}");
-                //return;
-            }
-            HubConnectionManagerService._hubConnection.Remove("CompleteActivityContext");
-            CLog.Information($"组件执行完成：{context.Activity.Name}");
-
-            //await MainApiClient.SyncJournalData(context.WorkflowExecutionContext.CorrelationId);
-
-            await context.CompleteActivityWithOutcomesAsync(erd?.Outcome??["Done"]);
+                BookmarkId = bookmarkId,
+                Callback = OnResumeAsync
+            };
+            context.CreateBookmark(bookmarkArgs);
+            // 线程在此释放，Elsa 持久化活动状态
+            Log.Information($"书签已创建，线程释放: {bookmarkId}");
         }
         catch (Exception ex)
         {
             Console.WriteLine("error:" + ex.Message);
             CLog.Error("error:" + ex.Message);
-            //await context.CompleteActivityWithOutcomesAsync("失败");
         }
     }
 
     private async ValueTask OnResumeAsync(ActivityExecutionContext context)
     {
-        CLog.Information("=======88888888888=====RESUME FROM BOOKMARK============");
-        foreach (var b in context.Bookmarks)
-        {
-            //Log.Information($"书签:{b.Id}");
-        }
+        Log.Information($"书签恢复，继续执行: {context.Activity.Name}");
         try
         {
-            await context.CompleteActivityAsync();
-            CLog.Information(context.IsCompleted.ToString());
+            var serviceProvider = context.GetRequiredService<IServiceProvider>();
+            var MainApiClient = new MainApiClient(serviceProvider);
+
+            // 从 PDZ 读取插头执行结果（由 ReportExecuteResult 存储）
+            var jobCorrelationId = context.WorkflowExecutionContext.CorrelationId;
+            var pdzId = jobCorrelationId.EndsWith("Child") ? jobCorrelationId.Replace("Child", "") : jobCorrelationId;
+            var pdz = await MainApiClient.GetPDZByPDZIdAsync(pdzId);
+
+            var outcomeStr = pdz?.GetActivityOutcome(context.Activity.Id);
+            var outcomes = string.IsNullOrEmpty(outcomeStr) ? ["Done"] : outcomeStr.Split('|');
+
+            Log.Information($"恢复完成，Outcome: {string.Join(",", outcomes)}");
+            await context.CompleteActivityWithOutcomesAsync(outcomes);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            CLog.Error(ex.ToString());
-            //throw;
+            CLog.Error($"OnResumeAsync error: {ex}");
+            await context.CompleteActivityWithOutcomesAsync(["Done"]);
         }
-        //var status = new ActivityStats();
-        //status.Blocked = false;
-        //status.Completed = 1;
-        //Log.Information($"{context.Activity.Id}|{JsonSerializer.Serialize(status)}");
     }
 }
-

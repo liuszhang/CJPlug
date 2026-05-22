@@ -35,6 +35,26 @@
                   RowHeaderWidth="0" GridLinesVisibility="Horizontal"
                   VerticalScrollBarVisibility="Auto">
             <DataGrid.Columns>
+                <DataGridTemplateColumn Header="" Width="50">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="停止" Width="44" Height="22"
+                                    FontSize="11" Padding="0"
+                                    Click="BtnStop_Click" Tag="{Binding Id}">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Status}" Value="running">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="#" Binding="{Binding Id}" Width="45"/>
                 <DataGridTextColumn Header="工具" Binding="{Binding ToolName}" Width="100"/>
                 <DataGridTextColumn Header="类型" Binding="{Binding PlugTypeKey}" Width="80"/>
@@ -59,6 +79,7 @@
                 <DataGridTextColumn Header="子状态" Binding="{Binding SubStatus}" Width="80"/>
                 <DataGridTextColumn Header="命令" Binding="{Binding Command}" Width="*" MinWidth="150"/>
                 <DataGridTextColumn Header="关联ID" Binding="{Binding CorrelationId}" Width="120"/>
+                <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="55"/>
                 <DataGridTextColumn Header="创建时间" Binding="{Binding CreatedAt}" Width="145"/>
                 <DataGridTextColumn Header="耗时" Binding="{Binding Duration}" Width="60"/>
             </DataGrid.Columns>

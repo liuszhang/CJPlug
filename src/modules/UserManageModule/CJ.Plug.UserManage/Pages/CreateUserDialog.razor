@@ -12,10 +12,10 @@
             <MudTextField @bind-Value="Model.Email"
                           Label="邮箱"
                           Variant="Variant.Outlined"
-                          Required="true"
+                          Required="false"
                           InputType="InputType.Email" />
 
-            <MudTextField @bind-Value="Model.Password"
+            @* <MudTextField @bind-Value="Model.Password"
                           Label="密码"
                           Variant="Variant.Outlined"
                           Required="true"
@@ -27,7 +27,7 @@
                           Required="true"
                           InputType="InputType.Password"
                           Error="@(!string.IsNullOrEmpty(_confirmPasswordError))"
-                          ErrorText="@_confirmPasswordError" />
+                          ErrorText="@_confirmPasswordError" /> *@
 
             <MudDivider />
 
@@ -48,7 +48,7 @@
                        @bind-Value="Model.DepartmentId"
                        Label="部门"
                        Variant="Variant.Outlined"
-                       Clearable="true"
+                       Required="true"
                        Placeholder="请选择部门">
                 @foreach (var dept in Departments)
                 {
@@ -98,28 +98,33 @@
             Snackbar.Add("请输入用户名", Severity.Warning);
             return;
         }
-        if (string.IsNullOrWhiteSpace(Model.Email))
+        // if (string.IsNullOrWhiteSpace(Model.Email))
+        // {
+        //     Snackbar.Add("请输入邮箱", Severity.Warning);
+        //     return;
+        // }
+        if (Model.DepartmentId == null)
         {
-            Snackbar.Add("请输入邮箱", Severity.Warning);
+            Snackbar.Add("请选择部门", Severity.Warning);
             return;
         }
-        if (string.IsNullOrWhiteSpace(Model.Password))
-        {
-            Snackbar.Add("请输入密码", Severity.Warning);
-            return;
-        }
-        if (Model.Password != Model.ConfirmPassword)
-        {
-            _confirmPasswordError = "两次输入的密码不一致";
-            Snackbar.Add("两次输入的密码不一致", Severity.Warning);
-            return;
-        }
+        // if (string.IsNullOrWhiteSpace(Model.Password))
+        // {
+        //     Snackbar.Add("请输入密码", Severity.Warning);
+        //     return;
+        // }
+        // if (Model.Password != Model.ConfirmPassword)
+        // {
+        //     _confirmPasswordError = "两次输入的密码不一致";
+        //     Snackbar.Add("两次输入的密码不一致", Severity.Warning);
+        //     return;
+        // }
 
         MudDialog.Close(DialogResult.Ok(new CreateUserRequest
         {
             UserName = Model.UserName.Trim(),
             Email = Model.Email.Trim(),
-            Password = Model.Password,
+            Password = "123456",
             FirstName = Model.FirstName?.Trim(),
             LastName = Model.LastName?.Trim(),
             PhoneNumber = Model.PhoneNumber?.Trim(),

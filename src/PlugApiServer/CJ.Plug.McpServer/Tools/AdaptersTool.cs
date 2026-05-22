@@ -1,4 +1,5 @@
-﻿using ModelContextProtocol.Server;
+using CJ.Plug.Models.Shared;
+using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
 
@@ -11,7 +12,7 @@ namespace CJ.Plug.McpServer.Tools
         public static async Task<string> ListAdapter()
         {
             var httpClient = new HttpClient();
-            var json = await httpClient.ReadJsonDocumentAsync("http://localhost:6661/api/mcptools/getActiveTools");
+            var json = await httpClient.ReadJsonDocumentAsync($"{GlobalData.MainApiServer}/api/mcptools/getActiveTools");
 
             return $"获取到的工具适配器数据：{JsonSerializer.Serialize(json)}";
         }
@@ -26,7 +27,7 @@ namespace CJ.Plug.McpServer.Tools
         public static async Task<string> ExecuteAdapter(string sourcePlugId)
         {
             var httpClient = new HttpClient();
-            var json = await httpClient.GetStringAsync($"http://localhost:6661/api/plug/executePlugByDefinitionId/{sourcePlugId}");
+            var json = await httpClient.GetStringAsync($"{GlobalData.MainApiServer}/api/plug/executePlugByDefinitionId/{sourcePlugId}");
 
             return $"启动工具适配器的结果：{json}";
         }

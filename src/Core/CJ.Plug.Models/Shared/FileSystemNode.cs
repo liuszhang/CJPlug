@@ -22,6 +22,12 @@ namespace CJ.Plug.Models.Shared
         public string? FullPath { get; set; }
         public bool IsDirectory { get; set; }
         public List<FileSystemNode>? Children { get; set; }
+        
+        // 文件元数据
+        public long Size { get; set; }
+        public string? Creator { get; set; }
+        public DateTime? LastWriteTime { get; set; }
+        
         [JsonIgnore]
         public HashSet<FileSystemNode>? HashChildren { get; set; }
     }

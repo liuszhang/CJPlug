@@ -52,4 +52,38 @@ public partial class MainApiClient : IProcessManageApiClient
             throw;
         }
     }
+
+    public async Task<JsonElement> AiGenerateWorkflowAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await ProcessManageApiClient.Value.AiGenerateWorkflowAsync(prompt, cancellationToken);
+            await AuditLog.LogSuccessAsync(AuditModule.ProcessManage, AuditOperationType.Other,
+                $"AI生成工作流: {prompt[..Math.Min(prompt.Length, 50)]}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.ProcessManage, AuditOperationType.Other,
+                "AI生成工作流失败", ex.Message);
+            throw;
+        }
+    }
+
+    public async Task<JsonElement> AiSaveWorkflowAsync(JsonElement result, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var r = await ProcessManageApiClient.Value.AiSaveWorkflowAsync(result, cancellationToken);
+            await AuditLog.LogSuccessAsync(AuditModule.ProcessManage, AuditOperationType.Create,
+                "AI生成工作流保存成功");
+            return r;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.ProcessManage, AuditOperationType.Create,
+                "AI生成工作流保存失败", ex.Message);
+            throw;
+        }
+    }
 }

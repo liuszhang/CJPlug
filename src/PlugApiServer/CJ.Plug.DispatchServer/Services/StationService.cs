@@ -1,4 +1,5 @@
-﻿using CJ.Plug.DispatchServer.Contracts;
+using CJ.Plug.DispatchServer.Contracts;
+using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Shared;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
@@ -29,6 +30,12 @@ namespace CJ.Plug.DispatchServer.Services
             var stationStatus= stationLists?.LastOrDefault();
             Console.WriteLine(stationStatus);
             
+            if (string.IsNullOrEmpty(stationStatus))
+            {
+                CLog.Error("No online station available.");
+                return null;
+            }
+
             if (stationStatus.StartsWith("http"))
             {
                 return stationStatus;

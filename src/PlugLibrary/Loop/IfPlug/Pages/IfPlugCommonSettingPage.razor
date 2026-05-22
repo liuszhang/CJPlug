@@ -13,15 +13,11 @@
 @using System.Text
 
 
-@* <MudText>@PlugDataZone?.PDZId</MudText>
-<MudText>@Plug?.DefinitionId</MudText> *@
+<MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+    条件表达式参数编辑在上方参数列表中完成，此处仅显示预览
+</MudAlert>
 
-<MudTextField Value="@From" Label="From"></MudTextField>
-<MudTextField Value="@To" Label="To"></MudTextField>
-<MudTextField Value="@Step" Label="Step"></MudTextField>
-
-
-<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None" Class="mt-2">
     <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
 </MudStack>
 
@@ -31,9 +27,5 @@
     public PlugDataZone? PlugDataZone { get; set; }
     [Parameter]
     public Plug? Plug { get; set; }
-
-    private string? From { get; set; }
-    private string? To { get; set; }
-    private string? Step { get; set; }
 
 }

@@ -1,0 +1,80 @@
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using Microsoft.AspNetCore.Components.Forms
+
+<MudDivider Class="my-2"></MudDivider>
+<MudText Typo="Typo.subtitle2" Color="Color.Primary">脚本配置</MudText>
+
+<MudTabs Elevation="0" ApplyEffectsToContainer="true" PanelClass="pa-2">
+    <MudTabPanel Text="上传脚本文件">
+        <MudStack>
+            <MudFileUpload T="IBrowserFile" FilesChanged="@OnScriptFileSelected">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload">
+                        选择Python脚本文件
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            @if (!string.IsNullOrEmpty(ScriptFileName))
+            {
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                    @ScriptFileName
+                </MudChip>
+            }
+        </MudStack>
+    </MudTabPanel>
+    <MudTabPanel Text="编辑器编写">
+        <MudTextField @bind-Value="@ScriptContent" Margin="Margin.Dense" Label="Python脚本"
+                      Placeholder="在此编写Python脚本..." Variant="Variant.Outlined" Lines="10"
+                      HelperText="直接在编辑器中编写Python脚本代码"></MudTextField>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public EventCallback<string> OnInfo { get; set; }
+
+    private string? ScriptContent { get; set; }
+    private string? ScriptFileName { get; set; }
+
+    private async Task OnScriptFileSelected(IBrowserFile file)
+    {
+        if (file == null) return;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            ScriptContent = await reader.ReadToEndAsync();
+            ScriptFileName = file.Name;
+            if (OnInfo.HasDelegate)
+                await OnInfo.InvokeAsync($"已加载脚本文件: {file.Name}");
+        }
+        catch (Exception ex)
+        {
+            if (OnError.HasDelegate)
+                await OnError.InvokeAsync($"读取脚本文件失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 将脚本类配置写入 Plug 对象。
+    /// </summary>
+    public void ApplyToPlug(Plug plug)
+    {
+        plug.PlugTypeKey = "PythonPlug";
+
+        // 添加脚本类默认参数（与Python插头一致）
+        plug.AddVariable("PythonScript", VariableTypeEnum.String.ToString());
+        plug.AddVariable("InputData", VariableTypeEnum.String.ToString());
+        plug.AddVariable("ResultString", VariableTypeEnum.String.ToString());
+
+        // 设置脚本内容
+        if (!string.IsNullOrEmpty(ScriptContent))
+        {
+            plug.SetVariableValue("PythonScript", ScriptContent);
+        }
+    }
+}

@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using Serilog;
@@ -15,7 +15,7 @@ namespace CJ.Plug_Aspire.StationApiService.Services.ToolActionExecute
         /// </summary>
         /// <param name="stationExecutionRequest"></param>
         /// <returns></returns>
-        public static async Task InvokeStationAgentAsync(PlugExecutionRequest stationExecutionRequest)
+        public static async Task<int> InvokeStationAgentAsync(PlugExecutionRequest stationExecutionRequest)
         {
 
             var workDirectory = string.IsNullOrEmpty(stationExecutionRequest.ToolFullPath) ? null : new FileInfo(stationExecutionRequest.ToolFullPath).DirectoryName;
@@ -27,7 +27,7 @@ namespace CJ.Plug_Aspire.StationApiService.Services.ToolActionExecute
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
             //Log.Information("BaseDirectory:" + baseDirectory);
 
-            string combinedPath = Path.Combine(baseDirectory, @"..\..\..\CJ.Plug.StationAgent\Debug\net9.0\CJ.Plug.StationAgent.exe");
+            string combinedPath = Path.Combine(baseDirectory, @"..\..\..\CJ.Plug.StationAgent\Debug\net10.0\CJ.Plug.StationAgent.exe");
             string targetExePath = Path.GetFullPath(combinedPath);
             //Log.Information("TargetExePath:" + targetExePath);
             // 创建 ProcessStartInfo 对象
@@ -45,17 +45,16 @@ namespace CJ.Plug_Aspire.StationApiService.Services.ToolActionExecute
             };
             try
             {
-                //Log.Information("2:" + JsonSerializer.Serialize(stationExecutionRequest));
-                // 创建 Process 对象
                 using (var process = new Process { StartInfo = startInfo })
                 {
-                    // 启动进程
                     process.Start();
+                    return process.Id;
                 }
             }
             catch (Exception e)
             {
                 CLog.Error(e.Message);
+                return 0;
             }
         }
 

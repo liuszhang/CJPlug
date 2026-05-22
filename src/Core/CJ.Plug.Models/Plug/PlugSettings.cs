@@ -1,4 +1,5 @@
-﻿using System;
+using CJ.Plug.Models.Shared;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,6 +21,12 @@ namespace CJ.Plug.Models.Plug
         public string? PlugType { get; set; } //设置初始化时的插头类型
         public string? PlugDisplayName { get; set; }  //设置初始化时的插头显示名称
         public string? PlugTypeKey { get; set; }
+
+        //插头的初始化参数
+        public List<BaseVariable>? InitVariables { get; set; } = new();
+
+
+        //用于序列化保存一些不固定的设置项，比如 Outcomes、Timeout 等等，具体内容由各插件自行定义和使用，非必要不使用，尽量使用插头参数管理
         public Dictionary<string, string> Settings { get; set; } = new Dictionary<string, string>();
 
         public string? GetSetting(string key)
@@ -43,39 +50,10 @@ namespace CJ.Plug.Models.Plug
             }
         }
 
-        public void RemoveSetting(string key)
-        {
-            if (Settings.ContainsKey(key))
-            {
-                Settings.Remove(key);
-            }
-        }
-
-        public void ClearSettings()
-        {
-            Settings.Clear();
-        }
-
-        public void SetSettings(Dictionary<string, string> settings)
-        {
-            Settings = settings;
-        }
-
-        public Dictionary<string, string> GetSettings()
-        {
-            return Settings;
-        }
-
         public string? GetSettingsJson()
         {
             return System.Text.Json.JsonSerializer.Serialize(this);
         }
-
-        public void SetSettingsJson(string json)
-        {
-            Settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-        }
-
 
 
     }

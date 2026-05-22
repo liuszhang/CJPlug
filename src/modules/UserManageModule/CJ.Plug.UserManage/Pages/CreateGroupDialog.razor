@@ -1,0 +1,56 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManageApi.Contracts
+@using CJ.Plug.UserManageApiClient
+@using CJ.Plug.AuthModels
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" Label="用户组名称" @bind-Value="_groupName" Variant="Variant.Outlined" FullWidth="true" Margin="Margin.Dense" Required="true" RequiredError="用户组名称不能为空" />
+        <MudTextField T="string" Label="描述" @bind-Value="_groupDescription" Variant="Variant.Outlined" FullWidth="true" Margin="Margin.Dense" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Submit">提交</MudButton>
+        <MudButton OnClick="Cancel" Color="Color.Primary">取消</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string? GroupName { get; set; }
+    [Parameter] public string? GroupDescription { get; set; }
+
+    private string? _groupName;
+    private string? _groupDescription;
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    protected override void OnParametersSet()
+    {
+        _groupName = GroupName ?? "";
+        _groupDescription = GroupDescription ?? "";
+    }
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_groupName))
+        {
+            return;
+        }
+
+        var request = new CreateGroupRequest
+        {
+            Name = _groupName,
+            Description = _groupDescription,
+            Status = DataStatus.Active,
+            Creator = "current-user" // 实际值由 Auth 系统设置
+        };
+
+        MudDialog.Close(DialogResult.Ok(request));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

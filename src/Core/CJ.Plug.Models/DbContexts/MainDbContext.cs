@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.Models.Station;
 using CJ.Plug.Models.PlugAction;
@@ -24,7 +24,6 @@ public class MainDbContext : IdentityDbContext<User, UserRole,int>
 
     //模型类定义放到各自模块中
 
-
     //public DbSet<Process> Processes { get; set; }
     //public DbSet<Plug> Plugs { get; set; }
     //public DbSet<PlugAction> PlugActions { get; set; }
@@ -44,10 +43,12 @@ public class MainDbContext : IdentityDbContext<User, UserRole,int>
     //public DbSet<PlugJob> PlugJobs { get; set; }
     //public DbSet<ToolJob> ToolJobs { get; set; }
 
+    // 用户组和用户组成员（多对多关系）
+    public DbSet<UserGroup> UserGroups { get; set; } = default!;
+    public DbSet<UserGroupMember> UserGroupMembers { get; set; } = default!;
 
     //public DbSet<Tool> Tools { get; set; }
     //public DbSet<Station> Stations { get; set; }
-
 
 
 
@@ -82,4 +83,3 @@ public class MainDbContext : IdentityDbContext<User, UserRole,int>
         });
     }
 }
-

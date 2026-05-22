@@ -142,6 +142,8 @@ public partial class ServiceSetting : UserControl
         BtnStartService.IsEnabled = false;
         SetStatusMessage("正在启动图站服务...", false);
 
+        var logService = ((App)Application.Current).LogService;
+
         try
         {
             var stationPath = FindStationApiExe();
@@ -164,11 +166,21 @@ public partial class ServiceSetting : UserControl
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8,
                 WorkingDirectory = Path.GetDirectoryName(stationPath) ?? "",
             };
             startInfo.Environment["ASPNETCORE_URLS"] = $"http://*:{_config.StationApiPort}";
 
+            logService.AppendLine($"========== 启动 StationApiServer ==========");
+            logService.AppendLine($"命令: {fileName} {arguments}");
+            logService.AppendLine($"端口: {_config.StationApiPort}");
+            logService.AppendLine($"工作目录: {startInfo.WorkingDirectory}");
+
             _serviceProcess = Process.Start(startInfo)!;
+
+            // 立即开始读取子进程的控制台输出（避免缓冲区堵塞）
+            StartReadingProcessOutput(_serviceProcess);
 
             // 等待启动完成
             for (int i = 0; i < 20; i++)
@@ -176,23 +188,26 @@ public partial class ServiceSetting : UserControl
                 await Task.Delay(500);
                 if (_serviceProcess.HasExited)
                 {
-                    var err = await _serviceProcess.StandardError.ReadToEndAsync();
-                    SetStatusMessage($"启动失败: {err}", true);
+                    logService.AppendLine("进程异常退出", isError: true);
+                    SetStatusMessage("启动失败，进程已退出", true);
                     BtnStartService.IsEnabled = true;
                     await RefreshServiceStatusAsync();
                     return;
                 }
                 if (await _apiService.TestStationApiAsync())
                 {
+                    logService.AppendLine($"[OK] StationApiServer HTTP 已就绪");
                     SetStatusMessage("启动成功", false);
                     await RefreshServiceStatusAsync();
                     return;
                 }
             }
+            logService.AppendLine("[WARN] 启动超时，请检查端口", isError: true);
             SetStatusMessage("启动超时，请检查端口占用", true);
         }
         catch (Exception ex)
         {
+            logService.AppendLine($"[ERROR] {ex.Message}", isError: true);
             SetStatusMessage($"启动失败: {ex.Message}", true);
         }
 
@@ -415,6 +430,50 @@ public partial class ServiceSetting : UserControl
         TxtStatusMessage.Foreground = isError
             ? new SolidColorBrush(Colors.Red)
             : new SolidColorBrush(Colors.Gray);
+    }
+
+    /// <summary>
+    /// 异步读取子进程的 stdout/stderr 并推送到日志服务
+    /// </summary>
+    private void StartReadingProcessOutput(Process process)
+    {
+        var logService = ((App)Application.Current).LogService;
+
+        // 读取 stdout
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    var line = await process.StandardOutput.ReadLineAsync();
+                    if (line == null) break;
+                    logService.AppendLine(line);
+                }
+            }
+            catch (Exception ex)
+            {
+                logService.AppendLine($"[stdout read error] {ex.Message}", isError: true);
+            }
+        });
+
+        // 读取 stderr
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    var line = await process.StandardError.ReadLineAsync();
+                    if (line == null) break;
+                    logService.AppendLine(line, isError: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                logService.AppendLine($"[stderr read error] {ex.Message}", isError: true);
+            }
+        });
     }
 
     private string? FindStationApiExe()

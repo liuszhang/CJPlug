@@ -41,5 +41,26 @@ namespace CJ.Plug.UserManageApiClient
             var response = await httpClient.DeleteAsync($"/api/department/delete/{id}", cancellationToken);
             return response.IsSuccessStatusCode;
         }
+
+        public async Task<List<DepartmentUserInfo>> GetDepartmentUsersAsync(int departmentId, CancellationToken cancellationToken = default)
+        {
+            var result = await httpClient.GetFromJsonAsync<List<DepartmentUserInfo>>(
+                $"/api/department/getUsers/{departmentId}", cancellationToken);
+            return result ?? [];
+        }
+
+        public async Task<bool> AddUserToDepartmentAsync(int departmentId, int userId, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/department/addUser",
+                new AddDepartmentUserRequest { DepartmentId = departmentId, UserId = userId }, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> RemoveUserFromDepartmentAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/department/removeUser",
+                new RemoveDepartmentUserRequest { UserId = userId }, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
     }
 }

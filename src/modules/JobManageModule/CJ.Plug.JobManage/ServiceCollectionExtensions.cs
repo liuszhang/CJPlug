@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ProcessManageModule.Menus;
+using JobManageModule.Permissions;
 
 
 public static class ServiceCollectionExtensions
@@ -40,6 +41,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IJobManageService, JobManageService>();
 
+        // 注册功能权限提供者
+        services.AddSingleton<IFunctionPermissionProvider, JobManagePermissionProvider>();
 
         services.AddHttpClient<IJobManageApiClient, JobManageApiClient>(client =>
         {

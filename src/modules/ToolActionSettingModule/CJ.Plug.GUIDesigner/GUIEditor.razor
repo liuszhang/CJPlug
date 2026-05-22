@@ -40,7 +40,7 @@
     }
     else if (!ShowGuiDesigner && !ShowAmisEditor)
     {
-        <Amis JsonStringData="@PlugGuiJsonData"></Amis>
+        <Amis @key="@($"amis-{SelectedPlug?.Id}")" JsonStringData="@PlugGuiJsonData"></Amis>
     }
     if (ShowAmisEditor)
     {
@@ -79,9 +79,18 @@ else
     private bool IsGuiDesignerMaximized { get; set; } = false;
 
 
+    private Plug? _lastSelectedPlug;
+    private bool _isEditingGui;
+
     protected override async Task OnParametersSetAsync()
     {
-        GetJsonStringData();
+        // 只在 SelectedPlug 真正变化时，才从数据库读取 GuiJsonData
+        if (!ReferenceEquals(_lastSelectedPlug, SelectedPlug))
+        {
+            _lastSelectedPlug = SelectedPlug;
+            _isEditingGui = false;
+            GetJsonStringData();
+        }
         StateHasChanged();
     }
 

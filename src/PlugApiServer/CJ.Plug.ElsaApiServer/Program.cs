@@ -7,10 +7,6 @@ using CJ.Plug.Models.Shared;
 using CJ.Plug.ModuleConfig;
 using CJ.Plug.TASApiClient;
 using Elsa.Agents;
-using Elsa.Api.Client.Resources.WorkflowInstances.Models;
-using Elsa.EntityFrameworkCore.Extensions;
-using Elsa.EntityFrameworkCore.Modules.Management;
-using Elsa.EntityFrameworkCore.Modules.Runtime;
 using Elsa.Extensions;
 using Elsa.Studio.Agents.UI.Pages;
 using Elsa.Studio.Models;
@@ -31,6 +27,10 @@ using NSwag;
 using Serilog;
 using System.Text;
 using System.Text.Json;
+
+// 设置 .NET Console 编码为 UTF-8
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
@@ -150,6 +150,66 @@ HubConnectionManagerService._hubConnection.On<string>("ResumeElsaProcess", async
         CLog.Error($"继续执行流程失败：{ex.Message}");
         CLog.Error($"继续执行流程失败：{ex.StackTrace}");
         //CLog.Error($"继续执行流程失败：{ex.InnerException}");
+    }
+});
+
+HubConnectionManagerService._hubConnection.On<string>("CompleteActivityContext", async (activityContext) =>
+{
+    Console.WriteLine($"Receive CompleteActivityContext:{activityContext ?? "(null)"}");
+    try
+    {
+        if (string.IsNullOrEmpty(activityContext))
+        {
+            Log.Warning("CompleteActivityContext 收到空消息");
+            return;
+        }
+
+        // 消息格式: correlationId|plugId
+        var parts = activityContext.Split('|');
+        if (parts.Length < 2)
+        {
+            Log.Warning($"CompleteActivityContext 消息格式错误: {activityContext}");
+            return;
+        }
+        var correlationId = parts[0];
+        var plugId = parts[1];
+        var bookmarkId = correlationId + plugId;
+        Log.Information($"准备恢复书签 [{bookmarkId}]，CorrelationId={correlationId}");
+
+        // 1. 通过 IWorkflowInstanceStore 查询工作流实例
+        var sp = builder.Services.BuildServiceProvider();
+        Log.Information($"DI resolved, searching instance by CorrelationId={correlationId}");
+        var instanceStore = sp.GetRequiredService<Elsa.Workflows.Management.IWorkflowInstanceStore>();
+        var filter = new Elsa.Workflows.Management.Filters.WorkflowInstanceFilter { CorrelationId = correlationId };
+        var instances = await instanceStore.FindManyAsync(filter);
+        var instance = instances?.FirstOrDefault();
+        Log.Information($"FindMany returned: {(instance == null ? "null" : $"{instance.Id} (total:{instances?.Count() ?? 0})")}");
+
+        if (instance == null)
+        {
+            Log.Warning($"未找到 CorrelationId={correlationId} 的工作流实例");
+            return;
+        }
+
+        // 2. 通过 IBookmarkResumer 直接恢复书签（避免 RunInstanceAsync 触发工作流重新反序列化）
+        var resumer = sp.GetRequiredService<IBookmarkResumer>();
+        var resumeFilter = new BookmarkFilter
+        {
+            BookmarkId = bookmarkId,
+            WorkflowInstanceId = instance.Id,
+            CorrelationId = correlationId
+        };
+        var options = new ResumeBookmarkOptions { Input = null, Properties = null };
+        Log.Information($"通过 BookmarkResumer 恢复书签: InstanceId={instance.Id}, BookmarkId={bookmarkId}");
+        var result = await resumer.ResumeAsync(resumeFilter, options);
+        Log.Information($"书签恢复{(result.Matched ? "成功" : "失败(Matched=false)")}: {bookmarkId}");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, $"CompleteActivityContext 处理失败: {ex.Message}");
+        Log.Error($"CompleteActivityContext StackTrace: {ex.StackTrace}");
+        if (ex.InnerException != null)
+            Log.Error($"CompleteActivityContext Inner: {ex.InnerException.Message}");
     }
 });
 

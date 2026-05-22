@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.PlugBaseCore.Contracts;

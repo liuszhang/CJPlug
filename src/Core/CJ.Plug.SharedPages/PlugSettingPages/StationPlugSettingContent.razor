@@ -1,4 +1,4 @@
-﻿@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Plug
 @using System.Text.Json
 @using CJ.Plug.Models.VariableType
 @using MudBlazor
@@ -123,19 +123,19 @@ OnClose="@OnChipClosed">
     }
 
 
-    private void OnChipClosed(MudChip<string> chip)
-    {
-        Plug.ToolVersions.Remove(chip.Value);
-        PlugSettings.RemoveSetting(chip.Value);
-        if (Plug.ToolVersions.Count > 0)
-        {
-            Plug.ToolVersion = Plug.ToolVersions.FirstOrDefault();
-        }
-        else
-        {
-            Plug.ToolVersion = "";
-        }
-    }
+    // private void OnChipClosed(MudChip<string> chip)
+    // {
+    //     Plug.ToolVersions.Remove(chip.Value);
+    //     PlugSettings.RemoveSetting(chip.Value);
+    //     if (Plug.ToolVersions.Count > 0)
+    //     {
+    //         Plug.ToolVersion = Plug.ToolVersions.FirstOrDefault();
+    //     }
+    //     else
+    //     {
+    //         Plug.ToolVersion = "";
+    //     }
+    // }
 
     private async Task SaveAndClose(string? commandLine = null)
     {

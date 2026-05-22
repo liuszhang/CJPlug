@@ -1,5 +1,6 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.PlugProcess;
+using CJ.Plug.ProcessManageApi.Apis;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,14 @@ public static class ProcessManageApi
 
 
         return app;
+    }
+
+    /// <summary>
+    /// 注册 AI Workflow Builder 端点
+    /// </summary>
+    public static IEndpointRouteBuilder MapAiWorkflowApi(this IEndpointRouteBuilder app)
+    {
+        return app.MapAiWorkflowBuilderApi();
     }
 }
 

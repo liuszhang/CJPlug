@@ -1,19 +1,12 @@
-﻿@page "/ProcessManageList"
+@page "/ProcessManageList"
 
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugProcess
 @using CJ.Plug.ProcessManage.Dialogs
-@using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
-@using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
-@using System.Text.Json.Nodes
 @using System.Text.Json
-@using Elsa.Api.Client.Shared.Models
-@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
-@using Radzen.Blazor
-@using Serilog
-@using CJ.Plug.ProcessManageApiClient
 @using Size=MudBlazor.Size
+@using ProcessManage.Components
 
 
 @inject HttpClient Http
@@ -54,6 +47,7 @@
                         <MudMenuItem>复制选中</MudMenuItem>
                     </MudMenu>
                 </MudButtonGroup>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Tertiary" StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="OpenAiDialog">AI 生成</MudButton>
                 <MudButton OnClick="EditProcess" Disabled="(selectedItemNow == null) || Loading" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">
                     
                     @if (Loading)
@@ -274,7 +268,7 @@
         }
         else
         {
-            Console.WriteLine(">>>>>>>>>>>>cancel edit");
+            Console.WriteLine(">>>>>>>>>>>cancel edit");
         }
 
         return;
@@ -344,7 +338,15 @@
         StateHasChanged();
     }
 
-
+    private async Task OpenAiDialog()
+    {
+        var dialog = await DialogService.ShowAsync<AiWorkflowDialog>("AI 生成工作流");
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data != null)
+        {
+            Snackbar.Add($"工作流 \"{result.Data}\" 已创建", Severity.Success);
+            await _table.ReloadServerData();
+        }
+    }
 
 }
-

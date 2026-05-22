@@ -1,9 +1,10 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.FileManageApiClient;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.PlugBaseCore.Models;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using System.Text.Json;
 
 namespace CSharpPlug.Services
 {
@@ -15,34 +16,68 @@ namespace CSharpPlug.Services
 
         public override async Task<ExecuteResultData?> PlugCommonExecute(ExecuteServiceContext context)
         {
-            //Plug plug = context.plugToExecute;
-            
             PlugExecutionRequest? plugExecutionRequest = context.plugExecutionRequest;
 
             Log.Information($"execute csharp plug");
             var erd = plugExecutionRequest?.ExecuteResultData ?? new ExecuteResultData();
             if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames)))) { return await ReportErrorResult(erd); }
 
-            var pdz = await MainApiClient.GetPDZByPDZIdAsync(erd.Ids.PDZId);
-            if (pdz == null)
+            var plugDefinitionId = erd.Ids.PlugDefinitionId;
+
+            var code = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.CSharpCode.ToString());
+            if (string.IsNullOrWhiteSpace(code))
             {
-                erd.ExecuteStatus = JobStatus.完成;
-                erd.ExecuteSubStatus = JobSubStatus.出错;
-                erd.Outcome = [InitOutcomes.结束.ToString()];
-                return await ExecuteResultReport(erd);
+                Log.Warning("CSharp 代码为空，使用默认示例代码");
+                code = "return \"未编写代码\";";
             }
 
-            var code = "int a = 10; int b = 20; return a + b;";
-            var references = new[]
+            var dllPaths = new List<string>();
+            var dllRefsJson = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.DllReferences.ToString());
+            if (!string.IsNullOrWhiteSpace(dllRefsJson))
             {
-                "System.Runtime.dll",          // 基础库
-                //"path/to/your/sdk.dll"         // 自定义 SDK
-            };
+                try
+                {
+                    var dllRefs = JsonSerializer.Deserialize<List<DllReference>>(dllRefsJson);
+                    if (dllRefs != null)
+                    {
+                        foreach (var dllRef in dllRefs)
+                        {
+                            if (!string.IsNullOrEmpty(dllRef.LocalPath) && File.Exists(dllRef.LocalPath))
+                            {
+                                dllPaths.Add(dllRef.LocalPath);
+                            }
+                            else if (!string.IsNullOrEmpty(dllRef.FileId))
+                            {
+                                var downloadedPath = await DownloadDll(dllRef);
+                                if (!string.IsNullOrEmpty(downloadedPath))
+                                {
+                                    dllPaths.Add(downloadedPath);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"解析 DLL 引用失败: {ex.Message}");
+                }
+            }
 
-            var result = await CodeRunner.RunCSharpCodeAsync(code, references);
-            Console.WriteLine(result); // 输出: 30
-            Log.Information(result); // 输出: 30
+            var useDotNetFramework = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.UseDotNetFramework.ToString());
+            var useBridge = string.Equals(useDotNetFramework, "true", StringComparison.OrdinalIgnoreCase);
 
+            string result;
+            if (useBridge)
+            {
+                Log.Information("CSharp 使用 .NET Framework 桥接执行");
+                result = await CodeRunner.RunCSharpCodeViaBridgeAsync(code, dllPaths);
+            }
+            else
+            {
+                result = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths);
+            }
+
+            Log.Information($"CSharp 执行结果: {result}");
 
             erd.ExecuteStatus = JobStatus.完成;
             erd.ExecuteSubStatus = JobSubStatus.已完成;
@@ -50,9 +85,40 @@ namespace CSharpPlug.Services
             return await ExecuteResultReport(erd);
         }
 
-        
+        private async Task<string?> DownloadDll(DllReference dllRef)
+        {
+            try
+            {
+                var fileApiClient = _serviceProvider.GetService(typeof(IFileManageApiClient)) as IFileManageApiClient;
+                if (fileApiClient == null) return null;
 
+                var tempDir = Path.Combine(Path.GetTempPath(), "CSharpPlug_Dlls", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempDir);
+                var tempPath = Path.Combine(tempDir, dllRef.FileName ?? "dependency.dll");
 
+                var stream = await fileApiClient.DownloadFileByFileId(dllRef.FileId!);
+                if (stream != null)
+                {
+                    await using (stream)
+                    await using (var fs = File.Create(tempPath))
+                    {
+                        await stream.CopyToAsync(fs);
+                    }
+                    return tempPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"下载 DLL 失败: {dllRef.FileName}, 错误: {ex.Message}");
+            }
+            return null;
+        }
+
+        public class DllReference
+        {
+            public string? FileName { get; set; }
+            public string? FileId { get; set; }
+            public string? LocalPath { get; set; }
+        }
     }
 }
-

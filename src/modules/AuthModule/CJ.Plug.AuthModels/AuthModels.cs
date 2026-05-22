@@ -24,7 +24,10 @@ namespace CJ.Plug.AuthModels
         DeleteRole,
         CreateDepartment,
         UpdateDepartment,
-        DeleteDepartment
+        DeleteDepartment,
+        CreateGroup,
+        UpdateGroup,
+        DeleteGroup
     }
 
     /// <summary>
@@ -125,6 +128,9 @@ namespace CJ.Plug.AuthModels
             AuthOperationType.CreateDepartment => "创建部门",
             AuthOperationType.UpdateDepartment => "编辑部门",
             AuthOperationType.DeleteDepartment => "删除部门",
+            AuthOperationType.CreateGroup => "创建用户组",
+            AuthOperationType.UpdateGroup => "编辑用户组",
+            AuthOperationType.DeleteGroup => "删除用户组",
             _ => "未知操作"
         };
         public string TargetDescription { get; set; } = string.Empty;

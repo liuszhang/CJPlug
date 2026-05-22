@@ -56,6 +56,7 @@ namespace CMDPlug.Services
             {
                 Name = InitVariableNames.CMDCommand.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
+                DefaultValue = "notepad",
             });
             InitVariables.Add(new BaseVariable()
             {
@@ -111,13 +112,18 @@ namespace CMDPlug.Services
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = false,
             });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.SupportRemoteView.ToString(),
+                Type = VariableTypeEnum.Bool.ToString(),
+                DefaultValue = "true",
+                IsBrowsable = false,
+            });
+            PlugSettings.InitVariables = InitVariables;
 
-            PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(),JsonSerializer.Serialize(InitVariables));
+            //PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(),JsonSerializer.Serialize(InitVariables));
             PlugSettings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
-
-            //PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(), InitVariableNames.CMDCommand.ToString());
-            //PlugSettings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-            //    $"{InitVariableNames.CMDCommand.ToString()}:{PlugVariableTypeEnum.文本.ToString()}");
+            PlugSettings.SetSetting(PlugSettingKey.SupportRemoteView.ToString(), "true");
 
             return Task.FromResult<PlugSettings?>(PlugSettings);
         }

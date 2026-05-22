@@ -12,7 +12,8 @@ namespace CJ.Plug.MCPToolsManageApi.Apis
 
             api.MapGet("/getTools", async (IMCPToolsManageService service) => await service.GetAllAsync());
             api.MapGet("/getActiveTools", async (IMCPToolsManageService service) => await service.GetActiveToolsAsync());
-            api.MapPost("/addTool", async (IMCPToolsManageService service, [FromBody] MCPTool request) => await service.CreateAsync(request));
+            api.MapGet("/getPublishedWorkflows", async (IMCPToolsManageService service) => await service.GetPublishedWorkflowsAsync());
+            api.MapPost("/addTool", async (IMCPToolsManageService service, [FromBody] MCPTool request) => await service.PublishToolAsync(request));
             api.MapPut("/updateTool", async (IMCPToolsManageService service, [FromBody] MCPTool request) => await service.UpdateAsync(request));
             api.MapDelete("/deleteTool/{toolId}", async (IMCPToolsManageService service, int toolId) => await service.DeleteAsync(toolId));
             ////获取流程的任务，只获取一个，用于测试

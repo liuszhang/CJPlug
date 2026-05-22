@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
+    <ProjectReference Include="..\..\AIModule\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
   </ItemGroup>
 
 </Project>

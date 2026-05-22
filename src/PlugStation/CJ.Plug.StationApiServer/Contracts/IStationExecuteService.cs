@@ -23,12 +23,12 @@ namespace CJ.Plug.StationApiServer.Contracts
         /// <summary>
         /// 发送日志到SignalR,此方法供StationAgent执行时调用
         /// </summary>
-        /// <param name="logContent"></param>
-        /// <param name="logType"></param>
-        /// <param name="logLevel"></param>
-        /// <param name="logSource"></param>
-        /// <returns></returns>
         Task SendLog(LogModel log);
+
+        /// <summary>
+        /// 手动停止任务，终止对应进程
+        /// </summary>
+        Task StopTask(int taskId);
     }
     
 }

@@ -55,6 +55,36 @@ namespace CJ.Plug.UserManageApi.Apis
                 }
             });
 
+            // 部门人员管理
+            api.MapGet("/getUsers/{departmentId:int}", async (int departmentId, IDepartmentManageService service) =>
+                await service.GetDepartmentUsersAsync(departmentId));
+
+            api.MapPost("/addUser", async ([FromBody] AddDepartmentUserRequest request, IDepartmentManageService service) =>
+            {
+                try
+                {
+                    var result = await service.AddUserToDepartmentAsync(request.DepartmentId, request.UserId);
+                    return result ? Results.Ok() : Results.BadRequest("用户不存在");
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
+            api.MapPost("/removeUser", async ([FromBody] RemoveDepartmentUserRequest request, IDepartmentManageService service) =>
+            {
+                try
+                {
+                    var result = await service.RemoveUserFromDepartmentAsync(request.UserId);
+                    return result ? Results.Ok() : Results.BadRequest("用户不存在");
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
             return app;
         }
     }

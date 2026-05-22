@@ -8,15 +8,26 @@
              d:DesignHeight="550" d:DesignWidth="800">
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/><!-- 0: 平台服务地址 -->
-            <RowDefinition Height="Auto"/><!-- 1: 图站程序路径 -->
-            <RowDefinition Height="Auto"/><!-- 2: 运行状态 -->
-            <RowDefinition Height="Auto"/><!-- 3: 服务控制 -->
-            <RowDefinition Height="Auto"/><!-- 4: 本地端口 -->
-            <RowDefinition Height="Auto"/><!-- 5: 版本 -->
-            <RowDefinition Height="Auto"/><!-- 6: 工具路径 -->
-            <RowDefinition Height="Auto"/><!-- 7: 自动启动 -->
-            <RowDefinition Height="*"/><!-- 8: 底部状态栏 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 0: 平台服务地址 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 1: 图站程序路径 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 2: 运行状态 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 3: 服务控制 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 4: 本地端口 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 5: 版本 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 6: 工具路径 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 7: 自动启动 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 8: 保存按钮 -->
+            <RowDefinition Height="*"/>
+            <!-- 9: 底部状态栏 -->
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -30,9 +41,7 @@
             <Button x:Name="BtnTestConnection" Content="测试连接" 
                     DockPanel.Dock="Right" Width="80" Margin="5,0,0,0"
                     Click="BtnTestConnection_Click"/>
-            <Button x:Name="BtnSave" Content="保存" 
-                    DockPanel.Dock="Right" Width="60" Margin="5,0,0,0"
-                    Click="BtnSave_Click"/>
+
             <TextBox x:Name="TxtMainServerUrl" Text="http://127.0.0.1:8080" 
                      VerticalAlignment="Center" MinWidth="200"/>
         </DockPanel>
@@ -126,8 +135,13 @@
                   Margin="0,5,0,5" Checked="ChkAutoStart_Changed" 
                   Unchecked="ChkAutoStart_Changed"/>
 
-        <!-- Row 8: 底部状态栏 -->
-        <Border Grid.Row="8" Grid.ColumnSpan="2" Background="#F5F5F5" 
+        <!-- Row 8: 保存按钮 -->
+        <Button x:Name="BtnSave" Content="保存配置" Grid.Row="8" Grid.Column="0" 
+        Width="80" 
+        Click="BtnSave_Click" HorizontalAlignment="Left" />
+
+        <!-- Row 9: 底部状态栏 -->
+        <Border Grid.Row="9" Grid.ColumnSpan="2" Background="#F5F5F5" 
                 BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" 
                 VerticalAlignment="Bottom" Padding="10,8">
             <StackPanel Orientation="Horizontal">

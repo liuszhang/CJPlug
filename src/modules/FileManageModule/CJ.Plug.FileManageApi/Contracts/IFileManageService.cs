@@ -17,6 +17,7 @@ namespace CJ.Plug.FileManageApi.Contracts
         Task<IResult> GetFileContent(string filePath);
         Task<IResult> GetFileContentByFileId(string fileId);
         Task<IResult> GetFileStreamByFileId(string fileId);
+        Task<IResult> DownloadFileByPath(string filePath);
 
         Task<FileSystemNode?> GetPlugWorkpathFiles(string? RootPath);
 

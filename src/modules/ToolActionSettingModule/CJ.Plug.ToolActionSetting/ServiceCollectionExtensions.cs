@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProcessManageModule.Menus;
+using ToolActionSettingModule.Permissions;
 
 
 public static class ServiceCollectionExtensions
@@ -17,6 +18,7 @@ public static class ServiceCollectionExtensions
     public class Module : ModuleBase
     {
     }
+
 
 
     public static IServiceCollection AddTASPageModuleServices(this IServiceCollection services)
@@ -46,6 +48,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModuleDbConfig,TASModuleDbConfig>();
 
         services.AddScoped<IPlugManageService, PlugManageService>();
+
+        // 注册功能权限提供者
+        services.AddSingleton<IFunctionPermissionProvider, ToolActionSettingPermissionProvider>();
 
         services.AddHttpClient<ITASApiClient, TASApiClient>(client =>
         {

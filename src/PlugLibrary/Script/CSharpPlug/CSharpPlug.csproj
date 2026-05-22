@@ -20,6 +20,21 @@
 	  <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
   </ItemGroup>
 
+  <!-- 桥接项目：声明构建依赖 + 复制 exe 到输出目录 -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\PlugToolIntegrations\DotnetCoreBridgeToDotnetFramework\DotnetCoreBridgeToDotnetFramework.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+
+  <Target Name="CopyBridgeExe" AfterTargets="Build" Condition="Exists('..\..\..\PlugToolIntegrations\DotnetCoreBridgeToDotnetFramework\bin\$(Configuration)\net48')">
+    <ItemGroup>
+      <BridgeFiles Include="..\..\..\PlugToolIntegrations\DotnetCoreBridgeToDotnetFramework\bin\$(Configuration)\net48\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BridgeFiles)" DestinationFolder="$(OutputPath)bridge\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
   <ItemGroup>
     <Content Update="wwwroot\CSharpPlug.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

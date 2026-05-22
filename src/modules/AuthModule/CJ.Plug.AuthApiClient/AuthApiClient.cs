@@ -6,7 +6,7 @@ namespace CJ.Plug.AuthApiClient
 {
     public interface IAuthApiClient
     {
-        Task<List<AuthRequestDto>> GetAllAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default);
+        Task<List<AuthRequestDto>> GetAllAuthRequestAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default);
         Task<AuthRequestDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<AuthRequestDto> CreateAsync(CreateAuthRequestDto request, CancellationToken cancellationToken = default);
         Task<AuthRequestDto?> ApproveAsync(ApproveAuthRequestDto request, CancellationToken cancellationToken = default);
@@ -18,7 +18,7 @@ namespace CJ.Plug.AuthApiClient
     {
         public AuthApiClient(HttpClient httpClient) : base(httpClient) { }
 
-        public async Task<List<AuthRequestDto>> GetAllAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default)
+        public async Task<List<AuthRequestDto>> GetAllAuthRequestAsync(AuthRequestStatus? status = null, CancellationToken cancellationToken = default)
         {
             var url = "/api/auth/getAll";
             if (status.HasValue)

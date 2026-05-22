@@ -19,5 +19,6 @@ namespace CMDPlug
         ShowConsole,
         RedirectOutput,
         RedirectWorkPath,
+        SupportRemoteView
     }
 }

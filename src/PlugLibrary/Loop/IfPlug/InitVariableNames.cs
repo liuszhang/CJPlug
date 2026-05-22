@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,8 +8,6 @@ namespace IfPlug
 {
     public enum InitVariableNames
     {
-        ConditionExpression,
-        To,
-        Step
+        ConditionExpression
     }
 }

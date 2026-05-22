@@ -1,4 +1,4 @@
-﻿@using Blazored.LocalStorage
+@using Blazored.LocalStorage
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.Models
@@ -17,6 +17,7 @@
 @inject IDomInteropService DomInteropService
 @inject IElsaStudioService ElsaStudioService
 @inject ElsaApiClient ElsaApiClient
+@inject NavigationManager NavigationManager
 
 <MudPaper Class="pa-0" Style="min-width:220px">
     <MudStack>
@@ -201,8 +202,21 @@
     {
         if (firstRender)
         {
-            CurrentUser = await DomInteropService.GetCurrentUserName();
-            await Refresh();
+            // Skip JS interop during static rendering (SSR / enhanced navigation)
+            //if (!RendererInfo.IsInteractive) return;
+            try
+            {
+                CurrentUser = await DomInteropService.GetCurrentUserName();
+                await Refresh();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in OnAfterRenderAsync: {ex.Message}");
+                //强制刷新页面，解决第一次打开组件库不显示组件的问题
+                //NavigationManager.Refresh(forceReload: true);
+                
+            }
+        
         }
     }
 }

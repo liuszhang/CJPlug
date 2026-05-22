@@ -37,6 +37,9 @@ public class StationTaskInfo
     [JsonPropertyName("completedAt")]
     public string? CompletedAt { get; set; }
 
+    [JsonPropertyName("processId")]
+    public int? ProcessId { get; set; }
+
     /// <summary>状态显示文本</summary>
     public string StatusDisplay => Status switch
     {

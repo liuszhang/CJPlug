@@ -1,0 +1,215 @@
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.Station
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.Models.VariableType.TypeSettings
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.SharedPages.Variable
+@using CJ.Plug.StationAndToolApiClient
+@using CJ.Plug.VariableUIHandler.Components
+@using CJ.Plug.VariableUIHandler.Models
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject IStationAndToolApiClient StationAndToolApiClient
+
+<MudDivider Class="my-2"></MudDivider>
+<MudText Typo="Typo.subtitle2" Color="Color.Primary">桌面工具配置</MudText>
+
+<MudTabs Elevation="0" ApplyEffectsToContainer="true" PanelClass="pa-2">
+    <MudTabPanel Text="从工具库选择">
+        <MudSelect T="Tool" Value="SelectedTool" ValueChanged="OnSelectedToolChanged" Label="选择工具" Clearable
+                   Placeholder="选择一个已配置的工具" Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+            @foreach (var t in Tools)
+            {
+                <MudSelectItem Value="t">
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PanToolAlt" Color="Color.Primary"></MudIcon>
+                        <MudText>@($"{t.ToolName}({t.ToolVersion})")</MudText>
+                    </MudStack>
+                </MudSelectItem>
+            }
+        </MudSelect>
+        @if (SelectedTool != null)
+        {
+            <MudTextField @bind-Value="@SelectedTool.ToolType" Margin="Margin.Dense" Label="工具类型" ReadOnly Variant="Variant.Filled"></MudTextField>
+            @foreach (var variable in ToolVariablesFromSelectedTool)
+            {
+                <MudStack Row AlignItems="AlignItems.Center">
+                    @if (variable.Type == VariableTypeEnum.File.ToString())
+                    {
+                        <MudText>@($"设置变量：{variable.Name}默认值：")</MudText>
+                        <FileUpload EditorContext="new DisplayInputEditorContext { Variable = variable }" />
+                    }
+                    else
+                    {
+                        <MudTextField T="string" Margin="Margin.Dense" Label="@($"设置变量：{variable.Name}默认值")"
+                                      @bind-Value="@variable.DefaultValue" Variant="Variant.Outlined"></MudTextField>
+                    }
+                    <MudSelect @bind-Value="variable.Type" Label="参数类型" Required Margin="@Margin.Dense"
+                               ToStringFunc="@(t => VariableTypeConverter.GetTypeDisplayName(t))">
+                        <MudSelectItem T="string" Value="@VariableTypeEnum.String.ToString()">
+                            @VariableTypeConverter.GetTypeDisplayName(VariableTypeEnum.String.ToString())
+                        </MudSelectItem>
+                        <MudSelectItem T="string" Value="@VariableTypeEnum.File.ToString()">
+                            @VariableTypeConverter.GetTypeDisplayName(VariableTypeEnum.File.ToString())
+                        </MudSelectItem>
+                    </MudSelect>
+                    @if (variable.Type == VariableTypeEnum.File.ToString())
+                    {
+                        <MudTooltip Text="如果参数类型设置为文件，调用工具时将自动处理为文件路径；如果勾选参数为输出，则工具执行完成后将自动把文件更新至参数中">
+                            <MudCheckBox Dense T="bool" @bind-Value="@variable.IsInput" Color="Color.Primary">输入</MudCheckBox>
+                        </MudTooltip>
+                        <MudTooltip Text="如果参数类型设置为文件，调用工具时将自动处理为文件路径；如果勾选参数为输出，则工具执行完成后将自动把文件更新至参数中">
+                            <MudCheckBox Dense T="bool" @bind-Value="@variable.IsOutput" Color="Color.Primary">输出</MudCheckBox>
+                        </MudTooltip>
+                    }
+                </MudStack>
+            }
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="手动输入路径">
+        <MudTextField @bind-Value="@ManualToolPath" Margin="Margin.Dense" Label="工具完整路径"
+                      Placeholder="例如：C:\Program Files\Tool\tool.exe" Variant="Variant.Outlined"
+                      HelperText="输入工具在图站上的完整路径"></MudTextField>
+        <MudTextField @bind-Value="@ManualToolName" Margin="Margin.Dense" Label="工具名称"
+                      Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
+    </MudTabPanel>
+    <MudTabPanel Text="上传文件夹">
+        <FolderUploader @ref="_folderUploader"
+                        ServerBaseUrl="@ServerBaseUrl"
+                        PlugFolder="@(PlugFolder ?? "")"
+                        Username="@Username"
+                        OnFolderSelected="OnFolderPicked" />
+        @if (_folderUploader != null && _folderUploader.HasSelection)
+        {
+            <MudTextField @bind-Value="@FolderToolName" Margin="Margin.Dense" Label="工具名称"
+                          Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField @bind-Value="@FolderEntryFile" Margin="Margin.Dense" Label="入口程序"
+                          Placeholder="例如：app.exe 或 main.py" Variant="Variant.Outlined"
+                          HelperText="指定文件夹中的入口执行程序"></MudTextField>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+
+@code {
+    /// <summary>服务器 API 基地址</summary>
+    [Parameter] public string ServerBaseUrl { get; set; } = "";
+
+    /// <summary>上传目标子文件夹（如 plugDefinitionId）</summary>
+    [Parameter] public string? PlugFolder { get; set; }
+
+    /// <summary>当前用户名</summary>
+    [Parameter] public string Username { get; set; } = "";
+
+    private List<Tool> Tools { get; set; } = new();
+    private Tool? SelectedTool { get; set; }
+    private IEnumerable<BaseVariable> ToolVariablesFromSelectedTool { get; set; } = new List<BaseVariable>();
+
+    // 手动输入路径
+    private string? ManualToolPath { get; set; }
+    private string? ManualToolName { get; set; }
+
+    // 文件夹上传
+    private FolderUploader? _folderUploader;
+    private string? FolderToolName { get; set; }
+    private string? FolderEntryFile { get; set; }
+
+    private bool _loaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loaded)
+        {
+            _loaded = true;
+            Tools = await StationAndToolApiClient.GetAllToolsAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSelectedToolChanged(Tool tool)
+    {
+        SelectedTool = tool;
+        ToolVariablesFromSelectedTool = tool?.GetVariablesFromToolCommand() ?? new List<BaseVariable>();
+    }
+
+    private Task OnFolderPicked((string FolderName, int FileCount) args)
+    {
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 将当前桌面类配置写入 Plug 对象。
+    /// </summary>
+    public void ApplyToPlug(Plug plug)
+    {
+        plug.PlugTypeKey = "CMDPlug";
+
+        if (SelectedTool != null)
+        {
+            plug.ToolId = SelectedTool.Id;
+            plug.ToolName = SelectedTool.ToolName;
+            plug.ToolVersion = SelectedTool.ToolVersion;
+            plug.ToolDisplayName = SelectedTool.Id == null ? null : $"{SelectedTool.ToolName}({SelectedTool.ToolVersion})";
+            plug.ToolCommandLineShema = SelectedTool.CommandParameter;
+        }
+        else if (!string.IsNullOrEmpty(ManualToolPath))
+        {
+            plug.ToolName = ManualToolName ?? "自定义工具";
+            plug.Value = ManualToolPath;
+            plug.ToolCommandLineShema = $"[{ManualToolPath}] ";
+        }
+        else if (_folderUploader?.HasSelection == true)
+        {
+            plug.ToolName = FolderToolName ?? "上传的工具";
+            plug.ToolVersionPath = $"uploaded://{plug.DefinitionId}";
+            if (!string.IsNullOrEmpty(FolderEntryFile))
+            {
+                plug.ToolCommandLineShema = $"[ToolPath]\\{FolderEntryFile} ";
+            }
+        }
+
+        // 桌面类默认参数（与CMD插头一致）
+        plug.AddVariable("CMDCommand", VariableTypeEnum.String.ToString());
+        plug.AddVariable("ResultString", VariableTypeEnum.String.ToString());
+        plug.AddVariable("ExecutionTimeout", VariableTypeEnum.String.ToString());
+        plug.AddVariable("WaitType", VariableTypeEnum.String.ToString());
+        plug.AddVariable("WatchProcessType", VariableTypeEnum.String.ToString());
+        plug.AddVariable("WatchProcessName", VariableTypeEnum.String.ToString());
+        plug.AddVariable("AutoCloseProcess", VariableTypeEnum.String.ToString());
+        plug.AddVariable("CloseProcessWhenError", VariableTypeEnum.String.ToString());
+        plug.AddVariable("ShowConsole", VariableTypeEnum.String.ToString());
+        plug.AddVariable("RedirectOutput", VariableTypeEnum.String.ToString());
+        plug.AddVariable("RedirectWorkPath", VariableTypeEnum.String.ToString());
+    }
+
+    /// <summary>将选中工具的变量附加到 Plug</summary>
+    public void ApplyToolVariables(Plug plug)
+    {
+        if (SelectedTool == null) return;
+        foreach (var variable in ToolVariablesFromSelectedTool)
+        {
+            plug.PlugVariables.Add(new PlugVariable
+            {
+                Name = variable.Name.TrimStart('[').TrimEnd(']'),
+                DefaultValue = variable.DefaultValue,
+                IsInitVariable = true,
+                Type = variable.Type,
+                IsInput = variable.IsInput,
+                IsOutput = variable.IsOutput,
+            });
+        }
+    }
+
+    /// <summary>文件夹上传是否已有选中文件</summary>
+    public bool HasFolderSelection => _folderUploader?.HasSelection == true;
+
+    /// <summary>触发文件夹上传到服务器</summary>
+    public async Task<int> UploadFolderAsync()
+    {
+        return _folderUploader != null ? await _folderUploader.UploadAsync() : 0;
+    }
+}

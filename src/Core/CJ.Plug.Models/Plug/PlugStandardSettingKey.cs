@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,6 +28,7 @@ namespace CJ.Plug.Models.Plug
         CommandLineShema,
         DownloadFromServerWhenRun,
         FileId,
+        SupportRemoteView,   //是否支持远程查看，主要针对桌面类插头，开启后可以在图站远程查看执行过程中的界面和操作，类似远程桌面分享的功能
 
 
         //web plug

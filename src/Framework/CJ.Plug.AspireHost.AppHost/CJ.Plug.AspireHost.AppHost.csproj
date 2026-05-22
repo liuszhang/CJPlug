@@ -27,4 +27,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="D:\Pro\CJ.Plug-Aspire\01.Scripts\Utf8ConsoleInit.cs" />
+  </ItemGroup>
+
 </Project>

@@ -14,7 +14,12 @@ using PlugsBundle;
 using Radzen;
 using Serilog;
 using System.Runtime.InteropServices;
+using System.Text;
 
+
+//设置.NET Console 编码为 UTF-8
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 
 var builder = WebApplication.CreateBuilder(args);

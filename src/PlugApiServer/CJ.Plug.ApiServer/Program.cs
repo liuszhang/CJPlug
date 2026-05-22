@@ -1,7 +1,9 @@
+using CJ.Plug.ElsaIntegration.ApiClient;
 using CJ.Plug.ElsaIntegration.Contracts;
 using CJ.Plug.ElsaIntegration.Services;
 using CJ.Plug.Login;
 using CJ.Plug.Models.DbContexts;
+using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.ModuleConfig;
 using CJ.Plug.PlugBaseCore.Contracts;
@@ -13,6 +15,23 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PlugsBundle;
 using Serilog;
+using System.Text;
+
+
+// 设置 .NET Console 编码为 UTF-8
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+
+// 清除 VS 调试器注入的缺失程序集，避免 Hosting startup assembly exception
+var hostingAssemblies = Environment.GetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
+if (!string.IsNullOrEmpty(hostingAssemblies))
+{
+    var cleaned = string.Join(";", hostingAssemblies
+        .Split(';', StringSplitOptions.RemoveEmptyEntries)
+        .Where(a => !a.Equals("Microsoft.WebTools.ApiEndpointDiscovery", StringComparison.OrdinalIgnoreCase)));
+    Environment.SetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES",
+        string.IsNullOrEmpty(cleaned) ? null : cleaned);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
@@ -93,9 +112,60 @@ builder.Services.AddHttpClient<ElsaApiClient>(client =>
 // 添加认证服务
 builder.Services.AddAuthentication();
 
+//添加Elsa相关服务
+builder.Services.ConfigElsaServicesWithOutDB();
+
+
 
 
 var app = builder.Build();
+
+// ★ 注册插件能力到 CapabilityRegistry（供 AI Workflow Builder 使用）
+try
+{
+    var capRegistry = app.Services.GetRequiredService<CJ.Plug.Models.MCPTools.CapabilityRegistry>();
+    capRegistry.RegisterRange(new CJ.Plug.Models.MCPTools.IPluginCapability[]
+    {
+        new RESTPlug.Capabilities.HttpPluginCapability(),
+        new PythonPlug.Capabilities.PythonPluginCapability(),
+        new CMDPlug.Capabilities.CmdPluginCapability(),
+        new AiAgentPlug.Capabilities.AiAgentPluginCapability(),
+    });
+    Console.WriteLine("[Startup] 插件能力注册完成");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Startup] 插件能力注册异常: {ex.Message}");
+}
+
+// 先执行数据库迁移，确保表结构存在
+try
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+    // 使用 EnsureCreated 创建所有表（基于当前模型，包括 Identity 表）
+    // 注意：如果后续需要正式迁移，应改回 MigrateAsync 并先生成包含 Identity 表的迁移
+    if (await db.Database.EnsureCreatedAsync())
+        Console.WriteLine("[SeedData] 数据库已创建");
+    else
+        Console.WriteLine("[SeedData] 数据库已存在");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[SeedData] 数据库迁移异常：{ex.Message}");
+    Log.Error(ex, "数据库迁移异常");
+}
+
+// 执行所有注册的种子数据提供者
+try
+{
+    await SeedDataRunner.RunAllAsync(app.Services);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[SeedData] 种子数据执行异常：{ex.Message}");
+    Log.Error(ex, "种子数据执行异常");
+}
 
 app.UseOpenApi();
 app.UseSwaggerUi();

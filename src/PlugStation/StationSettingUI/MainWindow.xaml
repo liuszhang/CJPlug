@@ -11,7 +11,7 @@
         MinHeight="450" MinWidth="650"
         WindowStartupLocation="CenterScreen"
         Loaded="MainWindow_Loaded"
-        Closing="MainWindow_Closing">
+        Closing="MainWindow_Closing" Icon="/edge.ico">
     <Window.Resources>
         <Style TargetType="TabItem">
             <Setter Property="FontSize" Value="14"/>
@@ -39,6 +39,11 @@
             <TabItem Header="任务列表">
                 <Grid Background="White">
                     <components:TaskList x:Name="TaskListCtrl"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="控制台日志">
+                <Grid Background="White">
+                    <components:ConsoleLogViewer x:Name="ConsoleLogViewerCtrl"/>
                 </Grid>
             </TabItem>
         </TabControl>

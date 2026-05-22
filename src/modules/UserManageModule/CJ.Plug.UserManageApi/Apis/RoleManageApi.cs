@@ -55,6 +55,45 @@ namespace CJ.Plug.UserManageApi.Apis
                 }
             });
 
+            api.MapPost("/addRoleToUser", async (AddRoleToUserRequest request, IRoleManageService service) =>
+            {
+                try
+                {
+                    var result = await service.AddRoleToUserAsync(request);
+                    return result ? Results.Ok() : Results.NotFound();
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
+            api.MapGet("/getRoleUsers/{roleId:int}", async (int roleId, IRoleManageService service) =>
+            {
+                try
+                {
+                    var users = await service.GetRoleUsersAsync(roleId);
+                    return Results.Ok(users);
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
+            api.MapPost("/removeRoleFromUser", async (RemoveRoleUserRequest request, IRoleManageService service) =>
+            {
+                try
+                {
+                    var result = await service.RemoveRoleFromUserAsync(request);
+                    return result ? Results.Ok() : Results.NotFound();
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
             return app;
         }
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,6 +14,6 @@ using System.Threading.Tasks;
         Job1,  //通过编辑器执行的Job PDZ
         Job2,  //通过执行页面执行的Job PDZ
         Job3,  //通过共享流程执行的Job PDZ
-
+        Use0,   //MCP Tool公共PDZ，发布时创建，作为参数模板和Job PDZ的复制源
     }
 

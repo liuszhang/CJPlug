@@ -35,6 +35,27 @@ public partial class TaskList : UserControl
         await RefreshAsync();
     }
 
+    private async void BtnStop_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int taskId)
+        {
+            btn.IsEnabled = false;
+            btn.Content = "...";
+            var ok = await _apiService.StopTaskAsync(taskId);
+            if (ok)
+            {
+                TxtStatus.Text = $"任务 #{taskId} 已停止";
+            }
+            else
+            {
+                TxtStatus.Text = $"停止任务 #{taskId} 失败";
+                btn.IsEnabled = true;
+                btn.Content = "停止";
+            }
+            await RefreshAsync();
+        }
+    }
+
     private async void BtnClearDone_Click(object sender, RoutedEventArgs e)
     {
         // 仅 UI 层面清除已完成/失败项（数据库保留，下次刷新会重新加载）

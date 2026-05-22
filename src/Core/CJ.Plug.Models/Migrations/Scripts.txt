@@ -1,4 +1,4 @@
-﻿2.	迁移所需的前置准备
+2.	迁移所需的前置准备
 •	安装/确认工具与包：
 •	全局工具：dotnet-ef（若未安装：dotnet tool install --global dotnet-ef）。
 •	在包含 MainDbContext 的项目（即 UserRole.cs）添加 Microsoft.EntityFrameworkCore.Design 包（若还没）：
@@ -8,7 +8,8 @@ dotnet add src/Core/CJ.Plug.Models package Microsoft.EntityFrameworkCore.Design
 3.	创建迁移与应用迁移（常用命令）
 •	先构建解决方案（确保模块 dll 存在）： dotnet build
 •	添加迁移（在解决方案根运行，指定迁移所在项目与启动项目）： 
-dotnet ef migrations add mcptooladdenable --project src/Core/CJ.Plug.Models --startup-project src/PlugApiServer/CJ.Plug.ApiServer -o Migrations/MainDb 
+dotnet ef migrations add AddDepartmentCreator --project src/Core/CJ.Plug.Models --startup-project src/PlugApiServer/CJ.Plug.ApiServer -o Migrations/MainDb 
+dotnet ef migrations add AddDepartmentCreator
 说明：
 •	--project 指含 DbContext 的项目（生成迁移文件）。
 •	--startup-project 指运行时/启动项目（设计时工厂会在其输出目录查找模块 dll），通常是 Program.cs。
