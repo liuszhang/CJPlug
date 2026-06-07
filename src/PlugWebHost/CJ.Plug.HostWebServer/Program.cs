@@ -7,6 +7,7 @@ using CJ.Plug.Models.Shared;
 using CJ.Plug.ModuleConfig;
 using Elsa.Extensions;
 using Microsoft.AspNetCore.Components.Server;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.FileProviders;
 using MudBlazor.Services;
 using MudExtensions.Services;
@@ -43,6 +44,9 @@ Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetVa
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
 Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
+// 显式加载静态 Web 资产清单（Build 模式而非 Publish 时需要）
+StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
+
 builder.Services.AddMudServices();
 builder.Services.AddMudExtensions();
 
@@ -52,7 +56,7 @@ builder.AddServiceDefaults();
 
 
 // Add services to the container.
-builder.Services.AddRazorComponents()    
+builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
@@ -117,7 +121,7 @@ builder.Services.Configure<CircuitOptions>(options =>
 
 var app = builder.Build();
 
-var serviceProvider=builder.Services.BuildServiceProvider();
+var serviceProvider = builder.Services.BuildServiceProvider();
 // 获取所有注册的 IModule 实例
 var modules = serviceProvider.GetRequiredService<IEnumerable<IModule>>().ToList();
 var moduleAssemblies = modules.Select(m => m.GetType().Assembly).Distinct().ToList();

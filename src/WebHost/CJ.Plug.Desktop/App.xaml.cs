@@ -49,12 +49,15 @@ public partial class App : System.Windows.Application
 
         // 窗口显示后再异步启动 AppHost，避免阻塞 UI
         var launcher = _host.Services.GetRequiredService<Services.AppHostLauncher>();
-        _ = StartAppHostInBackground(launcher);
+        var serviceControlVm = _host.Services.GetRequiredService<ViewModels.ServiceControlViewModel>();
+        _ = StartAppHostInBackground(launcher, serviceControlVm);
 
         base.OnStartup(e);
     }
 
-    private async Task StartAppHostInBackground(Services.AppHostLauncher launcher)
+    private async Task StartAppHostInBackground(
+        Services.AppHostLauncher launcher,
+        ViewModels.ServiceControlViewModel serviceControlVm)
     {
         try
         {
@@ -65,6 +68,10 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Error(ex, "AppHost 启动失败（找不到 DLL 或进程异常退出）");
+        }
+        finally
+        {
+            Dispatcher.Invoke(() => serviceControlVm.RefreshStatus());
         }
     }
 

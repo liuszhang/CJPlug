@@ -57,6 +57,9 @@ public partial class ServiceControlViewModel : ObservableObject
         }
     }
 
+    /// <summary>外部（如 App 启动后）通知 ViewModel 刷新状态。</summary>
+    internal void RefreshStatus() => UpdateStatus();
+
     [RelayCommand]
     private async Task Start()
     {
