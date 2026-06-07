@@ -22,15 +22,8 @@
                         Click="BtnRefresh_Click"/>
                 <Button x:Name="BtnAutoSearch" Content="自动搜索" Width="80" Margin="0,0,5,0"
                         Click="BtnAutoSearch_Click"/>
-                <Button x:Name="BtnFetchFromServer" Content="配置下载" Width="80" Margin="0,0,5,0"
-                        Click="BtnFetchFromServer_Click"/>
-                <Separator Width="1" Margin="10,0,10,0"/>
-                <Button x:Name="BtnAddTool" Content="添加工具" Width="80" Margin="0,0,5,0"
-                        Click="BtnAddTool_Click"/>
-                <Button x:Name="BtnEditTool" Content="编辑工具" Width="80" Margin="0,0,5,0"
-                        Click="BtnEditTool_Click"/>
-                <Button x:Name="BtnDeleteTool" Content="删除工具" Width="80" Margin="0,0,5,0"
-                        Click="BtnDeleteTool_Click"/>
+                <Button x:Name="BtnOpenInstallPath" Content="打开安装路径" Width="90" Margin="0,0,5,0"
+                        Click="BtnOpenInstallPath_Click"/>
                 <Separator Width="1" Margin="10,0,10,0"/>
                 <Button x:Name="BtnApply" Content="应用" Width="60"
                         Click="BtnApply_Click" FontWeight="Bold"/>
@@ -40,7 +33,7 @@
         </Border>
 
         <!-- 工具列表 DataGrid -->
-        <DataGrid x:Name="GridTools" Grid.Row="1" 
+        <DataGrid x:Name="GridTools" Grid.Row="1"
                   AutoGenerateColumns="False" CanUserAddRows="False"
                   CanUserDeleteRows="False" IsReadOnly="False"
                   SelectionMode="Single" SelectionUnit="FullRow"
@@ -58,13 +51,21 @@
                 <DataGridTextColumn Header="工具类型" Binding="{Binding ToolType}" 
                                     Width="100"/>
                 <DataGridTextColumn Header="版本" Binding="{Binding ToolVersion}" 
-                                    Width="80"/>
+                                    Width="70"/>
                 <DataGridTextColumn Header="安装路径" Binding="{Binding ToolPath}" 
                                     Width="140"/>
-                <DataGridTextColumn Header="启动命令" Binding="{Binding CommandParameter}" 
-                                    Width="*" MinWidth="150"/>
-                <DataGridCheckBoxColumn Header="启用" Binding="{Binding IsEnabled}" 
-                                        Width="55"/>
+                <DataGridTextColumn Header="状态" Binding="{Binding StatusText}" 
+                                    Width="70" IsReadOnly="True"/>
+                <DataGridTemplateColumn Header="操作" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding ActionButtonText}" 
+                                    IsEnabled="{Binding IsActionButtonEnabled}"
+                                    Click="ExecuteToolAction_Click"
+                                    Width="80" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

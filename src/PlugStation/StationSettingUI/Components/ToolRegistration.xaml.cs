@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Text.Json;
 using CJ.Plug.Models.Station;
 using StationSettingUI.Models;
 using StationSettingUI.Services;
@@ -10,10 +11,12 @@ namespace StationSettingUI.Components;
 
 /// <summary>
 /// 工具注册组件 - 管理图站上的工具安装和配置
+/// 从工具安装根目录（ToolsRootPath）扫描子文件夹，每个文件夹视为一个工具。
+/// 优先读取各文件夹下的 tool.config.json，其次自动探测可执行文件。
 /// </summary>
 public partial class ToolRegistration : UserControl
 {
-    private readonly StationConfigService _configService;
+    private readonly StationSettingUI.Services.StationConfigService _configService;
     private readonly StationApiService _apiService;
     private AppConfig _config;
     private bool _isInitialized;
@@ -23,7 +26,7 @@ public partial class ToolRegistration : UserControl
     public ToolRegistration()
     {
         InitializeComponent();
-        _configService = new StationConfigService();
+        _configService = new StationSettingUI.Services.StationConfigService();
         _config = _configService.LoadConfig();
         _apiService = new StationApiService(_config);
         GridTools.ItemsSource = Tools;
@@ -37,188 +40,340 @@ public partial class ToolRegistration : UserControl
         if (_isInitialized) return;
         _isInitialized = true;
 
-        await RefreshToolsAsync();
+        // 初始化时从服务器获取工具列表
+        await Task.Run(async () =>
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    var serverTools = await _apiService.FetchToolsFromServerAsync();
+                    if (serverTools != null && serverTools.Count > 0)
+                    {
+                        Tools.Clear();
+                        foreach (var tool in serverTools)
+                        {
+                            var model = new ToolRegistrationModel(tool);
+                            await UpdateToolActionStatusAsync(model);
+                            Tools.Add(model);
+                        }
+                        TxtToolCount.Text = $"共 {Tools.Count} 个工具";
+                        TxtToolbarStatus.Text = $"已加载 {Tools.Count} 个工具";
+                    }
+                }
+                catch (Exception)
+                {
+                    // 初始化失败静默处理，用户可手动刷新
+                }
+            });
+        });
     }
 
     /// <summary>
-    /// 刷新工具列表
-    /// </summary>
-    private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
-    {
-        await RefreshToolsAsync();
-    }
-
-    /// <summary>
-    /// 从主服务器加载工具列表
+    /// 从工具安装根目录（ToolsRootPath）加载工具列表。
+    /// 每个子文件夹视为一个工具；优先读取文件夹下的 tool.config.json，
+    /// 否则自动探测文件夹中的主可执行文件。
     /// </summary>
     private async Task RefreshToolsAsync()
     {
-        TxtToolbarStatus.Text = "正在加载...";
+        TxtToolbarStatus.Text = "正在扫描工具安装目录...";
 
         try
         {
-            var tools = await _apiService.FetchToolsFromServerAsync();
+            var tools = await Task.Run(() => ScanToolsFromRootPath(_config.ToolsRootPath));
             Tools.Clear();
 
-            if (tools != null)
+            foreach (var tool in tools)
             {
-                foreach (var tool in tools)
-                {
-                    Tools.Add(new ToolRegistrationModel(tool));
-                }
+                Tools.Add(new ToolRegistrationModel(tool));
             }
 
             TxtToolCount.Text = $"共 {Tools.Count} 个工具";
-            TxtToolbarStatus.Text = tools != null ? "加载完成" : "服务器无响应，显示本地缓存";
+            TxtToolbarStatus.Text = tools.Count > 0
+                ? $"扫描完成，发现 {tools.Count} 个工具"
+                : $"工具目录 \"{_config.ToolsRootPath}\" 下未发现工具";
         }
         catch (Exception ex)
         {
-            TxtToolbarStatus.Text = $"加载失败: {ex.Message}";
+            TxtToolbarStatus.Text = $"扫描失败: {ex.Message}";
         }
     }
 
     /// <summary>
-    /// 自动搜索本机已安装的工具
+    /// 自动搜索 — 与刷新相同，扫描工具安装根目录
     /// </summary>
     private async void BtnAutoSearch_Click(object sender, RoutedEventArgs e)
     {
         BtnAutoSearch.IsEnabled = false;
-        TxtToolbarStatus.Text = "正在搜索本机工具...";
+        TxtToolbarStatus.Text = "正在搜索工具安装目录...";
 
-        var foundTools = await Task.Run(() => AutoDetectLocalTools());
-
-        if (foundTools.Count > 0)
+        try
         {
+            var foundTools = await Task.Run(() => ScanToolsFromRootPath(_config.ToolsRootPath));
+
+            int added = 0;
             foreach (var tool in foundTools)
             {
-                // 避免重复添加
-                if (!Tools.Any(t => t.ToolName == tool.ToolName && t.ToolVersion == tool.ToolVersion))
+                if (!Tools.Any(t => t.ToolName == tool.ToolName && t.ToolPath == tool.ToolPath))
                 {
                     Tools.Add(new ToolRegistrationModel(tool));
+                    added++;
                 }
             }
-            TxtToolbarStatus.Text = $"搜索完成，找到 {foundTools.Count} 个新工具";
+
             TxtToolCount.Text = $"共 {Tools.Count} 个工具";
+            TxtToolbarStatus.Text = added > 0 ? $"发现 {added} 个新工具" : "未发现新工具";
         }
-        else
+        catch (Exception ex)
         {
-            TxtToolbarStatus.Text = "未发现新工具";
+            TxtToolbarStatus.Text = $"搜索失败: {ex.Message}";
         }
 
         BtnAutoSearch.IsEnabled = true;
     }
 
     /// <summary>
-    /// 从平台服务器下载工具配置
+    /// 扫描 ToolsRootPath 下的所有子文件夹，每个文件夹为一个工具
     /// </summary>
-    private async void BtnFetchFromServer_Click(object sender, RoutedEventArgs e)
+    private static List<Tool> ScanToolsFromRootPath(string rootPath)
     {
-        BtnFetchFromServer.IsEnabled = false;
+        var result = new List<Tool>();
+
+        if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
+            return result;
+
+        foreach (var dir in Directory.GetDirectories(rootPath))
+        {
+            try
+            {
+                var tool = BuildToolFromFolder(dir);
+                if (tool != null)
+                    result.Add(tool);
+            }
+            catch
+            {
+                // 跳过无法访问的文件夹
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 从单个工具文件夹构建 Tool 对象。
+    /// 优先读取 tool.config.json；否则自动探测文件夹内可执行文件。
+    /// </summary>
+    private static Tool? BuildToolFromFolder(string folderPath)
+    {
+        var folderName = Path.GetFileName(folderPath);
+
+        // 1. 尝试读取 tool.config.json
+        var configFile = Path.Combine(folderPath, "tool.config.json");
+        if (File.Exists(configFile))
+        {
+            try
+            {
+                var json = File.ReadAllText(configFile);
+                var tool = JsonSerializer.Deserialize<Tool>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (tool != null && !string.IsNullOrWhiteSpace(tool.ToolName))
+                {
+                    // 确保路径为当前文件夹
+                    if (string.IsNullOrWhiteSpace(tool.ToolPath))
+                        tool.ToolPath = folderPath;
+                    return tool;
+                }
+            }
+            catch
+            {
+                // JSON 解析失败则降级为自动探测
+            }
+        }
+
+        // 2. 自动探测：搜索文件夹内的常见可执行文件后缀
+        var exeExtensions = new[] { ".exe", ".bat", ".cmd", ".ps1" };
+        string? detectedExe = null;
+
+        foreach (var ext in exeExtensions)
+        {
+            // 优先根目录
+            var files = Directory.GetFiles(folderPath, $"*{ext}", SearchOption.TopDirectoryOnly);
+            if (files.Length > 0)
+            {
+                detectedExe = files[0];
+                break;
+            }
+        }
+
+        if (detectedExe == null)
+        {
+            // 没有可执行文件也创建工具条目（可能是配置型工具/脚本集）
+            // 但跳过明显不是工具的文件夹（如只有 .dll / .xml 等）
+            var hasContent = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories).Length > 0;
+            if (!hasContent) return null;
+        }
+
+        return new Tool
+        {
+            ToolName = folderName,
+            ToolVersion = "1.0",
+            ToolPath = folderPath,
+            CommandParameter = detectedExe != null
+                ? $"\"{detectedExe}\" [Arguments]"
+                : "[ToolPath]",
+            ToolType = "桌面类_商业",
+            IsEnabled = true,
+        };
+    }
+
+    /// <summary>
+    /// 刷新工具列表 - 从服务器获取工具列表并与本地配置比对
+    /// </summary>
+    private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
+    {
+        BtnRefresh.IsEnabled = false;
         TxtToolbarStatus.Text = "正在从服务器获取工具列表...";
 
         try
         {
-            var serverTools = await _apiService.FetchToolsFromServerAsync();
-            if (serverTools != null && serverTools.Count > 0)
+            // 先检查本地 StationApiServer 是否运行
+            var localOk = await _apiService.TestStationApiAsync();
+            if (!localOk)
             {
-                foreach (var tool in serverTools)
-                {
-                    // 下载每个工具的配置文件
-                    if (tool.Id.HasValue)
-                        await _apiService.DownloadToolConfigAsync(tool.Id.Value);
+                TxtToolbarStatus.Text = "本地图站服务未运行，请先启动服务";
+                return;
+            }
 
-                    // 添加到本地列表
-                    if (!Tools.Any(t => t.ToolName == tool.ToolName && t.ToolVersion == tool.ToolVersion))
-                    {
-                        Tools.Add(new ToolRegistrationModel(tool));
-                    }
-                }
-                TxtToolbarStatus.Text = $"从服务器同步了 {serverTools.Count} 个工具";
-                TxtToolCount.Text = $"共 {Tools.Count} 个工具";
-            }
-            else
+            var serverTools = await _apiService.FetchToolsFromServerAsync();
+            if (serverTools == null || serverTools.Count == 0)
             {
-                TxtToolbarStatus.Text = "服务器上没有可用的工具配置";
+                TxtToolbarStatus.Text = "服务器上没有可用的工具";
+                return;
             }
+
+            Tools.Clear();
+
+            foreach (var tool in serverTools)
+            {
+                var model = new ToolRegistrationModel(tool);
+                await UpdateToolActionStatusAsync(model);
+                Tools.Add(model);
+            }
+
+            TxtToolbarStatus.Text = $"从服务器获取了 {serverTools.Count} 个工具";
+            TxtToolCount.Text = $"共 {Tools.Count} 个工具";
         }
         catch (Exception ex)
         {
             TxtToolbarStatus.Text = $"获取失败: {ex.Message}";
         }
-
-        BtnFetchFromServer.IsEnabled = true;
-    }
-
-    /// <summary>
-    /// 添加新工具
-    /// </summary>
-    private void BtnAddTool_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new ToolEditDialog();
-        if (dialog.ShowDialog() == true && dialog.Tool != null)
+        finally
         {
-            Tools.Add(new ToolRegistrationModel(dialog.Tool));
-            TxtToolCount.Text = $"共 {Tools.Count} 个工具";
-            TxtToolbarStatus.Text = "工具已添加（点击「应用」保存）";
+            BtnRefresh.IsEnabled = true;
         }
     }
 
     /// <summary>
-    /// 编辑选中工具
+    /// 更新工具的操作状态（根据本地安装情况）
     /// </summary>
-    private void BtnEditTool_Click(object sender, RoutedEventArgs e)
+    private async Task UpdateToolActionStatusAsync(ToolRegistrationModel model)
     {
-        var selected = GridTools.SelectedItem as ToolRegistrationModel;
-        if (selected == null)
+        if (model.Tool.SkipDownloadToStation)
         {
-            TxtToolbarStatus.Text = "请先选择一个工具";
-            return;
-        }
-
-        var dialog = new ToolEditDialog(selected.Tool);
-        if (dialog.ShowDialog() == true && dialog.Tool != null)
-        {
-            // 替换列表中的项
-            var index = Tools.IndexOf(selected);
-            if (index >= 0)
+            // 无需下载至图站的工具，在本地逐层查找文件
+            if (string.IsNullOrWhiteSpace(model.ToolPath))
             {
-                Tools[index] = new ToolRegistrationModel(dialog.Tool);
+                model.ActionStatus = ToolActionStatus.NotFound;
             }
-            TxtToolbarStatus.Text = "工具已修改（点击「应用」保存）";
+            else
+            {
+                // 1. 直接检查原始路径（绝对路径或相对当前目录）
+                var exists = File.Exists(model.ToolPath);
+                // 2. 相对路径：尝试从 ToolsRootPath 解析
+                if (!exists && !Path.IsPathRooted(model.ToolPath))
+                    exists = File.Exists(Path.Combine(_config.ToolsRootPath, model.ToolPath));
+                // 3. 通过 StationApiServer 检查（作为兜底）
+                if (!exists)
+                    exists = await _apiService.CheckFileExistsAsync(model.ToolPath);
+                model.ActionStatus = exists ? ToolActionStatus.Ready : ToolActionStatus.NotFound;
+            }
+        }
+        else
+        {
+            // 需要下载的工具，本地安装目录 = ToolsRootPath/ToolName
+            var localPath = Path.Combine(_config.ToolsRootPath, model.ToolName ?? "unknown");
+
+            if (Directory.Exists(localPath))
+            {
+                var hasFiles = Directory.GetFiles(localPath, "*", SearchOption.AllDirectories).Length > 0;
+                model.ActionStatus = hasFiles ? ToolActionStatus.CanRedownload : ToolActionStatus.CanDownload;
+            }
+            else
+            {
+                model.ActionStatus = ToolActionStatus.CanDownload;
+            }
         }
     }
 
     /// <summary>
-    /// 删除选中工具
+    /// 执行工具操作（下载/重新下载）
     /// </summary>
-    private async void BtnDeleteTool_Click(object sender, RoutedEventArgs e)
+    private async void ExecuteToolAction_Click(object sender, RoutedEventArgs e)
     {
-        var selected = GridTools.SelectedItem as ToolRegistrationModel;
-        if (selected == null)
+        if (sender is Button button && button.DataContext is ToolRegistrationModel model)
         {
-            TxtToolbarStatus.Text = "请先选择一个工具";
-            return;
-        }
-
-        var result = MessageBox.Show(
-            $"确定要删除工具 \"{selected.ToolName}\" 吗？",
-            "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.Yes) return;
-
-        if (selected.Id.HasValue && selected.Id > 0)
-        {
-            var deleted = await _apiService.DeleteToolAsync(selected.Id.Value);
-            if (!deleted)
-            {
-                TxtToolbarStatus.Text = "删除失败，请检查服务连接";
+            if (model.ActionStatus != ToolActionStatus.CanDownload &&
+                model.ActionStatus != ToolActionStatus.CanRedownload)
                 return;
-            }
-        }
 
-        Tools.Remove(selected);
-        TxtToolCount.Text = $"共 {Tools.Count} 个工具";
-        TxtToolbarStatus.Text = "工具已删除";
+            button.IsEnabled = false;
+            TxtToolbarStatus.Text = $"正在{(model.ActionStatus == ToolActionStatus.CanRedownload ? "重新" : "")}下载工具 {model.ToolName}...";
+
+            try
+            {
+                // 确定目标安装目录：图站上统一放在 ToolsRootPath/ToolName 下
+                var targetPath = Path.Combine(_config.ToolsRootPath, model.ToolName ?? "unknown");
+
+                // 确保目标目录存在
+                if (!Directory.Exists(targetPath))
+                    Directory.CreateDirectory(targetPath);
+
+                // 调用下载接口（通过StationApiServer代理），传递服务端工具包根目录路径用于打包
+                var success = await _apiService.DownloadToolToStationAsync(
+                    model.ToolName ?? "",
+                    model.ToolVersion ?? "1.0",
+                    targetPath,
+                    model.Tool.ToolBasePath
+                );
+
+                if (success)
+                {
+                    // 验证文件是否实际下载成功
+                    if (Directory.Exists(targetPath) && Directory.GetFiles(targetPath, "*", SearchOption.AllDirectories).Length > 0)
+                    {
+                        TxtToolbarStatus.Text = $"工具 {model.ToolName} 下载完成";
+                        model.ActionStatus = ToolActionStatus.CanRedownload;
+                    }
+                    else
+                    {
+                        TxtToolbarStatus.Text = $"工具 {model.ToolName} 下载失败：服务端未找到工具文件";
+                        model.ActionStatus = ToolActionStatus.CanDownload;
+                    }
+                }
+                else
+                {
+                    TxtToolbarStatus.Text = $"工具 {model.ToolName} 下载失败";
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtToolbarStatus.Text = $"下载异常: {ex.Message}";
+            }
+
+            button.IsEnabled = true;
+        }
     }
 
     /// <summary>
@@ -247,6 +402,31 @@ public partial class ToolRegistration : UserControl
     }
 
     /// <summary>
+    /// 打开工具安装路径文件夹
+    /// </summary>
+    private void BtnOpenInstallPath_Click(object sender, RoutedEventArgs e)
+    {
+        var path = _config.ToolsRootPath;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            TxtToolbarStatus.Text = "未配置工具安装路径";
+            return;
+        }
+
+        if (!Directory.Exists(path))
+        {
+            TxtToolbarStatus.Text = $"安装路径不存在: {path}";
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true
+        });
+    }
+
+    /// <summary>
     /// DataGrid 选择变更
     /// </summary>
     private void GridTools_SelectionChanged(object sender, SelectedCellsChangedEventArgs e)
@@ -262,203 +442,4 @@ public partial class ToolRegistration : UserControl
         }
     }
 
-    /// <summary>
-    /// 自动检测本机安装的工具
-    /// </summary>
-    private static List<Tool> AutoDetectLocalTools()
-    {
-        var found = new List<Tool>();
-
-        // 已知工具的检测规则
-        var detectionRules = new (string Name, string Version, string[] Paths, string Exe, string Type)[]
-        {
-            // Python
-            ("Python", "3.x", new[] { @"C:\Python3*", @"C:\Program Files\Python3*" }, 
-                "python.exe", "桌面类_开源"),
-            // Word (via Office)
-            ("Word", "Office", new[] { @"C:\Program Files\Microsoft Office", @"C:\Program Files (x86)\Microsoft Office" }, 
-                "WINWORD.EXE", "桌面类_商业"),
-            // Excel
-            ("Excel", "Office", new[] { @"C:\Program Files\Microsoft Office", @"C:\Program Files (x86)\Microsoft Office" }, 
-                "EXCEL.EXE", "桌面类_商业"),
-            // MATLAB
-            ("MATLAB", "R202*", new[] { @"C:\Program Files\MATLAB" }, 
-                "matlab.exe", "桌面类_商业"),
-            // NX
-            ("NX", "NX*", new[] { @"C:\Program Files\Siemens" }, 
-                "ugraf.exe", "桌面类_工业"),
-        };
-
-        foreach (var rule in detectionRules)
-        {
-            foreach (var pathPattern in rule.Paths)
-            {
-                try
-                {
-                    var basePath = pathPattern.TrimEnd('*');
-                    if (!Directory.Exists(basePath)) continue;
-
-                    // 递归搜索可执行文件
-                    var matchingFiles = Directory.GetFiles(basePath, rule.Exe,
-                        SearchOption.AllDirectories);
-
-                    if (matchingFiles.Length > 0)
-                    {
-                        var exePath = matchingFiles[0];
-                        var dir = Path.GetDirectoryName(exePath) ?? basePath;
-
-                        found.Add(new Tool
-                        {
-                            ToolName = rule.Name,
-                            ToolVersion = rule.Version,
-                            ToolPath = dir,
-                            CommandParameter = $"[ToolPath]\\{rule.Exe} [Arguments]",
-                            ToolType = rule.Type,
-                            IsEnabled = true,
-                        });
-
-                        break; // 找到一个即可
-                    }
-                }
-                catch { /* 权限不足或路径无效 */ }
-            }
-        }
-
-        return found;
     }
-}
-
-/// <summary>
-/// 简单的工具编辑对话框（内嵌在主窗口中）
-/// </summary>
-public class ToolEditDialog : Window
-{
-    public Tool? Tool { get; private set; }
-
-    private readonly TextBox _txtName = new() { Width = 300, Margin = new Thickness(0, 3, 0, 5) };
-    private readonly TextBox _txtVersion = new() { Width = 120, Margin = new Thickness(0, 3, 0, 5), Text = "1.0" };
-    private readonly TextBox _txtPath = new() { Width = 350, Margin = new Thickness(0, 3, 0, 5) };
-    private readonly TextBox _txtCommand = new() { Width = 350, Margin = new Thickness(0, 3, 0, 5), Text = "[ToolPath]" };
-    private readonly TextBox _txtType = new() { Width = 200, Margin = new Thickness(0, 3, 0, 5), Text = "桌面类_商业" };
-    private readonly CheckBox _chkEnabled = new() { Margin = new Thickness(0, 3, 0, 0), IsChecked = true };
-
-    public ToolEditDialog(Tool? existing = null)
-    {
-        Title = existing != null ? "编辑工具" : "添加工具";
-        Width = 450;
-        Height = 370;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
-
-        if (existing != null)
-        {
-            _txtName.Text = existing.ToolName ?? "";
-            _txtVersion.Text = existing.ToolVersion ?? "1.0";
-            _txtPath.Text = existing.ToolPath ?? "";
-            _txtCommand.Text = existing.CommandParameter ?? "[ToolPath]";
-            _txtType.Text = existing.ToolType ?? "桌面类_商业";
-            _chkEnabled.IsChecked = existing.IsEnabled;
-        }
-
-        var browseBtn = new Button { Content = "浏览...", Width = 60, Margin = new Thickness(5, 0, 0, 0) };
-        var pathPanel = new DockPanel();
-        DockPanel.SetDock(browseBtn, Dock.Right);
-        pathPanel.Children.Add(browseBtn);
-        pathPanel.Children.Add(_txtPath);
-
-        browseBtn.Click += (s, e) =>
-        {
-            var path = StationSettingUI.Helpers.FolderBrowserHelper.ShowDialog(this, "选择工具安装目录", _txtPath.Text);
-            if (!string.IsNullOrEmpty(path))
-            {
-                _txtPath.Text = path;
-            }
-        };
-
-        var grid = new Grid { Margin = new Thickness(15) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 0
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 1
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 2
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 3
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 4
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // 5
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 6
-
-        grid.Children.Add(new TextBlock { Text = "工具名称:", VerticalAlignment = VerticalAlignment.Center });
-        Grid.SetRow(grid.Children[0], 0); Grid.SetColumn(grid.Children[0], 0);
-        Grid.SetRow(_txtName, 0); Grid.SetColumn(_txtName, 1);
-        grid.Children.Add(_txtName);
-
-        grid.Children.Add(new TextBlock { Text = "版本:", VerticalAlignment = VerticalAlignment.Center });
-        Grid.SetRow(grid.Children[1], 1); Grid.SetColumn(grid.Children[1], 0);
-        Grid.SetRow(_txtVersion, 1); Grid.SetColumn(_txtVersion, 1);
-        grid.Children.Add(_txtVersion);
-
-        grid.Children.Add(new TextBlock { Text = "安装路径:", VerticalAlignment = VerticalAlignment.Center });
-        Grid.SetRow(grid.Children[2], 2); Grid.SetColumn(grid.Children[2], 0);
-        Grid.SetRow(pathPanel, 2); Grid.SetColumn(pathPanel, 1);
-        grid.Children.Add(pathPanel);
-
-        grid.Children.Add(new TextBlock { Text = "启动命令:", VerticalAlignment = VerticalAlignment.Center });
-        Grid.SetRow(grid.Children[3], 3); Grid.SetColumn(grid.Children[3], 0);
-        Grid.SetRow(_txtCommand, 3); Grid.SetColumn(_txtCommand, 1);
-        grid.Children.Add(_txtCommand);
-
-        grid.Children.Add(new TextBlock { Text = "工具类型:", VerticalAlignment = VerticalAlignment.Center });
-        Grid.SetRow(grid.Children[4], 4); Grid.SetColumn(grid.Children[4], 0);
-        Grid.SetRow(_txtType, 4); Grid.SetColumn(_txtType, 1);
-        grid.Children.Add(_txtType);
-
-        Grid.SetRow(_chkEnabled, 5); Grid.SetColumn(_chkEnabled, 1);
-        _chkEnabled.Content = "启用此工具";
-        grid.Children.Add(_chkEnabled);
-
-        // 按钮
-        var buttonsPanel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 10, 0, 0)
-        };
-
-        var okBtn = new Button { Content = "确定", Width = 70, Margin = new Thickness(0, 0, 10, 0) };
-        var cancelBtn = new Button { Content = "取消", Width = 70 };
-
-        okBtn.Click += (s, e) =>
-        {
-            if (string.IsNullOrWhiteSpace(_txtName.Text))
-            {
-                MessageBox.Show("请输入工具名称", "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            Tool = new Tool
-            {
-                Id = existing?.Id,
-                ToolName = _txtName.Text.Trim(),
-                ToolVersion = _txtVersion.Text.Trim(),
-                ToolPath = _txtPath.Text.Trim(),
-                CommandParameter = _txtCommand.Text.Trim(),
-                ToolType = _txtType.Text.Trim(),
-                ToolCompany = existing?.ToolCompany ?? "CJ",
-                ToolLocation = existing?.ToolLocation ?? "图站",
-                IsEnabled = _chkEnabled.IsChecked == true,
-            };
-
-            DialogResult = true;
-            Close();
-        };
-
-        cancelBtn.Click += (s, e) => { DialogResult = false; Close(); };
-
-        buttonsPanel.Children.Add(okBtn);
-        buttonsPanel.Children.Add(cancelBtn);
-
-        Grid.SetRow(buttonsPanel, 6); Grid.SetColumnSpan(buttonsPanel, 2);
-        grid.Children.Add(buttonsPanel);
-
-        Content = grid;
-    }
-}

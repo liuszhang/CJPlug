@@ -1,0 +1,80 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="int" Label="源本体 *" @bind-Value="relationship.SourceOntologyId" Required="true">
+                @foreach (var o in ontologies)
+                {
+                    <MudSelectItem T="int" Value="o.Id">@o.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="int" Label="目标本体 *" @bind-Value="relationship.TargetOntologyId" Required="true">
+                @foreach (var o in ontologies)
+                {
+                    <MudSelectItem T="int" Value="o.Id">@o.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" Label="基数" @bind-Value="relationship.Cardinality">
+                <MudSelectItem T="string" Value="@("OneToOne")">一对一 (OneToOne)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("OneToMany")">一对多 (OneToMany)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("ManyToMany")">多对多 (ManyToMany)</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" Label="关系类型" @bind-Value="relationship.RelationshipType" Clearable="true">
+                @foreach (var item in relationEnumItems)
+                {
+                    <MudSelectItem T="string" Value="item.Code">@item.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="反向关系名" @bind-Value="relationship.InverseName" />
+            <MudTextField T="string" Label="描述" @bind-Value="relationship.Description" Lines="2" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    private OntologyRelationship relationship = new();
+    private List<Ontology> ontologies = new();
+    private List<BasicEnumItem> relationEnumItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await OntologyManageApiClient.GetAllOntologiesAsync();
+        ontologies = all?.Where(o => o != null).Cast<Ontology>().ToList() ?? new();
+
+        var basicEnums = await OntologyManageApiClient.GetAllBasicEnumsAsync();
+        var relationEnum = basicEnums?.FirstOrDefault(e => e.Code == "Relation");
+        relationEnumItems = relationEnum?.Items.OrderBy(i => i.SortOrder).ToList() ?? new();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (relationship.SourceOntologyId == 0 || relationship.TargetOntologyId == 0)
+        {
+            Snackbar.Add("源本体和目标本体不能为空", Severity.Warning);
+            return;
+        }
+        var result = await OntologyManageApiClient.CreateRelationshipAsync(relationship);
+        if (result != null)
+        {
+            Snackbar.Add("创建成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("创建失败", Severity.Error);
+        }
+    }
+}

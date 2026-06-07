@@ -33,6 +33,7 @@ public static class CustomElementRegistrationExtensions
 
         //添加前端DOM操作服务
         services.AddScoped<IDomInteropService, DomInteropService>();
+        services.AddScoped<FileDownloadService>();
 
         services.AddVariableUIHandlers();
 

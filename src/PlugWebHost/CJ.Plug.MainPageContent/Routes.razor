@@ -12,6 +12,8 @@
 @using Microsoft.Extensions.Options
 @using System.Reflection
 
+@implements IDisposable
+
 @inject NavigationManager NavigationManager
 @inject IEnumerable<IModule> Modules
 @inject IElsaStudioService ElsaStudioService
@@ -20,12 +22,12 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(MainLayout).Assembly" AdditionalAssemblies="@AdditionalAssemblies">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <RouteView RouteData="@routeData" DefaultLayout="@_currentLayout" />
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>
             <PageTitle>Not found</PageTitle>
-            <LayoutView Layout="@typeof(MainLayout)">
+            <LayoutView Layout="@_currentLayout">
                 <p role="alert">Sorry, there's nothing at this address.</p>
             </LayoutView>
         </NotFound>
@@ -36,22 +38,49 @@
 @code{
     public IEnumerable<Assembly> AdditionalAssemblies { get; set; } = null!;
 
+    private Type _currentLayout = typeof(MainLayout);
 
     protected override async Task OnInitializedAsync()
     {
         //前端初始化模块以注册路由和工具栏
         AdditionalAssemblies = Modules.Select(x => x.GetType().Assembly).Distinct().ToList();
-        // Console.WriteLine(AdditionalAssemblies.Count());
-        // foreach (var a in AdditionalAssemblies)
-        // {
-        //     Console.WriteLine(a.FullName);
-        // }
+
         foreach (var m in Modules)
         {
             await m.InitializeAsync();
         }
+
+        // 检测 URL 查询参数，动态选择布局
+        NavigationManager.LocationChanged += OnLocationChanged;
+        DetectLayout(NavigationManager.Uri);
     }
 
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        DetectLayout(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void DetectLayout(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            _currentLayout = query["hideMenu"] == "true"
+                ? typeof(EmbeddedLayout)
+                : typeof(MainLayout);
+        }
+        catch
+        {
+            _currentLayout = typeof(MainLayout);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

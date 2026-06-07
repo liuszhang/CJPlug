@@ -66,6 +66,13 @@ public class PlugExecuteService : IPlugExecuteService
     {
         PlugData? plugData;
         IPlugCommonExecute? handler;
+
+        // 防御性初始化：防止 API 反序列化或上游未初始化 ExecuteResultData/Ids 导致 NRE
+        if (request != null)
+        {
+            request.ExecuteResultData ??= new ExecuteResultData();
+        }
+
         if(request?.ExecuteResultData.Ids.ExecuteTaskPlugIds.Count==0)
         {
             //首次执行请求提交
@@ -110,6 +117,49 @@ public class PlugExecuteService : IPlugExecuteService
             {
                 //有插头ID，说明是来源于引擎或者流程图，先通过ID获取类型,再通过类型获取源插头
                 plugData = await PlugDataService.GetByPlugDefinitionIdAsync(request.ExecuteResultData.Ids.PlugDefinitionId);
+
+                // plugData 为 null 时无法继续执行，直接返回错误
+                if (plugData == null)
+                {
+                    CLog.Error($"StartExecutePlug: 未找到 PlugData，PlugDefinitionId={request.ExecuteResultData.Ids.PlugDefinitionId}");
+                    return new ExecuteResultData
+                    {
+                        ExecuteStatus = JobStatus.完成,
+                        ExecuteSubStatus = JobSubStatus.出错,
+                        Ids = request.ExecuteResultData.Ids
+                    };
+                }
+
+                // MCP 调用且为工作流类型：走 Use PDZ → Job PDZ → Elsa 流程图执行
+                if (request.McpToolType == "Workflow" && plugData != null)
+                {
+                    return await ExecuteMcpWorkflowFromRequest(request, plugData);
+                }
+
+                // MCP 调用且为单插头类型：Standalone 模式，直接设置输入参数并执行
+                if (request.McpToolType == "Plugin" && plugData != null
+                    && request.ExecuteMode == ExecuteMode.Standalone)
+                {
+                    var plug = await PlugManageService.GetPlugByDefinitionId(plugData.PlugDefinitionId);
+                    if (plug == null)
+                    {
+                        CLog.Error($"StartExecutePlug: 未找到插头 {plugData.PlugDefinitionId}");
+                        return new ExecuteResultData
+                        {
+                            ExecuteStatus = JobStatus.完成,
+                            ExecuteSubStatus = JobSubStatus.出错,
+                            Ids = request.ExecuteResultData?.Ids,
+                        };
+                    }
+                    // 直接将 MCP 输入参数设置到插头变量
+                    foreach (var v in request.InputVariables)
+                    {
+                        plug.SetVariableValue(v.Name, v.Value);
+                    }
+                    handler = PlugExecuteHandlerService.GetExecuteHandler(plug.PlugTypeKey);
+                    return await handler?.PlugCommonExecute(new(plug, request));
+                }
+
                 //Log.Information($"准备启动插头{plug.Name}");
                 request.ExecuteResultData = request.ExecuteResultData ?? new ExecuteResultData();
                 var PDZ = await PDZManageService.GetByPDZId(request.ExecuteResultData.Ids.PDZId);
@@ -194,6 +244,25 @@ public class PlugExecuteService : IPlugExecuteService
                 await ResumeBookmarkAsync(correlationId, plugId, pdzId, executeReport.Outcome);
                 await TryAwakenConvergencePlugs(pdzId, correlationId);
                 return;
+            }
+            else if (executeReport.ExecuteSubStatus == JobSubStatus.已完成)
+            {
+                // 图站执行完成回调：ExecuteStatus=执行中, ExecuteSubStatus=已完成
+                // 需要通知前端状态更新并恢复 Elsa 书签继续后续流程
+                if (executeReport.Ids.ExecuteTaskPlugIds.Count > 0) executeReport.Ids.ExecuteTaskPlugIds?.RemoveAt(0);
+                if (executeReport.Ids.ExecuteTaskPlugIds.Count == 0)
+                {
+                    status.Blocked = false;
+                    status.Completed = 1;
+                    StatusReporter.ReportPlugStatus(plugId, status, pdzId);
+                    await ResumeBookmarkAsync(correlationId, plugId, pdzId, executeReport.Outcome);
+                    await TryAwakenConvergencePlugs(pdzId, correlationId);
+                    return;
+                }
+                var request = new PlugExecutionRequest();
+                request.ExecuteResultData = executeReport;
+                request.ExecuteResultData.Ids = executeReport.Ids;
+                await StartExecutePlug(request);
             }
             else
             {
@@ -565,47 +634,92 @@ public class PlugExecuteService : IPlugExecuteService
     }
 
     /// <summary>
-    /// MCP Tool 执行：从 Use PDZ 复制为 Job3 PDZ，填充参数后执行工作流
+    /// MCP 统一执行端点：构造 PlugExecutionRequest 后走 StartExecutePlug 统一路径
     /// </summary>
-    public async Task<string?> ExecuteMcpWorkflow(PlugExecutionRequest request)
+    public async Task<string?> ExecuteMcpTool(CJ.Plug.Models.MCPTools.McpToolExecutionRequest request)
     {
-        var definitionId = request.PlugDefinitionId;
-        if (string.IsNullOrEmpty(definitionId))
+        if (string.IsNullOrEmpty(request.PlugDefinitionId))
         {
-            CLog.Error("ExecuteMcpWorkflow: PlugDefinitionId 为空");
+            CLog.Error("ExecuteMcpTool: PlugDefinitionId 为空");
             return null;
         }
 
+        var plugRequest = new PlugExecutionRequest
+        {
+            PlugDefinitionId = request.PlugDefinitionId,
+            InputVariables = request.InputVariables ?? new(),
+            ExecuteMode = request.ToolType == "Workflow" ? ExecuteMode.Plug : ExecuteMode.Standalone,
+            McpToolType = request.ToolType,
+        };
+
+        var result = await StartExecutePlug(plugRequest);
+
+        // 提取执行结果
+        if (result == null)
+            return "执行完成（无返回结果）";
+
+        if (!string.IsNullOrEmpty(result.ResultString))
+            return result.ResultString;
+
+        if (!string.IsNullOrEmpty(result.ExecuteResultMessage))
+            return result.ExecuteResultMessage;
+
+        return $"执行状态: {result.ExecuteStatus}({result.ExecuteSubStatus})";
+    }
+
+    /// <summary>
+    /// MCP 工作流执行子路径：从 Use PDZ 创建 Job PDZ，填充参数后通过 Elsa 引擎执行流程图
+    /// 由 StartExecutePlug 在检测到 McpToolType=="Workflow" 时调用
+    /// </summary>
+    private async Task<ExecuteResultData?> ExecuteMcpWorkflowFromRequest(PlugExecutionRequest request, PlugData plugData)
+    {
+        var definitionId = request.PlugDefinitionId;
+
         // 1. 查找 Use PDZ（参数模板）
-        var usePDZId = "MCP_Use_" + definitionId;
+        var usePDZId = "MCP_Use0_" + definitionId;
         var usePDZ = await PDZManageService.GetByPDZId(usePDZId);
         if (usePDZ == null)
         {
-            CLog.Error("ExecuteMcpWorkflow: 未找到 Use PDZ，请先发布为 MCP Tool");
-            return null;
+            CLog.Error("ExecuteMcpWorkflowFromRequest: 未找到 Use PDZ，请先发布为 MCP Tool");
+            return new ExecuteResultData
+            {
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                Ids = request.ExecuteResultData?.Ids ?? new ExecuteIdsBundle { PlugDefinitionId = definitionId },
+            };
         }
 
-        // 2. 获取 Plug 数据和流程图
-        var plugData = await PlugDataService.GetByPlugDefinitionIdAsync(definitionId);
-        var flowchart = usePDZ.GetFlowchartData(definitionId);
-        if (plugData == null || flowchart == null)
+        // 2. 获取流程图
+        var plug = await PlugManageService.GetPlugByDefinitionId(definitionId);
+        var flowchart = plug?.ToActivityJson();
+        if (flowchart == null || flowchart.Count == 0)
         {
-            CLog.Error("ExecuteMcpWorkflow: 未找到 Plug");
-            return null;
+            CLog.Error("ExecuteMcpWorkflowFromRequest: 未找到流程图数据");
+            return new ExecuteResultData
+            {
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                Ids = request.ExecuteResultData?.Ids ?? new ExecuteIdsBundle { PlugDefinitionId = definitionId },
+            };
         }
 
-        // 3. 从 Use PDZ 复制为 Job3 PDZ
+        // 3. 从 Use PDZ 复制为 Job PDZ
         var currentUser = "MCP_Caller";
         (var jobPDZId, var jobDefinitionId) = await MainApiClient.SubmitExecute(
             plugData, currentUser, usePDZ, PDZTypeEnum.Job3);
 
         if (string.IsNullOrEmpty(jobPDZId))
         {
-            CLog.Error("ExecuteMcpWorkflow: 创建 Job3 PDZ 失败");
-            return null;
+            CLog.Error("ExecuteMcpWorkflowFromRequest: 创建 Job PDZ 失败");
+            return new ExecuteResultData
+            {
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                Ids = request.ExecuteResultData?.Ids ?? new ExecuteIdsBundle { PlugDefinitionId = definitionId },
+            };
         }
 
-        // 4. 填充输入参数到 Job3 PDZ
+        // 4. 填充输入参数到 Job PDZ
         var jobPDZ = await MainApiClient.GetPDZByPDZIdAsync(jobPDZId);
         if (jobPDZ != null && request.InputVariables?.Count > 0)
         {
@@ -616,7 +730,7 @@ public class PlugExecuteService : IPlugExecuteService
             await MainApiClient.CreateOrUpdatePDZ(jobPDZ);
         }
 
-        // 5. 构造执行请求，走 Elsa 引擎
+        // 5. 构造执行请求，走 Elsa 引擎执行流程图
         var executeSetting = new ExecuteSetting
         {
             CorrelationId = jobPDZId,
@@ -626,7 +740,59 @@ public class PlugExecuteService : IPlugExecuteService
         var executeResult = await ElsaApiClient.ExecuteWorkflowWithExecuteSetting(flowchart, executeSetting);
         var workflowInstanceId = executeResult?.ExecuteResultMessage;
 
-        return "MCP 工作流执行成功，实例 ID: " + workflowInstanceId;
+        return new ExecuteResultData
+        {
+            ExecuteStatus = JobStatus.执行中,
+            ExecuteSubStatus = JobSubStatus.提交,
+            ResultString = $"工作流执行成功，实例 ID: {workflowInstanceId}",
+            Ids = new ExecuteIdsBundle
+            {
+                PlugDefinitionId = definitionId,
+                PDZId = jobPDZId,
+                JobCorrelationId = jobPDZId,
+            },
+        };
+    }
+
+    /// <summary>
+    /// 查询 Elsa 工作流实例的执行状态
+    /// </summary>
+    public async Task<CJ.Plug.Models.MCPTools.ExecutionStatusDto?> GetExecutionStatus(string workflowInstanceId)
+    {
+        if (string.IsNullOrEmpty(workflowInstanceId))
+            return null;
+
+        try
+        {
+            // 通过 correlationId 查询工作流实例
+            var instance = await ElsaApiClient.GetWorkflowInstanceByCorrelationIdAsync(workflowInstanceId);
+
+            if (instance == null)
+                return new CJ.Plug.Models.MCPTools.ExecutionStatusDto
+                {
+                    WorkflowInstanceId = workflowInstanceId,
+                    Status = "NotFound",
+                    ResultMessage = "未找到工作流实例",
+                };
+
+            return new CJ.Plug.Models.MCPTools.ExecutionStatusDto
+            {
+                WorkflowInstanceId = instance.Id,
+                Status = instance.Status?.ToString(),
+                CreatedAt = instance.CreatedAt,
+                FinishedAt = instance.FinishedAt,
+            };
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"GetExecutionStatus 失败: {ex.Message}");
+            return new CJ.Plug.Models.MCPTools.ExecutionStatusDto
+            {
+                WorkflowInstanceId = workflowInstanceId,
+                Status = "Error",
+                ResultMessage = ex.Message,
+            };
+        }
     }
 
 }

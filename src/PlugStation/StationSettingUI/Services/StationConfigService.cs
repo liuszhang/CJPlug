@@ -5,16 +5,14 @@ namespace StationSettingUI.Services;
 
 /// <summary>
 /// 应用配置持久化服务 — 基于 SQLite
-/// 数据库位置: %ProgramData%\CJStation\station_config.db
+/// 数据库位置: StationSettingUI 启动程序所在目录
 /// </summary>
 public class StationConfigService
 {
-    private static readonly string DbDir = Path.Combine(
-        //Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        AppContext.BaseDirectory,
-        "CJStation");
-
-    private static readonly string DbPath = Path.Combine(DbDir, "station_config.db");
+    private static readonly string DbPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "CJStation",
+        "station_config.db");
 
     private AppConfig? _config;
 
@@ -26,7 +24,6 @@ public class StationConfigService
         if (_config != null)
             return _config;
 
-        Directory.CreateDirectory(DbDir);
         InitDatabase();
 
         _config = ReadFromDb() ?? new AppConfig();
@@ -40,7 +37,6 @@ public class StationConfigService
     {
         if (_config == null) return;
 
-        Directory.CreateDirectory(DbDir);
         InitDatabase();
         WriteToDb(_config);
     }
@@ -49,6 +45,10 @@ public class StationConfigService
 
     private void InitDatabase()
     {
+        var dir = Path.GetDirectoryName(DbPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
         using var conn = new SqliteConnection($"Data Source={DbPath}");
         conn.Open();
 

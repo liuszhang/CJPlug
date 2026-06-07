@@ -14,7 +14,7 @@ public class StationManageService:IStationManageService
         _dbContext.Database.EnsureCreatedAsync();
         HubConnectionManagerService = hubConnectionManagerService;
         HubConnectionManagerService._hubConnection.Remove("StatusInfo");
-        HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+        HubConnectionManagerService._hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>
         {
             Console.WriteLine($"Receive:{ip},Status:{status}");
             // 更新图站状态
@@ -22,13 +22,15 @@ public class StationManageService:IStationManageService
             if (station != null)
             {
                 station.StationStatus = status;
+                if (!string.IsNullOrEmpty(toolsRootPath))
+                    station.StationBasePath = toolsRootPath;
                 _dbContext.SaveChanges();
                 Log.Information($"图站 {ip} 状态 Updated 为 {status}");
             }
             else
             {
                 // 如果图站不存在，可以选择创建新的图站或忽略
-                _dbContext.Set<Station>().Add(new Station
+                var newStation = new Station
                 {
                     StationIp = ip,
                     StationName = ip,
@@ -36,7 +38,10 @@ public class StationManageService:IStationManageService
                     IsStarted = false,
                     UpdateTime = DateTime.Now.ToString(),
                     StationCategory = "Unknown",
-                });
+                };
+                if (!string.IsNullOrEmpty(toolsRootPath))
+                    newStation.StationBasePath = toolsRootPath;
+                _dbContext.Set<Station>().Add(newStation);
                 _dbContext.SaveChanges();
                 Log.Information($"图站 {ip} 不存在，已 Create 新图站，状态为 {status}");
             }
@@ -103,8 +108,16 @@ public class StationManageService:IStationManageService
         existingStation.StationIp = updatedStation.StationIp;
         existingStation.StationName = updatedStation.StationName;
         existingStation.StationStatus = updatedStation.StationStatus;
+        existingStation.StationCategory = updatedStation.StationCategory;
+        existingStation.StationBasePath = updatedStation.StationBasePath;
         existingStation.IsStarted = updatedStation.IsStarted;
         existingStation.UpdateTime = updatedStation.UpdateTime;
+        existingStation.GuacamoleConnectionId = updatedStation.GuacamoleConnectionId;
+        existingStation.GuacamoleProtocol = updatedStation.GuacamoleProtocol;
+        existingStation.GuacamolePort = updatedStation.GuacamolePort;
+        existingStation.GuacamoleUsername = updatedStation.GuacamoleUsername;
+        existingStation.GuacamolePassword = updatedStation.GuacamolePassword;
+        existingStation.GuacamoleEnabled = updatedStation.GuacamoleEnabled;
 
 
         _dbContext.Entry(existingStation).State = EntityState.Modified;

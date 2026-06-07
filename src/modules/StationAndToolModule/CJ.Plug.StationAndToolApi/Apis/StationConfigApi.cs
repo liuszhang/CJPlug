@@ -18,6 +18,7 @@ public static class StationConfigApi
         api.MapPut("/UpdateConfig", async (IStationConfigService service, [FromBody] StationConfigTable updatedStationToolConfig) => await service.UpdateStationToolConfigAsync(updatedStationToolConfig));
         api.MapGet("/GetToolPathOnIp/{ip}/{toolName}/{version}", async (IStationConfigService service, string ip, string toolName, string? version) => await service.GetToolPathOnIp(ip, toolName, version));
         api.MapPost("/GetToolPathByFilter", async (IStationConfigService service, ToolConfigFilter filter) => await service.GetToolPathByFilter(filter));
+        api.MapPost("/GetToolDeploySetting", async (IStationConfigService service, [FromBody] ToolConfigFilter filter) => await service.GetToolDeploySetting(filter));
 
 
 

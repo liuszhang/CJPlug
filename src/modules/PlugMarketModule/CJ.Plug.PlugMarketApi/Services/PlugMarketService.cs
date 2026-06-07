@@ -52,5 +52,21 @@ namespace CJ.Plug.PlugMarketApi.Services
             return entity;
         }
 
+        public async Task<CJ.Plug.Models.Plug.Plug?> GetSourcePlugByMarketPlugIdAsync(int marketPlugId, CancellationToken cancellationToken = default)
+        {
+            var marketPlug = await _dbContext.Set<MarketPlug>()
+                .FirstOrDefaultAsync(x => x.Id == marketPlugId, cancellationToken);
+
+            if (marketPlug?.RootPlugID == null)
+                return null;
+
+            // 获取原始插头，并加载其参数列表
+            var sourcePlug = await _dbContext.Set<CJ.Plug.Models.Plug.Plug>()
+                .Include(p => p.PlugVariables)
+                .FirstOrDefaultAsync(x => x.Id == marketPlug.RootPlugID, cancellationToken);
+
+            return sourcePlug;
+        }
+
     }
 }

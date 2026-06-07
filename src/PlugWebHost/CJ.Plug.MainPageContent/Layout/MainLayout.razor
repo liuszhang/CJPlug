@@ -22,6 +22,7 @@
 @inject HubConnectionManagerService HubConnectionManagerService
 @inject IJSRuntime JsRuntime
 @inject IAppBarService AppBarService
+@inject IDomInteropService DomInteropService
 
 
 <script>
@@ -157,6 +158,14 @@
         if (firstRender)
         {
             await JsRuntime.InvokeVoidAsync("setupKeyboardShortcuts", DotNetObjectReference.Create(this));
+
+            // 检查当前登录人是否为空，若为空则跳转到登录页面
+            var currentUserId = await DomInteropService.GetCurrentUserId();
+            if (currentUserId == null)
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+                return;
+            }
         }
     }
 

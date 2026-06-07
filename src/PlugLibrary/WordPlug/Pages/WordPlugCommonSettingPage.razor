@@ -148,16 +148,18 @@
 
     private string HtmlContent;
     private string PdfContent;
-    private string pdfFilePath;
 
     protected override async Task OnParametersSetAsync()
-    {             
+    {
+        if (PlugDataZone == null)
+            return;
+
         if (!string.IsNullOrEmpty(PlugDefinitionId))
         {
             PlugData = PlugDataZone.GetPlugData(PlugDefinitionId);
         }
-        await LoadRootData();        
-        await RefreshWordContent();        
+        await LoadRootData();
+        await RefreshWordContent();
     }
 
     private async Task LoadRootData()
@@ -196,90 +198,60 @@
     {
         Processing = true;
         PdfContent = "";
+        StateHasChanged();
+
         if (string.IsNullOrEmpty(TmpLocalFilePath))
         {
+            Processing = false;
             return;
         }
         try
         {
             BookMarkList = WordService_OpenXml.GetBookmarksFromWordFile(TmpLocalFilePath);
-            pdfFilePath = TmpLocalFilePath.Replace(".docx", ".pdf");
-            //Log.Information("pdf path is:" + pdfFilePath);
-            //方法一：使用aspose.words直接转
+            var pdfFilePath = TmpLocalFilePath.Replace(".docx", ".pdf");
             WordService_Aspose.ConvertToPdf(TmpLocalFilePath, pdfFilePath);
 
-
-
-            //方法二：使用图站的桌面工具进行转换
-            // var inputs = new List<StationExectionVariable>();
-            // inputs.Add(new StationExectionVariable { Name = "WordFilePath", Value = Plug.RealValuePath });
-            // inputs.Add(new StationExectionVariable { Name = "PdfFilePath", Value = Plug.RealValuePath.Replace(".docx",".pdf") });
-
-            // var toolCommandRequest = new StationExecutionRequest
-            //     {
-            //         ExecutionToolType=ExecutionToolTypeEnum.SystemInitCMD.ToString(),
-            //         ToolName = "WordToPdf",
-            //         InputVariables = inputs
-            //     };
-            // //Log.Information(toolCommandRequest.GetInputValue("PdfFilePath"));
-            // await MainApiClient.ExecuteToolCommand(toolCommandRequest);
-
-
-            //转换完成后读取PDF内容并展示到界面    
             pdfFilePath = pdfFilePath.Trim('\"');
-            //Log.Information("pdf path is:" + pdfFilePath);
-            PdfContent = $"data:application/pdf;base64,{Convert.ToBase64String(File.ReadAllBytes(pdfFilePath))}";
-            StateHasChanged();
+            var pdfFileName = Path.GetFileName(pdfFilePath);
+            PdfContent = $"/webFiles/{pdfFileName}";
         }
         catch (Exception e)
         {
             Log.Information("word转pdf失败："+e.Message);
         }
-        Processing = false;
-        StateHasChanged();
-
-        // 替换为你的Word文件路径
-        //string wordFilePath = "C:/tmp/test.docx";
-        //HtmlContent = WordToHtmlService.ConvertToHtml(wordFilePath);
-        //string pdfFilePath = "C:/tmp/test.pdf";
-
-        //WordToPdfService.ConvertToPdf(wordFilePath, pdfFilePath);
+        finally
+        {
+            Processing = false;
+            StateHasChanged();
+        }
     }
 
     async Task CheckLocalFile(IBrowserFile browserFile)
     {
-        //Console.WriteLine("checked file name:" + browserFile.Name);
-        if (browserFile != null)
+        if (browserFile == null) return;
+        try
         {
-            try
-            {
-                (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile,PlugData);
-                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString(), browserFile.Name + ":" + fileId);
+            (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString(), browserFile.Name + ":" + fileId);
+            if (PlugDataZone != null)
                 await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
-                TmpLocalFilePath = filePath;
-                // Plug.Value = browserFile.Name;
-                // Plug.RealValuePath = null;
-                // var fileUploadRequest = new FileUploadRequest
-                //     {
-                //         FileId = RandomLongIdentityGenerator.GenerateId(),
-                //         FileName = browserFile.Name,
-                //         FileCreator = CurrentUser,
-                //         FileUploadType = FileFolderType.Design.ToString(),
-                //         PlugDefinitionId = Plug.DefinitionId,
-                //         ProcessDefinitionId = Plug.ParentPlugDefinitionId
-                //     };
-                // Plug.RealValuePath = await MainApiClient.UploadFileByRequest(browserFile,fileUploadRequest);
-                // PlugSettings.SetSetting(PlugSettingKey.FileId.ToString(), fileUploadRequest.FileId);
-                // Plug.PlugSettingsJson = JsonSerializer.Serialize(PlugSettings);
 
-                await RefreshWordContent();
-            }
-            catch (Exception ex)
+            // 下载到本地 Web 目录（与 LoadRootData 保持一致）
+            FileName = browserFile.Name;
+            FileId = fileId;
+            TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+            using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
             {
-                Log.Information("上传文件出错："+ex.Message);
+                await sourceStream?.CopyToAsync(stream);
             }
-        }
 
+            await RefreshWordContent();
+        }
+        catch (Exception ex)
+        {
+            Log.Information("上传文件出错："+ex.Message);
+        }
     }
 
     void OnChange(string html)
@@ -362,7 +334,7 @@
             //Console.WriteLine(TmpInput);
 
             TextMappings.Add(new WordTextMapping { InputSchema = TmpInput, BMName = bookmarkName ,Id=GetNextTextMappingId()});
-            PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
 
             await RefreshWordContent();
         }
@@ -379,17 +351,13 @@
     private async Task DeleteMapping(WordTextMapping textMapping)
     {
         TextMappings.Remove(textMapping);
-        PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.WordTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
         //StateHasChanged();
     }
     private int? GetNextTextMappingId()
     {
         var idList = TextMappings.Select(x => x.Id).ToList();
-        var maxId = idList.Max();
-        if (maxId==null)
-        {
-            maxId = 0;
-        }
+        var maxId = idList.DefaultIfEmpty(0).Max();
         return maxId + 1;
     }
 

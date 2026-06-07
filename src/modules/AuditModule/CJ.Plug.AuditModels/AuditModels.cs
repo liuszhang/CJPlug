@@ -44,12 +44,22 @@ namespace CJ.Plug.AuditModels
         /// 授权撤回
         /// </summary>
         Cancel = 22,
+
+        /// <summary>
+        /// 账号解锁
+        /// </summary>
+        Unlock = 23,
         
         /// <summary>
         /// 流程执行
         /// </summary>
         Execute = 30,
-        
+
+        /// <summary>
+        /// 文件下载
+        /// </summary>
+        Download= 31,
+
         /// <summary>
         /// 其他操作
         /// </summary>
@@ -100,6 +110,11 @@ namespace CJ.Plug.AuditModels
         /// 用户组管理
         /// </summary>
         UserGroupManage= 10,
+
+        /// <summary>
+        /// Skill管理
+        /// </summary>
+        Skill=11,
         
         /// <summary>
         /// 其他

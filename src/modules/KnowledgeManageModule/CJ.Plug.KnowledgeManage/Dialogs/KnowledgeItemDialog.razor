@@ -1,0 +1,129 @@
+@using CJ.Plug.Models.Knowledge
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField Label="标题" @bind-Value="_model.Title" Required="true"
+                                  RequiredError="标题为必填项" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int" Label="所属文件夹" @bind-Value="_model.FolderId" Required="true"
+                               RequiredError="请选择所属文件夹">
+                        @foreach (var folder in Folders)
+                        {
+                            <MudSelectItem T="int" Value="@folder.Id">
+                                @GetFolderDisplayName(folder)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="标签（逗号分隔）" @bind-Value="_model.Tags"
+                                  Placeholder="例如: C#,Blazor,教程" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="内容" @bind-Value="_model.Content" Lines="8"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_model.IsEnabled" Color="Color.Primary" Label="启用" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>
+    /// 是否编辑模式
+    /// </summary>
+    [Parameter] public bool IsEdit { get; set; }
+
+    /// <summary>
+    /// 编辑时的原始数据
+    /// </summary>
+    [Parameter] public KnowledgeItem? EditItem { get; set; }
+
+    /// <summary>
+    /// 所有文件夹列表
+    /// </summary>
+    [Parameter] public List<KnowledgeFolder> Folders { get; set; } = new();
+
+    /// <summary>
+    /// 当前选中的文件夹ID（新建时预选）
+    /// </summary>
+    [Parameter] public int? SelectedFolderId { get; set; }
+
+    private KnowledgeItem _model = new() { IsEnabled = true };
+    private MudForm? _form;
+
+    protected override void OnParametersSet()
+    {
+        if (IsEdit && EditItem is not null)
+        {
+            _model = new KnowledgeItem
+            {
+                Id = EditItem.Id,
+                FolderId = EditItem.FolderId,
+                Title = EditItem.Title,
+                Content = EditItem.Content,
+                Tags = EditItem.Tags,
+                Order = EditItem.Order,
+                IsEnabled = EditItem.IsEnabled,
+                CreatedAt = EditItem.CreatedAt,
+                UpdatedAt = EditItem.UpdatedAt,
+                CreatedBy = EditItem.CreatedBy
+            };
+        }
+        else
+        {
+            _model = new KnowledgeItem
+            {
+                IsEnabled = true,
+                FolderId = SelectedFolderId ?? (Folders.Count > 0 ? Folders[0].Id : 0)
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (_form is not null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid) return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    /// <summary>
+    /// 获取文件夹显示名称（支持层级缩进）
+    /// </summary>
+    private string GetFolderDisplayName(KnowledgeFolder folder)
+    {
+        var prefix = GetFolderPrefix(folder, 0);
+        return $"{prefix}{folder.Name}";
+    }
+
+    private string GetFolderPrefix(KnowledgeFolder folder, int depth)
+    {
+        if (folder.ParentId is null || depth > 10) return "";
+        var parent = Folders.FirstOrDefault(f => f.Id == folder.ParentId);
+        if (parent is null) return "";
+        return GetFolderPrefix(parent, depth + 1) + "  ";
+    }
+}

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
     <ProjectReference Include="..\..\Integrations\CJ.Plug.AmisIntegration\CJ.Plug.AmisIntegration.csproj" />
     <ProjectReference Include="..\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
   </ItemGroup>

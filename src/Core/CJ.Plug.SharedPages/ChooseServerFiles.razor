@@ -1,4 +1,4 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @using System.Text.Json.Serialization
 @using Blazored.LocalStorage
 @using CJ.Plug.ApiClient.Contracts
@@ -14,14 +14,11 @@
     <DialogContent>     
         <MudContainer Style="max-height: 350px; overflow-y: scroll">
             <MudPaper Class="pa-4">
-                <MudTreeView ServerData="LoadServerData" Items="TreeItems" @bind-SelectedValue="SelectedNode" Hover="true" Color="Color.Success">
-                    <ItemTemplate>
-                        <MudTreeViewItem ExpandedChanged="@((e) =>OnExpandedChanged(context.Value))" Text="@context.Value.Name" Value="@context.Value"
-                        Icon="@(context.Value.IsDirectory ?Icons.Material.Filled.Folder: Icons.Custom.FileFormats.FileDocument)"
-                        LoadingIconColor="Color.Info"
-                        CanExpand="@context.Value.IsDirectory">
-                        </MudTreeViewItem>
-                    </ItemTemplate>
+                <MudTreeView @bind-SelectedValue="SelectedNode" Hover="true" Color="Color.Success">
+                    @foreach (var rootItem in TreeItems)
+                    {
+                        <ServerFileTreeItem Node="rootItem" ToolAgentHostToUse="ToolAgentHostToUse" />
+                    }
                 </MudTreeView>
             </MudPaper>
         </MudContainer>
@@ -58,29 +55,53 @@
     {
         CLog.Information("ChooseServerFiles OnInitializedAsync");
         var currentUser = await DomInteropService.GetCurrentUserName();
-        var tmpTreeItems = await MainApiClient.GetFolderFiles(null, currentUser, ToolAgentHostToUse);
-        if (tmpTreeItems != null)
+
+        // 根节点1：用户工具目录（Tools/{userName}）
+        var userToolsRelPath = Path.GetRelativePath(
+            GlobalData.MainFileServerPathRoot,
+            GlobalData.GetUserToolsPath(currentUser));
+        var userRootNode = new FileSystemNode(userToolsRelPath, currentUser, true);
+        var userRootItem = new TreeItemData<FileSystemNode> { Value = userRootNode, Expandable = true, Text = userToolsRelPath };
+        var userChildren = await MainApiClient.GetFolderFiles(userRootNode, currentUser, ToolAgentHostToUse);
+        if (userChildren != null)
         {
-            //TreeItems=(tmpTreeItems);
-            foreach (var t in tmpTreeItems)
-            {
-                try
+            userRootItem.Children = userChildren
+                .Select(c => new TreeItemData<FileSystemNode>
                 {
-                    TreeItems.Add(new TreeItemData<FileSystemNode> { Value = t, Expandable = t.IsDirectory });
-                }
-                catch (Exception e)
-                {
-                    CLog.Error(e.Message);
-                }
-            }
+                    Value = c,
+                    Expandable = c.IsDirectory,
+                    Text = c.Name
+                })
+                .ToHashSet();
         }
+        TreeItems.Add(userRootItem);
+
+        // 根节点2：系统工具目录（Tools/0System）
+        var systemToolsRelPath = Path.GetRelativePath(
+            GlobalData.MainFileServerPathRoot,
+            GlobalData.SystemToolsPath);
+        var systemRootNode = new FileSystemNode(systemToolsRelPath, "0System", true);
+        var systemRootItem = new TreeItemData<FileSystemNode> { Value = systemRootNode, Expandable = true, Text = systemToolsRelPath };
+        var systemChildren = await MainApiClient.GetFolderFiles(systemRootNode, currentUser, ToolAgentHostToUse);
+        if (systemChildren != null)
+        {
+            systemRootItem.Children = systemChildren
+                .Select(c => new TreeItemData<FileSystemNode>
+                {
+                    Value = c,
+                    Expandable = c.IsDirectory,
+                    Text = c.Name
+                })
+                .ToHashSet();
+        }
+        TreeItems.Add(systemRootItem);
     }
 
     protected async Task Submit()
     {
         if (ToolName == null || ToolName == "")
         {
-            MudDialog.Close(DialogResult.Ok(SelectedNode.FullPath));
+            MudDialog.Close(DialogResult.Ok(SelectedNode?.FullPath ?? ""));
         }
         else
         {
@@ -90,28 +111,4 @@
     }
 
 
-    protected async Task OnExpandedChanged(FileSystemNode e)
-    {
-        //MyCon1sole.WriteLine(e.FullPath);
-    }
-
-
-    public async Task<IReadOnlyCollection<TreeItemData<FileSystemNode>>> LoadServerData(FileSystemNode parentNode)
-    {
-        //var currentUser = await _localStorageService.GetItemAsync<string>("username");
-        var currentUser = await DomInteropService.GetCurrentUserName();
-        var ChildTreeItems = await MainApiClient.GetFolderFiles(parentNode, currentUser, ToolAgentHostToUse);
-        List<TreeItemData<FileSystemNode>>? DynamicChildTreeItems = new();
-        if (ChildTreeItems != null)
-        {
-            foreach (var t in ChildTreeItems)
-            {
-                DynamicChildTreeItems.Add(new TreeItemData<FileSystemNode> { Value = t, Expandable = t.IsDirectory });
-            }
-            return DynamicChildTreeItems;
-        }
-        return null;        
-    }
-
 }
-

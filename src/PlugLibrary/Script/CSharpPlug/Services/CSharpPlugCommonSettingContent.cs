@@ -55,6 +55,18 @@ namespace CSharpPlug.Services
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = false
             });
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.EnvironmentVariables.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.UseDotNetFramework.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
 
             //settings.InitVariables = InitVariables;
 

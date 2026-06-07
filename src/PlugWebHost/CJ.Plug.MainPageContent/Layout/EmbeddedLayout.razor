@@ -1,0 +1,207 @@
+@using CJ.Plug.Models.Contracts
+@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.EventAggregator.Notifications
+@using CJ.Plug.Models.Services
+@using CJ.Plug.SharedPages.Contracts
+@using Serilog
+@inherits LayoutComponentBase
+
+@inject IServiceProvider ServiceProvider
+@inject NavigationManager NavigationManager
+@inject IAppBarService AppBarService
+@inject IJSRuntime JsRuntime
+@inject IDomInteropService DomInteropService
+
+<script>
+    window.setupKeyboardShortcuts = (dotNetHelper) => {
+    window.addEventListener('keydown', (event) => {
+    // 示例：当按下 Ctrl + S 时触发
+    if (event.altKey && event.key != null) {
+    dotNetHelper.invokeMethodAsync('OnKeyPressed', 'Alt+'+event.key.toUpperCase());
+    }
+    });
+    };
+</script>
+
+@* Required *@
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+
+@* Needed for dialogs *@
+<MudDialogProvider />
+
+@* Needed for snackbars *@
+<MudSnackbarProvider />
+
+<RadzenComponents @rendermode="InteractiveAuto" />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Style="background-color:rgba(89, 74, 226, 1);color:white">
+        <MudText Typo="Typo.h6" Style="margin-left:16px">CJ.Plug</MudText>
+        <MudSpacer />
+        @foreach (var appBarItem in AppBarService.AppBarItems)
+        {
+            @appBarItem
+        }
+        <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
+    </MudAppBar>
+
+    @* 日志面板（右侧抽屉，Alt+L 快捷键）*@
+    <MudDrawer @bind-Open="@showLogPanel" Width="30vw" Anchor="Anchor.End" Elevation="1" Variant="@DrawerVariant.Temporary" Overlay="false">
+        <MudDrawerHeader>
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+                <MudText Typo="Typo.h6">系统日志</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Edge="Edge.End" OnClick="@ToggleLogger" />
+            </MudStack>
+        </MudDrawerHeader>
+        <CJ.Plug.SharedPages.LogsWrapper HeightPercent="100" TabName=""></CJ.Plug.SharedPages.LogsWrapper>
+    </MudDrawer>
+
+    <MudMainContent Style="margin-top:0px">
+        <ErrorBoundary @ref="@_errorBoundary">
+            <ChildContent>
+                <CascadingValue Value="SetMenuNotify">
+                    @Body
+                </CascadingValue>
+            </ChildContent>
+            <ErrorContent>
+                @if (context is UnauthorizedAccessException)
+                {
+                    <MudText Typo="Typo.h6">未经授权访问！请登录。</MudText>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" ContentAlignment="HorizontalAlignment.Left" CloseIcon="@Icons.Material.Filled.Refresh" ShowCloseIcon="true" CloseIconClicked="(() => CloseError())">
+                        出错了！  @context.GetType().Name: @context.Message
+                    </MudAlert>
+                }
+            </ErrorContent>
+        </ErrorBoundary>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+    private bool showLogPanel { get; set; } = false;
+    private MudTheme? _theme = null;
+    private bool _isDarkMode = false;
+
+    public SetMenuNotify? SetMenuNotify { get; set; }
+
+    private void OnAppBarItemsChanged() => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _theme = new()
+            {
+                PaletteLight = _lightPalette,
+                PaletteDark = _darkPalette,
+                LayoutProperties = new LayoutProperties(),
+                ZIndex = new ZIndex()
+                {
+                    Drawer = 9999,
+                    Popover = 2100,
+                    AppBar = 2200,
+                    Dialog = 2201,
+                    Snackbar = 2500,
+                    Tooltip = 2600,
+                },
+            };
+
+        // 创建 no-op SetMenuNotify，因为在嵌入模式下不需要控制侧边栏
+        // 但仍需提供非 null 值以防止 GUIEditor/ProcessEditor 等页面崩溃
+        EventCallback<bool> noOpCallback = EventCallback.Factory.Create<bool>(this, _ => { });
+        SetMenuNotify = new SetMenuNotify(noOpCallback);
+
+        AppBarService.AppBarItemsChanged += OnAppBarItemsChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JsRuntime.InvokeVoidAsync("setupKeyboardShortcuts", DotNetObjectReference.Create(this));
+
+            // 检查当前登录人是否为空，若为空则跳转到登录页面
+            var currentUserId = await DomInteropService.GetCurrentUserId();
+            if (currentUserId == null)
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+                return;
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyPressed(string shortcut)
+    {
+        if (shortcut == "Alt+L")
+        {
+            ToggleLogger();
+        }
+    }
+
+    private void CloseError()
+    {
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    public string DarkLightModeButtonIcon => _isDarkMode switch
+    {
+        true => Icons.Material.Rounded.AutoMode,
+        false => Icons.Material.Outlined.DarkMode,
+    };
+
+    private readonly PaletteLight _lightPalette = new()
+        {
+            Black = "#110e2d",
+            AppbarText = "#424242",
+            AppbarBackground = "rgba(255,255,255,0.8)",
+            DrawerBackground = "#ffffff",
+            GrayLight = "#e8e8e8",
+            GrayLighter = "#f9f9f9",
+        };
+
+    private readonly PaletteDark _darkPalette = new()
+        {
+            Primary = "#7e6fff",
+            Surface = "#1e1e2d",
+            Background = "#1a1a27",
+            BackgroundGray = "#151521",
+            AppbarText = "#92929f",
+            AppbarBackground = "rgba(26,26,39,0.8)",
+            DrawerBackground = "#1a1a27",
+            ActionDefault = "#74718e",
+            ActionDisabled = "#9999994d",
+            ActionDisabledBackground = "#605f6d4d",
+            TextPrimary = "#b2b0bf",
+            TextSecondary = "#92929f",
+            TextDisabled = "#ffffff33",
+            DrawerIcon = "#92929f",
+            DrawerText = "#92929f",
+            GrayLight = "#2a2833",
+            GrayLighter = "#1e1e2d",
+            Info = "#4a86ff",
+            Success = "#3dcb6c",
+            Warning = "#ffb545",
+            Error = "#ff3f5f",
+            LinesDefault = "#33323e",
+            TableLines = "#33323e",
+            Divider = "#292838",
+            OverlayLight = "#1e1e2d80",
+        };
+
+    private void DarkModeToggle()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+
+    private void ToggleLogger()
+    {
+        InvokeAsync(() =>
+        {
+            showLogPanel = !showLogPanel;
+            StateHasChanged();
+        });
+    }
+}

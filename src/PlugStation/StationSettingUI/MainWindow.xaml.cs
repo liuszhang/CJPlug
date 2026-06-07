@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using StationSettingUI.Components;
 
 namespace StationSettingUI;
 
@@ -55,9 +57,40 @@ public partial class MainWindow : Window
     /// <summary>
     /// 窗口关闭前清理
     /// </summary>
-    private void MainWindow_Closing(object sender, CancelEventArgs e)
+    private async void MainWindow_Closing(object sender, CancelEventArgs e)
     {
         _clockTimer.Stop();
+
+        // 检查 StationApiServer 是否在运行
+        var stationProcessNames = new[] { "CJ.Plug.StationApiServer", "CJ.Plug.StationApiServer.exe" };
+        bool stationRunning = false;
+        foreach (var name in stationProcessNames)
+        {
+            try
+            {
+                var procs = Process.GetProcessesByName(name);
+                if (procs.Any(p => !p.HasExited))
+                {
+                    stationRunning = true;
+                    break;
+                }
+            }
+            catch { }
+        }
+
+        if (stationRunning)
+        {
+            var result = MessageBox.Show(
+                "是否一并关闭 StationApiServer？",
+                "关闭确认",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                await ServiceSetting.KillStationServiceAsync();
+            }
+        }
     }
 
     private void UpdateClock()

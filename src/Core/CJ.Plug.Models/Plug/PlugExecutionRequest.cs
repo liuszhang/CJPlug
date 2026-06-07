@@ -21,7 +21,13 @@ using System.Threading.Tasks;
         //手动指定的图站IP地址,可以在启动流程时指定具体的IP，如果为空，则执行时会自动根据调度系统分配IP进行执行
         public string? SpecifiedStationIp { get; set; }  
 
-        public ExecuteMode? ExecuteMode { get; set; }
+    public ExecuteMode? ExecuteMode { get; set; }
+
+    /// <summary>StationApiServer 端口号，StationAgent 执行完成后回传结果使用。默认 7660</summary>
+    public int StationApiPort { get; set; } = 7660;
+
+        /// <summary>MCP 调用时的工具类型: "Workflow" 或 "Plugin"，用于 StartExecutePlug 内部路由</summary>
+        public string? McpToolType { get; set; }
 
     //执行的输入参数列表，用于将值替换至RequestCommand中以生成真实执行的RequestCommand
     public List<PlugVariableData> InputVariables { get; set; } = new();

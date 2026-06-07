@@ -52,6 +52,32 @@ namespace CJ.Plug.UserManageApi.Apis
                 return Results.Ok(roles);
             });
 
+            api.MapPut("/{userId:int}/status", async (int userId, DataStatus status, IUserManageService service) =>
+            {
+                try
+                {
+                    var result = await service.SetUserStatusAsync(userId, status);
+                    return result ? Results.Ok() : Results.BadRequest("设置用户状态失败");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
+            api.MapPut("/{userId:int}/lockout", async (int userId, bool isLocked, IUserManageService service) =>
+            {
+                try
+                {
+                    var result = await service.SetUserLockoutAsync(userId, isLocked);
+                    return result ? Results.Ok() : Results.BadRequest("设置用户锁定状态失败");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
             return app;
         }
     }

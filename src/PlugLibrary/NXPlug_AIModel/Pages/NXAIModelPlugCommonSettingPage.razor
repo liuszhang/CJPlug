@@ -121,7 +121,8 @@
     protected override async Task OnInitializedAsync()
     {
         //Console.WriteLine(">>>>>>>>>>>>>>start init");
-        await MudDialog.SetOptionsAsync(diaOption);
+        if (MudDialog != null)
+            await MudDialog.SetOptionsAsync(diaOption);
 
         //Log.Information(Plug.Value);
         if(Plug.GetPlugSettings()?.Settings.Count==0)

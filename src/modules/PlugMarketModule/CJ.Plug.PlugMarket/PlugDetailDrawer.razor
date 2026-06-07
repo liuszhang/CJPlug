@@ -1,0 +1,415 @@
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.SharedPages.DataConnector
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using Elsa.Api.Client.Extensions
+@using Elsa.Studio.Workflows.Designer.Components
+@using Elsa.Studio.Workflows.UI.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+
+<MudDrawer @bind-Open="IsOpen"
+           Anchor="Anchor.Right"
+           Variant="DrawerVariant.Temporary"
+           OverlayAutoClose="true"
+           Width="900px">
+    <MudContainer Style="height:100%;overflow:hidden;display:flex;flex-direction:column;padding-top:16px;max-width:900px;">
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudText Typo="Typo.h5">@(MarketPlug?.MarketName ?? MarketPlug?.Name ?? "插头详情")</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           OnClick="CloseDrawer"
+                           Size="Size.Small"
+                           Color="Color.Default" />
+        </div>
+
+        @if (MarketPlug is not null && !string.IsNullOrWhiteSpace(MarketPlug.Description))
+        {
+            <MudText Typo="Typo.body2" Class="text-muted mb-2">@MarketPlug.Description</MudText>
+            @* <MudDivider Class="mb-2" /> *@
+        }
+
+        @if (_loading)
+        {
+            @* <div class="d-flex justify-center align-center" style="height:200px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.body2" Class="ml-2">加载流程数据中...</MudText>
+            </div> *@
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="mb-2">
+                <MudToolBar Dense="true">
+                    <MudToggleGroup Style="margin-left:8px" Size="Size.Small" T="string" @bind-Value="_activeTab" CheckMark>
+                        <MudToggleItem Value="@("逻辑流")" />
+                        <MudToggleItem Value="@("数据流")" />
+                        <MudToggleItem Value="@("基础信息")" />
+                    </MudToggleGroup>
+                    <MudSpacer />
+                    @if (_activeTab == "逻辑流" && _flowchart is not null)
+                    {
+                        <MudTooltip Text="适应屏幕">
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.FitScreen" OnClick="ZoomToFitAsync" />
+                        </MudTooltip>
+                        <MudTooltip Text="居中">
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.FilterCenterFocus" OnClick="CenterContentAsync" />
+                        </MudTooltip>
+                        <MudTooltip Text="自动布局">
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.AutoAwesomeMosaic" OnClick="AutoLayoutAsync" />
+                        </MudTooltip>
+                    }
+                </MudToolBar>
+            </MudPaper>
+
+            @if (_activeTab == "逻辑流")
+            {
+                <div style="flex:1;overflow:hidden;position:relative;">
+                    @if (_flowchart is not null)
+                    {
+                        <FlowchartDesigner @ref="_designer"
+                                           IsReadOnly="true"
+                                           Flowchart="@_flowchart"
+                                           ActivitySelected="OnActivitySelected"
+                                           CanvasSelected="OnCanvasSelected" />
+                    }
+                    else
+                    {
+                        <MudPaper Elevation="0" Class="pa-4 d-flex justify-center align-center" Style="height:300px;background-color: var(--mud-palette-background-grey);">
+                            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Default" />
+                                <MudText Typo="Typo.body2" Class="text-muted">该插头暂无流程图数据</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </div>
+            }
+            else if (_activeTab == "数据流")
+            {
+                <div style="flex:1;overflow:auto;">
+                    @if (_plugDataZone is not null)
+                    {
+                        <CascadingValue Value="_plugDataZone">
+                            <DataConnector />
+                        </CascadingValue>
+                    }
+                    else
+                    {
+                        <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.DataArray" Size="Size.Large" Color="Color.Default" />
+                                <MudText Typo="Typo.body2" Class="text-muted">该插头暂无参数数据</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </div>
+            }
+            else if (_activeTab == "基础信息")
+            {
+                <div style="flex:1;overflow-y:auto;">
+                    @if (_sourcePlug is not null)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="text-muted mb-2">基本信息</MudText>
+                        <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background-color: var(--mud-palette-background-grey); border-left: 3px solid var(--mud-palette-primary);">
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">名称</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.Name ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">类型</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.Type ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">分类</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.Category ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">分组</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.GroupName ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">创建人</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.Creater ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">DefinitionId</MudText>
+                                    <MudText Typo="Typo.body2" Style="font-family:monospace;font-size:0.85em;">@(_sourcePlug.DefinitionId ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">插头类型Key</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.PlugTypeKey ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">工具名称</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.ToolDisplayName ?? _sourcePlug.ToolName ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">工具版本</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.ToolVersion ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.caption" Class="text-muted">容器插头</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.IsContainerPlug ? "是" : "否")</MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+
+                        @if (!string.IsNullOrWhiteSpace(_sourcePlug.Description))
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="text-muted mb-2">描述</MudText>
+                            <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudText Typo="Typo.body2">@_sourcePlug.Description</MudText>
+                            </MudPaper>
+                        }
+
+                        @if (_plugVariables.Any())
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="text-muted mb-2">插头参数 (@_plugVariables.Count)</MudText>
+                            <MudTable Items="@_plugVariables" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>名称</MudTh>
+                                    <MudTh>显示名</MudTh>
+                                    <MudTh>类型</MudTh>
+                                    <MudTh>默认值</MudTh>
+                                    <MudTh>输入/输出</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="名称">
+                                        <MudText Typo="Typo.body2">@context.Name</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="显示名">
+                                        <MudText Typo="Typo.body2">@(context.DisplayName ?? "-")</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="类型">
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@(context.Type ?? "String")</MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="默认值">
+                                        <MudText Typo="Typo.body2" Style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                                                 Title="@context.DefaultValue">
+                                            @(string.IsNullOrEmpty(context.DefaultValue) ? "-" : context.DefaultValue)
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="输入/输出">
+                                        @if (context.IsInput)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">输入</MudChip>
+                                        }
+                                        @if (context.IsOutput)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">输出</MudChip>
+                                        }
+                                        @if (!context.IsInput && !context.IsOutput)
+                                        {
+                                            <MudText Typo="Typo.body2" Class="text-muted">-</MudText>
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    }
+                    else
+                    {
+                        <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Large" Color="Color.Default" />
+                                <MudText Typo="Typo.body2" Class="text-muted">无法获取插头基础信息</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </div>
+            }
+        }
+    </MudContainer>
+</MudDrawer>
+
+@code {
+    [Parameter] public MarketPlug? MarketPlug { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public IPlugMarketApiClient PlugMarketApiClient { get; set; } = default!;
+    [Inject] public ISnackbar Snackbar { get; set; } = default!;
+
+    private string _activeTab = "逻辑流";
+    private JsonObject? _flowchart;
+    private FlowchartDesigner? _designer;
+    private CJ.Plug.Models.Plug.Plug? _sourcePlug;
+    private List<PlugVariable> _plugVariables = new();
+    private PlugDataZone? _plugDataZone;
+    private int? _lastPlugId;
+    private bool _loading;
+    private bool _shouldAutoLayout;
+
+    protected override async void OnParametersSet()
+    {
+        if (IsOpen && MarketPlug is not null)
+        {
+            if (_lastPlugId != MarketPlug.Id)
+            {
+                _lastPlugId = MarketPlug.Id;
+                _activeTab = "逻辑流";
+                await LoadPlugDataAsync();
+            }
+        }
+        else if (!IsOpen)
+        {
+            _lastPlugId = null;
+            _flowchart = null;
+            _sourcePlug = null;
+            _plugVariables.Clear();
+            _plugDataZone = null;
+            _loading = false;
+            _shouldAutoLayout = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldAutoLayout && _designer is not null && _flowchart is not null)
+        {
+            _shouldAutoLayout = false;
+            await _designer.AutoLayoutAsync(_flowchart, null);
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPlugDataAsync()
+    {
+        _loading = true;
+        _flowchart = null;
+        _sourcePlug = null;
+        _plugVariables.Clear();
+        _plugDataZone = null;
+        _shouldAutoLayout = false;
+        StateHasChanged();
+
+        try
+        {
+            var sourcePlug = await PlugMarketApiClient.GetSourcePlugByMarketPlugIdAsync(MarketPlug!.Id!.Value);
+
+            if (sourcePlug is not null)
+            {
+                _sourcePlug = sourcePlug;
+
+                // 加载流程图数据
+                if (!string.IsNullOrEmpty(sourcePlug.ActivityJsonData))
+                {
+                    try
+                    {
+                        _flowchart = JsonNode.Parse(sourcePlug.ActivityJsonData)?.AsObject();
+                    }
+                    catch
+                    {
+                        // JSON 解析失败
+                    }
+                }
+
+                // 加载参数数据
+                _plugVariables = sourcePlug.PlugVariables?
+                    .Where(v => v.IsBrowsable != false)
+                    .ToList() ?? new();
+
+                // 构造 PlugDataZone 用于数据流展示
+                _plugDataZone = BuildPlugDataZone(sourcePlug);
+            }
+            else
+            {
+                Snackbar.Add("无法获取原始流程数据", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载流程数据失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            if (_flowchart is not null)
+            {
+                _shouldAutoLayout = true;
+            }
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// 从源插头数据构造一个最小的 PlugDataZone，供 DataConnector 展示数据流
+    /// </summary>
+    private PlugDataZone BuildPlugDataZone(CJ.Plug.Models.Plug.Plug sourcePlug)
+    {
+        var definitionId = sourcePlug.DefinitionId ?? "";
+
+        var pdz = new PlugDataZone
+        {
+            PlugDefinitionId = definitionId,
+            UserName = sourcePlug.Creater,
+            Type = PDZTypeEnum.Desi.ToString(),
+            PlugDatas = new List<PlugData>(),
+            PlugVariableDatas = new List<PlugVariableData>(),
+            DataFlowDatas = new List<DataFlowData>(),
+        };
+
+        // 添加主插头数据
+        pdz.PlugDatas.Add(new PlugData
+        {
+            PlugDefinitionId = definitionId,
+            Name = sourcePlug.Name,
+            PlugType = sourcePlug.Type,
+            PlugPosition = "0 0",
+        });
+
+        // 将插头参数转换为 PlugVariableData
+        if (sourcePlug.PlugVariables is not null)
+        {
+            foreach (var v in sourcePlug.PlugVariables.Where(v => v.IsBrowsable != false))
+            {
+                pdz.PlugVariableDatas.Add(new PlugVariableData
+                {
+                    PlugDefinitionId = definitionId,
+                    Name = v.Name,
+                    DisplayName = v.DisplayName,
+                    Description = v.Description,
+                    Type = v.Type,
+                    Value = v.DefaultValue,
+                    DefaultValue = v.DefaultValue,
+                    IsInput = v.IsInput,
+                    IsOutput = v.IsOutput,
+                    IsArray = v.IsArray,
+                    IsBrowsable = v.IsBrowsable,
+                });
+            }
+        }
+
+        return pdz;
+    }
+
+    private async Task ZoomToFitAsync()
+    {
+        if (_designer is not null)
+            await _designer.ZoomToFitAsync();
+    }
+
+    private async Task CenterContentAsync()
+    {
+        if (_designer is not null)
+            await _designer.CenterContentAsync();
+    }
+
+    private async Task AutoLayoutAsync()
+    {
+        if (_designer is not null)
+            await _designer.AutoLayoutAsync(_flowchart, null);
+    }
+
+    private void OnActivitySelected(JsonObject activity)
+    {
+    }
+
+    private void OnCanvasSelected()
+    {
+    }
+
+    private async Task CloseDrawer()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

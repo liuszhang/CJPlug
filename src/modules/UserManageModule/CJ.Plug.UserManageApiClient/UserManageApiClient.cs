@@ -75,5 +75,27 @@ namespace CJ.Plug.UserManageApiClient
 
             return result ?? [];
         }
+
+        public async Task<bool> SetUserStatusAsync(int userId, DataStatus status, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PutAsync(
+                requestUri: $"/api/user/{userId}/status?status={(int)status}",
+                content: null,
+                cancellationToken: cancellationToken
+            );
+
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> SetUserLockoutAsync(int userId, bool isLocked, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PutAsync(
+                requestUri: $"/api/user/{userId}/lockout?isLocked={isLocked.ToString().ToLower()}",
+                content: null,
+                cancellationToken: cancellationToken
+            );
+
+            return response.IsSuccessStatusCode;
+        }
     }
 }

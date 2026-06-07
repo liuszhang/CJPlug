@@ -1,6 +1,7 @@
-﻿@using CJ.Plug.AIChat.Components.Pages.Chat
+@using CJ.Plug.AIChat.Components.Pages.Chat
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.DeekSeekIn
+@using CJ.Plug.LlmConfigApiClient
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.AspNetCore.Components.Authorization
 @using MudBlazor
@@ -9,6 +10,7 @@
 
 
 @inject IDeepSeekService DeepSeekService
+@inject ILlmConfigApiClient LlmConfigApiClient
 
 <MudTextField @bind-Value="@Question" Immediate
               Placeholder="智能命令" Margin="Margin.Dense" Variant="Variant.Outlined"
@@ -24,23 +26,6 @@
         <MudPaper MaxWidth="60%" MaxHeight="80vh" MinWidth="1200px">
             <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
                 <CJ.Plug.SharedPages.Layout.VerticalWell ExtraPadding="100">
-                    @* <MudXChat ChatPosition="ChatBubblePosition.End">
-                        <MudXChatBubble>
-                            @Question
-                        </MudXChatBubble>
-                    </MudXChat>
-                    <MudXChat ChatPosition="ChatBubblePosition.Start">
-                        <MudXChatBubble>
-                            @Answer
-                        </MudXChatBubble>
-                    </MudXChat> *@
-
-                @*     <RadzenAIChat @ref="basicChat" 
-                Title="AI Assistant" 
-                Placeholder="Ask me anything..."
-                Style="height: 500px;"
-                /> *@
-
                     <RadzenChat @ref="basicChat"
                                 Title="智能命令"
                                 CurrentUserId="user1"
@@ -56,19 +41,21 @@
                                 ChatCleared="@OnChatCleared"
                                 TypingChanged="@OnTypingChanged" />
 
-                    @* <Chat></Chat> *@
-
-
                 </CJ.Plug.SharedPages.Layout.VerticalWell>
-                <MudStack Row AlignItems="AlignItems.Center">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(e => ToggleOverlay(false))">关闭</MudButton>
-                @* <MudCheckBox @bind-Value="UseOllama">使用本地模型</MudCheckBox> *@
-                <MudText Typo="Typo.body2">切换模型：</MudText>
-                <MudSelect @bind-Value="UseModel" Style="width:200px">
-                        <MudSelectItem Value="@("Ollama")">Ollama</MudSelectItem>
-                        <MudSelectItem Value="@("OpenRouter")">OpenRouter</MudSelectItem>
-                </MudSelect>
-                
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(e => ToggleOverlay(false))">关闭</MudButton>
+                    @if (_defaultModelInfo != null)
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.SmartToy" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">
+                            当前模型：@_defaultModelInfo.ProviderDisplayName / @_defaultModelInfo.ModelDisplayName
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">
+                            未配置默认模型
+                        </MudChip>
+                    }
                 </MudStack>
             </MudStack>
         </MudPaper>
@@ -81,35 +68,35 @@
     private string? Question { get; set; }
     private string? Answer { get; set; }
     private bool visible = false;
-    //RadzenAIChat basicChat;
     RadzenChat basicChat;
     private List<ChatUser> users = new();
     private List<ChatMessage> messages = new();
     ChatMessage TmpMessage = new ChatMessage();
-    private bool UseOllama = false;
-    private string UseModel { get; set; } = "Ollama";
+    private DefaultModelInfoResponse? _defaultModelInfo;
 
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         // Initialize users
         users.AddRange(new[]
         {
             new ChatUser { Id = "user1", Name = "ME", Color = "#1976d2" },
             new ChatUser { Id = "user2", Name = "AI", Color = "#388e3c" },
-            //new ChatUser { Id = "user3", Name = "Bob Johnson", Color = "#f57c00" }
         });
 
-        // Add some sample messages
         messages.AddRange(new[]
         {
             new ChatMessage { Content = "wake up!", UserId = "user1", Timestamp = DateTime.Now.AddMinutes(-30) },
-            //new ChatMessage { Content = "Thanks John! Looking forward to working together.", UserId = "user2", Timestamp = DateTime.Now.AddMinutes(-29) },
-            //new ChatMessage { Content = Answer, UserId = "user3", Timestamp = DateTime.Now.AddMinutes(-28) }
         });
-        // TmpMessage.UserId = "user2";
-        // TmpMessage.Timestamp = DateTime.Now.AddMinutes(-27);
-        //messages.Add(TmpMessage);
+
+        // 从 LLM 配置加载默认模型信息
+        try
+        {
+            _defaultModelInfo = await LlmConfigApiClient.GetDefaultModelInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AskAI] 加载默认模型配置失败: {ex.Message}");
+        }
     }
 
     void OnMessageAdded(ChatMessage message)
@@ -120,7 +107,6 @@
 
     async void OnMessageSent(ChatMessage message)
     {
-        //console.Log($"Message sent: {message.Content}", AlertStyle.Info);
         await TestDeepSeek(message.Content);
     }
 
@@ -132,7 +118,6 @@
 
     void OnChatCleared()
     {
-        //console.Log("Chat cleared", AlertStyle.Warning);
     }
 
     async Task SimulateJaneTyping()
@@ -149,8 +134,6 @@
 
     void OnTypingChanged(ChatTypingEventArgs args)
     {
-        // In a real app you would broadcast this via SignalR to other clients.
-        //console.Log($"TypingChanged: {args.UserId} => {args.IsTyping}", AlertStyle.Info);
     }
 
 
@@ -158,14 +141,11 @@
     {
         if (firstRender)
         {
-            //Console.WriteLine("Load Ai AppBar Item DONE");
-            //StateHasChanged();
         }
     }
 
     private async Task OnTextFieldKeyPressed(KeyboardEventArgs args)
     {
-        //Console.WriteLine(args.Key);
         if (args.Key == "Enter")
         {
             await OpenAndAnswer(Question);
@@ -189,20 +169,26 @@
     private async Task TestDeepSeek(string? Question)
     {
         var TmpMessage = new ChatMessage { Content = "", UserId = "user2", Timestamp = DateTime.Now.AddMinutes(-28) };
-        //TmpMessage.UserId = "user2";
-        //TmpMessage.Timestamp = DateTime.Now.AddMinutes(-27);
         messages.Add(TmpMessage);
         StateHasChanged();
-        //var deepSeek = ServiceProvider.GetRequiredService<IDeepSeekService>();
         Answer += "AI:";
-        //TmpMessage.UserId = "user2";
 
-        if (UseModel=="Ollama")
+        if (_defaultModelInfo != null && _defaultModelInfo.ProviderName.Contains("ollama", StringComparison.OrdinalIgnoreCase))
         {
-            //本地Ollama
-            await foreach (var response in DeepSeekService.AskWithTool(Question))
+            // Ollama 类型供应商 - 使用配置的端点和模型
+            var endpoint = new Uri(_defaultModelInfo.ApiBaseUrl);
+            await foreach (var response in DeepSeekService.AskWithTool(Question, endpoint, _defaultModelInfo.ModelName))
             {
-                //Console.WriteLine(response);
+                Answer += response;
+                TmpMessage.Content += response;
+                StateHasChanged();
+            }
+        }
+        else if (_defaultModelInfo != null && !string.IsNullOrEmpty(_defaultModelInfo.ApiKey))
+        {
+            // OpenRouter 等需要 API Key 的供应商
+            await foreach (var response in DeepSeekService.StreamReasoningFromContentAsync(Question, _defaultModelInfo.ApiKey, _defaultModelInfo.ModelName))
+            {
                 Answer += response;
                 TmpMessage.Content += response;
                 StateHasChanged();
@@ -210,18 +196,14 @@
         }
         else
         {
-            //免费的OpenRouter
-            await foreach (var response in DeepSeekService.StreamReasoningFromContentAsync(Question))
+            // 回退到默认 Ollama
+            await foreach (var response in DeepSeekService.AskWithTool(Question))
             {
-                //Console.WriteLine(response);
                 Answer += response;
                 TmpMessage.Content += response;
                 StateHasChanged();
             }
         }
-
-        
-        
 
         Answer += "\n以上。";
         messages.AddRange(new[]

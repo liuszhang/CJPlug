@@ -43,7 +43,7 @@ public class HubConnectionManagerService: IHubConnectionManager
             }
         };
 
-        _hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+        _hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>
         {
             //var TextValue = $"[客户端收到消息]图站地址：{ip}，状态：{status}";
             StationList.Add(ip);
@@ -51,7 +51,7 @@ public class HubConnectionManagerService: IHubConnectionManager
             var HashTextValues = new HashSet<string>(StationList);
             StationList = HashTextValues.ToList();
             //_httpHostIp.ToolAgentHostIps = HashTextValues.ToList();
-            //HttpHostIp.ToolAgentHostIps.Add("http://" + ip);                
+            //HttpHostIp.ToolAgentHostIps.Add("http://" + ip);
         });
 
         try

@@ -10,6 +10,7 @@ namespace CJ.Plug.Models.Shared
     {
         默认,
         调试,
-        管理
+        管理,
+        插头管理
     }
 }

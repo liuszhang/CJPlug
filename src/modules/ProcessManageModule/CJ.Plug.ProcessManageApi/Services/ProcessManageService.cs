@@ -14,11 +14,18 @@ public class ProcessManageService : BaseRepositoryService<Process, int>, IProces
         _ProcessDbContext = dbContext;
     }
 
-    public async Task<IEnumerable<Process>> GetAllWorkflowsAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Process>> GetAllWorkflowsAsync(string? userName = null, CancellationToken cancellationToken = default)
     {
         //await _dbContext.Database.EnsureCreatedAsync(cancellationToken);
-        return await _ProcessDbContext.Set<Process>()
-            .ToListAsync();
+        var query = _ProcessDbContext.Set<Process>().AsQueryable();
+
+        // admin 用户可以看到所有流程，普通用户仅看到自己创建的流程
+        if (!string.IsNullOrEmpty(userName) && !string.Equals(userName, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(p => p.Creater == userName);
+        }
+
+        return await query.Include(p => p.PlugVariables).ToListAsync(cancellationToken);
     }
     public async Task<Process> CreateWorkflowAsync(Process request, CancellationToken cancellationToken = default)
     {

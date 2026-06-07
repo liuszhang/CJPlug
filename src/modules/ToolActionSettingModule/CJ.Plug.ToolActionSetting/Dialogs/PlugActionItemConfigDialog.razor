@@ -1,0 +1,86 @@
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using CJ.Plug.SharedPages.PlugSettingPages
+@using MudBlazor
+
+@inject ISnackbar Snackbar
+@inject MainApiClient MainApiClient
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">配置动作 - @PlugActionItem?.Name</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack>
+            <MudSelect T="string" Label="目标类型" @bind-value="PlugActionItem.Category" Clearable Margin="Margin.Dense" Dense FullWidth Variant="Variant.Outlined">
+                @foreach (var c in PlugCategory.GetPlugActionCategorys())
+                {
+                    <MudSelectItem T="string" Value=@c>@c</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField FullWidth @bind-text="PlugActionItem.Name" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="动作名称"></MudTextField>
+
+            @if (PlugActionItem.Category == PlugCategorys.桌面类动作.ToString())
+            {
+                <ActionEXESettingContent Plug="SelectedPlug" PlugActionItem="PlugActionItem"></ActionEXESettingContent>
+            }
+            @if (PlugActionItem.Category == "DLL")
+            {
+                <ActionDLLSettingContent></ActionDLLSettingContent>
+            }
+
+            <MudStack Spacing="2">
+                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>
+                <MudDivider />
+                <MudCollapse Expanded="_expanded">
+                    <MudTextField @bind-Value="PlugActionItem.PlugTypeKey" Label="唯一标识符" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+                </MudCollapse>
+            </MudStack>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        @if (_saving)
+        {
+            <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Small"></MudProgressCircular>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary" OnClick="Save">保存</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public Plug? PlugActionItem { get; set; }
+
+    [Parameter]
+    public Plug? SelectedPlug { get; set; } = new();
+
+    private bool _expanded;
+    private bool _saving;
+
+    private async Task Save()
+    {
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            await MainApiClient.UpdatePlugAsync(PlugActionItem.Id, PlugActionItem);
+            MudDialog.Close(DialogResult.Ok(PlugActionItem));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败: {ex.Message}", Severity.Error);
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

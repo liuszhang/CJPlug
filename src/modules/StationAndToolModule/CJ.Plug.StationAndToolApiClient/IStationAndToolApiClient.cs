@@ -1,9 +1,6 @@
-﻿using CJ.Plug.Models.Station;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
+using CJ.Plug.Models.Station;
+using CJ.Plug.StationAndToolApi.Models;
 
 namespace CJ.Plug.StationAndToolApiClient
 {
@@ -25,13 +22,18 @@ namespace CJ.Plug.StationAndToolApiClient
         Task<Station?> GetStationByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<Station?> GetStationByIpAsync(string stationIp, CancellationToken cancellationToken = default);
         Task<string?> GetStationToUse(CancellationToken cancellationToken = default);
-        Task<Station?> GetStationToUseByTool(string toolName, string? version = null, CancellationToken cancellationToken = default);
+        Task<Station?> GetStationToUseByTool(string toolName, string? version = null, string? specifiedStationIp = null, CancellationToken cancellationToken = default);
         Task<Tool?> GetToolByDisplayNameAsync(string? toolDisplayName, CancellationToken cancellationToken = default);
         Task<Tool?> GetToolByIdAsync(int? id, CancellationToken cancellationToken = default);
         Task<string?> GetToolPathByFilter(ToolConfigFilter ToolConfigFilter);
         Task<string?> GetToolPathOnIp(string ip, string toolName, string? version = null);
+        Task<ToolDeploySettingModel?> GetToolDeploySettingAsync(ToolConfigFilter filter);
         Task<Station?> UpdateStationAsync(Station updatedStation, CancellationToken cancellationToken = default);
         Task<StationConfigTable?> UpdateStationToolConfigAsync(StationConfigTable updatedStationToolConfig, CancellationToken cancellationToken = default);
         Task<Tool?> UpdateToolAsync(Tool updatedTool, CancellationToken cancellationToken = default);
+        Task<Stream> DownloadToolAsync(string toolName, string version, CancellationToken cancellationToken = default);
+        Task<bool> MoveToolFilesFromTmpAsync(string toolName, bool isSystemTool, string userName);
+        Task<bool> DeleteToolTmpFilesAsync();
+        Task<int> ImportDefaultToolsAsync(CancellationToken cancellationToken = default);
     }
 }

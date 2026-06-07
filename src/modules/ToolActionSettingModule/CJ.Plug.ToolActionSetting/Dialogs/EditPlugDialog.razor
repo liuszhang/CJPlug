@@ -1,0 +1,157 @@
+@using CJ.Plug.ElsaIntegration.Contracts
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.StationAndToolApiClient
+@using CJ.Plug.ToolActionSetting.Components.Plugs
+@using Microsoft.JSInterop
+
+@inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+@inject IStationAndToolApiClient StationAndToolApiClient
+@inject IJSRuntime JsRuntime
+@inject IDomInteropService DomInteropService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack>
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="@Plug.Name" Margin="Margin.Dense" Label="插头名称" Variant="Variant.Outlined"></MudTextField>
+                <MudTooltip Text="系统插头只有管理员能够创建，创建后所有人可见">
+                    <MudSwitch T="bool" @bind-Value="@IsSystemPlug" Label="是否系统插头" Size="Size.Small" Color="Color.Primary"></MudSwitch>
+                </MudTooltip>
+            </MudStack>
+
+            <MudSelect T="string" Value="@Plug.Category" Label="插头类型" Required Margin="Margin.Dense" Dense Variant="Variant.Outlined" Disabled="true">
+                <MudSelectItem Value="@PlugCategorys.桌面类.ToString()">桌面类</MudSelectItem>
+                <MudSelectItem Value="@PlugCategorys.接口类.ToString()">接口类</MudSelectItem>
+                <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="@Plug.Type" Margin="Margin.Dense" Label="插头标识" ReadOnly="true" Variant="Variant.Filled"></MudTextField>
+            <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined"></MudTextField>
+            <MudTextField @bind-Value="@Plug.Description" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined" Lines="2"></MudTextField>
+
+            <MudCheckBox Dense @bind-Value="Plug.ShowInPlugLibrary" Label="插入插座" Color="Color.Primary"></MudCheckBox>
+            <MudCheckBox Dense @bind-Value="Plug.OnlyExecuteAction" Label="仅执行插头动作" Color="Color.Error"></MudCheckBox>
+
+            <MudStack Spacing="1">
+                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>
+                <MudCollapse Expanded="_expanded">
+                    <MudTextField @bind-Value="Plug.PlugTypeKey" Label="唯一标识符(开发人员)" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
+                </MudCollapse>
+                <MudDivider />
+            </MudStack>
+
+            @if (Plug.Category?.Contains("桌面") == true)
+            {
+                <DesktopPlugConfig @ref="_desktopConfig"
+                                   ServerBaseUrl="@(GlobalData.MainApiServer ?? "")"
+                                   PlugFolder="@(Plug.DefinitionId?.ToString())"
+                                   Username="@_currentUserName" />
+            }
+            else if (Plug.Category?.Contains("接口") == true)
+            {
+                <InterfacePlugConfig @ref="_interfaceConfig" />
+            }
+            else if (Plug.Category?.Contains("脚本") == true)
+            {
+                <ScriptPlugConfig @ref="_scriptConfig"
+                                  Plug="@Plug"
+                                  OnError="msg => Snackbar.Add(msg, Severity.Error)"
+                                  OnInfo="msg => Snackbar.Add(msg, Severity.Info)" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        @if (_submitting)
+        {
+            <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Small"></MudProgressCircular>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary" OnClick="Submit">保存</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public Plug Plug { get; set; } = new();
+
+    private bool IsSystemPlug { get; set; }
+    private bool _expanded;
+    private bool _submitting;
+    private string _currentUserName = "";
+
+    // 子组件引用
+    private DesktopPlugConfig? _desktopConfig;
+    private InterfacePlugConfig? _interfaceConfig;
+    private ScriptPlugConfig? _scriptConfig;
+
+    protected override void OnInitialized()
+    {
+        IsSystemPlug = Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _currentUserName = await DomInteropService.GetCurrentUserName();
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Plug.Name))
+        {
+            Snackbar.Add("请输入插头名称", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        StateHasChanged();
+
+        try
+        {
+            Plug.CreateType = IsSystemPlug ? PlugCreateTypeEnum.SystemInitPlug.ToString() : PlugCreateTypeEnum.RootPlug.ToString();
+
+            // 根据插头类型，将对应配置组件的设置写入 Plug 对象
+            if (Plug.Category?.Contains("桌面") == true && _desktopConfig != null)
+            {
+                if (_desktopConfig.HasFolderSelection)
+                {
+                    await _desktopConfig.UploadFolderAsync();
+                }
+                _desktopConfig.ApplyToPlug(Plug);
+                _desktopConfig.ApplyToolVariables(Plug);
+            }
+            else if (Plug.Category?.Contains("接口") == true && _interfaceConfig != null)
+            {
+                _interfaceConfig.ApplyToPlug(Plug);
+            }
+            else if (Plug.Category?.Contains("脚本") == true && _scriptConfig != null)
+            {
+                _scriptConfig.ApplyToPlug(Plug);
+            }
+
+            await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+            MudDialog.Close(DialogResult.Ok(Plug));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"更新插头失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

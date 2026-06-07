@@ -97,6 +97,78 @@ public static class McpSchemaGenerator
     }
 
     /// <summary>
+    /// 将入口变量列表（EntryVariableDto）转换为 MCP Tool 的 inputSchema（JSON Schema 格式）
+    /// </summary>
+    /// <param name="entryVariables">工作流的入口变量（已经过 IsInput 过滤的变量）</param>
+    /// <returns>MCP inputSchema JSON</returns>
+    public static JsonObject GenerateInputSchema(IEnumerable<EntryVariableDto> entryVariables)
+    {
+        var schema = new JsonObject
+        {
+            ["type"] = "object"
+        };
+
+        var properties = new JsonObject();
+        var required = new JsonArray();
+
+        foreach (var v in entryVariables)
+        {
+            if (string.IsNullOrWhiteSpace(v.Name))
+                continue;
+
+            if (!Enum.TryParse<VariableTypeEnum>(v.Type, out var varType))
+                continue;
+
+            var prop = BuildPropertySchema(v.Name, v.DisplayName, v.Description,
+                v.DefaultValue, v.IsRequired, v.IsArray, varType);
+            properties[v.Name] = prop;
+
+            if (v.IsRequired == true)
+                required.Add(v.Name);
+        }
+
+        schema["properties"] = properties;
+        if (required.Count > 0)
+            schema["required"] = required;
+
+        return schema;
+    }
+
+    /// <summary>
+    /// 构建单个参数的 JSON Schema property 节点（参数独立版本）
+    /// </summary>
+    private static JsonObject BuildPropertySchema(
+        string name, string? displayName, string? description,
+        string? defaultValue, bool isRequired, bool isArray, VariableTypeEnum varType)
+    {
+        var jsonType = McpTypeMapper.ToJsonSchemaType(varType, isArray);
+
+        var prop = new JsonObject
+        {
+            ["type"] = jsonType,
+            ["description"] = description ?? displayName ?? name
+        };
+
+        if (isArray)
+        {
+            var itemType = McpTypeMapper.ToJsonSchemaItemType(varType);
+            prop["items"] = new JsonObject { ["type"] = itemType };
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultValue))
+        {
+            prop["default"] = defaultValue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayName) && displayName != name)
+        {
+            prop["title"] = displayName;
+        }
+
+        return prop;
+    }
+
+    /// <summary>
     /// 将 MCP tools/call 传入的 arguments 映射为工作流执行参数
     /// </summary>
     /// <param name="arguments">MCP 客户端传来的参数（JSON）</param>

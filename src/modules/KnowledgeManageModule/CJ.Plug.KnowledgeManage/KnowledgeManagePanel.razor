@@ -1,0 +1,672 @@
+@page "/KnowledgeManage"
+
+@using CJ.Plug.Models.Knowledge
+@using CJ.Plug.KnowledgeApiClient
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject IKnowledgeApiClient KnowledgeApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>知识管理</PageTitle>
+
+@* 外层容器：flex 列布局，撑满可用高度 *@
+<div style="display: flex; flex-direction: column; height: calc(100vh - 120px); overflow: hidden;">
+
+@* ===== 知识库卡片选择栏 ===== *@
+<MudPaper Elevation="1" Class="pa-3 mb-2" Style="flex-shrink: 0;">
+    <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px;">
+        @foreach (var kb in _allBases)
+        {
+            var isSelected = _selectedBaseId == kb.Id;
+            <MudPaper Elevation="@(isSelected ? 4 : 0)"
+                      Class="pa-2"
+                      Style="@($"cursor: pointer; min-width: 140px; max-width: 180px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; {(isSelected ? "background: var(--mud-palette-primary-lighten); border: 2px solid var(--mud-palette-primary);" : "border: 2px solid transparent;")}")"
+                      @onclick="() => OnBaseSelected(kb.Id)">
+                @if (!string.IsNullOrEmpty(kb.IconUrl))
+                {
+                    <MudImage Src="@kb.IconUrl" Width="40" Height="40" ObjectFit="ObjectFit.Cover"
+                              Style="border-radius: 8px;" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.AutoStories" Size="Size.Large"
+                             Color="@(isSelected ? Color.Primary : Color.Default)" />
+                }
+                <MudText Typo="Typo.body2" Align="Align.Center" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
+                    @kb.Name
+                </MudText>
+                @if (isSelected)
+                {
+                    <div style="position: absolute; top: 2px; right: 2px; display: flex; gap: 2px;"
+                         @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                       Color="Color.Primary" Style="padding: 4px;"
+                                       OnClick="OpenEditBaseDialog" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                       Color="Color.Error" Style="padding: 4px;"
+                                       OnClick="DeleteBase" />
+                    </div>
+                }
+            </MudPaper>
+        }
+        @* 新建知识库卡片 *@
+        <MudPaper Elevation="0"
+                  Class="pa-2"
+                  Style="cursor: pointer; min-width: 140px; max-width: 180px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 2px dashed var(--mud-palette-lines-defaults);"
+                  @onclick="OpenCreateBaseDialog">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary">新建知识库</MudText>
+        </MudPaper>
+    </div>
+</MudPaper>
+
+@if (!_selectedBaseId.HasValue)
+{
+    <MudPaper Elevation="1" Class="pa-8" Style="flex: 1; text-align: center; display: flex; align-items: center; justify-content: center;">
+        <MudText Typo="Typo.h6" Class="mud-text-secondary">请先选择或创建一个知识库</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudGrid Style="flex: 1; min-height: 0;">
+        @* ===== 左栏：文件夹树 ===== *@
+        <MudItem xs="3">
+            <MudPaper Elevation="1" Class="pa-2" Style="height: 100%; display: flex; flex-direction: column;">
+                <MudText Typo="Typo.subtitle2" Class="px-2 py-1 mud-text-secondary">文件夹</MudText>
+                <div style="flex: 1; overflow-y: auto; min-height: 0;">
+                    @if (_folderTreeItems.Count > 0)
+                    {
+                        <MudTreeView T="KnowledgeFolder" AutoExpand Items="@_folderTreeItems" Hover="true"
+                                     SelectedValue="_selectedFolder"
+                                     SelectedValueChanged="OnFolderSelected">
+                            <ItemTemplate Context="item">
+                                <MudTreeViewItem T="KnowledgeFolder" Value="@item.Value" Items="@item.Children"
+                                                 Icon="@item.Icon" Expanded>
+                                    <BodyContent>
+                                        <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%">
+                                            <MudText Typo="Typo.body2" Style="cursor:pointer;">@item.Text</MudText>
+                                            @if (item.Value != null)
+                                            {
+                                                <div style="justify-self: end;">
+                                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                                                   Color="Color.Default" StopPropagation="true"
+                                                                   OnClick="() => OpenEditFolderDialog(item.Value)" />
+                                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                                   Color="Color.Error" StopPropagation="true"
+                                                                   OnClick="() => DeleteFolder(item.Value)" />
+                                                </div>
+                                            }
+                                        </div>
+                                    </BodyContent>
+                                </MudTreeViewItem>
+                            </ItemTemplate>
+                        </MudTreeView>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary pa-2">暂无文件夹</MudText>
+                    }
+                </div>
+                <MudDivider Class="my-2" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                           OnClick="OpenCreateFolderDialog">新建文件夹</MudButton>
+            </MudPaper>
+        </MudItem>
+
+        @* ===== 右栏：知识条目列表 ===== *@
+        <MudItem xs="9">
+            <MudPaper Elevation="1" Class="pa-4" Style="height: 100%; overflow-y: auto;">
+                @* 顶部工具栏 *@
+                <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">@GetSelectedFolderName()</MudText>
+                    <MudSpacer />
+                    <MudTextField T="string" Label="搜索" Variant="Variant.Outlined" Size="Size.Small"
+                                  @bind-Value="_searchKeyword" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" Class="mr-1"
+                                  Margin="Margin.Dense" Style="width: 140px;" OnKeyUp="@HandleSearchKey" />
+                    <MudTextField T="string" Label="标签过滤" Variant="Variant.Outlined" Size="Size.Small"
+                                  @bind-Value="_searchTag" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Label" Class="mr-1"
+                                  Margin="Margin.Dense" Style="width: 120px;" OnKeyUp="@HandleSearchKey" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Search" Size="Size.Small" Color="Color.Primary" OnClick="SearchItems" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Clear" Size="Size.Small" OnClick="ClearSearch" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenCreateItemDialog">添加知识</MudButton>
+                </MudStack>
+
+                @* 知识条目表格 *@
+                <MudDataGrid Items="@_items" T="KnowledgeItem" Hover="true" Dense="true"
+                             SelectionMode="DataGridSelectionMode.None">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Id" Title="ID" Sortable="true" Style="width: 60px;" />
+                        <TemplateColumn Title="标题">
+                            <CellTemplate>
+                                <MudText Style="cursor:pointer; color: var(--mud-palette-primary); text-decoration: underline;"
+                                         @onclick="() => OpenItemDetail(context.Item)">
+                                    @context.Item.Title
+                                </MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="标签" Style="width: 200px;">
+                            <CellTemplate>
+                                @if (!string.IsNullOrWhiteSpace(context.Item.Tags))
+                                {
+                                    @foreach (var tag in context.Item.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled" Class="ma-1">@tag</MudChip>
+                                    }
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="状态" Style="width: 80px;">
+                            <CellTemplate>
+                                <MudSwitch T="bool" Value="@context.Item.IsEnabled" Color="Color.Primary"
+                                           ValueChanged="(e) => ToggleItemEnabled(context.Item, e)" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.UpdatedAt" Title="更新时间" Sortable="true"
+                                        Format="yyyy-MM-dd HH:mm" Style="width: 140px;" />
+                        <TemplateColumn Title="操作" Style="width: 120px;">
+                            <CellTemplate>
+                                <MudTooltip Text="编辑">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                                   Color="Color.Primary" OnClick="() => OpenEditItemDialog(context.Item)" />
+                                </MudTooltip>
+                                <MudTooltip Text="删除">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="() => DeleteItem(context.Item)" />
+                                </MudTooltip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">暂无知识条目</MudText>
+                    </NoRecordsContent>
+                </MudDataGrid>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+</div>
+
+@code {
+    // ===== 状态 =====
+    private List<KnowledgeBase> _allBases = new();
+    private int? _selectedBaseId;
+    private List<KnowledgeFolder> _allFolders = new();
+    private List<TreeItemData<KnowledgeFolder>> _folderTreeItems = new();
+    private KnowledgeFolder? _selectedFolder;
+    private List<KnowledgeItem> _items = new();
+
+    // 搜索状态
+    private string _searchKeyword = string.Empty;
+    private string _searchTag = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBases();
+    }
+
+    /// <summary>
+    /// 知识库切换
+    /// </summary>
+    private async Task OnBaseSelected(int baseId)
+    {
+        _selectedBaseId = baseId;
+        _selectedFolder = null;
+        await LoadFolders();
+        await LoadItemsForSelectedFolder();
+    }
+
+    // ===== 知识库 CRUD =====
+
+    private async Task LoadBases()
+    {
+        try
+        {
+            _allBases = await KnowledgeApiClient.GetAllBasesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载知识库失败: {ex.Message}", Severity.Error);
+            _allBases = new();
+        }
+    }
+
+    private async Task OpenCreateBaseDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", false },
+            { "ExistingBases", _allBases }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeBaseDialog>("新建知识库", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeBase kb)
+        {
+            try
+            {
+                var created = await KnowledgeApiClient.CreateBaseAsync(kb);
+                Snackbar.Add($"知识库 '{created.Name}' 创建成功", Severity.Success);
+                await LoadBases();
+                _selectedBaseId = created.Id;
+                await LoadFolders();
+                await LoadItemsForSelectedFolder();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建知识库失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditBaseDialog()
+    {
+        if (!_selectedBaseId.HasValue) return;
+        var current = _allBases.FirstOrDefault(b => b.Id == _selectedBaseId.Value);
+        if (current is null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", true },
+            { "EditItem", current },
+            { "ExistingBases", _allBases }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeBaseDialog>("编辑知识库", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeBase updated)
+        {
+            try
+            {
+                await KnowledgeApiClient.UpdateBaseAsync(updated);
+                Snackbar.Add($"知识库 '{updated.Name}' 已更新", Severity.Success);
+                await LoadBases();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新知识库失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteBase()
+    {
+        if (!_selectedBaseId.HasValue) return;
+        var current = _allBases.FirstOrDefault(b => b.Id == _selectedBaseId.Value);
+        if (current is null) return;
+
+        var confirm = await DialogService.ShowMessageBoxAsync("确认删除知识库",
+            $"确定要删除知识库 \"{current.Name}\" 吗？其下所有文件夹和知识条目将被一并删除，此操作不可撤销。",
+            yesText: "确认删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            await KnowledgeApiClient.DeleteBaseAsync(current.Id);
+            Snackbar.Add($"知识库 '{current.Name}' 已删除", Severity.Success);
+            _selectedBaseId = null;
+            _selectedFolder = null;
+            _allFolders = new();
+            _folderTreeItems = new();
+            _items = new();
+            await LoadBases();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除知识库失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ===== 文件夹树构建 =====
+
+    private async Task LoadFolders()
+    {
+        if (!_selectedBaseId.HasValue)
+        {
+            _allFolders = new();
+            _folderTreeItems = new();
+            return;
+        }
+
+        try
+        {
+            _allFolders = await KnowledgeApiClient.GetFoldersByBaseAsync(_selectedBaseId.Value);
+            BuildFolderTree();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载文件夹失败: {ex.Message}", Severity.Error);
+            _allFolders = new();
+            _folderTreeItems = new();
+        }
+    }
+
+    /// <summary>
+    /// 构建文件夹树形结构，含"全部知识"虚拟根节点
+    /// </summary>
+    private void BuildFolderTree()
+    {
+        _folderTreeItems = new List<TreeItemData<KnowledgeFolder>>();
+
+        var lookup = new Dictionary<int, TreeItemData<KnowledgeFolder>>();
+        var childrenMap = new Dictionary<int, List<TreeItemData<KnowledgeFolder>>>();
+
+        foreach (var f in _allFolders)
+        {
+            var node = new TreeItemData<KnowledgeFolder>
+            {
+                Value = f,
+                Text = f.Name,
+                Icon = Icons.Material.Filled.Folder,
+                Expandable = true,
+                Expanded = true
+            };
+            lookup[f.Id] = node;
+
+            if (f.ParentId.HasValue)
+            {
+                if (!childrenMap.ContainsKey(f.ParentId.Value))
+                    childrenMap[f.ParentId.Value] = new();
+                childrenMap[f.ParentId.Value].Add(node);
+            }
+        }
+
+        foreach (var (parentId, children) in childrenMap)
+        {
+            if (lookup.TryGetValue(parentId, out var parent))
+            {
+                parent.Children = children;
+            }
+        }
+
+        var rootChildren = new List<TreeItemData<KnowledgeFolder>>();
+        foreach (var f in _allFolders)
+        {
+            if (!f.ParentId.HasValue || !lookup.ContainsKey(f.ParentId.Value))
+            {
+                rootChildren.Add(lookup[f.Id]);
+            }
+        }
+
+        var allKnowledgeNode = new TreeItemData<KnowledgeFolder>
+        {
+            Value = null,
+            Text = "全部知识",
+            Icon = Icons.Material.Filled.LibraryBooks,
+            Expandable = true,
+            Expanded = true,
+            Children = rootChildren
+        };
+
+        _folderTreeItems.Add(allKnowledgeNode);
+    }
+
+    private async Task OnFolderSelected(KnowledgeFolder? folder)
+    {
+        _selectedFolder = folder;
+        await LoadItemsForSelectedFolder();
+    }
+
+    private string GetSelectedFolderName()
+    {
+        if (_selectedFolder is null) return "全部知识";
+        return _selectedFolder.Name;
+    }
+
+    // ===== 知识条目加载 =====
+
+    private async Task LoadItemsForSelectedFolder()
+    {
+        try
+        {
+            if (_selectedFolder != null)
+            {
+                _items = await KnowledgeApiClient.GetItemsByFolderAsync(_selectedFolder.Id);
+            }
+            else if (_selectedBaseId.HasValue)
+            {
+                _items = await KnowledgeApiClient.GetItemsByBaseAsync(_selectedBaseId.Value);
+            }
+            else
+            {
+                _items = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载知识条目失败: {ex.Message}", Severity.Error);
+            _items = new();
+        }
+    }
+
+    // ===== 搜索 =====
+
+    private async Task SearchItems()
+    {
+        if (string.IsNullOrWhiteSpace(_searchKeyword) && string.IsNullOrWhiteSpace(_searchTag))
+        {
+            await LoadItemsForSelectedFolder();
+            return;
+        }
+
+        try
+        {
+            _items = await KnowledgeApiClient.SearchItemsAsync(
+                string.IsNullOrWhiteSpace(_searchKeyword) ? null : _searchKeyword,
+                string.IsNullOrWhiteSpace(_searchTag) ? null : _searchTag,
+                _selectedBaseId);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"搜索失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void HandleSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            SearchItems();
+        }
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchKeyword = string.Empty;
+        _searchTag = string.Empty;
+        await LoadItemsForSelectedFolder();
+    }
+
+    // ===== 知识条目 CRUD =====
+
+    /// <summary>
+    /// 点击标题打开只读详情对话框
+    /// </summary>
+    private async Task OpenItemDetail(KnowledgeItem item)
+    {
+        var parameters = new DialogParameters { { "Item", item } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<Dialogs.KnowledgeItemDetailDialog>($"知识详情: {item.Title}", parameters, options);
+    }
+
+    private async Task OpenCreateItemDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", false },
+            { "Folders", _allFolders },
+            { "SelectedFolderId", _selectedFolder?.Id }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeItemDialog>("添加知识", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeItem item)
+        {
+            try
+            {
+                await KnowledgeApiClient.CreateItemAsync(item);
+                Snackbar.Add($"知识条目 '{item.Title}' 创建成功", Severity.Success);
+                await LoadItemsForSelectedFolder();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditItemDialog(KnowledgeItem item)
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", true },
+            { "EditItem", item },
+            { "Folders", _allFolders }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeItemDialog>("编辑知识", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeItem updated)
+        {
+            try
+            {
+                await KnowledgeApiClient.UpdateItemAsync(updated);
+                Snackbar.Add($"知识条目 '{updated.Title}' 已更新", Severity.Success);
+                await LoadItemsForSelectedFolder();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteItem(KnowledgeItem item)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定要删除知识条目 \"{item.Title}\" 吗？此操作不可撤销。",
+            yesText: "确认删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            await KnowledgeApiClient.DeleteItemAsync(item.Id);
+            Snackbar.Add($"知识条目 '{item.Title}' 已删除", Severity.Success);
+            await LoadItemsForSelectedFolder();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ToggleItemEnabled(KnowledgeItem item, bool isEnabled)
+    {
+        item.IsEnabled = isEnabled;
+        try
+        {
+            await KnowledgeApiClient.UpdateItemAsync(item);
+            Snackbar.Add($"知识条目 '{item.Title}' 已{(isEnabled ? "启用" : "禁用")}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            item.IsEnabled = !isEnabled;
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ===== 文件夹 CRUD =====
+
+    private async Task OpenCreateFolderDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", false },
+            { "Folders", _allFolders },
+            { "ParentId", _selectedFolder?.Id }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeFolderDialog>("新建文件夹", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeFolder folder)
+        {
+            try
+            {
+                folder.BaseId = _selectedBaseId!.Value;
+                await KnowledgeApiClient.CreateFolderAsync(folder);
+                Snackbar.Add($"文件夹 '{folder.Name}' 创建成功", Severity.Success);
+                await LoadFolders();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"创建文件夹失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditFolderDialog(KnowledgeFolder folder)
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsEdit", true },
+            { "EditItem", folder },
+            { "Folders", _allFolders }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.KnowledgeFolderDialog>("编辑文件夹", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is KnowledgeFolder updated)
+        {
+            try
+            {
+                await KnowledgeApiClient.UpdateFolderAsync(updated);
+                Snackbar.Add($"文件夹 '{updated.Name}' 已更新", Severity.Success);
+                await LoadFolders();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"更新文件夹失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteFolder(KnowledgeFolder folder)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除文件夹",
+            $"确定要删除文件夹 \"{folder.Name}\" 吗？该文件夹下的所有子文件夹和知识条目将被一并删除，此操作不可撤销。",
+            yesText: "确认删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        try
+        {
+            await KnowledgeApiClient.DeleteFolderAsync(folder.Id);
+            Snackbar.Add($"文件夹 '{folder.Name}' 已删除", Severity.Success);
+            if (_selectedFolder?.Id == folder.Id)
+            {
+                _selectedFolder = null;
+            }
+            await LoadFolders();
+            await LoadItemsForSelectedFolder();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除文件夹失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

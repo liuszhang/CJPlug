@@ -1,0 +1,250 @@
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.VariableUIHandler.Pages
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using System.Text.Json
+@using System.Text
+@using PPTPlug.Services
+@using PPTPlug.Utils
+@using Serilog
+
+@inject MainApiClient MainApiClient
+@inject ILocalStorageService _localStorageService
+@inject IDomInteropService DomInteropService
+@inject IDialogService DialogService
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudFileUpload T="IBrowserFile" FilesChanged="@((f) => CheckLocalFile(f))" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" StartIcon="@Icons.Material.Filled.UploadFile" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">导入PPT文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+    <MudButton OnClick="LoadRootData" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">重新加载文件</MudButton>
+</MudStack>
+<MudText>文件内容预览(@FileName) </MudText>
+
+<MudStack Row Justify="Justify.SpaceBetween">
+    <MudStack Style="width:100%;border:dashed">
+        @if (!string.IsNullOrEmpty(PdfContent))
+        {
+            <iframe src="@PdfContent" width="100%" height="600px"></iframe>
+        }
+        @if (Processing)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small"></MudProgressCircular>
+        }
+    </MudStack>
+
+    <MudStack Justify="Justify.FlexStart" AlignItems="AlignItems.Stretch" Style="min-width:380px">
+        <MudText>文本替换配置</MudText>
+
+        <MudTextField @bind-Value="TmpOldText" Label="原文本" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="TmpNewText" Label="新文本" Variant="Variant.Outlined" />
+
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Input" OnClick="AddTextMapping" Disabled="Processing"
+                   Color="Color.Info" Size="Size.Small">
+            @if (Processing)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small"></MudProgressCircular>
+            }
+            else
+            {
+                <MudText>添加替换规则</MudText>
+            }
+        </MudButton>
+
+        <MudDataGrid T="WordTextMapping" Items="TextMappings" Dense ReadOnly="false" SortMode="SortMode.None" Style="width:380px"
+                     EditTrigger="@(DataGridEditTrigger.Manual)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">已配置文本替换清单</MudText>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x=>x.BMName" Title="原文本" Editable="false" />
+                <PropertyColumn Property="x=>x.InputSchema" Title="新文本" Editable="false" />
+                <TemplateColumn CellClass="d-flex justify-end">
+                    <CellTemplate>
+                        <MudStack Row>
+                            <MudButton OnClick="@(()=>DeleteMapping(@context.Item))" Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary">删除</MudButton>
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudStack>
+</MudStack>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    public PlugData? PlugData { get; set; } = new();
+
+    private string? FileId { get; set; }
+    private string? FileName { get; set; }
+    private string? TmpLocalFilePath { get; set; }
+
+    public List<WordTextMapping> TextMappings { get; set; } = new List<WordTextMapping>();
+    private bool Processing { get; set; } = false;
+    private IBrowserFile checkedFile;
+    private string? CurrentUser { get; set; }
+
+    private string? TmpOldText { get; set; }
+    private string? TmpNewText { get; set; }
+    private string PdfContent;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PlugDataZone == null)
+            return;
+
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            PlugData = PlugDataZone.GetPlugData(PlugDefinitionId);
+        }
+        await LoadRootData();
+        await RefreshPPTContent();
+    }
+
+    private async Task LoadRootData()
+    {
+        Processing = true;
+        var bmMappingJson = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.PPTTextMapping.ToString());
+        if (!string.IsNullOrEmpty(bmMappingJson))
+        {
+            TextMappings = JsonSerializer.Deserialize<List<WordTextMapping>>(bmMappingJson) ?? new List<WordTextMapping>();
+        }
+        CurrentUser = await DomInteropService.GetCurrentUserName();
+
+        var fileVariable = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.PPTFile.ToString());
+        if (!string.IsNullOrEmpty(fileVariable))
+        {
+            FileName = fileVariable.Split(':').FirstOrDefault();
+            FileId = fileVariable.Split(':').LastOrDefault();
+        }
+        if (string.IsNullOrEmpty(FileId) || string.IsNullOrEmpty(FileName))
+        {
+            Processing = false;
+            return;
+        }
+
+        TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+
+        await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+        using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
+        {
+            await sourceStream?.CopyToAsync(stream);
+        }
+        Processing = false;
+    }
+
+    private async Task RefreshPPTContent()
+    {
+        Processing = true;
+        PdfContent = "";
+        StateHasChanged();
+
+        if (string.IsNullOrEmpty(TmpLocalFilePath))
+        {
+            Processing = false;
+            return;
+        }
+        try
+        {
+            var pdfFilePath = TmpLocalFilePath.Replace(".pptx", ".pdf").Replace(".ppt", ".pdf");
+            PPTService_Aspose.ConvertToPdf(TmpLocalFilePath, pdfFilePath);
+
+            pdfFilePath = pdfFilePath.Trim('\"');
+            var pdfFileName = Path.GetFileName(pdfFilePath);
+            PdfContent = $"/webFiles/{pdfFileName}";
+        }
+        catch (Exception e)
+        {
+            Log.Information("PPT转PDF失败：" + e.Message);
+        }
+        finally
+        {
+            Processing = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        if (browserFile == null) return;
+        try
+        {
+            (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.PPTFile.ToString(), browserFile.Name + ":" + fileId);
+            if (PlugDataZone != null)
+                await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+            FileName = browserFile.Name;
+            FileId = fileId;
+            TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+            using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
+            {
+                await sourceStream?.CopyToAsync(stream);
+            }
+
+            await RefreshPPTContent();
+        }
+        catch (Exception ex)
+        {
+            Log.Information("上传文件出错：" + ex.Message);
+        }
+    }
+
+    private async Task AddTextMapping()
+    {
+        if (string.IsNullOrEmpty(TmpOldText) || string.IsNullOrEmpty(TmpNewText))
+        {
+            return;
+        }
+
+        Processing = true;
+        try
+        {
+            TextMappings.Add(new WordTextMapping
+            {
+                BMName = TmpOldText,
+                InputSchema = TmpNewText,
+                Id = GetNextTextMappingId()
+            });
+
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.PPTTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+
+            // 清空输入框
+            TmpOldText = "";
+            TmpNewText = "";
+
+            await RefreshPPTContent();
+        }
+        catch (Exception e)
+        {
+            Log.Information("添加文本替换规则出错：" + e.Message);
+        }
+        Processing = false;
+    }
+
+    private async Task DeleteMapping(WordTextMapping textMapping)
+    {
+        TextMappings.Remove(textMapping);
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.PPTTextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+    }
+
+    private int? GetNextTextMappingId()
+    {
+        var idList = TextMappings.Select(x => x.Id).ToList();
+        var maxId = idList.DefaultIfEmpty(0).Max();
+        return maxId + 1;
+    }
+}

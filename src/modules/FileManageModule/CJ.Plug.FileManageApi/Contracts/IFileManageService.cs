@@ -1,6 +1,7 @@
 ﻿
 using CJ.Plug.Models.Shared;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
 
 namespace CJ.Plug.FileManageApi.Contracts
 {
@@ -26,5 +27,7 @@ namespace CJ.Plug.FileManageApi.Contracts
         Task<IActionResult> CompleteUpload(FileUploadRequest? request);
 
         Task<FileInformation?> DeleteFile(FileDeleteRequest fileDeleteRequest);
+
+        Task<(Stream? fileStream, string? fileName, string? errorMessage)> DownloadToolAsync(string toolName, string toolVersion, string toolPath);
     }
 }

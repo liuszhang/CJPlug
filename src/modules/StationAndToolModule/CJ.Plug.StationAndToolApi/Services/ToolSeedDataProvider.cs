@@ -22,7 +22,7 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "获取NX模型参数",
             ToolVersion = "1.0",
             ToolCompany = "CJ",
-            ToolPath = @"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXGetParameters\bin\Debug\net4.8\NXGetParameters.exe",
+            ToolPath = @"Tools\0System\NXGetParameters.exe",
             CommandParameter = "[ToolPath] [ModelFilePath]",
             ToolType = ToolTypeEnum.桌面类_商业.ToString(),
             ToolDescription = "获取NX模型参数"
@@ -32,7 +32,7 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "设置NX模型参数",
             ToolVersion = "1.0",
             ToolCompany = "CJ",
-            ToolPath = @"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXUpdateParameters\bin\Debug\net4.8\NXUpdateParameters.exe",
+            ToolPath = @"Tools\0System\NXUpdateParameters.exe",
             CommandParameter = "[ToolPath] [ModelFilePath] [NewParameterString]",
             ToolType = ToolTypeEnum.桌面类_商业.ToString(),
             ToolDescription = "设置NX模型参数"
@@ -42,7 +42,7 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "NX模型转STL",
             ToolVersion = "1.0",
             ToolCompany = "CJ",
-            ToolPath = @"D:\Pro\CJ.Plug-Aspire\src\PlugToolIntegrations\NXToStl\bin\Debug\net4.8\NXToStl.exe",
+            ToolPath = @"Tools\0System\NXToStl.exe",
             CommandParameter = "[ToolPath] [ModelFilePath] [StlFilePath]",
             ToolType = ToolTypeEnum.桌面类_商业.ToString(),
             ToolDescription = "NX模型转STL"
@@ -52,7 +52,8 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "NX",
             ToolVersion = "12.0",
             ToolCompany = "Siemens",
-            ToolPath = @"C:\Program Files\Siemens\NX 12.0\NXBIN\ugraf.exe",
+            SkipDownloadToStation = true,
+            ToolPath = @"Tools\0System\ugraf.exe",
             ToolDescription = "NX 软件（前身为 Unigraphics，简称 UG）是由西门子数字工业软件（Siemens Digital Industries Software）开发和维护的，集 CAD、CAM、CAE 于一体的高效紧密集成软件。"
         },
         new()
@@ -60,6 +61,8 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "CMD",
             ToolVersion = "1.0",
             ToolCompany = "Microsoft",
+            IsSystemInitTool = true,
+            SkipDownloadToStation = true,
             ToolPath = @"C:\Windows\System32\cmd.exe",
             CommandParameter = "[CMDCommand]",
             ToolType = ToolTypeEnum.桌面类_商业.ToString(),
@@ -69,28 +72,42 @@ public class ToolSeedDataProvider : ISeedDataProvider
         {
             ToolName = "Nastran",
             ToolVersion = "2019",
-            ToolPath = @"C:\Program Files\MSC.Software\MSC Nastran 2019\bin\nastran.exe",
+            ToolPath = @"Tools\0System\nastran.exe",
+            SkipDownloadToStation = true,
             ToolDescription = "Nastran是进行网格计算的求解器"
+        },
+        new()
+        {
+            ToolName = "Patran",
+            ToolVersion = "20122",
+            ToolCompany = "MSC Software",
+            SkipDownloadToStation = true,
+            ToolPath = @"C:\MSC.Software\Patran\20122\bin\patran.exe",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = "Patran是MSC Software的有限元前后处理器，用于网格划分、载荷施加和结果可视化"
         },
         new()
         {
             ToolName = "Word",
             ToolVersion = "2016",
             ToolCompany = "Microsoft",
-            ToolDescription = "Microsoft Word 是一款文字处理软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"
+            ToolDescription = "Microsoft Word 是一款文字处理软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。",
+            SkipDownloadToStation = true,
         },
         new()
         {
             ToolName = "Excel",
             ToolVersion = "2016",
             ToolCompany = "Microsoft",
-            ToolDescription = "Microsoft Excel 是一款电子表格软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"
+            ToolDescription = "Microsoft Excel 是一款电子表格软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。",
+            SkipDownloadToStation = true,
         },
         new()
         {
             ToolName = "PowerPoint",
             ToolVersion = "2016",
             ToolCompany = "Microsoft",
+            SkipDownloadToStation = true,
             ToolDescription = "Microsoft PowerPoint 是一款幻灯片演示软件，是微软公司的办公软件套装 Microsoft Office 中的一个组成部分。"
         },
         new()
@@ -98,7 +115,19 @@ public class ToolSeedDataProvider : ISeedDataProvider
             ToolName = "VS",
             ToolVersion = "2022",
             ToolCompany = "Microsoft",
+            SkipDownloadToStation = true,
             ToolDescription = "Visual Studio 是一种由微软公司开发的集成开发环境（IDE），用于开发计算机程序、网站、网页应用程序、网页服务和移动应用程序。"
+        },
+        new()
+        {
+            ToolName = ".NET Framework 桥接程序",
+            ToolVersion = "1.0",
+            IsSystemInitTool = true,
+            ToolCompany = "CJ",
+            ToolPath = @"Tools\0System\DotnetCoreBridgeToDotnetFramework.exe",
+            CommandParameter = "[ToolPath] --codefile [CodeFilePath] --dlls [DllPaths]",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = ".NET Framework 桥接程序，用于在 .NET Framework 4.8 环境中执行 C# 代码，支持 DLL 引用和环境变量。\n参数说明：--codefile 代码文件路径，--dlls 分号分隔的 DLL 文件路径列表。\n系统内置工具，由 CSharpPlug 通过工具调度系统自动调用。"
         }
     ];
 

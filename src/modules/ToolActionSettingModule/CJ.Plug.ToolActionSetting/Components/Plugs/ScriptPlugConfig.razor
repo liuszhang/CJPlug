@@ -4,6 +4,22 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 <MudDivider Class="my-2"></MudDivider>
+
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Style="margin-right:16px;">脚本类型</MudText>
+    <MudSelect T="string" @bind-Value="@ScriptType" Label="选择脚本类型" Style="width:200px;"
+               Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        <MudSelectItem Value="@("Java")">Java</MudSelectItem>
+        <MudSelectItem Value="@("Python")">Python</MudSelectItem>
+        <MudSelectItem Value="@("JavaScript")">JavaScript</MudSelectItem>
+        <MudSelectItem Value="@("CSharp")">C#</MudSelectItem>
+        <MudSelectItem Value="@("Go")">Go</MudSelectItem>
+        <MudSelectItem Value="@("Rust")">Rust</MudSelectItem>
+        <MudSelectItem Value="@("Shell")">Shell</MudSelectItem>
+        <MudSelectItem Value="@("PowerShell")">PowerShell</MudSelectItem>
+    </MudSelect>
+</MudStack>
+
 <MudText Typo="Typo.subtitle2" Color="Color.Primary">脚本配置</MudText>
 
 <MudTabs Elevation="0" ApplyEffectsToContainer="true" PanelClass="pa-2">
@@ -12,7 +28,7 @@
             <MudFileUpload T="IBrowserFile" FilesChanged="@OnScriptFileSelected">
                 <ActivatorContent>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload">
-                        选择Python脚本文件
+                        选择@(ScriptType)脚本文件
                     </MudButton>
                 </ActivatorContent>
             </MudFileUpload>
@@ -26,18 +42,36 @@
         </MudStack>
     </MudTabPanel>
     <MudTabPanel Text="编辑器编写">
-        <MudTextField @bind-Value="@ScriptContent" Margin="Margin.Dense" Label="Python脚本"
-                      Placeholder="在此编写Python脚本..." Variant="Variant.Outlined" Lines="10"
-                      HelperText="直接在编辑器中编写Python脚本代码"></MudTextField>
+        <MudTextField @bind-Value="@ScriptContent" Margin="Margin.Dense" Label="@($"{ScriptType}脚本")"
+                      Placeholder="@($"在此编写{ScriptType}脚本...")" Variant="Variant.Outlined" Lines="10"
+                      HelperText="@($"直接在编辑器中编写{ScriptType}脚本代码")"></MudTextField>
     </MudTabPanel>
 </MudTabs>
 
 @code {
     [Parameter] public EventCallback<string> OnError { get; set; }
     [Parameter] public EventCallback<string> OnInfo { get; set; }
+    [Parameter] public Plug? Plug { get; set; }
 
     private string? ScriptContent { get; set; }
     private string? ScriptFileName { get; set; }
+    private string ScriptType { get; set; } = "Python";
+
+    protected override void OnParametersSet()
+    {
+        if (Plug != null)
+        {
+            // 从插头参数 Script 加载已保存的脚本内容
+            ScriptContent = Plug.GetVariableValue("Script");
+
+            // 从插头配置加载脚本类型，未配置则默认 Python
+            var savedType = Plug.GetPlugSetting("ScriptType");
+            if (!string.IsNullOrEmpty(savedType))
+            {
+                ScriptType = savedType;
+            }
+        }
+    }
 
     private async Task OnScriptFileSelected(IBrowserFile file)
     {
@@ -64,17 +98,20 @@
     /// </summary>
     public void ApplyToPlug(Plug plug)
     {
-        plug.PlugTypeKey = "PythonPlug";
+        // plug.PlugTypeKey = "PythonPlug";
 
-        // 添加脚本类默认参数（与Python插头一致）
-        plug.AddVariable("PythonScript", VariableTypeEnum.String.ToString());
+        // 保存脚本类型到插头配置
+        plug.SetPlugSetting("ScriptType", ScriptType);
+
+        // 添加脚本类默认参数
+        plug.AddVariable("Script", VariableTypeEnum.String.ToString());
         plug.AddVariable("InputData", VariableTypeEnum.String.ToString());
         plug.AddVariable("ResultString", VariableTypeEnum.String.ToString());
 
-        // 设置脚本内容
+        // 设置脚本内容到插头参数 Script
         if (!string.IsNullOrEmpty(ScriptContent))
         {
-            plug.SetVariableValue("PythonScript", ScriptContent);
+            plug.SetVariableValue("Script", ScriptContent);
         }
     }
 }

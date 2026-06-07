@@ -41,7 +41,8 @@ namespace CJ.Plug.Models.Plug
         Content,
 
         //script plug
-        TextMapping
+        TextMapping,
+        ScriptType               //用来保存是何种脚本，如java/python/c#等，插头执行时根据该配置匹配相应的脚本
 
 
 

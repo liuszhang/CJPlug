@@ -20,7 +20,7 @@ namespace ProcessManageModule.Menus
                     Icon = Icons.Material.Filled.Power,
                     Href = "/TAS",
                     Text = "插头管理",
-                    //GroupName = MenuItemGroups.General.Name,
+                    GroupName = MenuGroupEnum.插头管理.ToString(),
                 }
             };
 

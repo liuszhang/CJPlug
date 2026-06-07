@@ -3,6 +3,7 @@ using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Services;
+using CJ.Plug.Models.Shared;
 using CJ.Plug.Models.Station;
 using CJ.Plug.Models.VariableType;
 using CJ.Plug.PlugBaseCore.Contracts;
@@ -32,7 +33,8 @@ namespace CJ.Plug.PlugBaseCore.Services
                 return ERD;
             }
             //1 获取用于执行的图站，这一步决定了工具实际执行的路径
-            var StationToUse = await MainApiClient.GetStationToUseByTool(plugExecutionRequest.ToolName, plugExecutionRequest.ToolVersion);
+            // 如果用户手动指定了图站（SpecifiedStationIp），优先使用该图站
+            var StationToUse = await MainApiClient.GetStationToUseByTool(plugExecutionRequest.ToolName, plugExecutionRequest.ToolVersion, plugExecutionRequest.SpecifiedStationIp);
             if(StationToUse == null)
             {
                 CLog.Error($"未找到可用的图站来执行工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})");
@@ -40,6 +42,15 @@ namespace CJ.Plug.PlugBaseCore.Services
                 ERD.ExecuteSubStatus = JobSubStatus.出错;
                 ERD.ResultString = "可使用的图站为空，请检查配置。";
                 return ERD;
+            }
+            // 确保 StationIp 是完整的 URI 格式（兼容纯 IP 地址或缺少 scheme 的情况）
+            if (!string.IsNullOrEmpty(StationToUse.StationIp))
+            {
+                if (StationToUse.StationIp.StartsWith("://"))
+                    StationToUse.StationIp = "http" + StationToUse.StationIp;
+                else if (!StationToUse.StationIp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                         !StationToUse.StationIp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    StationToUse.StationIp = "http://" + StationToUse.StationIp;
             }
             //1.1 获取图站后，将参数中的文件参数下载至图站，并获取实际的文件路径作为后续工具执行的实际参数值
             foreach (var variable in plugExecutionRequest.InputVariables)
@@ -90,9 +101,9 @@ namespace CJ.Plug.PlugBaseCore.Services
                 Log.Information("根据配置表更新工具路径：" + toolPathByConfig);
                 Tool.ToolPath = toolPathByConfig;
             }
-            //将获取到的工具路径根据不同图站基础地址，拼接成完整的工具执行路径
-            var ToolPath = ParameterGenerator.GenerateToolPath(Tool.ToolPath, StationToUse);
-            Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的最终执行路径为：{ToolPath}");
+            //将获取到的工具路径根据不同图站基础地址，拼接成完整的工具执行路径（仅用于服务端检查）
+            var ToolPath = ParameterGenerator.GenerateToolPath(Tool.ToolPath);
+            Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的服务端路径为：{ToolPath}");
             if (string.IsNullOrEmpty(ToolPath))
             {
                 CLog.Error($"未找到工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的执行路径");
@@ -101,14 +112,80 @@ namespace CJ.Plug.PlugBaseCore.Services
                 ERD.ResultString = $"未找到工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的执行路径";
                 return ERD;
             }
-            plugExecutionRequest.ToolFullPath = ToolPath;
+            // 发送相对路径给图站，由图站根据自身配置的 ToolsRootPath 解析实际路径
+            plugExecutionRequest.ToolFullPath = Tool.ToolPath;
+
+            // 解析工具包根目录的绝对路径
+            var ToolBasePath = ParameterGenerator.GenerateToolPath(Tool.ToolBasePath);
+            Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})的工具包根目录为：{ToolBasePath}");
+
+            // === 检查并下载工具到图站 ===
+            if (!Tool.SkipDownloadToStation)
+            {
+            // 获取工具部署设置
+            var deploySetting = await MainApiClient.GetToolDeploySettingAsync(new ToolConfigFilter
+            {
+                ToolId = Tool.Id,
+                StationId = StationToUse.Id
+            });
+
+            // 仅传递工具名，由图站根据自身配置的 ToolsRootPath 解析安装目录
+            var stationToolDir = Tool.ToolName!;
+
+            bool needDownload = deploySetting?.AlwaysDownloadToStation == true;
+
+            if (!needDownload)
+            {
+                // 检查图站上是否存在工具文件（优先检查图站本地路径，其次检查服务端映射路径）
+                var stationClient = new StationApiClient(new HttpClient
+                {
+                    BaseAddress = new Uri(StationToUse.StationIp)
+                });
+                bool exists = await stationClient.CheckFileExistsAsync(stationToolDir);
+                if (!exists && !string.IsNullOrEmpty(ToolBasePath))
+                    exists = await stationClient.CheckFileExistsAsync(ToolBasePath);
+                if (!exists)
+                    exists = await stationClient.CheckFileExistsAsync(ToolPath);
+                needDownload = !exists;
+                Log.Information(exists
+                    ? $"工具{Tool.ToolName}在图站{StationToUse.StationIp}上已存在"
+                    : $"工具{Tool.ToolName}在图站{StationToUse.StationIp}上不存在，需要下载");
+            }
+
+            if (needDownload)
+            {
+                Log.Information($"开始下载工具 {Tool.ToolName}({Tool.ToolVersion}) 到图站 {StationToUse.StationIp}...");
+                var stationClient = new StationApiClient(new HttpClient
+                {
+                    BaseAddress = new Uri(StationToUse.StationIp)
+                });
+                var downloadResult = await stationClient.DownloadToolAsync(
+                    Tool.ToolName!, Tool.ToolVersion!, stationToolDir, Tool.ToolBasePath ?? Tool.ToolPath);
+
+                if (!downloadResult)
+                {
+                    Log.Error($"下载工具到图站{StationToUse.StationIp}失败");
+                    ERD.ExecuteStatus = JobStatus.完成;
+                    ERD.ExecuteSubStatus = JobSubStatus.出错;
+                    ERD.ResultString = $"下载工具{Tool.ToolName}到图站失败，请检查网络连接和图站状态";
+                    return ERD;
+                }
+                Log.Information($"工具{Tool.ToolName}已成功下载到图站: {stationToolDir}");
+            }
+            }
+            else
+            {
+                Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})已设置为跳过下载至图站，直接使用现有工具路径: {ToolPath}");
+            }
+            // === 检查并下载工具到图站 结束 ===
             //2.2 将命令行中的变量替换为参数的实际值
             plugExecutionRequest.RequestCommand = ParameterGenerator.EvalCommandLine(Command, plugExecutionRequest.InputVariables);
 
             if (plugExecutionRequest.RequestCommand.Contains("[ToolPath]"))
             {
-                //string escapedToolPath = ToolPath.Replace(@"\", @"\\");
-                string escapedToolPath = ToolPath.Replace(@"\\", Path.DirectorySeparatorChar.ToString());
+                // 使用原始相对路径，由图站根据自身 ToolsRootPath 解析实际执行路径
+                var rawToolPath = Tool.ToolPath ?? "";
+                string escapedToolPath = rawToolPath.Replace(@"\\", Path.DirectorySeparatorChar.ToString());
                 escapedToolPath = escapedToolPath.Replace(@"\", Path.DirectorySeparatorChar.ToString());
                 escapedToolPath=$"\"{escapedToolPath}\"";
                 plugExecutionRequest.RequestCommand = plugExecutionRequest.RequestCommand.Replace("[ToolPath]", escapedToolPath);
@@ -127,24 +204,32 @@ namespace CJ.Plug.PlugBaseCore.Services
             //        result?.Ids?.PDZId);
             var pdz = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
             var plugData = pdz?.GetPlugData(result?.Ids?.PlugDefinitionId);
-            var plugTypeKey = plugData.PlugTypeKey;
-            CLog.Information($"插头result?.Ids?.PlugDefinitionId：{result?.Ids?.PlugDefinitionId}");
-            CLog.Information($"插头plugExecutionRequest?.PlugType：{plugTypeKey}");
-            var plug = await MainApiClient.GetRootPlugByTypeNameAsync(plugTypeKey);
-            //var plug = await MainApiClient.GetPlugByDefinitionIdAsync(result?.Ids?.PlugDefinitionId);
-            var plugSetting = plug?.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
-            CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
-            if (plugSetting == "true")
+            if (plugData != null)
             {
-                //CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
-                StatusReporter.ReportStationExecuting(
-                    result?.Ids?.PlugDefinitionId,
-                    StationToUse.StationIp,
-                    result?.Ids?.PDZId);
+                var plugTypeKey = plugData.PlugTypeKey;
+                CLog.Information($"插头result?.Ids?.PlugDefinitionId：{result?.Ids?.PlugDefinitionId}");
+                CLog.Information($"插头plugExecutionRequest?.PlugType：{plugTypeKey}");
+                var plug = await MainApiClient.GetRootPlugByTypeNameAsync(plugTypeKey);
+                //var plug = await MainApiClient.GetPlugByDefinitionIdAsync(result?.Ids?.PlugDefinitionId);
+                var plugSetting = plug?.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
+                CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
+                if (plugSetting == "true")
+                {
+                    //CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
+                    StatusReporter.ReportStationExecuting(
+                        result?.Ids?.PlugDefinitionId,
+                        StationToUse.StationIp,
+                        result?.Ids?.PDZId);
+                }
+            }
+            else
+            {
+                CLog.Warning($"未找到 PlugData，PlugDefinitionId={result?.Ids?.PlugDefinitionId}，跳过远程桌面通知");
             }
 
             return result;
 
         }
+
     }
 }

@@ -87,9 +87,17 @@
                         _ => "未知"
                     };
                 }
-                <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
-                    @statusText
-                </MudChip>
+                <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                    <MudChip Color="@chipColor" Variant="Variant.Filled" Size="Size.Small">
+                        @statusText
+                    </MudChip>
+                    @if (IsUserLocked(context.Item))
+                    {
+                        <MudChip Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+                            已锁定
+                        </MudChip>
+                    }
+                </MudStack>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="创建时间" Sortable="true">
@@ -105,10 +113,32 @@
                 }
                 else
                 {
-
+                    @if (context.Item.Status == (int)DataStatus.Active)
+                    {
+                        <MudTooltip Text="禁用用户">
+                            <MudIconButton Icon="@Icons.Material.Outlined.NoAccounts" OnClick="@(() => ToggleUserStatus(context.Item))" Size="Size.Small" Color="Color.Warning"/>
+                        </MudTooltip>
+                    }
+                    else if (context.Item.Status == (int)DataStatus.Disabled)
+                    {
+                        <MudTooltip Text="启用用户">
+                            <MudIconButton Icon="@Icons.Material.Outlined.HowToReg" OnClick="@(() => ToggleUserStatus(context.Item))" Size="Size.Small" Color="Color.Success"/>
+                        </MudTooltip>
+                    }
+                    @if (IsUserLocked(context.Item))
+                    {
+                        <MudTooltip Text="解锁用户">
+                            <MudIconButton Icon="@Icons.Material.Outlined.LockOpen" OnClick="@(() => ToggleUserLockout(context.Item))" Size="Size.Small" Color="Color.Success"/>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudTooltip Text="锁定用户">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Lock" OnClick="@(() => ToggleUserLockout(context.Item))" Size="Size.Small" Color="Color.Error"/>
+                        </MudTooltip>
+                    }
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" OnClick="@(() => OpenEditDialog(context.Item))" Size="Size.Small"/>
                     <MudIconButton Icon="@Icons.Material.Outlined.Delete" OnClick="@(() => DeleteUser(context.Item))" Size="Size.Small" Color="Color.Error"/>
-
                 }
             </CellTemplate>
         </TemplateColumn>
@@ -285,6 +315,29 @@
         await CreateAuthRequest(AuthOperationType.DeleteUser, $"用户: {user.UserName}", JsonSerializer.Serialize(new { UserId = user.Id, UserName = user.UserName }));
     }
 
+    private async Task ToggleUserStatus(User user)
+    {
+        var currentStatus = (DataStatus)user.Status;
+        var newStatus = currentStatus == DataStatus.Active ? DataStatus.Disabled : DataStatus.Active;
+        var actionText = newStatus == DataStatus.Disabled ? "禁用" : "启用";
+        var operationType = newStatus == DataStatus.Disabled ? AuthOperationType.DisableUser : AuthOperationType.EnableUser;
+        var confirm = await DialogService.ShowMessageBoxAsync($"确认{actionText}", $"确定要提交{actionText}用户 \"{user.UserName}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
+        if (confirm != true) return;
+
+        await CreateAuthRequest(operationType, $"用户: {user.UserName}", JsonSerializer.Serialize(new { UserId = user.Id }));
+    }
+
+    private async Task ToggleUserLockout(User user)
+    {
+        var newLockState = !IsUserLocked(user);
+        var actionText = newLockState ? "锁定" : "解锁";
+        var operationType = newLockState ? AuthOperationType.LockUser : AuthOperationType.UnlockUser;
+        var confirm = await DialogService.ShowMessageBoxAsync($"确认{actionText}", $"确定要提交{actionText}用户 \"{user.UserName}\" 的授权请求吗？", yesText: "提交请求", cancelText: "取消");
+        if (confirm != true) return;
+
+        await CreateAuthRequest(operationType, $"用户: {user.UserName}", JsonSerializer.Serialize(new { UserId = user.Id }));
+    }
+
     private async Task CreateAuthRequest(AuthOperationType operationType, string targetDescription, string operationData)
     {
         try
@@ -313,4 +366,7 @@
             Snackbar.Add($"提交授权请求失败: {ex.Message}", Severity.Error);
         }
     }
+    
+    private static bool IsUserLocked(User user) =>
+        user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
 }

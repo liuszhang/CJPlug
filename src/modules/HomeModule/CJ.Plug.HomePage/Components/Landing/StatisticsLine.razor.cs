@@ -1,56 +1,36 @@
 ﻿using Microsoft.AspNetCore.Components;
-using System.Net.Http.Json;
-using System.Text.Json;
 
 namespace CJ.Plug.HomePage.Components.Landing;
 
 public partial class StatisticsLine
 {
-    private int _stars=19;
-    private int _downloads=260;
+    private int _userCount;
+    private int _toolCount;
+    private int _plugCount;
     private string _version = "1.0.0";
+    private bool _loaded;
 
-    [Inject] private HttpClient HttpClient { get; set; } = null!;
+    [Inject] private MainApiClient ApiClient { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
-        //(_version, _downloads) = await GetVersionAndDownloads();
-        //_stars = await GetStars();
-    }
-
-    private async Task<int> GetStars()
-    {
-        var content = await HttpClient.GetFromJsonAsync<JsonDocument>("https://api.github.com/repos/Blazor-Diagrams/Blazor.Diagrams");
-        if (content == null)
-            return 0;
-
-        return content.RootElement.GetProperty("stargazers_count").GetInt32();
-    }
-
-    private async Task<(string, int)> GetVersionAndDownloads()
-    {
-        var content = await HttpClient.GetFromJsonAsync<JsonDocument>("https://api.nuget.org/v3/index.json");
-        if (content != null)
+        try
         {
-            foreach (var resource in content.RootElement.GetProperty("resources").EnumerateArray())
-            {
-                if (resource.GetProperty("@type").GetString() == "SearchQueryService")
-                {
-                    var url = resource.GetProperty("@id").GetString();
-                    var packageContent = await HttpClient.GetFromJsonAsync<JsonDocument>(url + "?prerelease=true&q=packageid:Z.Blazor.Diagrams");
-                    if (packageContent != null)
-                    {
-                        foreach (var data in packageContent.RootElement.GetProperty("data").EnumerateArray())
-                        {
-                            var version = data.GetProperty("version").GetString()!;
-                            var downloads = data.GetProperty("totalDownloads").GetInt32();
-                            return (version, downloads);
-                        }
-                    }
-                }
-            }
-        }
+            var users = await ApiClient.GetAllUsersAsync();
+            _userCount = users?.Count() ?? 0;
 
-        return ("1.0.0", 0);
+            var tools = await ApiClient.GetAllToolsAsync();
+            _toolCount = tools?.Count ?? 0;
+
+            var plugs = await ApiClient.GetPlugs();
+            _plugCount = plugs?.Count ?? 0;
+
+            _loaded = true;
+        }
+        catch
+        {
+            _loaded = true;
+        }
     }
+
 }

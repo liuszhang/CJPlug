@@ -10,5 +10,13 @@ namespace CJ.Plug.AuthApi.Contracts
         Task<AuthRequestDto?> ApproveAsync(ApproveAuthRequestDto request, CancellationToken cancellationToken = default);
         Task<AuthRequestDto?> CancelAsync(int id, string cancelledBy, CancellationToken cancellationToken = default);
         Task<bool> HasPendingRequestAsync(AuthOperationType operationType, string targetDescription, CancellationToken cancellationToken = default);
+        Task<bool> UnlockSystemAdminAsync(UnlockSystemAdminRequest request, CancellationToken cancellationToken = default);
+    }
+
+    public class UnlockSystemAdminRequest
+    {
+        public string UserName { get; set; } = string.Empty;
+        public string UnlockedBy { get; set; } = string.Empty;
+        public string? Remark { get; set; }
     }
 }

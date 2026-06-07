@@ -24,7 +24,8 @@ namespace IfPlug.Services
                 {
 
                     builder.OpenComponent<IfPlugCommonSettingPage>(sequence++);
-                    //builder.AddAttribute(sequence++, nameof(IfPlugCommonSettingPage.Plug), Plug);
+                    builder.SetKey(context.PlugTypeKey);
+                    builder.AddAttribute(sequence++, nameof(IfPlugCommonSettingPage.Plug), context.Plug);
 
                     builder.CloseComponent();
 

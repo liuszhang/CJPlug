@@ -1,4 +1,4 @@
-﻿@page "/StationAndTool"
+@page "/StationAndTool"
 <PageTitle>图站与工具</PageTitle>
 
 
@@ -14,7 +14,10 @@
 
 <MudTabs>
     <MudTabPanel Text="图站状态">
-        <StationStatusList AllStations="AllStations" OnlineStations="OnlineStations" OnGetStationStatus="GetStationStatus"></StationStatusList>
+        <StationStatusList AllStations="AllStations" OnlineStations="OnlineStations"
+                           OnGetStationStatus="GetStationStatus"
+                           OnSelectedStationChanged="OnSelectedStationChanged">
+        </StationStatusList>
     </MudTabPanel>
     <MudTabPanel Text="工具配置">
         <ToolsManage OnlineStations="OnlineStations"></ToolsManage>
@@ -25,34 +28,50 @@
     public List<Station>? AllStations { get; set; } = new();
     public List<Station>? OnlineStations { get; set; } = new();
 
+    /// <summary>
+    /// 用户手动选择的图站 IP，为空时自动分配
+    /// </summary>
+    public string? SelectedStationIp { get; set; }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+            HubConnectionManagerService._hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>
               {
-                  //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
-                  // 将新日志添加到本地列表并触发UI更新
                   InvokeAsync(async () =>
                   {
                       Console.WriteLine(ip);
-                      await ProcessStationList(ip);
+                      Console.WriteLine(toolsRootPath);
+                      await ProcessStationList(ip, toolsRootPath);
                       StateHasChanged();
                   });
               });
             await GetStationStatus();
         }
-
-        //await TestHub();
     }
 
-    private async Task ProcessStationList(string ip)
+    private void OnSelectedStationChanged(string? stationIp)
     {
+        SelectedStationIp = stationIp;
+        StateHasChanged();
+    }
+
+    private async Task ProcessStationList(string ip, string toolsRootPath)
+    {
+        // 从 DB 刷新图站列表，获取主服务器刚更新的 StationBasePath 等字段
+        var latestStations = await StationAndToolApiClient.GetAllStationsAsync();
+        if (latestStations != null && latestStations.Count > 0)
+        {
+            AllStations = latestStations;
+        }
+
         foreach (var station in AllStations!)
         {
             if (station.StationIp == ip)
             {
                 station.IsStarted = true;
+                station.StationBasePath = toolsRootPath;
                 OnlineStations.Add(station);
             }
             else

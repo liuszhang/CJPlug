@@ -1,7 +1,19 @@
 @page "/AuditManage"
 
 @using CJ.Plug.AuditUI.Components
+@using CJ.Plug.AuthApiClient
+@using CJ.Plug.UserManageApiClient
+@using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.Models.Shared
+@using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
+
+@inject IAuthApiClient AuthApiClient
+@inject IUserManageApiClient UserManageApiClient
+@inject IRoleManageApiClient RoleManageApiClient
+@inject IDomInteropService DomInteropService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>审计管理</PageTitle>
 
@@ -17,6 +29,9 @@
                 <MudNavLink Icon="@Icons.Material.Filled.CleaningServices"
                             OnClick="@(() => SwitchTab("cleanup"))"
                             IsActive="@(_activeTab == "cleanup")">日志清理</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.LockOpen"
+                            OnClick="@(() => SwitchTab("unlock"))"
+                            IsActive="@(_activeTab == "unlock")">账号解锁</MudNavLink>
             </MudNavMenu>
         </MudItem>
 
@@ -31,6 +46,41 @@
                 {
                     <AuditCleanupPanel />
                 }
+                else if (_activeTab == "unlock")
+                {
+                    <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">账号解锁</MudText>
+                        <MudSpacer />
+                        <MudButton OnClick="RefreshUnlock" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
+                    </MudStack>
+
+                    <MudPaper Class="pa-4 mb-4" Elevation="1">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">系统管理员账号解锁</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4">此功能用于解锁因多次登录失败而被锁定的系统管理员账号。请确保您有相应权限。</MudText>
+                        
+                        <MudTable Items="@_lockedSystemAdmins" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>用户名</MudTh>
+                                <MudTh>邮箱</MudTh>
+                                <MudTh>锁定状态</MudTh>
+                                <MudTh>操作</MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="user">
+                                <MudTd>@user.UserName</MudTd>
+                                <MudTd>@user.Email</MudTd>
+                                <MudTd>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">已锁定</MudChip>
+                                </MudTd>
+                                <MudTd>
+                                    <MudIconButton Size="Size.Small" OnClick="@(() => UnlockUser(user.UserName))" Icon="@Icons.Material.Filled.LockOpen" Color="Color.Primary" Title="解锁账号" />
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText>当前没有锁定的系统管理员账号</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudPaper>
+                }
             </div>
         </MudItem>
     </MudGrid>
@@ -38,13 +88,84 @@
 
 @code {
     private string _activeTab = "logs";
+    private List<User> _lockedSystemAdmins = new();
+    private string _currentUser = string.Empty;
 
-    private void SwitchTab(string tab)
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _currentUser = await DomInteropService.GetCurrentUserName() ?? "admin";
+    }
+
+    private async Task SwitchTab(string tab)
     {
         if (_activeTab != tab)
         {
             _activeTab = tab;
+            if (tab == "unlock")
+            {
+                await LoadLockedSystemAdmins();
+            }
             StateHasChanged();
+        }
+    }
+
+    private async void RefreshUnlock()
+    {
+        await LoadLockedSystemAdmins();
+    }
+
+    // ===== 账号解锁相关 =====
+
+    private async Task LoadLockedSystemAdmins()
+    {
+        try
+        {
+            var users = await UserManageApiClient.GetAllUsersAsync();
+            var lockedAdmins = new List<User>();
+            foreach (var user in users)
+            {
+                var isLockedOut = user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+                if (user == null || !isLockedOut) continue;
+                var roles = await UserManageApiClient.GetUserRolesAsync(user.Id);
+                var roleNames = await RoleManageApiClient.GetAllAsync();
+                var isSystemAdmin = roles.Any(r =>
+                {
+                    var role = roleNames.FirstOrDefault(x => x.Id.ToString() == r || x.Name == r);
+                    return role?.Name == "系统管理员" || r == "系统管理员";
+                });
+                if (isSystemAdmin)
+                {
+                    lockedAdmins.Add(user);
+                }
+            }
+            _lockedSystemAdmins = lockedAdmins;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载锁定的系统管理员失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UnlockUser(string userName)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认解锁",
+            $"确定要解锁系统管理员账号 '{userName}' 吗？",
+            yesText: "解锁", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        var success = await AuthApiClient.UnlockSystemAdminAsync(userName, _currentUser);
+        if (success)
+        {
+            Snackbar.Add($"已成功解锁系统管理员账号 '{userName}'", Severity.Success);
+            await LoadLockedSystemAdmins();
+        }
+        else
+        {
+            Snackbar.Add($"解锁失败", Severity.Error);
         }
     }
 }

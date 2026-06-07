@@ -66,15 +66,44 @@ namespace CSharpPlug.Services
             var useDotNetFramework = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.UseDotNetFramework.ToString());
             var useBridge = string.Equals(useDotNetFramework, "true", StringComparison.OrdinalIgnoreCase);
 
+            // 读取环境变量配置
+            var envVars = new Dictionary<string, string>();
+            var envVarsJson = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.EnvironmentVariables.ToString());
+            if (!string.IsNullOrWhiteSpace(envVarsJson))
+            {
+                try
+                {
+                    var vars = JsonSerializer.Deserialize<List<EnvVariableEntry>>(envVarsJson);
+                    if (vars != null)
+                    {
+                        foreach (var v in vars)
+                        {
+                            if (!string.IsNullOrWhiteSpace(v.Key))
+                                envVars[v.Key] = v.Value;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"解析环境变量失败: {ex.Message}");
+                }
+            }
+
             string result;
             if (useBridge)
             {
-                Log.Information("CSharp 使用 .NET Framework 桥接执行");
-                result = await CodeRunner.RunCSharpCodeViaBridgeAsync(code, dllPaths);
+                Log.Information("CSharp 使用 .NET Framework 桥接执行（优先工具调度）");
+                // 传递 serviceProvider 和相关 ID，启用工具调度系统调用
+                result = await CodeRunner.RunCSharpCodeViaBridgeAsync(
+                    code, dllPaths, envVars,
+                    serviceProvider: _serviceProvider,
+                    pdzId: erd.Ids.PDZId,
+                    plugDefinitionId: plugDefinitionId,
+                    correlationId: erd.Ids.JobCorrelationId);
             }
             else
             {
-                result = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths);
+                result = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths, envVars);
             }
 
             Log.Information($"CSharp 执行结果: {result}");
@@ -119,6 +148,12 @@ namespace CSharpPlug.Services
             public string? FileName { get; set; }
             public string? FileId { get; set; }
             public string? LocalPath { get; set; }
+        }
+
+        public class EnvVariableEntry
+        {
+            public string Key { get; set; } = string.Empty;
+            public string Value { get; set; } = string.Empty;
         }
     }
 }

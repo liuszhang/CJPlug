@@ -1,0 +1,127 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="本体标识" @bind-Value="ontology.Name" Disabled="true" />
+            <MudTextField T="string" Label="显示名称" @bind-Value="ontology.DisplayName" />
+            <MudTextField T="string" Label="描述" @bind-Value="ontology.Description" Lines="2" />
+            <MudTextField T="string" Label="分类" @bind-Value="ontology.Category" />
+            <MudTextField T="string" Label="版本" @bind-Value="ontology.Version" />
+            <MudCheckBox T="bool" Label="系统内置" @bind-Checked="ontology.IsSystem" Disabled="true" />
+        </MudStack>
+
+        <MudDivider Class="my-4" />
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.h6">属性字段</MudText>
+            <MudSpacer />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="AddProperty">添加属性</MudButton>
+        </MudStack>
+
+        <MudDataGrid Items="@properties" T="Property" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                <PropertyColumn Property="x => x.Name" Title="标识" />
+                <PropertyColumn Property="x => x.DisplayName" Title="显示名" />
+                <TemplateColumn Title="类型">
+                    <CellTemplate>
+                        <MudChip Label="true" Size="Size.Small" Color="Color.Info">@context.Item.PropertyType</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="必填">
+                    <CellTemplate>
+                        @(context.Item.IsRequired ? "✓" : "")
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.DefaultValue" Title="默认值" />
+                <TemplateColumn Style="text-align:right">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditProperty(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteProperty(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent>
+                <MudText>暂无属性字段，点击"添加属性"创建</MudText>
+            </NoRecordsContent>
+        </MudDataGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int OntologyId { get; set; }
+
+    private Ontology ontology = new();
+    private List<Property> properties = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        ontology = await OntologyManageApiClient.GetOntologyByIdAsync(OntologyId) ?? new Ontology();
+        properties = ontology.Properties?.OrderBy(p => p.SortOrder).ToList() ?? new List<Property>();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        var result = await OntologyManageApiClient.UpdateOntologyAsync(ontology);
+        if (result != null)
+        {
+            Snackbar.Add("保存成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+
+    private async Task AddProperty()
+    {
+        var parameters = new DialogParameters { ["Property"] = new Property { OntologyId = OntologyId, SortOrder = properties.Count } };
+        var dialog = await DialogService.ShowAsync<NewPropertyDialog>("添加属性字段", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            ontology = await OntologyManageApiClient.GetOntologyByIdAsync(OntologyId) ?? new Ontology();
+            properties = ontology.Properties?.OrderBy(p => p.SortOrder).ToList() ?? new List<Property>();
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditProperty(Property prop)
+    {
+        var parameters = new DialogParameters { ["Property"] = prop };
+        var dialog = await DialogService.ShowAsync<NewPropertyDialog>("编辑属性字段", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            ontology = await OntologyManageApiClient.GetOntologyByIdAsync(OntologyId) ?? new Ontology();
+            properties = ontology.Properties?.OrderBy(p => p.SortOrder).ToList() ?? new List<Property>();
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteProperty(Property prop)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要删除属性 '{prop.DisplayName}' 吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            await OntologyManageApiClient.DeletePropertyAsync(prop.Id);
+            ontology = await OntologyManageApiClient.GetOntologyByIdAsync(OntologyId) ?? new Ontology();
+            properties = ontology.Properties?.OrderBy(p => p.SortOrder).ToList() ?? new List<Property>();
+            StateHasChanged();
+        }
+    }
+}

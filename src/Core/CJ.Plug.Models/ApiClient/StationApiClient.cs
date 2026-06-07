@@ -3,6 +3,7 @@ using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.VariableType;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 public class StationApiClient(HttpClient httpClient)
@@ -100,6 +101,7 @@ public class StationApiClient(HttpClient httpClient)
             var ExecuteResultData = ExecuteRequest.ExecuteResultData ?? new ExecuteResultData();
             ExecuteResultData.ResultString = resultString;
             ExecuteResultData.ExecuteSubStatus = status;
+            ExecuteResultData.ExecuteStatus = JobStatus.完成;
             Console.WriteLine($"发送执行结果状态：{JsonSerializer.Serialize(ExecuteResultData)}");
             var result = await httpClient.PostAsJsonAsync<ExecuteResultData>("/api/station/reportResult", ExecuteResultData);
             if (!result.IsSuccessStatusCode)
@@ -136,6 +138,32 @@ public class StationApiClient(HttpClient httpClient)
             CLog.Error($"图站下载文件{fileId}失败，状态码：{response.StatusCode}");
             return string.Empty;
         }
+    }
+
+    public async Task<bool> CheckFileExistsAsync(string filePath)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new { filePath }), Encoding.UTF8, "application/json");
+        var response = await httpClient.PostAsync("/api/station/fileExists", content);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<bool>(result);
+        }
+        return false;
+    }
+
+    public async Task<bool> DownloadToolAsync(string toolName, string toolVersion, string targetPath, string? toolFilePath = null)
+    {
+        var payload = new
+        {
+            toolName,
+            toolVersion,
+            targetPath,
+            toolFilePath
+        };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await httpClient.PostAsync("/api/station/downloadTool", content);
+        return response.IsSuccessStatusCode;
     }
 }
 

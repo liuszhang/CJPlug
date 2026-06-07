@@ -35,6 +35,8 @@ namespace CJ.Plug.Models.Plug
         //public bool IsPlugIning { get; set; } = false;
         //执行时是否只执行动作而忽略插头本身执行
         public bool OnlyExecuteAction { get; set; } = false;
+        public bool SupportNoWindow { get; set; } = true;
+        public bool NeedToolEnvirment { get; set; } = true;
         //当作为流程执行时的触发活动ID,已经转移到PDZ中，弃用
         [Obsolete]
         public string? TriggerPlugDefinitionId { get; set; }

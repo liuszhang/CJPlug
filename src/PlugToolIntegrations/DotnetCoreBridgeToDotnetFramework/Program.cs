@@ -94,11 +94,15 @@ namespace DotnetCoreBridgeToDotnetFramework
                 // 将统一 DLL 目录加入 Windows 搜索路径（AddDllDirectory 保留默认搜索顺序）
                 AddDllDirectory(dllDir);
 
-                // 如果设置了 NX 安装路径，也加入搜索
-                var nxUgii = Environment.GetEnvironmentVariable("NX_UGII_ROOT");
-                if (!string.IsNullOrEmpty(nxUgii) && Directory.Exists(nxUgii))
+                // 从父进程传入的通用 DLL 搜索目录列表（分号分隔）
+                var dllDirs = Environment.GetEnvironmentVariable("BRIDGE_DLL_DIRS");
+                if (!string.IsNullOrEmpty(dllDirs))
                 {
-                    AddDllDirectory(nxUgii);
+                    foreach (var dir in dllDirs.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (Directory.Exists(dir))
+                            AddDllDirectory(dir);
+                    }
                 }
 
                 // 退出时清理

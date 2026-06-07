@@ -10,15 +10,18 @@ namespace StationSettingUI.Components;
 /// </summary>
 public partial class TaskList : UserControl
 {
-    private readonly StationConfigService _configService;
+    private readonly StationSettingUI.Services.StationConfigService _configService;
     private readonly StationApiService _apiService;
     private AppConfig _config;
     private bool _isInitialized;
 
+    /// <summary>全量任务数据（服务端原始数据）</summary>
+    private List<StationTaskInfo> _allTasks = new();
+
     public TaskList()
     {
         InitializeComponent();
-        _configService = new StationConfigService();
+        _configService = new StationSettingUI.Services.StationConfigService();
         _config = _configService.LoadConfig();
         _apiService = new StationApiService(_config);
     }
@@ -78,21 +81,82 @@ public partial class TaskList : UserControl
         TxtStatus.Text = "正在加载...";
 
         var tasks = await _apiService.GetTasksAsync();
-        GridTasks.Items.Clear();
+        _allTasks = tasks ?? new List<StationTaskInfo>();
 
-        if (tasks != null)
+        ApplyFilter();
+        TxtStatus.Text = tasks != null ? "加载完成" : "服务无响应";
+    }
+
+    /// <summary>
+    /// 根据当前筛选条件过滤并刷新 DataGrid
+    /// </summary>
+    private void ApplyFilter()
+    {
+        // XAML 解析期间 CmbStatusFilter.IsSelected 会提前触发 Filter_Changed，
+        // 此时后续控件尚未创建，需判空保护
+        if (CmbStatusFilter == null || TxtToolFilter == null ||
+            TxtTypeFilter == null || TxtKeywordFilter == null || GridTasks == null)
+            return;
+
+        var filtered = _allTasks.AsEnumerable();
+
+        // 状态筛选
+        var statusTag = (CmbStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        if (!string.IsNullOrEmpty(statusTag) && statusTag != "all")
+            filtered = filtered.Where(t => t.Status == statusTag);
+
+        // 工具名筛选（模糊匹配）
+        var toolFilter = TxtToolFilter.Text?.Trim();
+        if (!string.IsNullOrEmpty(toolFilter))
+            filtered = filtered.Where(t =>
+                t.ToolName?.Contains(toolFilter, StringComparison.OrdinalIgnoreCase) == true);
+
+        // 类型筛选（模糊匹配）
+        var typeFilter = TxtTypeFilter.Text?.Trim();
+        if (!string.IsNullOrEmpty(typeFilter))
+            filtered = filtered.Where(t =>
+                t.PlugTypeKey?.Contains(typeFilter, StringComparison.OrdinalIgnoreCase) == true);
+
+        // 关键词筛选（搜索命令、关联ID、子状态）
+        var keyword = TxtKeywordFilter.Text?.Trim();
+        if (!string.IsNullOrEmpty(keyword))
         {
-            foreach (var t in tasks)
-                GridTasks.Items.Add(t);
+            filtered = filtered.Where(t =>
+                (t.Command?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true) ||
+                (t.CorrelationId?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true) ||
+                (t.SubStatus?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true));
         }
 
+        GridTasks.Items.Clear();
+        foreach (var t in filtered)
+            GridTasks.Items.Add(t);
+
         UpdateSummary();
-        TxtStatus.Text = tasks != null ? "加载完成" : "服务无响应";
+    }
+
+    /// <summary>
+    /// 筛选条件变更时重新过滤
+    /// </summary>
+    private void Filter_Changed(object sender, EventArgs e)
+    {
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// 清除所有筛选条件
+    /// </summary>
+    private void BtnClearFilter_Click(object sender, RoutedEventArgs e)
+    {
+        CmbStatusFilter.SelectedIndex = 0;
+        TxtToolFilter.Text = "";
+        TxtTypeFilter.Text = "";
+        TxtKeywordFilter.Text = "";
     }
 
     private void UpdateSummary()
     {
         var count = GridTasks.Items.Count;
+        var total = _allTasks.Count;
         var running = 0;
         var completed = 0;
         var failed = 0;
@@ -107,6 +171,9 @@ public partial class TaskList : UserControl
             }
         }
 
-        TxtSummary.Text = $"共 {count} 个任务 | 执行中: {running} | 已完成: {completed} | 失败: {failed}";
+        if (count == total)
+            TxtSummary.Text = $"共 {count} 个任务 | 执行中: {running} | 已完成: {completed} | 失败: {failed}";
+        else
+            TxtSummary.Text = $"显示 {count}/{total} 个任务 | 执行中: {running} | 已完成: {completed} | 失败: {failed}";
     }
 }

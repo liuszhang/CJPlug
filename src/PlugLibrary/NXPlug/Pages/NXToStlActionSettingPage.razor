@@ -1,0 +1,32 @@
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugAction
+@using MudBlazor
+@using NXPlug
+
+<MudAlert Dense>NX 模型转 STL 参数定义</MudAlert>
+
+<MudStack Spacing="2">
+    <MudTextField T="string" Label="PRT文件路径" Variant="Variant.Outlined"
+                  HelperText="NX 部件文件（.prt）的完整路径" />
+    <MudTextField T="string" Label="STL输出路径" Variant="Variant.Outlined"
+                  HelperText="STL 输出文件的完整路径" />
+    <MudGrid>
+        <MudItem xs="6">
+            <MudTextField T="string" Label="弦高公差 (mm)" Variant="Variant.Outlined"
+                          HelperText="控制网格精度，默认 0.08" />
+        </MudItem>
+        <MudItem xs="6">
+            <MudTextField T="string" Label="邻接公差 (mm)" Variant="Variant.Outlined"
+                          HelperText="控制面缝合精度，默认 0.08" />
+        </MudItem>
+    </MudGrid>
+    <MudCheckBox T="bool" Label="自动生成法线" Color="Color.Primary" />
+</MudStack>
+
+@code {
+    [Parameter]
+    public Plug? Plug { get; set; }
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+}

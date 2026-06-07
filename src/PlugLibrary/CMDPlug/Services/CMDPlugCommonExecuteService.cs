@@ -3,172 +3,147 @@ using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
+using CJ.Plug.PlugBaseCore.Services;
 using CJ.Plug.PlugDataZoneApiClient;
 using CMDPlug;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 
-public class CMDPlugCommonExecuteService : BasePlugExecuteService
+/// <summary>
+/// CMD 插头通用执行服务。
+/// 继承 <see cref="StationPlugExecuteService"/> 获得两阶段状态机（提交→图站执行完成）的通用能力。
+/// </summary>
+public class CMDPlugCommonExecuteService : StationPlugExecuteService
 {
-    private IToolExecuteService ToolExecuteService { get; set; }
-
-    public CMDPlugCommonExecuteService(IServiceProvider serviceProvider, IToolExecuteService toolExecuteService) : base(serviceProvider)
+    public CMDPlugCommonExecuteService(IServiceProvider serviceProvider) : base(serviceProvider)
     {
-        ToolExecuteService = toolExecuteService;
     }
+
+    // ========================= 抽象实现 =========================
+
+    protected override string ToolName => "CMD";
+    protected override string ToolVersion => "1.0";
+    protected override string[]? DataPrepareVariableNames => Enum.GetNames(typeof(InitVariableNames));
+    protected override string ResultStringVariableName => InitVariableNames.ResultString.ToString();
 
     public override bool IsThisPlugTypeKey(string? PlugTypeKey) => (PlugTypeKey == PlugKeySetting.CommonExecuteKey);
 
-    public override async Task<ExecuteResultData?> PlugCommonExecute(ExecuteServiceContext context)
-    {
-        Plug plug = context.plugToExecute;
-        PlugExecutionRequest? plugExecutionRequest = context.plugExecutionRequest;
+    // ========================= 提交逻辑 =========================
 
-        var resultData = plugExecutionRequest.ExecuteResultData;
-        var status = plugExecutionRequest.ExecuteResultData?.ExecuteSubStatus;
-        if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames))))
-            return await ReportErrorResult(resultData);
-        CLog.Information($"开始执行CMD插头，状态为{status.ToString()}", context.plugExecutionRequest.ExecuteResultData.Ids.PDZId);
-        if (status == JobSubStatus.提交)
-        {
-            resultData = await SubmitCmdExecute(plugExecutionRequest);
-            return await ExecuteResultReport(resultData);
-        }
-        else if (status==JobSubStatus.图站执行完成)
-        {
-            Log.Information("图站执行完成，执行CMD插头数据后处理");
-            //if (plugExecutionRequest.ExecuteMode==ExecuteMode.Standalone)
-            //{
-            //    Log.Information("独立执行模型，直接返回结果数据");
-            //    resultData.ExecuteStatus = JobStatus.完成;
-            //    resultData.ExecuteSubStatus = JobSubStatus.已完成;
-            //    return await ExecuteResultReport(resultData);
-            //}
-            try
-            {
-                //非独立执行模式，需要更新相关PDZ数据
-                //将plugExecutionRequest.ExecuteResultData的值写入相应的数据空间
-                //Log.Information($"PDZ:{plugExecutionRequest.ExecuteResultData.Ids.PDZId}");
-                PDZApiClient= PDZApiClient??_serviceProvider.GetRequiredService<IPDZApiClient>();
-                var PDZ = await PDZApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.ExecuteResultData.Ids.PDZId);
-                var resultString = plugExecutionRequest.ExecuteResultData.ResultString;
-                var execteId = plugExecutionRequest.ExecuteResultData.Ids?.ExecuteTaskPlugIds?[0];
-                var identityId = execteId.Contains("|") ? execteId.Split('|')[1] : null;
-                if (identityId == null)
-                {
-                    PDZ?.SetVariableValue(plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId, InitVariableNames.ResultString.ToString(), resultString);
-                }
-                else
-                {
-                    PDZ?.SetActionVariableValue(plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId, identityId, InitVariableNames.ResultString.ToString(), resultString);                    
-                }
-                await PDZApiClient.CreateOrUpdatePDZ(PDZ);
-                resultData.ExecuteStatus= JobStatus.完成;
-                resultData.ExecuteSubStatus = JobSubStatus.已完成;
-                return await ExecuteResultReport(resultData);
-            }
-            catch (Exception ex)
-            {
-                CLog.Error($"{plug.Name}后处理执行失败：{ex.Message}");
-                resultData.ExecuteStatus = JobStatus.完成;
-                resultData.ExecuteSubStatus = JobSubStatus.出错;
-                return await ((IPlugCommonExecute)this).ExecuteResultReport(MainApiClient, resultData);
-            }
-        }
-        return await ExecuteResultReport(resultData);
-    }
-
-    /// <summary>
-    /// 获取PDZ中指定插头的命令行数据
-    /// </summary>
-    /// <param name="plugDataZone"></param>
-    /// <param name="PlugDefinitionId"></param>
-    /// <param name="IdentityId"></param>
-    /// <returns></returns>
-    private string? GetCMDCommandLine(PlugDataZone plugDataZone,string PlugDefinitionId,string? IdentityId=null)
+    protected override async Task<ExecuteResultData?> SubmitAsync(PlugExecutionRequest executionRequest)
     {
-        if (IdentityId == null)
+        if (executionRequest.ExecuteMode == ExecuteMode.Standalone)
         {
-            var commandLine = plugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.CMDCommand.ToString());
-            return commandLine;
+            return await SubmitStandalone(executionRequest);
         }
         else
         {
-            var commandLine = plugDataZone.ActionVariableDatas?
-                .Where(p => p.ActionIdentityId == IdentityId)
-                .Where(p => p.Name == InitVariableNames.CMDCommand.ToString())
-                .FirstOrDefault()?.Value;
-            return commandLine;
+            return await SubmitNormal(executionRequest);
         }
     }
 
-    public async Task<ExecuteResultData?> SubmitCmdExecute(PlugExecutionRequest? plugExecutionRequest)
+    /// <summary>
+    /// Standalone 模式（MCP Plugin 类型）：从 InputVariables 读取 MCP 传入的参数
+    /// </summary>
+    private async Task<ExecuteResultData?> SubmitStandalone(PlugExecutionRequest executionRequest)
     {
-        var resultData = plugExecutionRequest.ExecuteResultData;
-
-        var execteId = plugExecutionRequest.ExecuteResultData.Ids?.ExecuteTaskPlugIds?[0];
-        //包含|则表示执行的是插头的动作
-        var identityId = execteId.Contains("|") ? execteId.Split('|')[1] : null;
-        var ExecutionRequest = plugExecutionRequest ?? new PlugExecutionRequest();
-        //工具信息是插头特有的，CMD插头就指定调用CDM 1.0工具
-        ExecutionRequest.ToolName = "CMD";
-        ExecutionRequest.ToolVersion = "1.0";
         var inputs = new List<PlugVariableData>();
-        if (plugExecutionRequest.ExecuteMode != ExecuteMode.Standalone)
+        var inputVars = executionRequest.InputVariables;
+        if (inputVars != null && inputVars.Count > 0)
         {
-            PDZApiClient = PDZApiClient ?? _serviceProvider.GetRequiredService<IPDZApiClient>();
+            var cmd = inputVars.FirstOrDefault(v => v.Name == "command")?.Value;
+            var args = inputVars.Where(v => v.Name == "arguments")
+                .Select(v => v.Value)
+                .Where(v => !string.IsNullOrEmpty(v));
+            var workingDir = inputVars.FirstOrDefault(v => v.Name == "workingDirectory")?.Value;
+            var timeout = inputVars.FirstOrDefault(v => v.Name == "timeout")?.Value;
 
-            var PDZ = await PDZApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.ExecuteResultData.Ids?.PDZId);
-            if (PDZ == null)
+            var cmdCommand = cmd;
+            if (args.Any())
+                cmdCommand += " " + string.Join(" ", args);
+
+            if (!string.IsNullOrEmpty(cmdCommand))
             {
-                CLog.Error($"未找到数据空间：{plugExecutionRequest.ExecuteResultData.Ids?.PDZId}");
-                resultData.ExecuteStatus = JobStatus.完成;
-                resultData.ExecuteSubStatus = JobSubStatus.出错;
-                return resultData;
+                inputs.Add(new PlugVariableData
+                {
+                    Name = InitVariableNames.CMDCommand.ToString(),
+                    Value = cmdCommand
+                });
             }
-            inputs.Add(new PlugVariableData
+            if (!string.IsNullOrEmpty(workingDir))
             {
-                Name = InitVariableNames.CMDCommand.ToString(),
-                Value = GetCMDCommandLine(PDZ, plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId, identityId)
-            });
-            // 获取执行超时参数，作为命令参数传入
-            var timeoutValue = GetPDZVariableValue(PDZ, plugExecutionRequest.ExecuteResultData.Ids.PlugDefinitionId,
-                InitVariableNames.ExecutionTimeout.ToString(), identityId);
-            if (!string.IsNullOrEmpty(timeoutValue))
+                inputs.Add(new PlugVariableData
+                {
+                    Name = InitVariableNames.RedirectWorkPath.ToString(),
+                    Value = workingDir
+                });
+            }
+            if (!string.IsNullOrEmpty(timeout))
             {
                 inputs.Add(new PlugVariableData
                 {
                     Name = InitVariableNames.ExecutionTimeout.ToString(),
-                    Value = timeoutValue
+                    Value = timeout
                 });
             }
         }
-        //将插头的实际参数信息放入执行请求中（如果是独立执行模式，放的是个空的）
-        ExecutionRequest.InputVariables.AddRange(inputs);
-        resultData = await ToolExecuteService.ExecuteToolAsync(ExecutionRequest);
-        return resultData;
+
+        executionRequest.InputVariables.Clear();
+        executionRequest.InputVariables.AddRange(inputs);
+        return await ToolExecuteService!.ExecuteToolAsync(executionRequest);
     }
 
     /// <summary>
-    /// 获取PDZ中指定插头的变量值（兼容普通变量和动作变量）
+    /// 普通模式：从 PDZ 读取变量后提交到图站执行
     /// </summary>
-    private string? GetPDZVariableValue(PlugDataZone plugDataZone, string plugDefinitionId, string variableName, string? identityId = null)
+    private async Task<ExecuteResultData?> SubmitNormal(PlugExecutionRequest executionRequest)
     {
-        if (identityId == null)
+        var resultData = executionRequest.ExecuteResultData!;
+        PDZApiClient ??= _serviceProvider.GetRequiredService<IPDZApiClient>();
+
+        var PDZ = await PDZApiClient.GetPDZByPDZIdAsync(executionRequest.ExecuteResultData.Ids?.PDZId);
+        if (PDZ == null)
         {
-            return plugDataZone.GetVariableValue(plugDefinitionId, variableName);
+            CLog.Error($"未找到数据空间：{executionRequest.ExecuteResultData.Ids?.PDZId}");
+            resultData.ExecuteStatus = JobStatus.完成;
+            resultData.ExecuteSubStatus = JobSubStatus.出错;
+            return resultData;
         }
-        else
+
+        var plugDefinitionId = executionRequest.ExecuteResultData.Ids!.PlugDefinitionId!;
+        var identityId = ParseIdentityId(executionRequest);
+
+        var inputs = new List<PlugVariableData>
         {
-            return plugDataZone.ActionVariableDatas?
-                .Where(p => p.ActionIdentityId == identityId)
-                .Where(p => p.Name == variableName)
-                .FirstOrDefault()?.Value;
+            new()
+            {
+                Name = InitVariableNames.CMDCommand.ToString(),
+                Value = GetCMDCommandLine(PDZ, plugDefinitionId, identityId)
+            }
+        };
+
+        // 执行超时参数
+        var timeoutValue = GetPDZVariableValue(PDZ, plugDefinitionId,
+            InitVariableNames.ExecutionTimeout.ToString(), identityId);
+        if (!string.IsNullOrEmpty(timeoutValue))
+        {
+            inputs.Add(new PlugVariableData
+            {
+                Name = InitVariableNames.ExecutionTimeout.ToString(),
+                Value = timeoutValue
+            });
         }
+
+        executionRequest.InputVariables.AddRange(inputs);
+        return await ToolExecuteService!.ExecuteToolAsync(executionRequest);
     }
 
-    
+    // ========================= 辅助方法 =========================
 
-
+    /// <summary>
+    /// 获取 PDZ 中 CMDCommand 变量的值（兼容普通变量和动作变量）
+    /// </summary>
+    private string? GetCMDCommandLine(PlugDataZone pdz, string plugDefinitionId, string? identityId = null)
+    {
+        return GetPDZVariableValue(pdz, plugDefinitionId, InitVariableNames.CMDCommand.ToString(), identityId);
+    }
 }
-

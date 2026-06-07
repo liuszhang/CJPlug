@@ -1,3 +1,4 @@
+using CJ.Plug.ApiServer;
 using CJ.Plug.ElsaIntegration.ApiClient;
 using CJ.Plug.ElsaIntegration.Contracts;
 using CJ.Plug.ElsaIntegration.Services;
@@ -61,6 +62,10 @@ Log.Logger = new LoggerConfiguration()
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
+// 全局 JSON 序列化配置：忽略循环引用
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
+
 //builder.AddNpgsqlDataSource("postgresdb");
 //builder.AddNpgsqlDataSource("NpgsqlConnectionString");
 
@@ -92,6 +97,20 @@ builder.Services.AddOpenApiDocument(configure =>
 {
     configure.Title = "Main API";
 });
+
+// 添加CORS服务
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// 添加打包模块服务
+builder.Services.AddPackageModuleServices();
 
 builder.Services.ConfigModuleApiServices();
 //单独添加用户认证相关服务
@@ -180,11 +199,17 @@ app.UseAuthentication();
 // 必须先调用 UseRouting
 app.UseRouting();
 
+// 启用CORS
+app.UseCors("AllowAll");
+
 app.UseAntiforgery();
 app.UseWebSockets(); // 添加 WebSocket 支持 (VNC/SSH 代理)
 
 //添加各模块的注入端点
 app.ConfigModuleApis();
+
+// 添加打包模块API
+app.AddPackageModuleApi();
 
 //aspire相关服务
 app.MapDefaultEndpoints();

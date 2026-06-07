@@ -1,0 +1,173 @@
+@using CJ.Plug.Models.Knowledge
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid>
+                @* 图标上传区域 *@
+                <MudItem xs="12" Style="display: flex; justify-content: center;">
+                    @if (!string.IsNullOrEmpty(_iconPreview))
+                    {
+                        <MudFileUpload T="IBrowserFile" FilesChanged="OnIconSelected" Accept="image/*">
+                            @* <SelectedTemplate>
+                                <div style="position: relative; width: 96px; height: 96px; cursor: pointer;"
+                                     @onclick="context.OpenFilePickerAsync">
+                                    <MudImage Src="@_iconPreview" Width="96" Height="96" ObjectFit="ObjectFit.Cover"
+                                              Style="border-radius: 50%;" />
+                                    <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); border-radius: 0 0 50% 50%; text-align: center; padding: 2px;">
+                                        <MudText Typo="Typo.caption" Style="color: white;">更换</MudText>
+                                    </div>
+                                </div>
+                            </SelectedTemplate> *@
+                           <CustomContent>
+                                <div style="position: relative; width: 96px; height: 96px; cursor: pointer;"
+                                     @onclick="context.OpenFilePickerAsync">
+                                    <MudImage Src="@_iconPreview" Width="96" Height="96" ObjectFit="ObjectFit.Cover"
+                                              Style="border-radius: 50%;" />
+                                    <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); border-radius: 0 0 50% 50%; text-align: center; padding: 2px;">
+                                        <MudText Typo="Typo.caption" Style="color: white;">更换</MudText>
+                                    </div>
+                                </div>
+                            </CustomContent>
+                        </MudFileUpload>
+                    }
+                    else
+                    {
+                        <MudFileUpload T="IBrowserFile" FilesChanged="OnIconSelected" Accept="image/*">
+                            <SelectedTemplate>
+                                <div style="width: 96px; height: 96px;"></div>
+                            </SelectedTemplate>
+                            <CustomContent>
+                                <MudIconButton Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large"
+                                               Color="Color.Primary" OnClick="context.OpenFilePickerAsync"
+                                               Style="width: 96px; height: 96px; border: 2px dashed var(--mud-palette-lines-defaults); border-radius: 50%;" />
+                            </CustomContent>
+                        </MudFileUpload>
+                    }
+                </MudItem>
+                @if (!string.IsNullOrEmpty(_iconPreview))
+                {
+                    <MudItem xs="12" Style="display: flex; justify-content: center;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                                   OnClick="ClearIcon" StartIcon="@Icons.Material.Filled.Delete">
+                            清除图标
+                        </MudButton>
+                    </MudItem>
+                }
+                <MudItem xs="12">
+                    <MudTextField Label="知识库名称" @bind-Value="_model.Name" Required="true"
+                                  RequiredError="知识库名称为必填项"
+                                  Validation="@ValidateName" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="描述" @bind-Value="_model.Description" Lines="3" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudNumericField T="int" Label="排序" @bind-Value="_model.Order" Min="0" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public bool IsEdit { get; set; }
+
+    [Parameter] public KnowledgeBase? EditItem { get; set; }
+
+    /// <summary>
+    /// 已有的知识库列表（用于名称唯一性校验）
+    /// </summary>
+    [Parameter] public List<KnowledgeBase> ExistingBases { get; set; } = new();
+
+    private KnowledgeBase _model = new();
+    private MudForm? _form;
+    private string? _iconPreview;
+
+    protected override void OnParametersSet()
+    {
+        if (IsEdit && EditItem is not null)
+        {
+            _model = new KnowledgeBase
+            {
+                Id = EditItem.Id,
+                Name = EditItem.Name,
+                Description = EditItem.Description,
+                IconUrl = EditItem.IconUrl,
+                Order = EditItem.Order
+            };
+            _iconPreview = EditItem.IconUrl;
+        }
+        else
+        {
+            _model = new KnowledgeBase();
+            _iconPreview = null;
+        }
+    }
+
+    private IEnumerable<string> ValidateName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            yield return "知识库名称为必填项";
+            yield break;
+        }
+
+        var duplicate = ExistingBases.Any(b =>
+            b.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            b.Id != _model.Id);
+        if (duplicate)
+        {
+            yield return "知识库名称已存在，请使用其他名称";
+        }
+    }
+
+    private async Task OnIconSelected(IBrowserFile file)
+    {
+        using var stream = file.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024); // 2MB 限制
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        var bytes = memoryStream.ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        var mime = ext switch
+        {
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            _ => "image/jpeg"
+        };
+        _model.IconUrl = $"data:{mime};base64,{base64}";
+        _iconPreview = _model.IconUrl;
+    }
+
+    private void ClearIcon()
+    {
+        _model.IconUrl = null;
+        _iconPreview = null;
+    }
+
+    private async Task Save()
+    {
+        if (_form is not null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid) return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

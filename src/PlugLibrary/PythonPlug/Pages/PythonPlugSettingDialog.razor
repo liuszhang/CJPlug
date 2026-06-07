@@ -1,4 +1,5 @@
 ﻿@using System.Text.Json.Nodes
+@using BlazorMonaco
 @using BlazorMonaco.Editor
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Station
@@ -34,8 +35,8 @@
                         </ChildContent>
                         <TooltipContent>
                             <MudText Typo="Typo.h6">参数集成格式说明</MudText>
-                            <MudText Typo="Typo.body2">如果需要获取输入参数，输入格式为'get参数名()'.</MudText>
-                            <MudText Typo="Typo.body2">示例，如果需要获取Input1参数值，输入：'a=getInput1()'</MudText>
+                            <MudText Typo="Typo.body2">方式一：使用通配符 $&#123;参数名&#125;（推荐），示例：'a=$&#123;p1&#125;'，执行时自动替换为参数值</MudText>
+                            <MudText Typo="Typo.body2">方式二：使用函数格式 'get参数名()'，示例：'a=getInput1()'</MudText>
                             <MudText Typo="Typo.body2">设置输出参数值：'setOutput("Output1","test")'</MudText>
                             <MudText Typo="Typo.body2">获取输出参数值：'getOutput("Output1")'</MudText>
                             <MudIcon Icon="@Icons.Material.Filled.Star" />
@@ -46,6 +47,26 @@
                         @* <MudIconButton Icon="@Icons.Material.Outlined.Save" OnClick="@OnSaveClick" /> *@
                         <MudButton OnClick="@OnSaveClick" Variant="Variant.Outlined" Color="Color.Primary">保存</MudButton>
                     </MudBadge>
+                    <MudMenu EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                             Label="插入参数" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                        <ChildContent>
+                            @if (Plug?.PlugVariables?.Count > 0)
+                            {
+                                @foreach (var v in Plug.PlugVariables)
+                                {
+                                    if (v.Name == InitVariableNames.PythonScript.ToString() || v.Name == InitVariableNames.ResultString.ToString())
+                                        continue;
+                                    <MudMenuItem OnClick="@(() => InsertParameterAtCursor(v.Name))">
+                                        <MudText>@v.Name <MudText Typo="Typo.caption" Color="Color.Default">@("${" + v.Name + "}")</MudText></MudText>
+                                    </MudMenuItem>
+                                }
+                            }
+                            else
+                            {
+                                <MudMenuItem Disabled="true">（暂无输入参数）</MudMenuItem>
+                            }
+                        </ChildContent>
+                    </MudMenu>
                     <MudButton OnClick="GetDefaultValue" Variant="Variant.Outlined" Color="Color.Primary">重置</MudButton>
 
                     <MudText>@Plug?.RealValuePath</MudText>
@@ -117,6 +138,8 @@
     private bool _editTriggerRowClick;
 
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+
+    [CascadingParameter] public PlugDataZone? PlugDataZone { get; set; }
 
     List<PlugVariable> rootPlugVariables = new List<PlugVariable>();
     private IBrowserFile File;
@@ -315,11 +338,37 @@ if a == 1:
             var model = await _editor.GetModel();
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
 
+            // 先替换参数通配符 ${参数名}，再用替换后的脚本执行测试
+            var substitutedCode = PythonPlugCommonExecuteService.SubstituteParameters(editorCode, paramName =>
+            {
+                // 优先级1: PlugDataZone（用户在参数配置页填入的实际值）
+                if (PlugDataZone != null && DefinitionId != null)
+                {
+                    var pdzVal = PlugDataZone.GetVariableValue(DefinitionId, paramName);
+                    if (!string.IsNullOrEmpty(pdzVal))
+                        return pdzVal;
+                }
+                // 优先级2: 根插头定义中的 Value / DefaultValue
+                var v = Plug?.PlugVariables?.FirstOrDefault(p =>
+                    string.Equals(p.Name, paramName, StringComparison.OrdinalIgnoreCase));
+                if (v != null && !string.IsNullOrEmpty(v.Value))
+                    return v.Value;
+                if (v != null && !string.IsNullOrEmpty(v.DefaultValue))
+                    return v.DefaultValue;
+                return null;
+            });
+
             PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
             stationExecutionRequest.PlugType = PlugKeySetting.CommonExecuteKey;
             stationExecutionRequest.ExecuteMode = ExecuteMode.Standalone;
             stationExecutionRequest.ToolName = "Python";
-            stationExecutionRequest.RequestCommand = PythonPlugCommonExecuteService.BuildPythonExecuteCommand(editorCode);
+            var base64Script = Convert.ToBase64String(Encoding.UTF8.GetBytes(substitutedCode));
+            stationExecutionRequest.RequestCommand = "$d=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('" 
+                 + base64Script + "'));"
+                 + "$f=$env:TEMP + '\\py_' + (Get-Random) + '.py';"
+                 + "Set-Content -Path $f -Value $d -Encoding UTF8;"
+                 + "python $f;"
+                 + "Remove-Item $f -Force";
 
             var result = await MainApiClient.ExecuteOnStation(stationExecutionRequest);
             CLog.Information($"执行结果：{result.ResultString}");
@@ -375,6 +424,50 @@ if a == 1:
     {
         Console.WriteLine(">>>>>>>>>>>>start to execute activity:"+JsonSerializer.Serialize(Activity));
 
+    }
+
+    /// <summary>
+    /// 在Monaco编辑器光标位置插入参数通配符 ${paramName}
+    /// </summary>
+    private async Task InsertParameterAtCursor(string paramName)
+    {
+        try
+        {
+            if (_editor == null) return;
+
+            var selection = await _editor.GetSelection();
+            var insertText = "${" + paramName + "}";
+
+            var editOp = new IdentifiedSingleEditOperation
+            {
+                Range = selection,
+                Text = insertText
+            };
+
+            // 计算插入后的光标位置（在插入文本之后）
+            var newPosition = new BlazorMonaco.Position
+            {
+                LineNumber = selection.SelectionStartLineNumber,
+                Column = selection.SelectionStartColumn + insertText.Length
+            };
+            var endSelection = new Selection
+            {
+                SelectionStartLineNumber = newPosition.LineNumber,
+                SelectionStartColumn = newPosition.Column,
+                PositionLineNumber = newPosition.LineNumber,
+                PositionColumn = newPosition.Column
+            };
+
+            await _editor.ExecuteEdits("insert-parameter",
+                new List<IdentifiedSingleEditOperation> { editOp },
+                new List<Selection> { endSelection });
+            await _editor.Focus();
+            _isDirty = true;
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"插入参数失败: {ex.Message}");
+        }
     }
 
 }

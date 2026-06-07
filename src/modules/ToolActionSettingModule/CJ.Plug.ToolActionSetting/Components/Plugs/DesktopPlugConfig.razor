@@ -36,6 +36,10 @@
             <MudTextField @bind-Value="@SelectedTool.ToolType" Margin="Margin.Dense" Label="工具类型" ReadOnly Variant="Variant.Filled"></MudTextField>
             @foreach (var variable in ToolVariablesFromSelectedTool)
             {
+                @if(variable.Name == "ToolPath")
+                {
+                    continue; // CMDCommand 和 ExecutionTimeout 由用户手动输入，不在此处展示
+                }
                 <MudStack Row AlignItems="AlignItems.Center">
                     @if (variable.Type == VariableTypeEnum.File.ToString())
                     {
@@ -146,7 +150,7 @@
     /// </summary>
     public void ApplyToPlug(Plug plug)
     {
-        plug.PlugTypeKey = "CMDPlug";
+        // plug.PlugTypeKey = "CMDPlug";
 
         if (SelectedTool != null)
         {
@@ -173,17 +177,17 @@
         }
 
         // 桌面类默认参数（与CMD插头一致）
-        plug.AddVariable("CMDCommand", VariableTypeEnum.String.ToString());
-        plug.AddVariable("ResultString", VariableTypeEnum.String.ToString());
-        plug.AddVariable("ExecutionTimeout", VariableTypeEnum.String.ToString());
-        plug.AddVariable("WaitType", VariableTypeEnum.String.ToString());
-        plug.AddVariable("WatchProcessType", VariableTypeEnum.String.ToString());
-        plug.AddVariable("WatchProcessName", VariableTypeEnum.String.ToString());
-        plug.AddVariable("AutoCloseProcess", VariableTypeEnum.String.ToString());
-        plug.AddVariable("CloseProcessWhenError", VariableTypeEnum.String.ToString());
-        plug.AddVariable("ShowConsole", VariableTypeEnum.String.ToString());
-        plug.AddVariable("RedirectOutput", VariableTypeEnum.String.ToString());
-        plug.AddVariable("RedirectWorkPath", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("CMDCommand", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("ResultString", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("ExecutionTimeout", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("WaitType", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("WatchProcessType", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("WatchProcessName", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("AutoCloseProcess", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("CloseProcessWhenError", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("ShowConsole", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("RedirectOutput", VariableTypeEnum.String.ToString());
+        // plug.AddVariable("RedirectWorkPath", VariableTypeEnum.String.ToString());
     }
 
     /// <summary>将选中工具的变量附加到 Plug</summary>
@@ -192,6 +196,10 @@
         if (SelectedTool == null) return;
         foreach (var variable in ToolVariablesFromSelectedTool)
         {
+            if (variable.Name == "ToolPath")
+            {
+                continue; // ToolPath 由用户手动输入，不在此处添加到 Plug 变量中
+            }
             plug.PlugVariables.Add(new PlugVariable
             {
                 Name = variable.Name.TrimStart('[').TrimEnd(']'),

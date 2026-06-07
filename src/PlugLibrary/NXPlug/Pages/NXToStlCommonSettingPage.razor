@@ -1,0 +1,68 @@
+
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugBaseCore.Models
+@using MudBlazor
+@using NXPlug
+
+<MudStack Spacing="2">
+    <MudAlert Severity="Severity.Info" Dense>NX 模型转 STL — 通过 NX Open API 将 .prt 文件导出为 STL 三角网格</MudAlert>
+
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">导出参数设置</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="prtFilePath" Label="PRT 文件路径"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="选择要转换的 NX 部件文件" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="stlOutputPath" Label="STL 输出路径"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="转换后的 STL 文件保存位置" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="chordalTol" Label="弦高公差 (mm)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="默认 0.08，值越小精度越高" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="adjacencyTol" Label="邻接公差 (mm)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="默认 0.08" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudCheckBox @bind-Value="autoNormalGen" T="bool" Label="自动生成法线"
+                                 Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+</MudStack>
+
+@code {
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    private string? prtFilePath;
+    private string? stlOutputPath;
+    private string? chordalTol = "0.08";
+    private string? adjacencyTol = "0.08";
+    private bool autoNormalGen = true;
+    private string? DefinitionId;
+
+    protected override void OnInitialized()
+    {
+        DefinitionId = SettingContext?.PlugDefinitionId;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+    }
+}

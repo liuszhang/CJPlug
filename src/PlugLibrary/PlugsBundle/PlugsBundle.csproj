@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Loop\AndPlug\AndPlug.csproj" />
     <ProjectReference Include="..\Loop\ForPlug\ForPlug.csproj" />
     <ProjectReference Include="..\Loop\IfPlug\IfPlug.csproj" />
+    <ProjectReference Include="..\Loop\PausePlug\PausePlug.csproj" />
     <ProjectReference Include="..\MatlabPlug\MatlabPlug.csproj" />
     <ProjectReference Include="..\MCDataGetPlug\MCDataGetPlug.csproj" />
     <ProjectReference Include="..\NXPlug\NXPlug.csproj" />
@@ -28,12 +29,15 @@
     <ProjectReference Include="..\Script\CalculatorPlug\CalculatorPlug.csproj" />
     <ProjectReference Include="..\Script\CSharpPlug\CSharpPlug.csproj" />
     <ProjectReference Include="..\Script\DllLoaderPlug\DllLoaderPlug.csproj" />
+    <ProjectReference Include="..\Script\JavaPlug\JavaPlug.csproj" />
     <ProjectReference Include="..\Script\JavaScriptPlug\JavaScriptPlug.csproj" />
     <ProjectReference Include="..\SendHttpRequestPlug\SendHttpRequestPlug.csproj" />
     <ProjectReference Include="..\CAD\StlViewerPlug\StlViewerPlug.csproj" />
     <ProjectReference Include="..\TextReaderPlug\TextReaderPlug.csproj" />
     <ProjectReference Include="..\TextWriterPlug\TextWriterPlug.csproj" />
     <ProjectReference Include="..\WordPlug\WordPlug.csproj" />
+    <ProjectReference Include="..\PPTPlug\PPTPlug.csproj" />
+    <ProjectReference Include="..\PatranPlug\PatranPlug.csproj" />
   </ItemGroup>
 
   <ItemGroup>

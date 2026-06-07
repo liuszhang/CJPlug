@@ -1,0 +1,72 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="规则名称" @bind-Value="rule.Name" />
+            <MudTextField T="string" Label="规则描述" @bind-Value="rule.Description" Lines="3" />
+            <MudSwitch T="bool" Label="启用" @bind-Checked="rule.IsEnabled" Color="Color.Primary" />
+            <MudDateRangePicker T="DateTime?" Label="生效日期范围" @bind-DateRange="dateRange" Clearable="true" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int RuleId { get; set; }
+
+    private OntologyRule rule = new();
+    private DateRange? dateRange;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allRules = await OntologyManageApiClient.GetAllRulesAsync();
+        var existing = allRules?.FirstOrDefault(r => r?.Id == RuleId);
+        if (existing != null)
+        {
+            rule = new OntologyRule
+            {
+                Id = existing.Id,
+                Name = existing.Name,
+                Description = existing.Description,
+                IsEnabled = existing.IsEnabled,
+                EffectiveFrom = existing.EffectiveFrom,
+                EffectiveTo = existing.EffectiveTo,
+                SortOrder = existing.SortOrder
+            };
+
+            if (existing.EffectiveFrom.HasValue || existing.EffectiveTo.HasValue)
+            {
+                dateRange = new DateRange(existing.EffectiveFrom, existing.EffectiveTo);
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        rule.EffectiveFrom = dateRange?.Start;
+        rule.EffectiveTo = dateRange?.End;
+
+        var result = await OntologyManageApiClient.UpdateRuleAsync(rule);
+        if (result != null)
+        {
+            Snackbar.Add("保存成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+}

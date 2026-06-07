@@ -129,7 +129,7 @@
             ConstructionOptions="EditorConstructionOptions" />
         </MudStack> *@
 
-        <MonacoEditorWrapper @ref="_editor" Id="@("text-editor-"+PlugData.DefinitionId)"></MonacoEditorWrapper>
+        <MonacoEditorWrapper @ref="_editor" Id="@("text-editor-"+PlugData?.DefinitionId)"></MonacoEditorWrapper>
 
         <MudStack Spacing="0">
             <MudTextField TextChanged="ParseTextChanged" @bind-Value="@ParseResultString" Immediate="true" HelperText="如：result/data[0]/id" Label="解析表达式" Variant="Variant.Outlined" Margin="Margin.Dense" />
@@ -194,7 +194,7 @@
     public PlugVariableData? OutputMappingData { get; set; }
 
 
-    public List<PlugVariableData> VariablesOfPlug => PlugDataZone?.GetVariablesOfPlug(PlugDefinitionId);
+    public List<PlugVariableData> VariablesOfPlug => PlugDataZone?.GetVariablesOfPlug(PlugDefinitionId) ?? new();
 
     //public string? Method = "GET";
     //public string? Url = @"http://localhost:6661/api/job/getJobs";
@@ -280,7 +280,7 @@
         {
             PlugType = SendHttpRequestPlug.PlugKeySetting.PlugTypeName,
             PlugTypeKey = SendHttpRequestPlug.PlugKeySetting.PlugTypeKey,
-            PDZId=PlugDataZone.PDZId,
+            PDZId=PlugDataZone?.PDZId,
 PlugDefinitionId=PlugDefinitionId,
             //ExecuteMode = ExecuteMode.Standalone,
             InputVariables = inputs

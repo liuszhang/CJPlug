@@ -114,6 +114,56 @@ public partial class MainApiClient : IUserManageApiClient, IDepartmentManageApiC
         return result;
     }
 
+    public async Task<bool> SetUserStatusAsync(int userId, DataStatus status, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await UserManageApiClient.Value.SetUserStatusAsync(userId, status, cancellationToken);
+            if (result)
+            {
+                await AuditLog.LogSuccessAsync(AuditModule.UserManage, AuditOperationType.Update,
+                    $"设置用户ID: {userId} 状态为 {status.GetDisplayName()}");
+            }
+            else
+            {
+                await AuditLog.LogFailureAsync(AuditModule.UserManage, AuditOperationType.Update,
+                    $"设置用户状态失败ID: {userId}", "操作失败");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.UserManage, AuditOperationType.Update,
+                $"设置用户状态异常ID: {userId}", ex.Message);
+            throw;
+        }
+    }
+
+    public async Task<bool> SetUserLockoutAsync(int userId, bool isLocked, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await UserManageApiClient.Value.SetUserLockoutAsync(userId, isLocked, cancellationToken);
+            if (result)
+            {
+                await AuditLog.LogSuccessAsync(AuditModule.UserManage, AuditOperationType.Update,
+                    $"设置用户ID: {userId} 锁定状态为 {(isLocked ? "锁定" : "解锁")}");
+            }
+            else
+            {
+                await AuditLog.LogFailureAsync(AuditModule.UserManage, AuditOperationType.Update,
+                    $"设置用户锁定状态失败ID: {userId}", "操作失败");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.UserManage, AuditOperationType.Update,
+                $"设置用户锁定状态异常ID: {userId}", ex.Message);
+            throw;
+        }
+    }
+
     // IDepartmentManageApiClient
     public async Task<List<DepartmentManageDto>> GetAllDepartmentsAsync(CancellationToken cancellationToken = default)
     {

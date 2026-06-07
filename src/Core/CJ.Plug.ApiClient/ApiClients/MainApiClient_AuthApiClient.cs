@@ -93,4 +93,29 @@ public partial class MainApiClient : IAuthApiClient
             $"查询待审批请求: {operationType} - {target}");
         return result;
     }
+
+    public async Task<bool> UnlockSystemAdminAsync(string userName, string unlockedBy, string? remark = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await AuthApiClient.Value.UnlockSystemAdminAsync(userName, unlockedBy, remark, cancellationToken);
+            if (result)
+            {
+                await AuditLog.LogSuccessAsync(AuditModule.AuthManage, AuditOperationType.Unlock, 
+                    $"解锁系统管理员账号: {userName}，操作人: {unlockedBy}", remark ?? "");
+            }
+            else
+            {
+                await AuditLog.LogFailureAsync(AuditModule.AuthManage, AuditOperationType.Unlock, 
+                    $"解锁系统管理员账号失败: {userName}", "权限不足或账号不存在");
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.AuthManage, AuditOperationType.Unlock, 
+                $"解锁系统管理员账号异常: {userName}", ex.Message);
+            throw;
+        }
+    }
 }

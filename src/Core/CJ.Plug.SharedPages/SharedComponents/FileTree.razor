@@ -1,0 +1,444 @@
+@using System.IO
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Services
+@using CJ.Plug.SharedPages.SharedComponents
+@using MudBlazor
+@inject MainApiClient MainApiClient
+
+<MudTreeView Items="@TreeData" Dense="true" Elevation="0" Class="@Class" Style="@Style">
+    <ItemTemplate Context="item">
+        @{
+            var node = (FileTreeNode)item.Value;
+            var nodeIcon = node.Icon ?? (node.IsFolder ? Icons.Material.Filled.Folder : GetFileIcon(node.FileType));
+            var nodeIconColor = node.IconColor ?? (node.IsFolder ? Color.Warning : Color.Secondary);
+        }
+        @if (node.IsFolder)
+        {
+            <MudTreeViewItem Items="@node.Children"
+                             Icon="@nodeIcon"
+                             IconColor="@nodeIconColor"
+                             Text="@node.Text"
+                             Expanded="true">
+                <BodyContent>
+                    <div class="d-flex align-center justify-space-between w-100">
+                        <MudText Typo="Typo.body2" Style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; word-break: break-all;">@node.Text</MudText>
+                        @if (ShowDownloadButton || ShowDeleteButton)
+                        {
+                            <div class="d-flex align-center gap-2" style="flex-shrink: 0;">
+                                @if (ShowDownloadButton)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="() => HandleDownload(node)"
+                                                   Title="打包下载" />
+                                }
+                                @if (ShowDeleteButton)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => HandleDelete(node)"
+                                                   Title="删除文件夹" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </BodyContent>
+            </MudTreeViewItem>
+        }
+        else
+        {
+            <MudTreeViewItem Items="@node.Children"
+                             Icon="@nodeIcon"
+                             IconColor="@nodeIconColor"
+                             Text="@node.Text"
+                             Expanded="true">
+                <BodyContent>
+                    <div class="d-flex align-center justify-space-between w-100">
+                        <MudText Typo="Typo.body2" Style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; word-break: break-all;">@node.Text</MudText>
+                        @if (ShowFileInfo || ShowDownloadButton || ShowDeleteButton)
+                        {
+                            <div class="d-flex align-center gap-2" style="flex-shrink: 0;">
+                                @if (ShowFileInfo)
+                                {
+                                    @if (ShowSize)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="text-muted">@GetSizeDisplay(node.FileSize)</MudText>
+                                    }
+                                    @if (ShowFileType)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@node.FileType</MudChip>
+                                    }
+                                    @if (ShowModifiedTime && node.ModifiedTime.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="text-muted">@node.ModifiedTime.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                    }
+                                }
+                                @if (ShowDownloadButton)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="() => HandleDownload(node)"
+                                                   Title="下载" />
+                                }
+                                @if (ShowDeleteButton)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => HandleDelete(node)"
+                                                   Title="删除" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </BodyContent>
+            </MudTreeViewItem>
+        }
+    </ItemTemplate>
+</MudTreeView>
+
+@code {
+    [Parameter]
+    public IEnumerable<FileSystemNode> Items { get; set; } = new List<FileSystemNode>();
+
+    [Parameter] public bool ShowFileInfo { get; set; } = true;
+    [Parameter] public bool ShowSize { get; set; } = true;
+    [Parameter] public bool ShowFileType { get; set; } = true;
+    [Parameter] public bool ShowModifiedTime { get; set; } = true;
+    [Parameter] public bool ShowDownloadButton { get; set; }
+    [Parameter] public bool ShowDeleteButton { get; set; }
+
+    [Parameter] public EventCallback<FileSystemNode> OnItemClick { get; set; }
+    [Parameter] public EventCallback<FileSystemNode> OnItemDeleted { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private FileDownloadService FileDownloadService { get; set; } = null!;
+
+    // ===== 下载 & 删除（组件内部闭环） =====
+
+    private async Task HandleDownload(FileTreeNode treeNode)
+    {
+        if (treeNode.GetStreamAsync is null) return;
+
+        var fileName = treeNode.Text;
+        // 文件夹下载的是 zip 压缩流，需要加 .zip 后缀
+        if (treeNode.IsFolder && !fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            fileName += ".zip";
+
+        var stream = await treeNode.GetStreamAsync();
+
+        if (stream is not null)
+        {
+            await FileDownloadService.DownloadFileFromStreamAsync(fileName, stream);
+            Snackbar.Add($"「{fileName}」下载成功", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"「{fileName}」下载失败", Severity.Error);
+        }
+    }
+
+    private async Task HandleDelete(FileTreeNode treeNode)
+    {
+        var fileName = treeNode.Text;
+        bool success = false;
+
+        // 优先使用 MainApiClient.DeleteFileWithRequest
+        if (!string.IsNullOrEmpty(treeNode.DeletePath))
+        {
+            try
+            {
+                // DeletePath 是完整文件相对路径，直接传给 FilePath
+                var result = await MainApiClient.DeleteFileWithRequest(new FileDeleteRequest()
+                {
+                    FilePath = treeNode.DeletePath.Replace('\\', '/'),
+                    FileName = string.Empty
+                });
+                success = result != null;
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"删除文件失败: {ex.Message}", Severity.Error);
+                success = false;
+            }
+        }
+        // 降级使用 DeleteAsync 委托
+        else if (treeNode.DeleteAsync is not null)
+        {
+            success = await treeNode.DeleteAsync();
+        }
+        else
+        {
+            Snackbar.Add($"「{fileName}」无法删除：未配置删除路径或删除委托", Severity.Warning);
+            return;
+        }
+
+        if (success)
+        {
+            Snackbar.Add($"「{fileName}」已删除", Severity.Success);
+            // 从树中移除已删除的节点
+            if (_treeData is List<TreeItemData<FileTreeNode>> list)
+                RemoveTreeNodeRecursive(list, treeNode);
+            StateHasChanged();
+            // 通知父组件
+            if (OnItemDeleted.HasDelegate)
+                await OnItemDeleted.InvokeAsync(null);
+        }
+        else
+            Snackbar.Add($"「{fileName}」删除失败", Severity.Error);
+    }
+
+    private static bool RemoveTreeNodeRecursive(List<TreeItemData<FileTreeNode>> nodes, FileTreeNode target)
+    {
+        for (int i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(nodes[i].Value, target))
+            {
+                nodes.RemoveAt(i);
+                return true;
+            }
+            var children = nodes[i].Children as List<TreeItemData<FileTreeNode>>;
+            if (children != null && RemoveTreeNodeRecursive(children, target))
+                return true;
+        }
+        return false;
+    }
+
+    // ===== 树构建 =====
+
+    public class FileTreeNode
+    {
+        public string Text { get; set; } = string.Empty;
+        public bool IsFolder { get; set; }
+        public string FileType { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public DateTime? ModifiedTime { get; set; }
+        public string? Icon { get; set; }
+        public Color? IconColor { get; set; }
+        public IReadOnlyCollection<TreeItemData<FileTreeNode>>? Children { get; set; }
+        public Func<Task<Stream?>>? GetStreamAsync { get; set; }
+        public Func<Task<bool>>? DeleteAsync { get; set; }
+        public string? DeletePath { get; set; }
+    }
+
+    private sealed class MutableTreeNode
+    {
+        public string Name { get; set; } = string.Empty;
+        public bool IsFolder { get; set; }
+        public string FileType { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public DateTime? ModifiedTime { get; set; }
+        public string? Icon { get; set; }
+        public Color? IconColor { get; set; }
+        public Func<Task<Stream?>>? GetStreamAsync { get; set; }
+        public Func<Task<bool>>? DeleteAsync { get; set; }
+        public string? DeletePath { get; set; }
+        public List<MutableTreeNode> Children { get; set; } = new();
+
+        public TreeItemData<FileTreeNode> ToTreeItemData()
+        {
+            var childItems = IsFolder
+                ? Children.Select(c => c.ToTreeItemData()).ToList()
+                : null;
+
+            return new TreeItemData<FileTreeNode>
+            {
+                Value = new FileTreeNode
+                {
+                    Text = Name, IsFolder = IsFolder, FileType = FileType,
+                    FileSize = FileSize, ModifiedTime = ModifiedTime,
+                    Icon = Icon, IconColor = IconColor, Children = childItems,
+                    GetStreamAsync = GetStreamAsync, DeleteAsync = DeleteAsync,
+                    DeletePath = DeletePath
+                },
+                Children = childItems
+            };
+        }
+    }
+
+    private IReadOnlyCollection<TreeItemData<FileTreeNode>> _treeData = new List<TreeItemData<FileTreeNode>>();
+    public IReadOnlyCollection<TreeItemData<FileTreeNode>> TreeData => _treeData;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        BuildTree();
+    }
+
+    private void BuildTree()
+    {
+        if (Items == null || !Items.Any())
+        {
+            _treeData = new List<TreeItemData<FileTreeNode>>();
+            return;
+        }
+
+        // 如果 Items 包含嵌套的 Children，使用递归构建
+        if (Items.Any(n => n.Children?.Any() == true))
+        {
+            _treeData = Items.Select(n => BuildTreeNodeRecursive(n)).ToList();
+            return;
+        }
+
+        // 否则使用基于 RelativePath 的扁平化构建
+        var rootNodes = new Dictionary<string, MutableTreeNode>();
+        var nodeMap = new Dictionary<string, MutableTreeNode>();
+
+        foreach (var node in Items)
+        {
+            var relativePath = node.RelativePath ?? node.FullPath ?? node.Name ?? string.Empty;
+            var parts = relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length == 0)
+            {
+                rootNodes[node.Name ?? "unknown"] = MapToMutableTreeNode(node);
+                continue;
+            }
+
+            var currentPath = "";
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var isLast = i == parts.Length - 1;
+                var part = parts[i];
+                var parentPath = currentPath;
+                currentPath = string.IsNullOrEmpty(currentPath) ? part : $"{currentPath}/{part}";
+
+                if (!nodeMap.TryGetValue(currentPath, out var mNode))
+                {
+                    var sourceNode = isLast ? node : null;
+                    mNode = MapToMutableTreeNode(part, isLast ? node.IsDirectory : true, sourceNode);
+                    nodeMap[currentPath] = mNode;
+
+                    if (string.IsNullOrEmpty(parentPath))
+                        rootNodes[part] = mNode;
+                    else if (nodeMap.TryGetValue(parentPath, out var parentNode))
+                        parentNode.Children.Add(mNode);
+                }
+                else if (isLast)
+                {
+                    UpdateMutableTreeNode(mNode, node);
+                }
+            }
+        }
+
+        _treeData = rootNodes.Values.Select(n => n.ToTreeItemData()).ToList();
+    }
+
+    private static TreeItemData<FileTreeNode> BuildTreeNodeRecursive(FileSystemNode node)
+    {
+        var childItems = node.Children?.Select(c => BuildTreeNodeRecursive(c)).ToList();
+        var treeNode = new FileTreeNode
+        {
+            Text = node.Name ?? node.FolderDisplayName ?? "unknown",
+            IsFolder = node.IsDirectory,
+            FileType = node.IsDirectory ? "" : node.FileType,
+            FileSize = node.IsDirectory ? 0 : node.FileSize,
+            ModifiedTime = node.ModifiedTime,
+            Icon = node.Icon,
+            IconColor = ParseIconColor(node.IconColor),
+            Children = childItems,
+            GetStreamAsync = node.GetStreamAsync,
+            DeleteAsync = node.DeleteAsync,
+            DeletePath = node.DeletePath
+        };
+        return new TreeItemData<FileTreeNode>
+        {
+            Value = treeNode,
+            Children = childItems
+        };
+    }
+
+    private static MutableTreeNode MapToMutableTreeNode(FileSystemNode node)
+    {
+        return new MutableTreeNode
+        {
+            Name = node.Name ?? "unknown",
+            IsFolder = node.IsDirectory,
+            FileType = node.IsDirectory ? "" : node.FileType,
+            FileSize = node.IsDirectory ? 0 : node.FileSize,
+            ModifiedTime = node.ModifiedTime,
+            Icon = node.Icon,
+            IconColor = ParseIconColor(node.IconColor),
+            GetStreamAsync = node.GetStreamAsync,
+            DeleteAsync = node.DeleteAsync,
+            DeletePath = node.DeletePath
+        };
+    }
+
+    private static MutableTreeNode MapToMutableTreeNode(string name, bool isFolder, FileSystemNode? sourceNode)
+    {
+        if (sourceNode == null)
+        {
+            return new MutableTreeNode { Name = name, IsFolder = isFolder };
+        }
+        return new MutableTreeNode
+        {
+            Name = name,
+            IsFolder = isFolder,
+            FileType = (!isFolder) ? sourceNode.FileType : "",
+            FileSize = (!isFolder) ? sourceNode.FileSize : 0,
+            ModifiedTime = sourceNode.ModifiedTime,
+            Icon = sourceNode.Icon,
+            IconColor = ParseIconColor(sourceNode.IconColor),
+            GetStreamAsync = sourceNode.GetStreamAsync,
+            DeleteAsync = sourceNode.DeleteAsync,
+            DeletePath = sourceNode.DeletePath
+        };
+    }
+
+    private static void UpdateMutableTreeNode(MutableTreeNode target, FileSystemNode source)
+    {
+        target.IsFolder = source.IsDirectory;
+        if (!source.IsDirectory)
+        {
+            target.FileType = source.FileType;
+            target.FileSize = source.FileSize;
+            target.ModifiedTime = source.ModifiedTime;
+            target.Icon = source.Icon ?? target.Icon;
+            target.IconColor = ParseIconColor(source.IconColor) ?? target.IconColor;
+            target.GetStreamAsync = source.GetStreamAsync;
+            target.DeleteAsync = source.DeleteAsync;
+            target.DeletePath = source.DeletePath;
+        }
+    }
+
+    // ===== 静态工具 =====
+
+    private static string GetFileIcon(string? fileType) => (fileType ?? string.Empty).ToLowerInvariant() switch
+    {
+        "pdf" => Icons.Material.Filled.PictureAsPdf,
+        "doc" or "docx" => Icons.Material.Filled.Description,
+        "xls" or "xlsx" or "csv" => Icons.Material.Filled.TableChart,
+        "ppt" or "pptx" => Icons.Material.Filled.Slideshow,
+        "jpg" or "jpeg" or "png" or "gif" or "bmp" or "svg" or "webp" => Icons.Material.Filled.Image,
+        "mp4" or "avi" or "mov" or "wmv" => Icons.Material.Filled.VideoFile,
+        "mp3" or "wav" or "flac" => Icons.Material.Filled.AudioFile,
+        "zip" or "rar" or "7z" or "tar" or "gz" => Icons.Material.Filled.Archive,
+        "txt" or "md" => Icons.Material.Filled.Article,
+        "json" or "xml" or "yaml" or "yml" => Icons.Material.Filled.Code,
+        "py" or "js" or "cs" or "cpp" or "java" => Icons.Material.Filled.Terminal,
+        "dll" or "exe" => Icons.Material.Filled.InsertDriveFile,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+
+    private static Color? ParseIconColor(string? colorStr)
+    {
+        if (string.IsNullOrEmpty(colorStr)) return null;
+        if (Enum.TryParse<Color>(colorStr, true, out var color))
+            return color;
+        return null;
+    }
+
+    private static string GetSizeDisplay(long fileSize) => fileSize switch
+    {
+        < 1024 => $"{fileSize} B",
+        < 1024 * 1024 => $"{fileSize / 1024.0:F1} KB",
+        < 1024 * 1024 * 1024 => $"{fileSize / (1024.0 * 1024):F1} MB",
+        _ => $"{fileSize / (1024.0 * 1024 * 1024):F2} GB"
+    };
+}

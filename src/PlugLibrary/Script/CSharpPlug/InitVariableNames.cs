@@ -11,5 +11,6 @@ namespace CSharpPlug
         CSharpCode,
         DllReferences,
         UseDotNetFramework,
+        EnvironmentVariables,
     }
 }

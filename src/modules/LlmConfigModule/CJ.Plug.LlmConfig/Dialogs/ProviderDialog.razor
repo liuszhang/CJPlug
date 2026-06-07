@@ -1,0 +1,58 @@
+@using CJ.Plug.LlmConfigModel.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Provider.Name" Label="供应商标识" Required="true"
+                                  Placeholder="如 openai, deepseek, ollama" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Provider.DisplayName" Label="显示名称" Required="true"
+                                  Placeholder="如 OpenAI, DeepSeek" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Provider.ApiBaseUrl" Label="API 基础地址" Required="true"
+                                  Placeholder="如 https://api.openai.com/v1" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Provider.ApiKey" Label="API Key"
+                                  Placeholder="留空表示无需 API Key" Variant="Variant.Outlined"
+                                  InputType="@(_showApiKey ? InputType.Text : InputType.Password)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="() => _showApiKey = !_showApiKey" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Provider.Description" Label="描述"
+                                  Placeholder="供应商描述/备注" Variant="Variant.Outlined" Lines="2" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Provider.SortOrder" Label="排序" Variant="Variant.Outlined" Min="0" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSwitch @bind-Value="Provider.IsEnabled" Label="启用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="!_isValid">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public LlmProvider Provider { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _showApiKey;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(Provider));
+    private void Cancel() => MudDialog.Cancel();
+}

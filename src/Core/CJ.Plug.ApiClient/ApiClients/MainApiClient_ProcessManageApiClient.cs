@@ -25,9 +25,9 @@ public partial class MainApiClient : IProcessManageApiClient
         }
     }
 
-    public async Task<Process[]> GetWorkflowsAsync(int maxItems = 20, CancellationToken cancellationToken = default)
+    public async Task<Process[]> GetWorkflowsAsync(int maxItems = 20, string? userName = null, CancellationToken cancellationToken = default)
     {
-        var result = await ProcessManageApiClient.Value.GetWorkflowsAsync(maxItems, cancellationToken);
+        var result = await ProcessManageApiClient.Value.GetWorkflowsAsync(maxItems, userName, cancellationToken);
         await AuditLog.LogSuccessAsync(AuditModule.ProcessManage, AuditOperationType.Other, "查询所有流程");
         return result;
     }

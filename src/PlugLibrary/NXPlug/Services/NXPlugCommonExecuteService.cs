@@ -19,26 +19,26 @@ using System.Text.Json;
 
 public class NXPlugCommonExecuteService(IServiceProvider serviceProvider) : BasePlugExecuteService(serviceProvider)
 {
-    public override bool IsThisPlugTypeKey(string? PlugTypeKey) => (PlugTypeKey == PlugKeySetting.CommonExecuteKey);
+    public override bool IsThisPlugTypeKey(string? PlugTypeKey) => (PlugTypeKey == PlugKeySetting.NXPlug.CommonExecuteKey);
 
     public override async Task<ExecuteResultData?> PlugCommonExecute(ExecuteServiceContext context)
     {
         PlugExecutionRequest? plugExecutionRequest = context.plugExecutionRequest;
         var erd = plugExecutionRequest?.ExecuteResultData ?? new ExecuteResultData();
         //前处理----------------------------
-        if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames)))) { return await ReportErrorResult(erd); }
+        if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(NXPlugVariables)))) { return await ReportErrorResult(erd); }
 
 
         CLog.Information($"--执行NX插头执行逻辑--", PlugDataZone.PDZId);
         CLog.Information($"PDZID: {PlugDataZone.PDZId}", PlugDataZone.PDZId);
         CLog.Information($"PlugID: {plugExecutionRequest?.PlugDefinitionId}", PlugDataZone.PDZId);
-        var PlugVariableData = PlugDataZone.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == plugExecutionRequest?.PlugDefinitionId && p.Name == InitVariableNames.NXFile.ToString());
+        var PlugVariableData = PlugDataZone.PlugVariableDatas.FirstOrDefault(p => p.PlugDefinitionId == plugExecutionRequest?.PlugDefinitionId && p.Name == NXPlugVariables.NXFile.ToString());
         var FileId = PlugVariableData.Value.GetFileIdFromFileVariable();
         CLog.Information($"FileID: {FileId}", PlugDataZone.PDZId);
         //var stream = await MainApiClient.DownloadFileByFileId(FileId);
-        if (!string.IsNullOrEmpty(PlugDataZone?.GetVariableValue(plugExecutionRequest?.PlugDefinitionId, InitVariableNames.ModelParameters.ToString())))
+        if (!string.IsNullOrEmpty(PlugDataZone?.GetVariableValue(plugExecutionRequest?.PlugDefinitionId, NXPlugVariables.ModelParameters.ToString())))
         {
-            var ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(PlugDataZone?.GetVariableValue(plugExecutionRequest.PlugDefinitionId, InitVariableNames.ModelParameters.ToString()));
+            var ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(PlugDataZone?.GetVariableValue(plugExecutionRequest.PlugDefinitionId, NXPlugVariables.ModelParameters.ToString()));
             var newParameters = ToolIntegrationUtils.ProcessSetParameters(ModelParameters, plugExecutionRequest.PlugDefinitionId, PlugDataZone);
             if (string.IsNullOrEmpty(newParameters))
             {

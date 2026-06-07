@@ -13,6 +13,12 @@ namespace CJ.Plug.Models.Station
         public string? ToolName { get; set; }
         public int? ToolId { get; set; }
         public string? ToolPath { get; set; }
+
+        /// <summary>
+        /// 覆盖默认的工具包根目录
+        /// </summary>
+        public string? ToolBasePath { get; set; }
+
         public string? ToolVersion { get; set; }
         public string? CommandParameter { get; set; }
         public bool? IsDisabled { get; set; } = false;

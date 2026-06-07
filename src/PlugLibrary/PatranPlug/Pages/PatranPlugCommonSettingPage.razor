@@ -1,0 +1,295 @@
+@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Extensions
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugBaseCore.Models
+@using CJ.Plug.SharedPages.SharedComponents
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using PatranPlug.Models
+@using Serilog
+@using System.Text.Json
+
+@inject MainApiClient MainApiClient
+
+@* 工具栏 *@
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None" Spacing="2">
+    <MudFileUpload T="IBrowserFile" FilesChanged="UploadScriptFile" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" Size="Size.Small" Variant="Variant.Filled"
+                Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileOpen">导入脚本文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+    <MudButton OnClick="ClearScript" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+        StartIcon="@Icons.Material.Filled.Clear">清空脚本</MudButton>
+    <MudButton OnClick="LoadFileContent" Disabled="Processing" Size="Size.Small" Variant="Variant.Filled"
+        Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh">刷新内容</MudButton>
+    <MudSpacer />
+    <MudText Typo="Typo.body2">当前文件: @(CurrentFileName ?? "未导入")</MudText>
+</MudStack>
+
+<MudDivider Style="margin:5px;" />
+
+@* 主内容区：左侧编辑器 + 右侧关键字映射配置 *@
+<MudStack Row Style="width:100%;height:400px" StretchItems="StretchItems.Start" Spacing="2">
+
+    @* 左侧：脚本预览编辑器 *@
+    <MonacoEditorWrapper @ref="_editor" Id="@($"patran-editor-{PlugDefinitionId}")" Language="tcl" />
+
+    @* 右侧：关键字映射配置面板 *@
+    <MudPaper Style="min-width:380px;max-width:420px;padding:8px;" Elevation="2">
+        <MudText Typo="Typo.h6" GutterBottom>关键字映射配置</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">定义脚本中的关键字与变量的映射关系，运行时将自动替换</MudText>
+
+        @* 添加新映射 *@
+        <MudStack Row Spacing="1" AlignItems="AlignItems.End" Class="mb-2">
+            <MudTextField @bind-Value="NewMapping.Keyword" Label="关键字" Variant="Variant.Outlined"
+                Margin="Margin.Dense" Style="flex:1" Placeholder="如: {{MATERIAL_ID}}" />
+            <MudSelect @bind-Value="NewMapping.VariableName" Label="绑定变量" Variant="Variant.Outlined"
+                Margin="Margin.Dense" Style="flex:1">
+                @foreach (var varName in AvailableVariables)
+                {
+                    <MudSelectItem Value="@varName">@varName</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+        <MudStack Row Spacing="1" AlignItems="AlignItems.End" Class="mb-2">
+            <MudTextField @bind-Value="NewMapping.Description" Label="描述（可选）" Variant="Variant.Outlined"
+                Margin="Margin.Dense" Style="flex:1" />
+            <MudButton OnClick="AddMapping" Variant="Variant.Filled" Color="Color.Primary"
+                Size="Size.Small" StartIcon="@Icons.Material.Filled.Add">添加</MudButton>
+        </MudStack>
+
+        <MudDivider Class="my-2" />
+
+        @* 已配置映射列表 *@
+        @if (KeywordMappings.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense>尚未配置任何关键字映射</MudAlert>
+        }
+        else
+        {
+            <MudSimpleTable Dense Hover Style="max-height:220px;overflow-y:auto;">
+                <thead>
+                    <tr>
+                        <th>关键字</th>
+                        <th>绑定变量</th>
+                        <th style="width:40px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var mapping in KeywordMappings)
+                    {
+                        <tr>
+                            <td><MudText Typo="Typo.body2">@mapping.Keyword</MudText></td>
+                            <td><MudText Typo="Typo.body2">@mapping.VariableName</MudText></td>
+                            <td>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                    Size="Size.Small" OnClick="@(() => RemoveMapping(mapping))" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+
+</MudStack>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    public string? PlugDefinitionId { get; set; }
+    public PlugData? PlugData { get; set; }
+
+    private MonacoEditorWrapper _editor = null!;
+    private string? CurrentFileName;
+    private string? CurrentFileId;
+    private bool Processing = false;
+
+    // 关键字映射
+    private PatranKeywordMapping NewMapping { get; set; } = new();
+    private List<PatranKeywordMapping> KeywordMappings { get; set; } = new();
+    private List<string> AvailableVariables { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (SettingContext != null)
+        {
+            PlugDefinitionId = SettingContext.PlugDefinitionId;
+            PlugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PlugDataZone == null || PlugDefinitionId == null)
+            return;
+
+        // 加载脚本文件信息
+        var scriptFileValue = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.ScriptFile.ToString());
+        if (!string.IsNullOrEmpty(scriptFileValue))
+        {
+            CurrentFileName = scriptFileValue.GetFileNameFromFileVariable();
+            CurrentFileId = scriptFileValue.GetFileIdFromFileVariable();
+        }
+
+        // 加载关键字映射
+        var mappingJson = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.KeywordMappingJson.ToString());
+        if (!string.IsNullOrEmpty(mappingJson))
+        {
+            try
+            {
+                KeywordMappings = JsonSerializer.Deserialize<List<PatranKeywordMapping>>(mappingJson) ?? new();
+            }
+            catch
+            {
+                KeywordMappings = new List<PatranKeywordMapping>();
+            }
+        }
+
+        // 构建可用变量列表（排除隐藏变量和自身）
+        var hiddenVars = new HashSet<string>(Enum.GetNames(typeof(InitVariableNames)));
+        AvailableVariables = PlugDataZone?.PlugVariableDatas?
+            .Where(v => v.PlugDefinitionId == PlugDefinitionId)
+            .Where(v => !hiddenVars.Contains(v.Name))
+            .Select(v => v.Name)
+            .ToList() ?? new();
+
+        // 如果没有可用变量，至少提供一些示例
+        if (AvailableVariables.Count == 0)
+        {
+            AvailableVariables.Add("MaterialId");
+            AvailableVariables.Add("Thickness");
+            AvailableVariables.Add("Pressure");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(500);
+            await LoadFileContent();
+        }
+    }
+
+    /// <summary>
+    /// 导入脚本文件
+    /// </summary>
+    private async Task UploadScriptFile(IBrowserFile browserFile)
+    {
+        if (browserFile == null) return;
+
+        try
+        {
+            Processing = true;
+            var plugData = PlugDataZone?.GetPlugData(PlugDefinitionId);
+            var (filePath, fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, plugData);
+            if (!string.IsNullOrEmpty(fileId))
+            {
+                CurrentFileName = browserFile.Name;
+                CurrentFileId = fileId;
+                PlugDataZone?.SetVariableValue(PlugDefinitionId,
+                    InitVariableNames.ScriptFile.ToString(),
+                    $"{browserFile.Name}:{fileId}");
+                await LoadFileContent();
+            }
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"导入脚本文件失败: {ex.Message}");
+        }
+        finally
+        {
+            Processing = false;
+        }
+    }
+
+    /// <summary>
+    /// 加载并显示脚本文件内容
+    /// </summary>
+    private async Task LoadFileContent()
+    {
+        if (string.IsNullOrEmpty(CurrentFileId))
+            return;
+
+        Processing = true;
+        try
+        {
+            var content = await MainApiClient.GetFileContentByFileId(CurrentFileId);
+            if (_editor != null)
+            {
+                await _editor.SetValue(content ?? string.Empty);
+            }
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"读取脚本内容失败: {ex.Message}");
+        }
+        finally
+        {
+            Processing = false;
+        }
+    }
+
+    /// <summary>
+    /// 清空脚本
+    /// </summary>
+    private async Task ClearScript()
+    {
+        if (_editor != null)
+        {
+            await _editor.SetValue(string.Empty);
+        }
+        CurrentFileName = null;
+        CurrentFileId = null;
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.ScriptFile.ToString(), string.Empty);
+    }
+
+    /// <summary>
+    /// 添加关键字映射
+    /// </summary>
+    private void AddMapping()
+    {
+        if (string.IsNullOrWhiteSpace(NewMapping.Keyword) || string.IsNullOrWhiteSpace(NewMapping.VariableName))
+            return;
+
+        KeywordMappings.Add(new PatranKeywordMapping
+        {
+            Keyword = NewMapping.Keyword,
+            VariableName = NewMapping.VariableName,
+            Description = NewMapping.Description,
+        });
+
+        // 保存到PDZ
+        SaveMappings();
+
+        // 重置输入
+        NewMapping = new PatranKeywordMapping();
+    }
+
+    /// <summary>
+    /// 删除关键字映射
+    /// </summary>
+    private void RemoveMapping(PatranKeywordMapping mapping)
+    {
+        KeywordMappings.Remove(mapping);
+        SaveMappings();
+    }
+
+    /// <summary>
+    /// 保存映射配置到PDZ
+    /// </summary>
+    private void SaveMappings()
+    {
+        var json = JsonSerializer.Serialize(KeywordMappings);
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.KeywordMappingJson.ToString(), json);
+    }
+}

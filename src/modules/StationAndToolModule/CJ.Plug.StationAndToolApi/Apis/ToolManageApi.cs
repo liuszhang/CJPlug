@@ -16,6 +16,12 @@ public static class ToolManageApi
         api.MapPost("/CreateTool", async (IToolManageService service, [FromBody] Tool newTool) => await service.CreateToolAsync(newTool));
         api.MapDelete("/DeleteTool/{ToolId}", async (IToolManageService service, int ToolId) => await service.DeleteToolAsync(ToolId));
         api.MapPut("/UpdateTool", async (IToolManageService service, Tool updatedTool) => await service.UpdateToolAsync(updatedTool));
+        api.MapPost("/MoveToolFilesFromTmp", async (IToolManageService service, [FromBody] ToolFileMoveRequest req) =>
+            Results.Ok(await service.MoveToolFilesFromTmpAsync(req.ToolName, req.IsSystemTool, req.UserName)));
+        api.MapPost("/DeleteToolTmpFiles", async (IToolManageService service) =>
+            Results.Ok(await service.DeleteToolTmpFilesAsync()));
+        api.MapPost("/ImportDefaultTools", async (IToolManageService service) =>
+            Results.Ok(await service.ImportDefaultToolsAsync()));
         //api.MapGet("/GetToolPathOnIp/{ip}/{toolName}/{version}", async (IToolManageService service, string ip, string toolName, string? version) => await service.GetToolPathOnIp(ip, toolName, version));
 
 
@@ -25,4 +31,6 @@ public static class ToolManageApi
     }
 
 }
+
+public record ToolFileMoveRequest(string ToolName, bool IsSystemTool, string UserName);
 

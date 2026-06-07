@@ -41,4 +41,14 @@ public class PlugMarketApiClient : BaseApiClient, IPlugMarketApiClient
             return false;
         }
     }
+
+    public async Task<CJ.Plug.Models.Plug.Plug?> GetSourcePlugByMarketPlugIdAsync(int marketPlugId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"api/plug/getSourcePlug/{marketPlugId}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<CJ.Plug.Models.Plug.Plug>(cancellationToken: cancellationToken);
+        }
+        return null;
+    }
 }

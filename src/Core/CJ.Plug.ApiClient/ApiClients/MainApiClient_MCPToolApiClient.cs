@@ -30,4 +30,9 @@ public partial class MainApiClient : IMCPToolApiClient
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, $"更新MCP工具: {request.Name}");
         return result;
     }
+
+    public async Task NotifyRefreshAsync(CancellationToken cancellationToken = default)
+    {
+        await MCPToolApiClient.Value.NotifyRefreshAsync(cancellationToken);
+    }
 }

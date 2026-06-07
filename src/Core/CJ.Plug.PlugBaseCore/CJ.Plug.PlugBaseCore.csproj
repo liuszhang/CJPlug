@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CJ.Plug.SharedPages.DataConnector\CJ.Plug.SharedPages.DataConnector.csproj" />
+    <ProjectReference Include="..\..\modules\Integrations\CJ.Plug.AmisIntegration\CJ.Plug.AmisIntegration.csproj" />
   </ItemGroup>
 
 </Project>

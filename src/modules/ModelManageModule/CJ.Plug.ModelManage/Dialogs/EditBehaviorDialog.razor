@@ -1,0 +1,129 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="int" Label="所属本体 *" Value="behavior.OntologyId" ValueChanged="@OnOntologyChanged" Required="true">
+                @foreach (var o in ontologies)
+                {
+                    <MudSelectItem T="int" Value="o.Id">@o.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="行为名称 *" @bind-Value="behavior.Name" Required="true" />
+            <MudTextField T="string" Label="行为描述" @bind-Value="behavior.Description" Lines="3" />
+            <MudSwitch T="bool" Label="启用" @bind-Checked="behavior.IsEnabled" Color="Color.Primary" />
+            @if (availableRules.Any())
+            {
+                <MudSelect T="int" Label="关联规则" MultiSelection="true"
+                           SelectedValues="selectedRuleIds"
+                           SelectedValuesChanged="@OnRuleSelectionChanged">
+                    @foreach (var r in availableRules)
+                    {
+                        <MudSelectItem T="int" Value="r.Id">@(r.Description ?? $"规则 #{r.Id}")</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int BehaviorId { get; set; }
+
+    private ObjectBehavior behavior = new();
+    private List<Ontology> ontologies = new();
+    private List<OntologyRule> availableRules = new();
+    private IReadOnlyCollection<int> selectedRuleIds = Array.Empty<int>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await OntologyManageApiClient.GetAllOntologiesAsync();
+        ontologies = all?.Where(o => o != null).Cast<Ontology>().ToList() ?? new();
+
+        var existing = await OntologyManageApiClient.GetAllBehaviorsAsync();
+        var match = existing?.FirstOrDefault(b => b?.Id == BehaviorId);
+        if (match != null)
+        {
+            behavior = new ObjectBehavior
+            {
+                Id = match.Id,
+                OntologyId = match.OntologyId,
+                Name = match.Name,
+                Description = match.Description,
+                IsEnabled = match.IsEnabled,
+                SortOrder = match.SortOrder
+            };
+        }
+
+        await LoadRules();
+    }
+
+    private async Task LoadRules()
+    {
+        if (behavior.OntologyId > 0)
+        {
+            var allRules = await OntologyManageApiClient.GetRulesByOntologyIdAsync(behavior.OntologyId);
+            availableRules = allRules?.Where(r => r != null).Cast<OntologyRule>().ToList() ?? new();
+
+            var linkedRules = await OntologyManageApiClient.GetRulesByBehaviorIdAsync(BehaviorId);
+            selectedRuleIds = (linkedRules?.Where(r => r != null).Select(r => r!.Id) ?? Enumerable.Empty<int>()).ToList().AsReadOnly();
+        }
+    }
+
+    private async Task OnOntologyChanged(int ontologyId)
+    {
+        behavior.OntologyId = ontologyId;
+        selectedRuleIds = Array.Empty<int>();
+        if (ontologyId > 0)
+        {
+            var rules = await OntologyManageApiClient.GetRulesByOntologyIdAsync(ontologyId);
+            availableRules = rules?.Where(r => r != null).Cast<OntologyRule>().ToList() ?? new();
+        }
+        else
+        {
+            availableRules = new();
+        }
+    }
+
+    private async Task OnRuleSelectionChanged(IReadOnlyCollection<int> selected)
+    {
+        selectedRuleIds = selected;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (behavior.OntologyId == 0)
+        {
+            Snackbar.Add("所属本体不能为空", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(behavior.Name))
+        {
+            Snackbar.Add("行为名称不能为空", Severity.Warning);
+            return;
+        }
+        var ruleIds = selectedRuleIds.Any() ? selectedRuleIds.ToList() : null;
+        var result = await OntologyManageApiClient.UpdateBehaviorAsync(behavior, ruleIds);
+        if (result != null)
+        {
+            Snackbar.Add("保存成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+}

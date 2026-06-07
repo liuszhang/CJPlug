@@ -1,4 +1,4 @@
-﻿using CJ.Plug.ApiClient.Contracts;
+using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.MCPToolApiClient;
 using CJ.Plug.MCPToolsManage.Menus;
 using CJ.Plug.MCPToolsManageApi.Apis;
@@ -7,6 +7,7 @@ using CJ.Plug.MCPToolsManageApi.DbContext;
 using CJ.Plug.MCPToolsManageApi.Services;
 using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.MCPTools;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.UserManageApiClient;
 using Microsoft.AspNetCore.Builder;
@@ -42,6 +43,13 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IMCPToolsManageService, MCPToolsManageService>();
 
+        // 注册 MCP Tool 变更通知器（通过 HTTP 调用 DispatchServer 触发 SignalR 广播）
+        services.AddSingleton<IMcpToolChangeNotifier, HttpMcpToolChangeNotifier>();
+        services.AddHttpClient("DispatchServer", client =>
+        {
+            client.BaseAddress = new(GlobalData.MainDispatcherServer);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
 
         services.AddHttpClient<IMCPToolApiClient, MCPToolApiClient>(client =>
         {
@@ -59,9 +67,4 @@ public static class ServiceCollectionExtensions
             endpoints.MapMCPToolsManageApi();
         });
     }
-
-
-
-
 }
-

@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.DispatchServer.Contracts;
 using CJ.Plug.Models.EventAggregator;
 using CJ.Plug.Models.LogModels;
@@ -18,8 +18,9 @@ public class MainHub(IStationService stationService):Hub
         await Clients.All.SendAsync("TellMeStatus");
     }
 
-    public async Task SendStationStatus(string ip, string status)
+    public async Task SendStationStatus(string ip, string status, string toolsRootPath = "")
     {
+        Console.WriteLine($"Prepare to Send Station Status:{ip} is {status}, ToolsRootPath: {toolsRootPath}");
         //将状态新增或更新到持久化存储中
         string encodedIp = Uri.EscapeDataString(ip);
         var host = await stationService.GetApiServer();
@@ -28,21 +29,22 @@ public class MainHub(IStationService stationService):Hub
         if (exist != null)
         {
             exist.UpdateTime = DateTime.Now.ToString();
-            //exist.IsStarted = true;
+            if (!string.IsNullOrEmpty(toolsRootPath))
+                exist.StationBasePath = toolsRootPath;
             await httpClient.PutAsJsonAsync("api/Station/UpdateStation", exist);
-            Console.WriteLine($"Update {ip} Status To {status}");
+            Console.WriteLine($"Update {ip} Status To {status}, BasePath: {exist.StationBasePath}");
         }
         else
         {
             exist = new Station();
             exist.UpdateTime = DateTime.Now.ToString();
             exist.StationIp = ip;
-            //exist.IsStarted = true;
+            if (!string.IsNullOrEmpty(toolsRootPath))
+                exist.StationBasePath = toolsRootPath;
             await httpClient.PostAsJsonAsync("api/Station/CreateStation", exist);
-            Console.WriteLine($"Create {ip}({status})");
+            Console.WriteLine($"Create {ip}({status}), BasePath: {exist.StationBasePath}");
         }
-        //Console.WriteLine("获取ToolAgent状态：" + ip + ":" + status);
-        await Clients.All.SendAsync("StatusInfo", ip, status);
+        await Clients.All.SendAsync("StatusInfo", ip, status, toolsRootPath);
 
     }
 
@@ -100,6 +102,15 @@ public class MainHub(IStationService stationService):Hub
         {
             Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp}");
             await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp);
+        }
+
+        /// <summary>
+        /// MCP Tool 更新通知（发布、删除、启用/禁用时触发）
+        /// </summary>
+        public async Task MCPToolUpdated(string toolId, string action = "updated")
+        {
+            Console.WriteLine($"MCP Tool {action}: {toolId}");
+            await Clients.All.SendAsync("MCPToolUpdated", toolId, action);
         }
     }
 

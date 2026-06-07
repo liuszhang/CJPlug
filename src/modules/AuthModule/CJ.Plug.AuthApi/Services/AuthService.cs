@@ -65,7 +65,19 @@ namespace CJ.Plug.AuthApi.Services
                 }
                 else
                 {
-                    throw new InvalidOperationException("创建数据失败");
+                    Log.Error("创建目标数据失败: OperationType={OperationType}, OperationData={OperationData}",
+                        operationType, request.OperationData);
+                    throw new InvalidOperationException($"创建数据失败: {operationType}");
+                }
+            }
+
+            // 启用/禁用/锁定/解锁操作：记录目标用户ID到TargetId，审批通过后才执行变更
+            if (IsUserStatusOrLockOperation(operationType))
+            {
+                var targetId = ExtractTargetIdFromOperationData(request.OperationData);
+                if (targetId > 0)
+                {
+                    entity.TargetId = targetId;
                 }
             }
 
@@ -85,22 +97,26 @@ namespace CJ.Plug.AuthApi.Services
 
             if (request.IsApproved)
             {
-                // 批准：将状态改为启用
+                // 批准：将状态改为启用或执行变更操作
                 var success = await ActivateTargetDataAsync((AuthOperationType)entity.OperationType, entity.TargetId, cancellationToken);
                 if (!success)
                 {
-                    Log.Error("激活数据失败：{Id}", request.RequestId);
+                    Log.Error("激活/执行数据失败：{Id}", request.RequestId);
                     return null;
                 }
             }
             else
             {
-                // 拒绝：删除数据
-                var success = await DeleteTargetDataAsync((AuthOperationType)entity.OperationType, entity.TargetId, cancellationToken);
-                if (!success)
+                // 拒绝：启用/禁用/锁定/解锁操作被拒绝时无需删除数据，仅更新授权状态
+                if (!IsUserStatusOrLockOperation((AuthOperationType)entity.OperationType))
                 {
-                    Log.Error("删除数据失败：{Id}", request.RequestId);
-                    // 即使删除失败也继续更新授权状态
+                    // 其他操作（创建/更新/删除）：删除数据
+                    var success = await DeleteTargetDataAsync((AuthOperationType)entity.OperationType, entity.TargetId, cancellationToken);
+                    if (!success)
+                    {
+                        Log.Error("删除数据失败：{Id}", request.RequestId);
+                        // 即使删除失败也继续更新授权状态
+                    }
                 }
             }
 
@@ -125,8 +141,8 @@ namespace CJ.Plug.AuthApi.Services
             // 只有请求人可以撤回
             if (entity.RequestedBy != cancelledBy) return null;
 
-            // 撤回时删除数据
-            if (entity.TargetId > 0)
+            // 撤回时删除数据（启用/禁用/锁定/解锁操作不需要删除）
+            if (entity.TargetId > 0 && !IsUserStatusOrLockOperation((AuthOperationType)entity.OperationType))
             {
                 await DeleteTargetDataAsync((AuthOperationType)entity.OperationType, entity.TargetId, cancellationToken);
             }
@@ -159,6 +175,37 @@ namespace CJ.Plug.AuthApi.Services
         }
 
         /// <summary>
+        /// 判断是否为用户状态/锁定操作（审批通过时执行变更，拒绝/撤回时无需删除数据）
+        /// </summary>
+        private static bool IsUserStatusOrLockOperation(AuthOperationType operationType)
+        {
+            return operationType is AuthOperationType.EnableUser
+                or AuthOperationType.DisableUser
+                or AuthOperationType.LockUser
+                or AuthOperationType.UnlockUser;
+        }
+
+        /// <summary>
+        /// 从操作数据JSON中提取目标ID
+        /// </summary>
+        private static int ExtractTargetIdFromOperationData(string operationData)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(operationData);
+                if (doc.RootElement.TryGetProperty("UserId", out var userIdElement))
+                {
+                    return userIdElement.GetInt32();
+                }
+                return 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// 创建目标数据（状态=授权中）
         /// </summary>
         private async Task<int> CreateTargetDataAsync(AuthOperationType operationType, string operationData, string creator, CancellationToken cancellationToken)
@@ -188,13 +235,43 @@ namespace CJ.Plug.AuthApi.Services
 
         private async Task<int> CreateUserDataAsync(string operationData, CancellationToken cancellationToken)
         {
-            var request = JsonSerializer.Deserialize<CreateUserRequest>(operationData);
-            if (request == null) return 0;
-            
-            // 设置状态为授权中
-            request.Status = DataStatus.Authorizing;
-            var user = await _userManageService.CreateUserAsync(request, cancellationToken);
-            return user?.Id ?? 0;
+            try
+            {
+                Log.Information("开始反序列化用户数据: {OperationData}", operationData);
+                var request = JsonSerializer.Deserialize<CreateUserRequest>(operationData);
+                if (request == null)
+                {
+                    Log.Error("JSON 反序列化失败，返回 null: {OperationData}", operationData);
+                    return 0;
+                }
+                
+                Log.Information("反序列化成功: UserName={UserName}, Email={Email}, DepartmentId={DepartmentId}", 
+                    request.UserName, request.Email, request.DepartmentId);
+                
+                // 设置状态为授权中
+                request.Status = DataStatus.Authorizing;
+                Log.Information("调用 UserManageService.CreateUserAsync");
+                var user = await _userManageService.CreateUserAsync(request, cancellationToken);
+                
+                if (user == null)
+                {
+                    Log.Error("UserManageService.CreateUserAsync 返回 null");
+                    return 0;
+                }
+                
+                Log.Information("用户创建成功: Id={Id}, UserName={UserName}", user.Id, user.UserName);
+                return user.Id;
+            }
+            catch (JsonException ex)
+            {
+                Log.Error(ex, "JSON 反序列化异常: {OperationData}", operationData);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "CreateUserDataAsync 发生异常");
+                return 0;
+            }
         }
 
         private async Task<int> CreateRoleDataAsync(string operationData, CancellationToken cancellationToken)
@@ -232,7 +309,7 @@ namespace CJ.Plug.AuthApi.Services
         }
 
         /// <summary>
-        /// 激活目标数据（状态改为启用）
+        /// 激活目标数据（状态改为启用）或执行变更操作
         /// </summary>
         private async Task<bool> ActivateTargetDataAsync(AuthOperationType operationType, int targetId, CancellationToken cancellationToken)
         {
@@ -260,13 +337,21 @@ namespace CJ.Plug.AuthApi.Services
                     case AuthOperationType.DeleteGroup:
                         // 删除操作直接执行
                         return await ExecuteDeleteOperationAsync(operationType, targetId, cancellationToken);
+                    case AuthOperationType.EnableUser:
+                        return await _userManageService.SetUserStatusAsync(targetId, DataStatus.Active, cancellationToken);
+                    case AuthOperationType.DisableUser:
+                        return await _userManageService.SetUserStatusAsync(targetId, DataStatus.Disabled, cancellationToken);
+                    case AuthOperationType.LockUser:
+                        return await _userManageService.SetUserLockoutAsync(targetId, true, cancellationToken);
+                    case AuthOperationType.UnlockUser:
+                        return await _userManageService.SetUserLockoutAsync(targetId, false, cancellationToken);
                     default:
                         return false;
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "激活目标数据失败");
+                Log.Error(ex, "激活/执行目标数据失败");
                 return false;
             }
         }
@@ -411,6 +496,69 @@ namespace CJ.Plug.AuthApi.Services
                 RequestedAt = DateTime.UtcNow,
                 Status = 0 // Pending
             };
+        }
+
+        public async Task<bool> UnlockSystemAdminAsync(UnlockSystemAdminRequest request, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                // 查找用户
+                var user = await _userManageService.GetAllUsersAsync(cancellationToken);
+                var targetUser = user.FirstOrDefault(u => u.UserName == request.UserName);
+                if (targetUser == null)
+                {
+                    Log.Warning("解锁系统管理员失败：用户 {UserName} 不存在", request.UserName);
+                    return false;
+                }
+
+                // 检查是否为系统管理员
+                var roles = await _userManageService.GetUserRolesAsync(targetUser.Id, cancellationToken);
+                Log.Information("用户 {UserName} 的角色列表: {@Roles}", request.UserName, roles);
+                var isSystemAdmin = roles.Any(r => r == "SystemAdmin" || r == "系统管理员" || r.Contains("SystemAdmin") || r.Contains("系统管理员"));
+                if (!isSystemAdmin)
+                {
+                    Log.Warning("解锁系统管理员失败：用户 {UserName} 不是系统管理员，实际角色: {@Roles}", request.UserName, roles);
+                    return false;
+                }
+
+                // 检查是否已锁定（通过 LockoutEnd 判断，而非 IsLocked 自定义字段）
+                var isLockedOut = targetUser.LockoutEnabled && targetUser.LockoutEnd.HasValue && targetUser.LockoutEnd.Value > DateTimeOffset.UtcNow;
+                if (!isLockedOut)
+                {
+                    Log.Warning("解锁系统管理员失败：用户 {UserName} 未锁定", request.UserName);
+                    return false;
+                }
+
+                // 解锁账号
+                var unlockResult = await _userManageService.SetUserLockoutAsync(targetUser.Id, false, cancellationToken);
+                if (!unlockResult)
+                {
+                    Log.Error("解锁系统管理员失败：解锁操作失败");
+                    return false;
+                }
+
+                // 创建审计记录
+                var auditRequest = new CreateAuthRequestDto
+                {
+                    OperationType = AuthOperationType.UnlockUser,
+                    TargetDescription = $"解锁系统管理员账号: {request.UserName}",
+                    OperationData = JsonSerializer.Serialize(new { 
+                        UserName = request.UserName, 
+                        UnlockedBy = request.UnlockedBy,
+                        Remark = request.Remark 
+                    }),
+                    RequestedBy = request.UnlockedBy
+                };
+                await CreateAsync(auditRequest, cancellationToken);
+
+                Log.Information("成功解锁系统管理员账号：{UserName}，操作人：{UnlockedBy}", request.UserName, request.UnlockedBy);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "解锁系统管理员时发生异常");
+                return false;
+            }
         }
 
         public static AuthRequestDto MapToDto(AuthRequestEntity entity)

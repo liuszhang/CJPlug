@@ -1,0 +1,68 @@
+@using CJ.Plug.LlmConfigModel.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="ModelConfig.ModelName" Label="模型标识" Required="true"
+                                  Placeholder="如 gpt-4o, deepseek-r1, qwen3:4b" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="ModelConfig.DisplayName" Label="显示名称" Required="true"
+                                  Placeholder="如 GPT-4o, DeepSeek R1" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect @bind-Value="ModelConfig.ModelType" Label="模型类型" Required="true" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("Chat")">Chat (对话)</MudSelectItem>
+                        <MudSelectItem Value="@("Completion")">Completion (补全)</MudSelectItem>
+                        <MudSelectItem Value="@("Embedding")">Embedding (向量)</MudSelectItem>
+                        <MudSelectItem Value="@("Image")">Image (图像)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="ModelConfig.MaxTokens" Label="最大 Tokens"
+                                     Variant="Variant.Outlined" Min="1" Max="1000000"
+                                     Placeholder="如 4096" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="ModelConfig.Temperature" Label="温度 (Temperature)"
+                                     Variant="Variant.Outlined" Min="0.0" Max="2.0" Step="0.1"
+                                     Placeholder="0.7" />
+                </MudItem>
+                <MudItem xs="6" Class="d-flex align-center">
+                    <MudStack Row Spacing="4">
+                        <MudSwitch @bind-Value="ModelConfig.IsDefault" Label="默认模型" Color="Color.Primary" />
+                        <MudSwitch @bind-Value="ModelConfig.IsEnabled" Label="启用" Color="Color.Primary" />
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="ModelConfig.Description" Label="描述/备注"
+                                  Variant="Variant.Outlined" Lines="2" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="ModelConfig.ExtraParams" Label="额外参数 (JSON)"
+                                  Placeholder='如 {"top_p": 0.9, "frequency_penalty": 0.5}'
+                                  Variant="Variant.Outlined" Lines="3" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="!_isValid">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public LlmModelConfig ModelConfig { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(ModelConfig));
+    private void Cancel() => MudDialog.Cancel();
+}

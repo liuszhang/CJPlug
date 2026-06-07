@@ -10,7 +10,7 @@ namespace StationSettingUI.Components
 {
     public partial class RemoteDesktopSetting : UserControl, INotifyPropertyChanged
     {
-        private readonly StationConfigService _configService;
+        private readonly StationSettingUI.Services.StationConfigService _configService;
         private readonly StationApiService _apiService;
         private readonly AppConfig _config;
 
@@ -18,7 +18,7 @@ namespace StationSettingUI.Components
         {
             InitializeComponent();
             DataContext = this;
-            _configService = new StationConfigService();
+            _configService = new StationSettingUI.Services.StationConfigService();
             _config = _configService.LoadConfig();
             _apiService = new StationApiService(_config);
         }

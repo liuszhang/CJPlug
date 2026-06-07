@@ -8,6 +8,7 @@
 @using CJ.Plug.Models.Station
 @using CJ.Plug.Models.VariableType
 @using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Contracts
 @using CJ.Plug.SharedPages.SharedComponents
 @using Elsa.Api.Client.Extensions
@@ -28,6 +29,7 @@
 @inject MainApiClient MainApiClient
 @inject IToolExecuteService ToolExecuteService
 @inject HubConnectionManagerService HubConnectionManagerService
+@implements IDisposable
 
 
 <MudStack Row AlignItems="AlignItems.Center">
@@ -98,6 +100,12 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
 
 <MudButton OnClick="TestExecute" Disabled="Loading" Variant="Variant.Filled" Color="Color.Primary">执行测试</MudButton>
 <MudTextField @bind-Value="JobResultString" Lines="3" AutoGrow Variant="Variant.Outlined" ReadOnly></MudTextField>
+
+<MudDivider />
+<MudText Typo="Typo.subtitle2" Class="mt-2">执行监控</MudText>
+<MudPaper Style="height: 300px; overflow-y: auto;" Elevation="0" Class="pa-1">
+    <ExecuteLogs />
+</MudPaper>
 </MudStack>
 @code{
     [CascadingParameter]
@@ -171,6 +179,7 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
 
     private string? TmpJobCorrelationId { get; set; } = null;
     private string? JobResultString { get; set; }
+    private System.Threading.Timer? _pollTimer;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -222,7 +231,7 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
     {     
         //await CheckKeywords();
         ToolCommandVariables.Add(ToolCommandVariable);
-        PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
+        PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ToolCommandVariable.ToString(), JsonSerializer.Serialize(ToolCommandVariables));
         //如果有新增的参数，则添加到变量列表
         //PlugDataZone.SetVariableValue(Plug.DefinitionId, ToolCommandVariable.OutputName, PlugDataZone.GetVariableValue(Plug.DefinitionId, ToolCommandVariable.OutputName));
         StateHasChanged();
@@ -251,7 +260,8 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
 
 
     private async Task TestExecute()
-    {        
+    {
+        GlobalLogCollector.ClearLogs();
         var executeRequest = GenerateRequest();
         if (executeRequest == null)
         {
@@ -278,7 +288,7 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
                 var tmpValue = toolCommandVariable.VariableValue;
                 if (toolCommandVariable.IsFromPlugVariable)
                 {
-                    tmpValue = PlugDataZone.GetVariableValue(PlugData.PlugDefinitionId, toolCommandVariable.VariableValue?.TrimStart('[')?.TrimEnd(']'));
+                    tmpValue = PlugDataZone?.GetVariableValue(PlugData.PlugDefinitionId, toolCommandVariable.VariableValue?.TrimStart('[')?.TrimEnd(']'));
                 }
 
                 inputs.Add(new PlugVariableData
@@ -311,18 +321,78 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
         try
         {
             var result = await ToolExecuteService.ExecuteToolAsync(executeRequest);
+            if (result?.Ids?.ToolJobCorrelationId == null)
+            {
+                // 同步执行已直接返回结果（Standalone 模式）
+                JobResultString = result?.ResultString ?? "执行完成，无结果数据";
+                Loading = false;
+                StateHasChanged();
+                return;
+            }
             TmpJobCorrelationId = result.Ids.ToolJobCorrelationId;
             CLog.Information($"已提交，监控作业: {TmpJobCorrelationId}",PlugDataZone?.PDZId);
 
+            // 启动轮询定时器，作为 SignalR 事件的备用机制
+            StartPolling();
         }
         catch (Exception ex)
         {
             CLog.Error($"提交失败: {ex.Message}");
+            Loading = false;
+            StateHasChanged();
         }
+    }
+
+    private int _pollCount = 0;
+    private const int MaxPollCount = 60; // 最多轮询 60 次（约 3 分钟）
+
+    private void StartPolling()
+    {
+        _pollTimer?.Dispose();
+        _pollCount = 0;
+        _pollTimer = new System.Threading.Timer(async _ =>
+        {
+            if (!Loading || string.IsNullOrEmpty(TmpJobCorrelationId)) return;
+            _pollCount++;
+            if (_pollCount > MaxPollCount)
+            {
+                _pollTimer?.Dispose();
+                _pollTimer = null;
+                await InvokeAsync(() =>
+                {
+                    CLog.Error("轮询超时，未能获取执行结果");
+                    Loading = false;
+                    StateHasChanged();
+                });
+                return;
+            }
+            try
+            {
+                var resultData = await MainApiClient.GetToolJobResultByCorrelationIdAsync(TmpJobCorrelationId);
+                if (resultData != null && resultData.ExecuteStatus == JobStatus.完成)
+                {
+                    _pollTimer?.Dispose();
+                    _pollTimer = null;
+                    await InvokeAsync(() =>
+                    {
+                        JobResultString = resultData.ResultString;
+                        Loading = false;
+                        StateHasChanged();
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"轮询执行结果出错: {ex.Message}");
+            }
+        }, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
     }
 
     private async Task OnReceiveJobStatus()
     {
+        _pollTimer?.Dispose();
+        _pollTimer = null;
+
         var resultData = await MainApiClient.GetToolJobResultByCorrelationIdAsync(TmpJobCorrelationId);
         if (resultData == null)
         {
@@ -338,9 +408,10 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
             Loading = false;
             StateHasChanged();
         });
+    }
 
-        // JobResultString = resultData.ResultString;
-        // Loading = false;
-        // StateHasChanged();
+    public void Dispose()
+    {
+        _pollTimer?.Dispose();
     }
 }

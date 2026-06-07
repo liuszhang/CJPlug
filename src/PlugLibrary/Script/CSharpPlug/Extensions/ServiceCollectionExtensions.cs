@@ -15,7 +15,8 @@ namespace CSharpPlug.Extensions
         {
             services
                 .AddScoped<IPlugCommonSettingContent, Services.CSharpPlugCommonSettingContent>()
-                .AddScoped<IPlugCommonExecute, CSharpPlugCommonExecuteService>();
+                .AddScoped<IPlugCommonExecute, CSharpPlugCommonExecuteService>()
+                .AddScoped<BridgeToolService>();
 
             return services;
         }
@@ -28,7 +29,8 @@ namespace CSharpPlug.Extensions
         public static IServiceCollection AddCSharpExecute(this IServiceCollection services)
         {
             services
-                .AddScoped<IPlugCommonExecute, CSharpPlugCommonExecuteService>();
+                .AddScoped<IPlugCommonExecute, CSharpPlugCommonExecuteService>()
+                .AddScoped<BridgeToolService>();
 
             return services;
         }

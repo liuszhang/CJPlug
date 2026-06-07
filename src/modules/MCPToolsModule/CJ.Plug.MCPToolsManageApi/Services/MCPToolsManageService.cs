@@ -9,8 +9,39 @@ namespace CJ.Plug.MCPToolsManageApi.Services
 {
 public class MCPToolsManageService : BaseRepositoryService<MCPTool, int>, IMCPToolsManageService
 {
-    public MCPToolsManageService(MainDbContext dbContext) : base(dbContext)
+    private readonly IMcpToolChangeNotifier? _notifier;
+
+    public MCPToolsManageService(MainDbContext dbContext, IMcpToolChangeNotifier? notifier = null) : base(dbContext)
     {
+        _notifier = notifier;
+    }
+
+    public override async Task<MCPTool> CreateAsync(MCPTool entity, CancellationToken cancellationToken = default)
+    {
+        var result = await base.CreateAsync(entity, cancellationToken);
+        var notifyId = result.ToolId ?? result.SourcePlugId;
+        if (_notifier != null && !string.IsNullOrEmpty(notifyId))
+            await _notifier.NotifyAsync(notifyId, "published", cancellationToken);
+        return result;
+    }
+
+    public override async Task<MCPTool?> UpdateAsync(MCPTool entity, CancellationToken cancellationToken = default)
+    {
+        var result = await base.UpdateAsync(entity, cancellationToken);
+        var notifyId = result?.ToolId ?? result?.SourcePlugId;
+        if (_notifier != null && result != null && !string.IsNullOrEmpty(notifyId))
+            await _notifier.NotifyAsync(notifyId, "updated", cancellationToken);
+        return result;
+    }
+
+    public override async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var entity = await GetByIdAsync(id, cancellationToken);
+        var toolId = entity?.ToolId ?? entity?.SourcePlugId;
+        var result = await base.DeleteAsync(id, cancellationToken);
+        if (result && _notifier != null && !string.IsNullOrEmpty(toolId))
+            await _notifier.NotifyAsync(toolId, "deleted", cancellationToken);
+        return result;
     }
 
     public async Task<IEnumerable<MCPTool>> GetActiveToolsAsync()
@@ -31,36 +62,55 @@ public class MCPToolsManageService : BaseRepositoryService<MCPTool, int>, IMCPTo
             return saved;
 
         // 2. 查找对应的 Plug 定义
-        var plug = await _dbContext.Set<global::CJ.Plug.Models.Plug.Plug>()
-            .Include(p => p.PlugVariables)
-            .FirstOrDefaultAsync(p => p.DefinitionId == tool.SourcePlugId);
+        //var plug = await _dbContext.Set<global::CJ.Plug.Models.Plug.Plug>()
+        //    .Include(p => p.PlugVariables)
+        //    .FirstOrDefaultAsync(p => p.DefinitionId == tool.SourcePlugId);
 
-        if (plug == null)
-            return saved;
+        //if (plug == null)
+        //    return saved;
 
-        // 3. 创建或更新 Use 类型 PDZ（和用户无关，作为参数模板）
-        var usePDZId = "MCP_Use_" + tool.SourcePlugId;
-        var existingPDZ = await _dbContext.Set<PlugDataZone>()
+        // 2. 查找对应的 PDZ 定义
+        var designPDZ = await _dbContext.Set<PlugDataZone>()
             .Include(p => p.PlugVariableDatas)
-            .FirstOrDefaultAsync(p => p.PDZId == usePDZId && p.Type == PDZTypeEnum.Use0.ToString());
+            .FirstOrDefaultAsync(p => p.PlugDefinitionId == tool.SourcePlugId && p.Type == PDZTypeEnum.Desi.ToString());
 
-        var pdz = existingPDZ ?? new PlugDataZone
-        {
-            PDZId = usePDZId,
-            Type = PDZTypeEnum.Use0.ToString(),
-            PlugDefinitionId = tool.SourcePlugId,
-            UserName = "MCP_System",
-        };
+        if (designPDZ == null)
+            {
+                Console.WriteLine($"Warning: No design PDZ found for PlugDefinitionId {tool.SourcePlugId}. Skipping PDZ creation.");
+                return saved;
+            }
 
-        // 从 Plug 定义同步变量到 PDZ
-        pdz.SyncVariablesFromPlug(plug);
+            // 3. 使用 CopyPDZ 完整复制 Desi PDZ → Use0 PDZ（作为参数模板）
+            //    CopyPDZ 会完整保留 IsInput、IsBrowsable、IsRequired 等元数据，
+            //    确保 McpServer 通过 GetPublishedWorkflowsAsync 能正确读取入口参数
+            var usePDZId = "MCP_Use0_" + tool.SourcePlugId;
 
-        if (existingPDZ != null)
-            _dbContext.Update(pdz);
-        else
+            // 先删除旧的 Use0 PDZ（如果存在），然后基于 Desi PDZ 创建新的副本
+            var existingPDZ = await _dbContext.Set<PlugDataZone>()
+                .FirstOrDefaultAsync(p => p.PDZId == usePDZId && p.Type == PDZTypeEnum.Use0.ToString());
+            if (existingPDZ != null)
+            {
+                _dbContext.Set<PlugDataZone>().Remove(existingPDZ);
+                await _dbContext.SaveChangesAsync(); // 先保存删除，避免 PDZId 冲突
+            }
+
+            var pdz = designPDZ.CopyPDZ("MCP_System", PDZTypeEnum.Use0.ToString(), tool.SourcePlugId);
+            pdz.PDZId = usePDZId; // 使用固定的 MCP 参数模板 PDZ ID
+
+            // 发布为 MCP Tool 时，将所有可见参数标记为输入参数
+            if (pdz.PlugVariableDatas != null)
+            {
+                foreach (var v in pdz.PlugVariableDatas)
+                {
+                    if (v.IsBrowsable != false)
+                    {
+                        v.IsInput = true;
+                    }
+                }
+            }
+
             _dbContext.Add(pdz);
-
-        await _dbContext.SaveChangesAsync();
+            await _dbContext.SaveChangesAsync();
         return saved;
     }
 
@@ -93,16 +143,53 @@ public class MCPToolsManageService : BaseRepositoryService<MCPTool, int>, IMCPTo
                 WorkflowDefinitionId = tool.SourcePlugId,
                 Name = tool.Name,
                 Description = tool.Description,
+                ToolType = tool.ToolType ?? "Workflow",
             };
 
             // 从 Use PDZ 提取入口变量
             var pdZ = pdZs.FirstOrDefault(p => p.PlugDefinitionId == tool.SourcePlugId);
             if (pdZ?.PlugVariableDatas != null && pdZ.PlugVariableDatas.Count > 0)
             {
+                Console.WriteLine($"[GetPublishedWorkflowsAsync] Tool={tool.Name}, PDZ={pdZ.PDZId}, Total variables={pdZ.PlugVariableDatas.Count}");
+                foreach (var v in pdZ.PlugVariableDatas)
+                {
+                    Console.WriteLine($"[GetPublishedWorkflowsAsync]   Var: Name={v.Name}, IsInput={v.IsInput}, IsBrowsable={v.IsBrowsable}, Type={v.Type}");
+                }
+
                 dto.EntryVariables = pdZ.PlugVariableDatas
-                    .Where(v => v.IsInput && v.IsBrowsable != false)
+                    .Where(v => v.IsInput && v.IsBrowsable != false && v.PlugDefinitionId==tool.SourcePlugId)
                     .Select(v => ToEntryDto(v))
                     .ToList();
+
+                Console.WriteLine($"[GetPublishedWorkflowsAsync] Tool={tool.Name}, EntryVariables after filter={dto.EntryVariables.Count}");
+            }
+            else
+            {
+                Console.WriteLine($"[GetPublishedWorkflowsAsync] Tool={tool.Name}, No PlugVariableDatas found. pdZ exists={pdZ != null}, count={pdZ?.PlugVariableDatas?.Count ?? -1}");
+            }
+
+            // 回退：如果 Use PDZ 中没有找到入口参数，从 Plug 定义中获取
+            if (dto.EntryVariables.Count == 0)
+            {
+                try
+                {
+                    var plug = await _dbContext.Set<CJ.Plug.Models.Plug.Plug>()
+                        .Include(p => p.PlugVariables)
+                        .FirstOrDefaultAsync(p => p.DefinitionId == tool.SourcePlugId);
+                    if (plug?.PlugVariables != null && plug.PlugVariables.Count > 0)
+                    {
+                        Console.WriteLine($"[GetPublishedWorkflowsAsync] Fallback to Plug definition: Tool={tool.Name}, PlugVariables={plug.PlugVariables.Count}");
+                        dto.EntryVariables = plug.PlugVariables
+                            .Where(v => v.IsInput && v.IsBrowsable != false)
+                            .Select(v => ToEntryDto(v))
+                            .ToList();
+                        Console.WriteLine($"[GetPublishedWorkflowsAsync] Fallback: Tool={tool.Name}, EntryVariables={dto.EntryVariables.Count}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[GetPublishedWorkflowsAsync] Fallback failed for Tool={tool.Name}: {ex.Message}");
+                }
             }
 
             result.Add(dto);

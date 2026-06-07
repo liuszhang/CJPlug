@@ -135,6 +135,12 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
         }
 
 
+        // 确保 stationIp 是完整的 URI 格式
+        if (stationIp.StartsWith("://"))
+            stationIp = "http" + stationIp;
+        else if (!stationIp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                 !stationIp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            stationIp = "http://" + stationIp;
         StationApiClient stationApiClient = new StationApiClient(new HttpClient() { BaseAddress = new Uri(stationIp) });
         try
         {

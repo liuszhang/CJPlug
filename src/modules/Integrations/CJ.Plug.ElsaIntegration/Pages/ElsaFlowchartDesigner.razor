@@ -123,6 +123,7 @@ draggable="false"
     public async Task CenterContentAsync() => await Designer.CenterContentAsync();
     public async Task AutoLayoutAsync() => await Designer.AutoLayoutAsync(Flowchart, ActivityStats);
     public async Task LoadActivityAsync(JsonObject root) => await Designer.LoadFlowchartAsync(root, ActivityStats);
+    public async Task UpdateActivityStatsAsync(string activityId, ActivityStats? stats) => await Designer.UpdateActivityStatsAsync(activityId, stats);
 
 
     protected override async Task OnInitializedAsync()

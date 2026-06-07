@@ -196,13 +196,13 @@
         if (!string.IsNullOrEmpty(PlugDefinitionId))
         {
             PlugData = PlugDataZone?.PlugDatas?.FirstOrDefault(p => p.PlugDefinitionId == PlugDefinitionId);
-            NXFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == InitVariableNames.NXFile.ToString()).FirstOrDefault();
-            StlFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == InitVariableNames.StlFile.ToString()).FirstOrDefault();
-            if (!string.IsNullOrEmpty(PlugDataZone?.GetVariableValue(PlugData?.PlugDefinitionId, InitVariableNames.ModelParameters.ToString())))
+            NXFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == NXPlugVariables.NXFile.ToString()).FirstOrDefault();
+            StlFileData = PlugDataZone?.PlugVariableDatas?.Where(v => v.PlugDefinitionId == PlugDefinitionId && v.Name == NXPlugVariables.StlFile.ToString()).FirstOrDefault();
+            if (!string.IsNullOrEmpty(PlugDataZone?.GetVariableValue(PlugData?.PlugDefinitionId, NXPlugVariables.ModelParameters.ToString())))
             {
-                ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(PlugDataZone?.GetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ModelParameters.ToString()));
+                ModelParameters = JsonSerializer.Deserialize<List<ModelParameter>?>(PlugDataZone?.GetVariableValue(PlugData.PlugDefinitionId, NXPlugVariables.ModelParameters.ToString()));
             }
-            rootPlugVariables = JsonSerializer.Serialize(PlugDataZone.GetVariablesOfPlug(PlugDefinitionId));
+            rootPlugVariables = JsonSerializer.Serialize(PlugDataZone?.GetVariablesOfPlug(PlugDefinitionId));
 
         }
         await GetModelParametersTable();
@@ -259,7 +259,7 @@
             {
             //Plug = Plug,
                 PlugDefinitionId=PlugData?.PlugDefinitionId,
-                Variable = PlugDataZone?.PlugVariableDatas?.Where(p=>p.PlugDefinitionId==PlugDefinitionId).FirstOrDefault(p => p.Name == InitVariableNames.ModelParameters.ToString()),
+                Variable = PlugDataZone?.PlugVariableDatas?.Where(p=>p.PlugDefinitionId==PlugDefinitionId).FirstOrDefault(p => p.Name == NXPlugVariables.ModelParameters.ToString()),
                 PlugDataZone = PlugDataZone,
             //OnValueChanged = OnValueChanged,
             };
@@ -289,13 +289,13 @@
                 FileRealPath = null;
                 string? fileId;
                 //(FileRealPath,fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
-                var ModelVariable = PlugDataZone?.PlugVariableDatas?.Where(p => p.PlugDefinitionId == PlugDefinitionId).FirstOrDefault(p => p.Name == InitVariableNames.NXFile.ToString());
+                var ModelVariable = PlugDataZone?.PlugVariableDatas?.Where(p => p.PlugDefinitionId == PlugDefinitionId).FirstOrDefault(p => p.Name == NXPlugVariables.NXFile.ToString());
                 (FileRealPath, fileId) = await FileManageApiClient.UploadFileToVariable(browserFile.OpenReadStream(maxAllowedSize: 512000000), browserFile.Name, ModelVariable);
 
                 CLog.Information("FileRealPath is:" + FileRealPath);
                 //Plug.SetPlugSetting(PlugSettingKey.FileId.ToString(), fileId);
-                //Plug.SetVariableValue(InitVariableNames.NXFile.ToString(), browserFile.Name + ":" + fileId);
-                PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.NXFile.ToString(), browserFile.Name + ":" + fileId);
+                //Plug.SetVariableValue(NXPlugVariables.NXFile.ToString(), browserFile.Name + ":" + fileId);
+                PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, NXPlugVariables.NXFile.ToString(), browserFile.Name + ":" + fileId);
 
                 //browserFile = null;
             }
@@ -354,7 +354,7 @@
             return;
         }
         ModelParameters = ToolIntegrationUtils.ProcessGetParameters(paraString,ModelParameters);
-        PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.ModelParameters.ToString(), JsonSerializer.Serialize(ModelParameters));
+        PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, NXPlugVariables.ModelParameters.ToString(), JsonSerializer.Serialize(ModelParameters));
 
         //强制刷新一下表格
         ArrayChildContent = null;
@@ -423,7 +423,7 @@
             StateHasChanged();
             return;
         }
-        CLog.Information("完成设置NX模型参数：" + parameterString,PlugDataZone.PDZId);
+        CLog.Information("完成设置NX模型参数：" + parameterString,PlugDataZone?.PDZId);
         //更新了参数后，需要重新获取模型数据
         NXFileData = await MainApiClient.GetPlugVariableDataById(NXFileData.Id);
         //Log.Information("NEW NXFileData Value is:" + NXFileData?.Value);
@@ -450,7 +450,7 @@
         showProgress = true;
         if (string.IsNullOrEmpty(NXFileData?.Value))
         {
-            CLog.Information("no model!", PlugDataZone.PDZId);
+            CLog.Information("no model!", PlugDataZone?.PDZId);
             return;
         }
         TmpJobCorrelationId = "ToStl" + RandomLongIdentityGenerator.GenerateId();
@@ -500,7 +500,7 @@
         await InvokeAsync(async() =>
         {
             StlFileData = await MainApiClient.GetPlugVariableDataById(StlFileData.Id);
-            PlugDataZone.SetVariableValue(PlugData.PlugDefinitionId, InitVariableNames.StlFile.ToString(), StlFileData?.Value);
+            PlugDataZone?.SetVariableValue(PlugData.PlugDefinitionId, NXPlugVariables.StlFile.ToString(), StlFileData?.Value);
             StateHasChanged();
         });
         //更新新的STL文件数据

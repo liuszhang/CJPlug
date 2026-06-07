@@ -1,0 +1,84 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="属性标识 *" @bind-Value="prop.Name" Required="true" />
+            <MudTextField T="string" Label="显示名称 *" @bind-Value="prop.DisplayName" Required="true" />
+            <MudSelect T="string" Label="属性类型 *" @bind-Value="prop.PropertyType" Required="true">
+                <MudSelectItem Value="@("Text")">文本(Text)</MudSelectItem>
+                <MudSelectItem Value="@("Number")">数字(Number)</MudSelectItem>
+                <MudSelectItem Value="@("Select")">下拉选择(Select)</MudSelectItem>
+                <MudSelectItem Value="@("Date")">日期(Date)</MudSelectItem>
+                <MudSelectItem Value="@("Boolean")">布尔(Boolean)</MudSelectItem>
+                <MudSelectItem Value="@("JsonText")">JSON文本(JsonText)</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="描述" @bind-Value="prop.Description" />
+            <MudTextField T="string" Label="默认值" @bind-Value="prop.DefaultValue" />
+            <MudStack Row Spacing="4">
+                <MudCheckBox T="bool" Label="必填" @bind-Checked="prop.IsRequired" />
+                <MudCheckBox T="bool" Label="可浏览" @bind-Checked="prop.IsBrowsable" />
+            </MudStack>
+            <MudNumericField T="int" Label="排序" @bind-Value="prop.SortOrder" />
+            <MudTextField T="string" Label="UI提示" @bind-Value="prop.UIHint" />
+            <MudTextField T="string" Label="校验规则" @bind-Value="prop.ValidationRule" />
+
+            @if (prop.PropertyType == "Select")
+            {
+                <MudTextField T="string" Label="下拉选项(JSON数组)" @bind-Value="prop.SelectOptions" Placeholder='["选项A","选项B"]' />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Property Property { get; set; } = new();
+
+    private Property prop = new();
+
+    protected override void OnParametersSet()
+    {
+        prop = Property;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(prop.Name) || string.IsNullOrWhiteSpace(prop.DisplayName))
+        {
+            Snackbar.Add("属性标识和显示名称不能为空", Severity.Warning);
+            return;
+        }
+
+        Property? result;
+        if (prop.Id == 0)
+        {
+            result = await OntologyManageApiClient.CreatePropertyAsync(prop);
+        }
+        else
+        {
+            result = await OntologyManageApiClient.UpdatePropertyAsync(prop);
+        }
+
+        if (result != null)
+        {
+            Snackbar.Add(prop.Id == 0 ? "添加成功" : "更新成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add(prop.Id == 0 ? "添加失败" : "更新失败", Severity.Error);
+        }
+    }
+}

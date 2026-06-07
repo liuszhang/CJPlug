@@ -90,12 +90,50 @@ public partial class PlugDataZone
             return null;
         }
 
-        // 将插头的参数复制到PDZ参数中
+        // 将插头的参数复制到PDZ参数中（保留完整元数据，包括 IsInput/IsRequired 等）
         public void SetVariablesFromPlug(Plug plug)
         {
             foreach (var v in plug.PlugVariables)
             {
-                SetVariableValue(plug.DefinitionId, v.Name, v.Value, v.Type);
+                PlugVariableDatas ??= new List<PlugVariableData>();
+                var existing = PlugVariableDatas
+                    .FirstOrDefault(p => p.PlugDefinitionId == plug.DefinitionId && p.Name == v.Name);
+                if (existing != null)
+                {
+                    existing.Value = v.Value;
+                    existing.Type = v.Type;
+                    existing.IsInput = v.IsInput;
+                    existing.IsOutput = v.IsOutput;
+                    existing.IsRequired = v.IsRequired;
+                    existing.IsArray = v.IsArray;
+                    existing.IsBrowsable = v.IsBrowsable;
+                    existing.IsInitVariable = v.IsInitVariable;
+                    existing.DisplayName = v.DisplayName;
+                    existing.Description = v.Description;
+                    existing.DefaultValue = v.DefaultValue;
+                    existing.Category = v.Category;
+                }
+                else
+                {
+                    PlugVariableDatas.Add(new PlugVariableData()
+                    {
+                        PlugDataZoneId = this.Id,
+                        PlugDefinitionId = plug.DefinitionId,
+                        Name = v.Name,
+                        Value = v.Value,
+                        Type = v.Type ?? CJ.Plug.Models.VariableType.VariableTypeEnum.String.ToString(),
+                        DisplayName = v.DisplayName,
+                        Description = v.Description,
+                        DefaultValue = v.DefaultValue,
+                        IsInput = v.IsInput,
+                        IsOutput = v.IsOutput,
+                        IsRequired = v.IsRequired,
+                        IsArray = v.IsArray,
+                        IsBrowsable = v.IsBrowsable,
+                        IsInitVariable = v.IsInitVariable,
+                        Category = v.Category,
+                    });
+                }
             }
             // 流程图数据已迁移至插头定义层，不再复制到 PDZ
             // SetFlowchartData(plug.DefinitionId, plug.ToActivityJson());
@@ -157,9 +195,17 @@ public partial class PlugDataZone
                     PlugDefinitionId = plug.DefinitionId,
                     Name = plugVar.Name,
                     Type = plugVar.Type,
-                    Value = null, // 值为空
+                    Value = null, // 运行时值为空
+                    DisplayName = plugVar.DisplayName,
+                    Description = plugVar.Description,
+                    DefaultValue = plugVar.DefaultValue,
+                    IsInput = plugVar.IsInput,
+                    IsOutput = plugVar.IsOutput,
+                    IsRequired = plugVar.IsRequired,
+                    IsArray = plugVar.IsArray,
                     IsInitVariable = plugVar.IsInitVariable,
                     IsBrowsable = plugVar.IsBrowsable,
+                    Category = plugVar.Category,
                 };
                 PlugVariableDatas ??= new List<PlugVariableData>();
                 PlugVariableDatas.Add(newPlugVariableData);
@@ -408,13 +454,25 @@ public partial class PlugDataZone
                     Name = v.Name,
                     Value = v.Value,
                     Type = v.Type,
+                    DisplayName = v.DisplayName,
+                    Description = v.Description,
+                    DefaultValue = v.DefaultValue,
                     DisplayValue = v.DisplayValue,
-                    IsInitVariable = v.IsInitVariable,
+                    IsInput = v.IsInput,
+                    IsOutput = v.IsOutput,
+                    IsRequired = v.IsRequired,
+                    IsArray = v.IsArray,
                     IsBrowsable = v.IsBrowsable,
+                    IsInitVariable = v.IsInitVariable,
                     IsValueFromOtherVariable = v.IsValueFromOtherVariable,
                     SourceValuePlugDefinitionId = v.SourceValuePlugDefinitionId,
                     SourceValueVariableId = v.SourceValueVariableId,
-                    SourceValueVariableName = v.SourceValueVariableName
+                    SourceValueVariableName = v.SourceValueVariableName,
+                    Category = v.Category,
+                    UIHint = v.UIHint,
+                    StorageDriver = v.StorageDriver,
+                    StorageDriverTypeName = v.StorageDriverTypeName,
+                    InputAndOutput = v.InputAndOutput,
                 };
                 if (TargetPDZType == PDZTypeEnum.Desi.ToString()|| v.IsValueFromOtherVariable)
                 {

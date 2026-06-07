@@ -1,0 +1,56 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="本体标识 *" @bind-Value="ontology.Name" Required="true" RequiredError="本体标识不能为空" />
+            <MudTextField T="string" Label="显示名称 *" @bind-Value="ontology.DisplayName" Required="true" RequiredError="显示名称不能为空" />
+            <MudTextField T="string" Label="描述" @bind-Value="ontology.Description" Lines="3" />
+            <MudTextField T="string" Label="分类" @bind-Value="ontology.Category" />
+            <MudTextField T="string" Label="版本" @bind-Value="ontology.Version" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Ontology Ontology { get; set; } = new();
+
+    private Ontology ontology = new();
+
+    protected override void OnParametersSet()
+    {
+        ontology = Ontology;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(ontology.Name) || string.IsNullOrWhiteSpace(ontology.DisplayName))
+        {
+            Snackbar.Add("本体标识和显示名称不能为空", Severity.Warning);
+            return;
+        }
+        var result = await OntologyManageApiClient.CreateOntologyAsync(ontology);
+        if (result != null)
+        {
+            Snackbar.Add("创建成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("创建失败", Severity.Error);
+        }
+    }
+}

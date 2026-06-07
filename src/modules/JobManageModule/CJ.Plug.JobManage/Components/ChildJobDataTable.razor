@@ -77,7 +77,7 @@ else
             <MudTd DataLabel="" Style="text-align:right">
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
                     <MudMenuItem OnClick="JobDetails" Icon="@Icons.Material.Outlined.ZoomIn">详情</MudMenuItem>
-                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                    <MudMenuItem OnClick="() => DeleteToolJob(context)" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
                     <MudMenuItem Icon="@Icons.Material.Outlined.Cancel" Disabled="@(context.FinishedAt != null)">取消</MudMenuItem>
                 </MudMenu>
             </MudTd>
@@ -153,6 +153,12 @@ else
         //StateHasChanged();
     }
 
+
+    private async Task DeleteToolJob(ToolJob job)
+    {
+        await MainApiClient.DeleteJobAsync(job);
+        await OnParametersSetAsync();
+    }
 
     private void JobDetails()
     {

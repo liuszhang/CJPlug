@@ -1,0 +1,133 @@
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Blazored.LocalStorage
+@using CJ.Plug.ApiClient.Contracts
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+
+@inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+
+<MudDialog Class="stack-resize">
+    <DialogContent>     
+        <MudContainer Style="max-height: 350px; overflow-y: scroll">
+            <MudPaper Class="pa-4">
+                <MudTreeView @bind-SelectedValue="SelectedNode" Hover="true" Color="Color.Success">
+                    @foreach (var rootItem in TreeItems)
+                    {
+                        <ServerFileTreeItem Node="rootItem" ToolAgentHostToUse="ToolAgentHostToUse" />
+                    }
+                </MudTreeView>
+            </MudPaper>
+        </MudContainer>
+        <MudDivider></MudDivider>
+        <MudText>已选择：@(SelectedNode == null ? "无" : SelectedNode.FullPath)</MudText>
+        <MudDivider></MudDivider>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            <MudAlertTitle>提示</MudAlertTitle>
+            <MudText>请从临时工具包文件夹中选择一个可执行文件（如.exe文件）。创建工具时路径将自动转换为正式存储路径。</MudText>
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(SelectedNode == null || SelectedNode.IsDirectory)">确认</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private FileSystemNode[] FileTreeNodes { get; set; } = new FileSystemNode[0];
+    private List<TreeItemData<FileSystemNode>>? TreeItems { get; set; } = new ();
+
+    private FileSystemNode? SelectedNode { get; set; }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public string ToolAgentHostToUse { get; set; }
+    [Parameter] public bool IsTemporaryToolPackage { get; set; } = false;
+
+    void Cancel() => MudDialog.Cancel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        CLog.Information("ChooseToolExecutable OnInitializedAsync");
+        var currentUser = await DomInteropService.GetCurrentUserName();
+
+        if (IsTemporaryToolPackage)
+        {
+            // 显示临时工具包文件夹
+            var tmpToolsRelPath = Path.GetRelativePath(
+                GlobalData.MainFileServerPathRoot,
+                Path.Combine(GlobalData.ToolsRootPath, "Tmp"));
+            var tmpRootNode = new FileSystemNode(tmpToolsRelPath, "临时工具包", true);
+            var tmpRootItem = new TreeItemData<FileSystemNode> { Value = tmpRootNode, Expandable = true, Text = "临时工具包文件夹" };
+            var tmpChildren = await MainApiClient.GetFolderFiles(tmpRootNode, currentUser, ToolAgentHostToUse);
+            if (tmpChildren != null)
+            {
+                tmpRootItem.Children = tmpChildren
+                    .Select(c => new TreeItemData<FileSystemNode>
+                    {
+                        Value = c,
+                        Expandable = c.IsDirectory,
+                        Text = c.Name
+                    })
+                    .ToHashSet();
+            }
+            TreeItems.Add(tmpRootItem);
+        }
+        else
+        {
+            // 显示用户工具目录
+            var userToolsRelPath = Path.GetRelativePath(
+                GlobalData.MainFileServerPathRoot,
+                GlobalData.GetUserToolsPath(currentUser));
+            var userRootNode = new FileSystemNode(userToolsRelPath, currentUser, true);
+            var userRootItem = new TreeItemData<FileSystemNode> { Value = userRootNode, Expandable = true, Text = userToolsRelPath };
+            var userChildren = await MainApiClient.GetFolderFiles(userRootNode, currentUser, ToolAgentHostToUse);
+            if (userChildren != null)
+            {
+                userRootItem.Children = userChildren
+                    .Select(c => new TreeItemData<FileSystemNode>
+                    {
+                        Value = c,
+                        Expandable = c.IsDirectory,
+                        Text = c.Name
+                    })
+                    .ToHashSet();
+            }
+            TreeItems.Add(userRootItem);
+
+            // 显示系统工具目录
+            var systemToolsRelPath = Path.GetRelativePath(
+                GlobalData.MainFileServerPathRoot,
+                GlobalData.SystemToolsPath);
+            var systemRootNode = new FileSystemNode(systemToolsRelPath, "0System", true);
+            var systemRootItem = new TreeItemData<FileSystemNode> { Value = systemRootNode, Expandable = true, Text = systemToolsRelPath };
+            var systemChildren = await MainApiClient.GetFolderFiles(systemRootNode, currentUser, ToolAgentHostToUse);
+            if (systemChildren != null)
+            {
+                systemRootItem.Children = systemChildren
+                    .Select(c => new TreeItemData<FileSystemNode>
+                    {
+                        Value = c,
+                        Expandable = c.IsDirectory,
+                        Text = c.Name
+                    })
+                    .ToHashSet();
+            }
+            TreeItems.Add(systemRootItem);
+        }
+    }
+
+    protected async Task Submit()
+    {
+        if (SelectedNode == null)
+        {
+            MudDialog.Cancel();
+            return;
+        }
+
+        // 直接返回原始 Tmp 路径，不做转换。路径转换在 NewTool.Submit() 中完成。
+        MudDialog.Close(DialogResult.Ok(SelectedNode.FullPath));
+    }
+}

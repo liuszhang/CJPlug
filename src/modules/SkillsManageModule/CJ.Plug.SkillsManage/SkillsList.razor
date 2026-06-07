@@ -1,0 +1,368 @@
+@page "/SkillsList"
+
+
+
+@using CJ.Plug.Models.Skills
+@using CJ.Plug.SkillApiClient
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using Size = MudBlazor.Size
+
+@inject ISkillApiClient SkillApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject CJ.Plug.SharedPages.Services.FileDownloadService FileDownloadService
+
+
+<PageTitle>Skills管理</PageTitle>
+
+<MudTabs ActivePanelIndex="_activeTabIndex" ActivePanelIndexChanged="OnTabChanged" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0">
+    <MudTabPanel Text="我创建的" Icon="@Icons.Material.Filled.Person">
+        <MudDataGrid Items="@mySkills" T="Skill" Hover="true" Dense="true" SelectionMode="DataGridSelectionMode.None">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">我创建的 Skills</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="OpenCreateDialog">新建 Skill</MudButton>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x => x.Id" Title="编号" Sortable="true" />
+                <TemplateColumn Title="Skill 名称">
+                    <CellTemplate>
+                        <span @onclick="async () => await OpenSkillDetailDrawer(context.Item)"
+                              @onclick:preventDefault
+                              style="cursor:pointer;color:var(--mud-palette-primary);text-decoration:underline;">
+                            @context.Item.Name
+                        </span>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.DisplayName" Title="显示名" Sortable="true" />
+                <PropertyColumn Property="x => x.Category" Title="分类" Sortable="true" />
+                <PropertyColumn Property="x => x.Description" Title="描述" />
+                <PropertyColumn Property="x => x.Author" Title="作者" />
+                <TemplateColumn Title="是否启用">
+                    <CellTemplate>
+                        <MudSwitch T="bool"
+                                   Value="@context.Item.IsEnabled"
+                                   Color="Color.Primary"
+                                   ValueChanged="(e) => ToggleEnabled(context.Item, e)" />
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="操作">
+                    <CellTemplate>
+                        <MudButton OnClick="() => OpenEditDialog(context.Item)"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Class="me-1">编辑</MudButton>
+                        <MudButton OnClick="() => OpenDeleteDialog(context.Item)"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   Size="Size.Small">删除</MudButton>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2">未找到任何自定义 Skill。</MudText>
+            </NoRecordsContent>
+        </MudDataGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="系统预设" Icon="@Icons.Material.Filled.Settings">
+        <MudDataGrid Items="@presetSkills" T="Skill" Hover="true" Dense="true" SelectionMode="DataGridSelectionMode.None">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">系统预设 Skills</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenImportDialog"
+                           StartIcon="@Icons.Material.Filled.FileDownload">导入</MudButton>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x => x.Id" Title="编号" Sortable="true" />
+                <TemplateColumn Title="Skill 名称">
+                    <CellTemplate>
+                        <span @onclick="async () => await OpenSkillDetailDrawer(context.Item)"
+                              @onclick:preventDefault
+                              style="cursor:pointer;color:var(--mud-palette-primary);text-decoration:underline;">
+                            @context.Item.Name
+                        </span>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.DisplayName" Title="显示名" Sortable="true" />
+                <PropertyColumn Property="x => x.Category" Title="分类" Sortable="true" />
+                <PropertyColumn Property="x => x.Description" Title="描述" />
+                <PropertyColumn Property="x => x.Author" Title="作者" />
+                <TemplateColumn Title="是否启用">
+                    <CellTemplate>
+                        <MudSwitch T="bool"
+                                   Value="@context.Item.IsEnabled"
+                                   Color="Color.Primary"
+                                   ValueChanged="(e) => ToggleEnabled(context.Item, e)" />
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="操作">
+                    <CellTemplate>
+                        <MudButton OnClick="() => OpenEditDialog(context.Item)"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small">编辑</MudButton>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2">暂无系统预设 Skill。</MudText>
+            </NoRecordsContent>
+        </MudDataGrid>
+    </MudTabPanel>
+</MudTabs>
+
+@* 技能详情抽屉 *@
+<SkillDetailDrawer @bind-IsOpen="_skillDetailDrawerOpen"
+                   Skill="_selectedSkill"
+                   SkillApiClient="SkillApiClient"
+                   FileDownloadService="FileDownloadService" />
+
+@* 新建/编辑对话框 *@
+<MudDialog @bind-Visible="@_dialogVisible" Title="@_dialogTitle">
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="名称" @bind-Value="_editModel.Name" Required="true"
+                                  RequiredError="名称为必填项" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="显示名" @bind-Value="_editModel.DisplayName" Required="true"
+                                  RequiredError="显示名为必填项" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="分类" @bind-Value="_editModel.Category" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="图标" @bind-Value="_editModel.Icon" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="作者" @bind-Value="_editModel.Author" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField Label="源插头ID" @bind-Value="_editModel.SourcePlugId" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="描述" @bind-Value="_editModel.Description" Lines="2" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="Prompt模板" @bind-Value="_editModel.PromptTemplate" Lines="6"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_editModel.IsEnabled" Color="Color.Primary"
+                               Label="启用" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelDialog">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSkill">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* 删除确认对话框 *@
+<MudDialog @bind-Visible="@_deleteDialogVisible" Title="确认删除">
+    <DialogContent>
+        <MudText>确定要删除 Skill "<b>@_deleteTarget?.Name</b>" 吗？此操作不可撤销。</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelDelete">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ConfirmDelete">确认删除</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Skill> skills = new();
+    private List<Skill> mySkills => skills.Where(s => !s.IsPreset).ToList();
+    private List<Skill> presetSkills => skills.Where(s => s.IsPreset).ToList();
+    private int _activeTabIndex;
+    private bool _dialogVisible;
+    private bool _deleteDialogVisible;
+    private string _dialogTitle = "新建 Skill";
+    private Skill _editModel = new();
+    private Skill? _deleteTarget;
+    private MudForm? _form;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSkills();
+    }
+
+    private async Task LoadSkills()
+    {
+        var result = await SkillApiClient.GetAllSkillsAsync();
+        skills = result?.Where(s => s is not null).Cast<Skill>().ToList() ?? new();
+    }
+
+    private async Task Refresh()
+    {
+        await LoadSkills();
+    }
+
+    // ===== 技能详情抽屉 =====
+    private bool _skillDetailDrawerOpen;
+    private Skill? _selectedSkill;
+    private int _previousTabIndex;
+
+    private void OnTabChanged(int newIndex)
+    {
+        if (newIndex != _previousTabIndex)
+        {
+            _previousTabIndex = newIndex;
+            // 切换页签时关闭详情抽屉，避免 OverlayAutoClose 未同步状态导致抽屉重新打开
+            _skillDetailDrawerOpen = false;
+            _selectedSkill = null;
+        }
+    }
+
+    private async Task OpenSkillDetailDrawer(Skill skill)
+    {
+        _selectedSkill = skill;
+        _skillDetailDrawerOpen = true;
+        StateHasChanged();
+    }
+
+    
+
+
+
+
+
+    // ===== 新建 =====
+    private void OpenCreateDialog()
+    {
+        _skillDetailDrawerOpen = false;
+        _dialogTitle = "新建 Skill";
+        _editModel = new Skill { IsEnabled = true };
+        _dialogVisible = true;
+    }
+
+    // ===== 编辑 =====
+    private void OpenEditDialog(Skill skill)
+    {
+        _skillDetailDrawerOpen = false;
+        _dialogTitle = "编辑 Skill";
+        _editModel = new Skill
+        {
+            Id = skill.Id,
+            Name = skill.Name,
+            DisplayName = skill.DisplayName,
+            Description = skill.Description,
+            PromptTemplate = skill.PromptTemplate,
+            IsPreset = skill.IsPreset,
+            Category = skill.Category,
+            Icon = skill.Icon,
+            Author = skill.Author,
+            SourcePlugId = skill.SourcePlugId,
+            IsEnabled = skill.IsEnabled,
+            CreatedAt = skill.CreatedAt,
+            UpdatedAt = skill.UpdatedAt,
+        };
+        _dialogVisible = true;
+    }
+
+    private async Task SaveSkill()
+    {
+        if (_form is not null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid) return;
+        }
+
+        try
+        {
+            if (_editModel.Id == 0)
+            {
+                await SkillApiClient.CreateSkillAsync(_editModel);
+                Snackbar.Add($"Skill '{_editModel.Name}' 创建成功。", Severity.Success);
+            }
+            else
+            {
+                await SkillApiClient.UpdateSkillAsync(_editModel);
+                Snackbar.Add($"Skill '{_editModel.Name}' 已更新。", Severity.Success);
+            }
+            _dialogVisible = false;
+            await LoadSkills();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"操作失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CancelDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    // ===== 删除 =====
+    private void OpenDeleteDialog(Skill skill)
+    {
+        _deleteTarget = skill;
+        _deleteDialogVisible = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deleteTarget is null) return;
+
+        try
+        {
+            await SkillApiClient.DeleteSkillAsync(_deleteTarget.Id);
+            Snackbar.Add($"Skill '{_deleteTarget.Name}' 已删除。", Severity.Success);
+            _deleteDialogVisible = false;
+            _deleteTarget = null;
+            await LoadSkills();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CancelDelete()
+    {
+        _deleteDialogVisible = false;
+        _deleteTarget = null;
+    }
+
+    // ===== 导入 =====
+    private async Task OpenImportDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ImportSkillDialog.SkillApiClient)] = SkillApiClient
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ImportSkillDialog>("导入 Skill", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is Skill importedSkill)
+        {
+            Snackbar.Add($"Skill '{importedSkill.Name}' 导入成功。", Severity.Success);
+            await LoadSkills();
+        }
+    }
+
+    // ===== 启用/禁用 =====
+    private async Task ToggleEnabled(Skill skill, bool isEnabled)
+    {
+        skill.IsEnabled = isEnabled;
+        try
+        {
+            await SkillApiClient.UpdateSkillAsync(skill);
+            Snackbar.Add($"Skill '{skill.Name}' 已{(isEnabled ? "启用" : "禁用")}。", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            // 回滚
+            skill.IsEnabled = !isEnabled;
+            Snackbar.Add($"操作失败：{ex.Message}", Severity.Error);
+        }
+    }
+}

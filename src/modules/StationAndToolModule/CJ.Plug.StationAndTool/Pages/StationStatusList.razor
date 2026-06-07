@@ -1,6 +1,7 @@
-﻿
+
 @using CJ.Plug.Models.Station
 @using CJ.Plug.StationAndTool.Dialogs
+@using CJ.Plug.StationAndTool.Services
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
@@ -12,181 +13,349 @@
 @inject IDialogService DialogService
 @inject HubConnectionManagerService HubConnectionManagerService
 @inject MainApiClient MainApiClient
+@inject ISnackbar Snackbar
+@inject StationSelectionService StationSelectionService
 
+<style>
+    .station-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .station-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .computer-frame {
+        background: linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%);
+        border-radius: 8px 8px 0 0;
+        padding: 12px;
+        position: relative;
+    }
+
+    .computer-screen {
+        background: linear-gradient(180deg, #0a1628 0%, #162d50 100%);
+        border: 3px solid #444;
+        border-radius: 6px;
+        padding: 16px;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .screen-online {
+        border-color: #4caf50;
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+    }
+
+    .screen-offline {
+        border-color: #666;
+    }
+
+    .screen-content {
+        text-align: center;
+        color: #fff;
+    }
+
+    .station-ip-display {
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #4fc3f7;
+        text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+    }
+
+    .station-name-display {
+        font-size: 0.85rem;
+        color: #90caf9;
+        margin-top: 4px;
+    }
+
+    .status-indicator {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    .status-online {
+        background: #4caf50;
+        box-shadow: 0 0 8px #4caf50;
+    }
+
+    .status-offline {
+        background: #757575;
+        animation: none;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .computer-stand {
+        background: linear-gradient(180deg, #555 0%, #333 100%);
+        height: 20px;
+        margin: 0 30%;
+        border-radius: 0 0 4px 4px;
+    }
+
+    .computer-base {
+        background: linear-gradient(180deg, #444 0%, #222 100%);
+        height: 8px;
+        margin: 0 15%;
+        border-radius: 0 0 8px 8px;
+    }
+
+    .card-actions {
+        background: #f5f5f5;
+        padding: 12px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .info-chip {
+        font-size: 0.75rem;
+    }
+
+    .category-icon {
+        font-size: 1.2rem;
+    }
+</style>
 
 <PageTitle>图站状态监控</PageTitle>
 
-
-
-<MudStack Justify="Justify.FlexStart">
-    <MudStack Row AlignItems="AlignItems.Center">        
-        <MudButton OnClick="GetStationStatus" Variant="Variant.Filled" Color="Color.Primary">刷新图站状态</MudButton>
-        @* <MudButton OnClick="SetToolAgentToUse" Variant="Variant.Filled">指定运行图站</MudButton> *@        
-        <MudCheckBox @bind-Value="@ShowAllToolAgents" @bind-Value:after="StateHasChanged" Color="Color.Tertiary">显示所有图站</MudCheckBox>
-        <MudSpacer></MudSpacer>
-        <MudText>当前分配的图站：@ToolAgentToUse</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearUserSetToolAgent">重置</MudButton>
+<MudStack Spacing="3">
+    <MudStack Row AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
+        <MudButton OnClick="GetStationStatus" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新图站状态
+        </MudButton>
+        <MudSwitch @bind-Value="@ShowAllToolAgents" @bind-Value:after="StateHasChanged"
+                   Color="Color.Primary" Label="显示所有图站" />
+        <MudSpacer />
+        <MudPaper Class="pa-2 d-flex align-center" Elevation="0" Style="background: var(--mud-palette-background-grey);">
+            <MudIcon Icon="@Icons.Material.Filled.Computer" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.body2">当前分配：</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Primary" Class="ml-1">
+                @(string.IsNullOrEmpty(ToolAgentToUse) ? "自动分配" : ToolAgentToUse)
+            </MudText>
+            @if (!string.IsNullOrEmpty(ToolAgentToUse))
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Clear" Size="Size.Small"
+                               OnClick="ClearUserSetToolAgent" Class="ml-1" />
+            }
+        </MudPaper>
     </MudStack>
+
     @if (Loading)
     {
-        <MudProgressLinear Indeterminate Color="Color.Primary"></MudProgressLinear>
-
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
     }
 
-    <MudDataGrid Items="@StationsToShow" Filterable="false" SortMode="@SortMode.None" Groupable="false" Hover NoRecordsContent="NoRecordsContent">
-        <Columns>
-            <TemplateColumn Title="收藏">
-                <CellTemplate>
-                    <MudCheckBox @bind-Value="IpStarted" Color="Color.Warning" CheckedIcon="@Icons.Material.Filled.Star" UncheckedIcon="@Icons.Material.Filled.StarOutline"></MudCheckBox>
-                </CellTemplate>
-            </TemplateColumn>
-            <PropertyColumn Property="x => x.Id" Title="编号"/>
-            <TemplateColumn Title="图站地址">
-                <CellTemplate>
-                    <MudStack Row AlignItems="AlignItems.Center">
-                        <MudAvatar Color="@(context.Item.IsStarted?Color.Success:Color.Default)" Size="Size.Small">@(context.Item.IsStarted?"On":"Off")</MudAvatar>
-                        <MudText>@context.Item.StationIp</MudText>
-                    </MudStack>
-                </CellTemplate>
-            </TemplateColumn>
-            <PropertyColumn Property="x => x.StationCategory" Title="图站类型" />
-            <PropertyColumn Property="x => x.StationBasePath" Title="文件存放基础路径" />
-            <TemplateColumn CellClass="d-flex justify-end">
-                <CellTemplate>
-                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
-                        @* <MudDivider Vertical="true" Class="mx-2" /> *@
-                        <MudButton OnClick="() => ConfigTools(context.Item)" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">图站工具配置</MudButton>
+    @if (StationsToShow == null || !StationsToShow.Any())
+    {
+        <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.Computer" Size="Size.Large" Color="Color.Default" Style="opacity: 0.5;" />
+            <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">暂无图站连接</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">请等待图站上线或点击刷新按钮</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var station in StationsToShow)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Class="station-card" Elevation="2">
+                        <div class="computer-frame">
+                            <div class="computer-screen @(station.IsStarted ? "screen-online" : "screen-offline")">
+                                <div class="status-indicator @(station.IsStarted ? "status-online" : "status-offline")" />
+                                <div class="screen-content">
+                                    <div class="station-ip-display">@(station.StationIp ?? "未知IP")</div>
+                                    <div class="station-name-display">@(station.StationName ?? "未命名")</div>
+                                    <MudText Typo="Typo.caption" Style="color: #64b5f6; margin-top: 8px;">
+                                        @(station.IsStarted ? "● 在线运行中" : "○ 离线")
+                                    </MudText>
+                                </div>
+                            </div>
+                            <div class="computer-stand" />
+                            <div class="computer-base" />
+                        </div>
 
-                        <MudButton OnClick="()=>SetToolAgentToUse(context.Item.StationIp)" Size="@Size.Small" Variant="@Variant.Outlined" Color="@Color.Primary">使用此图站</MudButton>
-                    </MudStack>
-                </CellTemplate>
-            </TemplateColumn>
-        </Columns>
-    </MudDataGrid>
+                        <MudCardContent Class="pa-3">
+                            <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined"
+                                         Icon="@GetCategoryIcon(station.StationCategory)">
+                                    @(station.StationCategory ?? "Windows")
+                                </MudChip>
+                                @if (station.Id.HasValue)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                        #@station.Id
+                                    </MudChip>
+                                }
+                                @if (!string.IsNullOrEmpty(station.StationBasePath))
+                                {
+                                    <MudTooltip Text="@station.StationBasePath">
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                                 Icon="@Icons.Material.Filled.Folder">
+                                            @(station.StationBasePath.Length > 15 ? station.StationBasePath[..15] + "..." : station.StationBasePath)
+                                        </MudChip>
+                                    </MudTooltip>
+                                }
+                            </MudStack>
+                        </MudCardContent>
 
-
-
+                        <MudCardActions Class="card-actions d-flex justify-space-between">
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudTooltip Text="配置此图站的工具">
+                                    <MudButton OnClick="@(() => ConfigTools(station))"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Settings">
+                                        配置
+                                    </MudButton>
+                                </MudTooltip>
+                                <MudTooltip Text="选择此图站执行任务">
+                                    <MudButton OnClick="@(() => SetToolAgentToUse(station.StationIp))"
+                                               Color="@(ToolAgentToUse == station.StationIp ? Color.Success : Color.Default)"
+                                               StartIcon="@Icons.Material.Filled.CheckCircle">
+                                        @(ToolAgentToUse == station.StationIp ? "已选中" : "使用")
+                                    </MudButton>
+                                </MudTooltip>
+                            </MudButtonGroup>
+                            <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                <ActivatorContent>
+                                    <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" />
+                                </ActivatorContent>
+                                <ChildContent>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error"
+                                                 OnClick="@(() => DeleteStation(station))">
+                                        删除图站
+                                    </MudMenuItem>
+                                </ChildContent>
+                            </MudMenu>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
 </MudStack>
 
 
-
-@code{
+@code {
     [Parameter]
     public EventCallback OnGetStationStatus { get; set; }
     [Parameter]
     public List<Station>? AllStations { get; set; } = new();
     [Parameter]
     public List<Station>? OnlineStations { get; set; } = new();
+    [Parameter]
+    public EventCallback<string?> OnSelectedStationChanged { get; set; }
 
-    private List<Station>? StationsToShow {
-        get
-        {
-            return ShowAllToolAgents ? AllStations : OnlineStations;
-        }
-    }
-
+    private List<Station>? StationsToShow => ShowAllToolAgents ? AllStations : OnlineStations;
 
     private bool Loading = true;
-    public string TextValue { get; set; } = "";
     public string ToolAgentToUse { get; set; } = "";
-    public string? tmpToolAgentToUse { get; set; }
-    public IReadOnlyCollection<string> SelectedValues = [];
-    private bool IpStarted = false;
     private bool ShowAllToolAgents = true;
-    private List<string>? stationStatus { get; set; } = new();
-    //public HashSet<string> HashTextValues2 { get; set; } = new HashSet<string>();
-    private RenderFragment NoRecordsContent=new RenderFragment(builder =>
-    {
-        builder.AddContent(0, "无连接到的图站，请稍后再试");
-    });
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {           
-            // HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
-            //   {
-            //       //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
-            //       // 将新日志添加到本地列表并触发UI更新
-            //       InvokeAsync(async () =>
-            //       {
-            //           Console.WriteLine(ip);
-            //           await ProcessStationList(ip);
-            //           StateHasChanged();
-            //       });
-            //   });
-            // await GetStationStatus();
-
-            //AllStations = await MainApiClient.GetAllStationsAsync() ?? new List<Station>();
-            //AllStations?.Clear();
-            // Console.WriteLine($"loading done{AllStations.Count}");
-            // Loading = false;
-            // StateHasChanged();
-        }
-
-        //await TestHub();
-    }
     protected override async Task OnParametersSetAsync()
     {
         if (AllStations != null && AllStations.Count > 0)
         {
             Loading = false;
-            //StationsToShow = ShowAllToolAgents? AllStations : OnlineStations;
         }
     }
 
-    private async Task ProcessStationList(string ip)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        foreach(var station in AllStations!)
+        if (firstRender)
         {
-            if (station.StationIp == ip)
+            var savedStation = await StationSelectionService.GetSelectedStationIpAsync();
+            if (!string.IsNullOrEmpty(savedStation))
             {
-                station.IsStarted = true;
-                if (!stationStatus!.Contains(ip))
-                {
-                    stationStatus.Add(ip);
-                }
-            }
-            else
-            {
-                station.IsStarted = false;
+                ToolAgentToUse = savedStation;
+                StateHasChanged();
             }
         }
+    }
+
+    private string GetCategoryIcon(string? category)
+    {
+        return category?.ToLower() switch
+        {
+            "windows" => Icons.Material.Filled.Window,
+            "linux" => Icons.Material.Filled.Terminal,
+            _ => Icons.Material.Filled.Computer
+        };
     }
 
     private async Task GetStationStatus()
     {
         await OnGetStationStatus.InvokeAsync();
-        // AllStations = await MainApiClient.GetAllStationsAsync() ?? new List<Station>();
-        // await HubConnectionManagerService.ConnectAsync();
-        // await HubConnectionManagerService.InvokeAsync<string>("TellMeStatus", null);
     }
 
-
-    async Task SetToolAgentToUse(string ip)
+    private async Task SetToolAgentToUse(string? ip)
     {
-        if (ip != null)
+        if (!string.IsNullOrEmpty(ip))
         {
-            // await ToolAgentStatus.SetToolAgentToUse(ip);
-            // _HttpHostIp.ToolAgentHostIp = ip;
             ToolAgentToUse = ip;
-        }
-        else
-        {
-            //ToolAgentToUse = await ToolAgentConnect.GetToolAgentToUse();
+            await StationSelectionService.SetSelectedStationIpAsync(ip);
+            await OnSelectedStationChanged.InvokeAsync(ip);
+            Snackbar.Add($"已选择图站: {ip}", Severity.Info);
         }
         StateHasChanged();
     }
 
-    async Task ClearUserSetToolAgent()
+    private async Task ClearUserSetToolAgent()
     {
         ToolAgentToUse = "";
+        await StationSelectionService.SetSelectedStationIpAsync(null);
+        await OnSelectedStationChanged.InvokeAsync(null);
+        Snackbar.Add("已重置为自动分配图站", Severity.Info);
     }
 
-    async Task ConfigTools(Station? station)
+    private async Task ConfigTools(Station? station)
     {
         var parameters = new DialogParameters<ToolConfigDialog> { { x => x.Station, station } };
-        var dialog = await DialogService.ShowAsync<ToolConfigDialog>(null, parameters);
+        await DialogService.ShowAsync<ToolConfigDialog>(null, parameters);
     }
 
+    private async Task DeleteStation(Station station)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除图站 [{station.StationIp}] 吗？此操作不可撤销。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var success = await MainApiClient.DeleteStationAsync(station.Id ?? 0);
+        if (success)
+        {
+            Snackbar.Add($"已删除图站 {station.StationIp}", Severity.Success);
+            AllStations?.Remove(station);
+            OnlineStations?.Remove(station);
+
+            // 如果删除的是当前选中的图站，清除选择
+            if (ToolAgentToUse == station.StationIp)
+            {
+                await ClearUserSetToolAgent();
+            }
+
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("删除失败，请重试", Severity.Error);
+        }
+    }
 }

@@ -1,0 +1,160 @@
+@using CJ.Plug.Models.Skills
+@using CJ.Plug.SkillApiClient
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="me-2" />导入 Skill
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
+            @* 本地文件上传 *@
+            <MudTabPanel Text="本地文件" Icon="@Icons.Material.Filled.Upload">
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    选择包含 <b>skill.md</b> 的 .zip 文件导入
+                </MudText>
+                <MudFileUpload T="IBrowserFile"
+                               FilesChanged="OnFileSelected"
+                               Accept=".zip">
+                    <CustomContent>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload"
+                                   OnClick="@context.OpenFilePickerAsync">
+                            选择 ZIP 文件
+                        </MudButton>
+                    </CustomContent>
+                    <SelectedTemplate>
+                        @if (_selectedFile != null)
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
+                                @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))
+                            </MudText>
+                        }
+                    </SelectedTemplate>
+                </MudFileUpload>
+            </MudTabPanel>
+
+            @* URL 导入 *@
+            <MudTabPanel Text="URL 导入" Icon="@Icons.Material.Filled.Link">
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    输入指向 .zip 文件的 URL 地址
+                </MudText>
+                <MudTextField @bind-Value="_importUrl"
+                              Label="ZIP 文件 URL"
+                              Placeholder="https://example.com/skill.zip"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Link" />
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (_importing)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-1">正在导入，请稍候...</MudText>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Import"
+                   Disabled="@(!CanImport || _importing)"
+                   StartIcon="@Icons.Material.Filled.FileDownload">
+            导入
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ISkillApiClient SkillApiClient { get; set; } = default!;
+
+    private int _activeTab;
+    private IBrowserFile? _selectedFile;
+    private string? _importUrl;
+    private bool _importing;
+    private string? _errorMessage;
+
+    private bool CanImport => _activeTab switch
+    {
+        0 => _selectedFile != null,
+        1 => !string.IsNullOrWhiteSpace(_importUrl),
+        _ => false
+    };
+
+    private void OnFileSelected(IBrowserFile file)
+    {
+        _selectedFile = file;
+        _errorMessage = null;
+    }
+
+    private async Task Import()
+    {
+        _importing = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            Skill? result = null;
+
+            if (_activeTab == 0 && _selectedFile != null)
+            {
+                // 本地文件上传
+                await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024); // 100MB
+                result = await SkillApiClient.ImportSkillAsync(stream, _selectedFile.Name);
+            }
+            else if (_activeTab == 1 && !string.IsNullOrWhiteSpace(_importUrl))
+            {
+                // URL 导入
+                result = await SkillApiClient.ImportSkillFromUrlAsync(_importUrl);
+            }
+
+            if (result != null)
+            {
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                _errorMessage = "导入失败，未返回有效的 Skill 数据。";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"导入失败：{ex.Message}";
+        }
+        finally
+        {
+            _importing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        return bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            < 1024 * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+            _ => $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
+        };
+    }
+}

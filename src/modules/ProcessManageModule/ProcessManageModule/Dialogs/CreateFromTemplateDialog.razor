@@ -1,0 +1,293 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.Services
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.PlugDataZoneApiClient
+@using CJ.Plug.ProcessManage.Data
+@using CJ.Plug.ProcessManage.Models
+@using CJ.Plug.ProcessManageApiClient
+@using CJ.Plug.ProcessManage.Components
+@using CJ.Plug.SharedPages.Contracts
+
+@inject IProcessManageApiClient MainApiClient
+@inject IPDZApiClient PDZApiClient
+@inject IDomInteropService DomInteropService
+@inject MainApiClient TasApiClient
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="me-2" />
+            @(_selectedTemplate == null ? "选择流程模板" : "从模板创建流程")
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (_selectedTemplate == null)
+        {
+            @* ---------- 步骤 1：模板选择 ---------- *@
+            <MudGrid Spacing="3">
+                @foreach (var template in _templates)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudCard Elevation="2" Class="template-card cursor-pointer" @onclick="() => SelectTemplate(template)">
+                            <MudCardContent>
+                                <div class="d-flex align-center mb-3">
+                                    <MudIcon Icon="@template.Icon" Size="Size.Large" Color="Color.Primary" Class="me-3" />
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1" Class="fw-bold">@template.Name</MudText>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mt-1">@template.Category</MudChip>
+                                    </div>
+                                </div>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="template-desc mb-3">
+                                    @template.Description
+                                </MudText>
+                                <TemplateFlowchartPreview TemplateJson="@template.TemplateJson" />
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else
+        {
+            @* ---------- 步骤 2：输入名称和描述 ---------- *@
+            @* 已选模板概要 *@
+            <MudPaper Elevation="1" Class="pa-3 mb-4">
+                <div class="d-flex align-center mb-2">
+                    <MudIcon Icon="@_selectedTemplate.Icon" Size="Size.Medium" Color="Color.Primary" Class="me-2" />
+                    <MudText Typo="Typo.subtitle1">@_selectedTemplate.Name</MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ms-3">@_selectedTemplate.Category</MudChip>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@_selectedTemplate.Description</MudText>
+            </MudPaper>
+
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_processName"
+                              Label="流程名称 *"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Placeholder="输入新流程的名称"
+                              Required="true" />
+
+                <MudTextField @bind-Value="_processDescription"
+                              Label="流程描述"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="3"
+                              Placeholder="可选：描述流程的用途和功能" />
+            </MudStack>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_processing">取消</MudButton>
+
+        @if (_selectedTemplate != null)
+        {
+            <MudButton Color="Color.Secondary" OnClick="BackToTemplates" Disabled="_processing">返回选择</MudButton>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="Submit"
+                       Disabled="_processing || string.IsNullOrWhiteSpace(_processName)">
+                @(_processing ? "创建中..." : "创建流程")
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .template-card {
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    .template-card:hover {
+        border-color: var(--mud-palette-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .template-desc {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private List<ProcessTemplate> _templates = [];
+    private ProcessTemplate? _selectedTemplate;
+    private string _processName = "";
+    private string _processDescription = "";
+    private bool _processing;
+
+    protected override void OnInitialized()
+    {
+        _templates = ProcessTemplates.GetAll();
+    }
+
+    private void SelectTemplate(ProcessTemplate template)
+    {
+        _selectedTemplate = template;
+        _processName = ""; // 不预填名称，让用户自行命名
+        _processDescription = "";
+    }
+
+    private void BackToTemplates()
+    {
+        _selectedTemplate = null;
+        _processName = "";
+        _processDescription = "";
+    }
+
+
+    /// <summary>
+    /// 使用系统已有的流程导入逻辑：解析模板 JSON，替换占位 ID，创建 Process + PDZ。
+    /// 逻辑对齐 MyDiagramDesignerWrapper.ImportWorkflow()。
+    /// </summary>
+    private async Task Submit()
+    {
+        if (_selectedTemplate == null || string.IsNullOrWhiteSpace(_processName))
+            return;
+
+        _processing = true;
+        StateHasChanged();
+
+        try
+        {
+            var definitionId = RandomLongIdentityGenerator.GenerateId();
+            var userName = await DomInteropService.GetCurrentUserName() ?? "null";
+
+            // 1. 解析模板 JSON，替换占位 ID
+            var templateJson = JsonNode.Parse(_selectedTemplate.TemplateJson)?.AsObject()
+                ?? throw new InvalidOperationException("模板 JSON 解析失败");
+            var jsonStr = templateJson.ToJsonString();
+            // 替换根级别占位符
+            jsonStr = jsonStr.Replace("{definitionId}", definitionId);
+            // 为每个活动生成真实 ID 并替换占位符（最多 10 个活动）
+            var activityIds = new List<string>();
+            for (int i = 0; i < 10; i++)
+            {
+                var placeholder = $"{{activity_{i}_id}}";
+                if (!jsonStr.Contains(placeholder)) break;
+                var realId = RandomLongIdentityGenerator.GenerateId();
+                jsonStr = jsonStr.Replace(placeholder, realId);
+                activityIds.Add(realId);
+            }
+
+            var flowchart = JsonNode.Parse(jsonStr)?.AsObject()
+                ?? throw new InvalidOperationException("替换后 JSON 解析失败");
+            flowchart["name"] = _processName.Trim();
+
+            // 2. 创建 Process
+            var process = new Process();
+            process.DefinitionId = definitionId;
+            process.Name = _processName.Trim();
+            process.Description = _processDescription?.Trim();
+            process.Version = 1;
+            process.Creater = userName;
+            process.Type = PlugCategorys.流程.ToString();
+            process.Category = PlugCategorys.流程.ToString();
+            process.GroupName = PlugGroupEnum.我的流程.ToString();
+            process.ShowInPlugLibrary = false;
+            process.CreateType = PlugCreateTypeEnum.新建流程.ToString();
+            process.ActivityJsonData = flowchart.ToJsonString();
+
+            var result = await MainApiClient.CreateNewWorkflow(process);
+            CLog.Information($"模板创建流程成功: {result.Name} (ID: {result.Id})");
+
+            // 3. 创建 PDZ，从活动提取 PlugData + PlugVariableData（对齐 ImportWorkflow 逻辑）
+            var newPDZ = new PlugDataZone
+            {
+                UserName = userName,
+                PlugDefinitionId = definitionId,
+                Type = PDZTypeEnum.Desi.ToString(),
+                PDZId = userName + definitionId + PDZTypeEnum.Desi.ToString(),
+            };
+            newPDZ.PDZWorkPath = Path.Combine(newPDZ.UserName, newPDZ.PDZId);
+
+            // 流程本身的 PlugData
+            newPDZ.PlugDatas.Add(new PlugData
+            {
+                PlugDefinitionId = definitionId,
+                Name = process.Name,
+                WorkPath = newPDZ.PDZWorkPath,
+                PlugPosition = "0 0",
+            });
+
+            // 每个活动创建 PlugData + PlugVariableData
+            var plugDatas = flowchart["activities"]?.AsArray();
+            if (plugDatas != null)
+            {
+                foreach (var plugData in plugDatas)
+                {
+                    var actId = plugData?["id"]?.GetValue<string>();
+                    var actName = plugData?["name"]?.GetValue<string>();
+                    var actType = plugData?["type"]?.GetValue<string>();
+                    var metaPos = plugData?["metadata"]?["designer"]?["position"];
+                    var x = metaPos?["x"]?.GetValue<double>() ?? 0;
+                    var y = metaPos?["y"]?.GetValue<double>() ?? 0;
+
+                    if (string.IsNullOrEmpty(actId) || string.IsNullOrEmpty(actName))
+                        continue;
+
+                    newPDZ.PlugDatas.Add(new PlugData
+                    {
+                        PlugDefinitionId = actId,
+                        ParentPlugDefinitionId = definitionId,
+                        Name = actName,
+                        PlugType = actType,
+                        PlugTypeKey = actType,
+                        WorkPath = Path.Combine(newPDZ.PDZWorkPath, actId),
+                        PlugPosition = $"{x} {y}",
+                    });
+
+                    // 从根插头同步参数到 PDZ
+                    if (!string.IsNullOrEmpty(actType))
+                    {
+                        var rootPlug = await TasApiClient.GetRootPlugByTypeNameAsync(actType);
+                        if (rootPlug?.PlugVariables != null)
+                        {
+                            foreach (var p in rootPlug.PlugVariables)
+                            {
+                                newPDZ.PlugVariableDatas.Add(new PlugVariableData
+                                {
+                                    PlugDefinitionId = actId,
+                                    Name = p.Name,
+                                    Value = p.Value,
+                                    DefaultValue = p.DefaultValue,
+                                    Type = p.Type,
+                                    IsInitVariable = p.IsInitVariable,
+                                    IsBrowsable = p.IsBrowsable,
+                                    IsArray = p.IsArray,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. 保存 PDZ
+            await PDZApiClient.CreateOrUpdatePDZ(newPDZ);
+
+            MudDialog.Close(DialogResult.Ok(process));
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"模板创建流程失败: {ex.Message}");
+            _processing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

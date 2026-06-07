@@ -7,6 +7,16 @@
 @inject IEnumerable<IMenuService> MenuServices
 
 <MudNavMenu>
+    
+    @* 其他非调试菜单 *@
+    @foreach (var menu in _menuItems)
+    {
+        if (menu.GroupName != MenuGroupEnum.调试.ToString() && menu.GroupName != MenuGroupEnum.管理.ToString())
+        {
+            <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
+        }
+    }
+
     @* 管理分组 *@
     @{
         var manageItems = _menuItems.Where(x => x.GroupName == MenuGroupEnum.管理.ToString()).ToList();
@@ -18,16 +28,8 @@
             {
                 <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
             }
+            <MudNavLink Match="NavLinkMatch.All" Href="/download-package" Icon="@Icons.Material.Filled.Download" IconColor="Color.Primary">本地部署包</MudNavLink>
         </MudNavGroup>
-    }
-
-    @* 其他非调试菜单 *@
-    @foreach (var menu in _menuItems)
-    {
-        if (menu.GroupName != MenuGroupEnum.调试.ToString() && menu.GroupName != MenuGroupEnum.管理.ToString())
-        {
-            <MudNavLink Match="NavLinkMatch.All" Href="@menu.Href" Icon="@menu.Icon" IconColor="Color.Primary">@menu.Text</MudNavLink>
-        }
     }
 
     @* 调试分组 *@

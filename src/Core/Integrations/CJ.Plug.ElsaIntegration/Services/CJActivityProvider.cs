@@ -52,7 +52,7 @@ namespace CJ.Plug.ElsaIntegration.Services
                     Namespace = "CJ",
                     DisplayName = $"{x.Name}",
                     Category = x.GroupName??"",
-                    Description = "插头描述："+x.Description,
+                    Description = $"[DefinitionId:{x.DefinitionId}]插头描述："+x.Description,
                     Ports = ports,
                     IsBrowsable = x.ShowInPlugLibrary,
                     IsContainer=x.IsContainerPlug,

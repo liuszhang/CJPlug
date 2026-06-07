@@ -127,7 +127,7 @@
     public string? TabTitle { get; set; }
     [CascadingParameter]
     public PlugDataZone? PlugDataZone { get; set; }
-    [CascadingParameter]
+    [CascadingParameter(Name = "SelectedPlugDefinitionId")]
     public string? SelectedPlugDefinitionId { get; set; }
 
 

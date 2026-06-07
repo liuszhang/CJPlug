@@ -15,6 +15,7 @@
 @using CJ.Plug.PlugBaseCore.Components
 @using CJ.Plug.PlugBaseCore.Contracts
 @using CJ.Plug.PlugBaseCore.Models
+@using CJ.Plug.AmisIntegration.Components
 @using CJ.Plug.PlugDataZoneApiClient
 @using CJ.Plug.SharedPages
 @using CJ.Plug.TASApiClient
@@ -43,7 +44,7 @@
 @inject HubConnectionManagerService HubConnectionManagerService
 
 <CascadingValue Value="PlugDataZone">
-    <CascadingValue Value="SelectedPlugDefinitionId">
+    <CascadingValue Value="SelectedPlugDefinitionId" Name="SelectedPlugDefinitionId">
 
         <MudDialog Class="stack-resize" Style="height:880px;width:1500px;">
             <TitleContent>
@@ -232,7 +233,7 @@
             {
                 foreach (var pcsc in PlugCommonSettingContent)
                 {
-                    var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId);
+                    var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId, rootPlug);
                     var tmpContent = await pcsc.GetPlugCommonSettingContent(context);
                     if (tmpContent != null)
                     {
@@ -249,34 +250,26 @@
                         if (PlugData.PlugType.Contains("桌面类"))
                         {
                             CLog.Information($"PlugType {PlugData.PlugType} contains '桌面类', trying to get common setting content for CMDPlug");
-                            var context2 = new GetSettingContext("CMDPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
+                            var context2 = new GetSettingContext("CMDPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId, rootPlug);
                             PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
                             if (PlugCommonExecuteSettingContent != null)
                             {
                                 break;
                             }
                         }
-                        else if (PlugData.PlugType.Contains("接口类"))
-                        {
-                            CLog.Information($"PlugType {PlugData.PlugType} contains '接口类', trying to get common setting content for RESTPlug");
-                            var context2 = new GetSettingContext("RESTPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
-                            PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
-                            if (PlugCommonExecuteSettingContent != null)
-                            {
-                                break;
-                            }
-                        }
-                        else if (PlugData.PlugType.Contains("脚本类"))
-                        {
-                            CLog.Information($"PlugType {PlugData.PlugType} contains '脚本类', trying to get common setting content for PythonPlug");
-                            var context2 = new GetSettingContext("PythonPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId);
-                            PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
-                            if (PlugCommonExecuteSettingContent != null)
-                            {
-                                break;
-                            }
-                        }                        
                     }
+                }
+                // 如果仍然没有找到内置配置界面，则回退到使用插头自定义的AMIS执行界面
+                if (PlugCommonExecuteSettingContent == null && !string.IsNullOrWhiteSpace(rootPlug?.GuiJsonData))
+                {
+                    CLog.Information($"No built-in setting content found for PlugType {PlugData.PlugType}, falling back to AMIS custom execution interface.");
+                    var guiJsonData = rootPlug.GuiJsonData;
+                    PlugCommonExecuteSettingContent = builder =>
+                    {
+                        builder.OpenComponent<Amis>(0);
+                        builder.AddAttribute(1, "JsonStringData", guiJsonData);
+                        builder.CloseComponent();
+                    };
                 }
             }
             Loading = false;

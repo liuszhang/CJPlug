@@ -38,13 +38,13 @@ namespace CJ.Plug.FileManageApiClient
                 var response = new HttpResponseMessage();
                 if (parentNode == null)
                 {
-                    response = await httpClient.GetAsync("/api/file/GetFolderFiles/" + userName + "\\Tools");
+                    response = await httpClient.GetAsync("/api/file/GetFolderFiles/" + (userName + "/Tools").Replace('\\', '/'));
                 }
 
                 if (parentNode != null)
                 {
                     //Log.Information($"GetFolderFiles: {parentNode.FullPath}");
-                    response = await httpClient.GetAsync("/api/file/GetFolderFiles/" + parentNode.FullPath);
+                    response = await httpClient.GetAsync("/api/file/GetFolderFiles/" + parentNode.FullPath.Replace('\\', '/'));
                 }
                 //response = await Http.GetAsync("api/ToolAgentFile/GetCurrentFiles/?rootPath=" + parentNode.FullPath);
                 if (response.IsSuccessStatusCode)
@@ -60,6 +60,10 @@ namespace CJ.Plug.FileManageApiClient
                     try
                     {
                         var tmpFileTreeNodes = System.Text.Json.JsonSerializer.Deserialize<FileSystemNode>(json, options);
+                        if (tmpFileTreeNodes == null)
+                        {
+                            return null;
+                        }
                         //MyCon1sole.WriteLine(tmpFileTreeNodes.Name);
                         if (parentNode == null)
                         {

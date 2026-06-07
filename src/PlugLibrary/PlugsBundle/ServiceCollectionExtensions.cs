@@ -1,4 +1,4 @@
-﻿using AiAgentPlug.Extensions;
+using AiAgentPlug.Extensions;
 using CJ.Plug.PlugBaseCore;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Services;
@@ -28,11 +28,15 @@ using System.Reflection;
 using TextReaderPlug.Extensions;
 using TextWriterPlug.Extensions;
 using WordPlug.Extensions;
+using PPTPlug.Extensions;
 using AndPlug.Extensions;
 using CalculatorPlug.Extensions;
 using CSharpPlug.Extensions;
 using DllLoaderPlug;
+using JavaPlug.Extensions;
 using StlViewerPlug.Extensions;
+using PatranPlug.Extensions;
+using PausePlug.Extensions;
 
 
 namespace PlugsBundle
@@ -49,7 +53,7 @@ namespace PlugsBundle
             services.AddScoped<IPlugSettingDialogShow, PlugSettingDialogCoreShow>();
             services.AddScoped<IToolExecuteService, ToolExecuteService>();
 
-            //services.AddPatran();
+            services.AddPatran();
             services.AddNX();
             services.AddPython();
             services.AddCMD();
@@ -60,6 +64,7 @@ namespace PlugsBundle
             //services.AddMCDataGet();
             services.AddMatlab();
             services.AddWord();
+            services.AddPPT();
             services.AddAiAgent();
             services.AddNXAIModel();
             services.AddSendHttpRequest();
@@ -71,18 +76,20 @@ namespace PlugsBundle
             services.AddIf();
             services.AddAnd();
             services.AddCSharp();
+            services.AddJava();
             services.AddCalculator();
             services.AddDllLoaderPage();
             services.AddStlViewer();
+            services.AddPause();
 
 
 
             //系统初始化工具服务
             services.AddScoped<IPlugCommonSettingContent, WordToPdf>();
             services.AddScoped<IPlugCommonSettingContent, InsertDataToWord>();
-            services.AddScoped<IPlugCommonSettingContent, NXGetParameters>();
-            services.AddScoped<IPlugCommonSettingContent, NXSetParameters>();
-            services.AddScoped<IPlugCommonSettingContent, NXToStl>();
+            //services.AddScoped<IPlugCommonSettingContent, NXGetParameters>();
+            //services.AddScoped<IPlugCommonSettingContent, NXSetParameters>();
+            //services.AddScoped<IPlugCommonSettingContent, NXToStl>();
 
             return services;
         }
@@ -98,7 +105,7 @@ namespace PlugsBundle
             services.AddScoped<IToolExecuteService, ToolExecuteService>();
 
 
-            //services.AddPatranExecute();
+            services.AddPatranExecute();
             services.AddNXExecute();
             services.AddPythonExecute();
             services.AddCMDExecute();
@@ -110,6 +117,7 @@ namespace PlugsBundle
             services.AddMCDataGetExecute();
             services.AddMatlabExecute();
             services.AddWordExecute();
+            services.AddPPTExecute();
             services.AddNXAIModelExecute();
             //services.AddWhileExecute();
             services.AddExcelExecute();
@@ -119,9 +127,11 @@ namespace PlugsBundle
             services.AddIfExecute();
             services.AddAndExecute();
             services.AddCSharpExecute();
+            services.AddJavaExecute();
             services.AddCalculatorExecute();
             services.AddDllLoaderExecute();
             services.AddStlViewerExecute();
+            services.AddPauseExecute();
 
             return services;
         }

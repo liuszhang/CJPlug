@@ -263,11 +263,19 @@ else
     /// <param name="activity"></param>
     /// <returns></returns>
     public async Task UpdateActivity(JsonObject activity)
-    {        
+    {
         //Log.Information($"开始更新活动：{activity}");
         //Console.WriteLine(">>>>>>>>>>start update activity");
         //await Designer.UpdateActivityAsync(activity.GetId(), activity);
         //Console.WriteLine(">>>>>>>>>>end update activity");
+    }
+
+    /// <summary>
+    /// 直接更新活动状态（用于 SignalR 实时通知刷新流程图节点样式）
+    /// </summary>
+    public async Task UpdateActivityStatsAsync(string activityId, ActivityStats? stats)
+    {
+        await Designer.UpdateActivityStatsAsync(activityId, stats);
     }
 
     private async Task OpenFileExplorer()

@@ -1,5 +1,7 @@
+using System.IO;
 using CJ.Plug.AuditModels;
 using CJ.Plug.Models.Station;
+using CJ.Plug.StationAndToolApi.Models;
 using CJ.Plug.StationAndToolApiClient;
 
 public partial class MainApiClient : IStationAndToolApiClient
@@ -118,9 +120,9 @@ public partial class MainApiClient : IStationAndToolApiClient
         return result;
     }
 
-    public async Task<Station?> GetStationToUseByTool(string toolName, string? version = null, CancellationToken ct = default)
+    public async Task<Station?> GetStationToUseByTool(string toolName, string? version = null, string? specifiedStationIp = null, CancellationToken ct = default)
     {
-        var result = await StationAndToolApiClient.Value.GetStationToUseByTool(toolName, version, ct);
+        var result = await StationAndToolApiClient.Value.GetStationToUseByTool(toolName, version, specifiedStationIp, ct);
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"按工具获取工作站: {toolName}");
         return result;
     }
@@ -143,6 +145,13 @@ public partial class MainApiClient : IStationAndToolApiClient
     {
         var result = await StationAndToolApiClient.Value.GetToolPathByFilter(ToolConfigFilter);
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "按筛选获取工具路径");
+        return result;
+    }
+
+    public async Task<ToolDeploySettingModel?> GetToolDeploySettingAsync(ToolConfigFilter filter)
+    {
+        var result = await StationAndToolApiClient.Value.GetToolDeploySettingAsync(filter);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取工具部署设置");
         return result;
     }
 
@@ -171,6 +180,34 @@ public partial class MainApiClient : IStationAndToolApiClient
     {
         var result = await StationAndToolApiClient.Value.UpdateToolAsync(updatedTool, ct);
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, $"更新工具ID: {updatedTool.Id}");
+        return result;
+    }
+
+    public async Task<Stream> DownloadToolAsync(string toolName, string version, CancellationToken ct = default)
+    {
+        var result = await StationAndToolApiClient.Value.DownloadToolAsync(toolName, version, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Download, $"下载工具: {toolName} v{version}");
+        return result;
+    }
+
+    public async Task<bool> MoveToolFilesFromTmpAsync(string toolName, bool isSystemTool, string userName)
+    {
+        var result = await StationAndToolApiClient.Value.MoveToolFilesFromTmpAsync(toolName, isSystemTool, userName);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, $"移动工具包文件: {toolName}");
+        return result;
+    }
+
+    public async Task<bool> DeleteToolTmpFilesAsync()
+    {
+        var result = await StationAndToolApiClient.Value.DeleteToolTmpFilesAsync();
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Delete, "删除工具包临时文件");
+        return result;
+    }
+
+    public async Task<int> ImportDefaultToolsAsync(CancellationToken ct = default)
+    {
+        var result = await StationAndToolApiClient.Value.ImportDefaultToolsAsync(ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, $"导入默认工具，处理 {result} 个");
         return result;
     }
 }

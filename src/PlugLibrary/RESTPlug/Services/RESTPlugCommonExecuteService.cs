@@ -1,56 +1,68 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
-using CJ.Plug.Models.VariableType;
 using CJ.Plug.PlugBaseCore.Models;
+using CJ.Plug.PlugBaseCore.Services;
 using RESTPlug;
 using RESTPlug.Utils;
-using System.Text.Json;
 
-public class RESTPlugCommonExecuteService : BasePlugExecuteService
+/// <summary>
+/// RESTPlug 的通用执行服务。继承 <see cref="ApiPlugExecuteService"/>，
+/// 复用 HTTP 请求发送、响应解析、OutputMapping 变量写入等通用逻辑。
+/// </summary>
+public class RESTPlugCommonExecuteService : ApiPlugExecuteService
 {
-    public RESTPlugCommonExecuteService(IServiceProvider serviceProvider) : base(serviceProvider)
+    /// <inheritdoc/>
+    protected override string PlugTypeKey => PlugKeySetting.CommonExecuteKey;
+
+    /// <inheritdoc/>
+    protected override string[]? DataPrepareVariableNames =>
+        Enum.GetNames(typeof(InitVariableNames));
+
+    public RESTPlugCommonExecuteService(IServiceProvider serviceProvider)
+        : base(serviceProvider)
     {
     }
 
-    public override bool IsThisPlugTypeKey(string? PlugTypeKey) => (PlugTypeKey == PlugKeySetting.CommonExecuteKey);
-    public override async Task<ExecuteResultData?> PlugCommonExecute(ExecuteServiceContext context)
+    // ========================= BuildRequestAsync =========================
+
+    /// <summary>
+    /// 从 PDZ 读取 Url 和 Method 变量，构建 HttpRequestMessage。
+    /// </summary>
+    protected override async Task<HttpRequestMessage?> BuildRequestAsync(
+        PlugDataZone plugDataZone,
+        string plugDefinitionId)
     {
-       
-        PlugExecutionRequest? plugExecutionRequest = context.plugExecutionRequest;
-        var erd = plugExecutionRequest?.ExecuteResultData;
-
-        if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames)))) { return await ReportErrorResult(erd); }
-
-        CLog.Information($"execute rest plug", PlugDataZone.PDZId);
-
-        var result =await new SendHttpRequestPlugCommonExecuteService(_serviceProvider).TrySendAsync(PlugDataZone, plugExecutionRequest.PlugDefinitionId);
-        //var result =await sendHttpRequestPlug.TrySendAsync(PlugDataZone, plugExecutionRequest.PlugDefinitionId);
-        //CLog.Information($"result.ResultString:{result?.ResultString}",PlugDataZone.PDZId);
-        erd.ResultString= result.ResultString;
-
-        //var OutputMapping = PlugDataZone.GetVariableValue(plugExecutionRequest.PlugDefinitionId,InitVariableNames.OutputMappings.ToString());
-        var OutputMapping = PlugDataZone.PlugVariableDatas.FirstOrDefault(p =>
-        p.PlugDefinitionId == plugExecutionRequest.PlugDefinitionId && p.Name == InitVariableNames.OutputMappings.ToString());
-        if (string.IsNullOrEmpty(OutputMapping.Value))
+        try
         {
-            return await ReportCompletedResult(erd);
+            var method = GetVariableValueSafe(plugDataZone, plugDefinitionId,
+                InitVariableNames.Method.ToString()) ?? "GET";
+            var url = GetVariableValueSafe(plugDataZone, plugDefinitionId,
+                InitVariableNames.Url.ToString()) ?? "";
+
+            if (string.IsNullOrEmpty(url))
+            {
+                CLog.Warning("请求地址为空。构建请求失败。");
+                return null;
+            }
+
+            var request = new HttpRequestMessage(new HttpMethod(method), url);
+            return request;
         }
-        var Outputs = JsonSerializer.Deserialize<List<DefaultOutputMapping>>(OutputMapping.Value);
-        foreach (var output in Outputs)
+        catch (Exception ex)
         {
-            output.Value = DataParser.GetParsedResult(erd?.ResultString,output.ReadSchemaValue);
-            //CLog.Information($"{output.OutputName}:{output.Value.ToString()}",PlugDataZone.PDZId);
-            PlugDataZone.SetVariableValue(plugExecutionRequest.PlugDefinitionId, output.OutputName, output.Value);
+            CLog.Error($"构建 HTTP 请求异常: {ex.Message}");
+            CLog.Error(ex.StackTrace);
+            return null;
         }
-        await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
-        //CLog.Information($"updated PDZ in main api after set variable values", PlugDataZone.PDZId);
+    }
 
-        //OutputMapping.Value=JsonSerializer.Serialize(Outputs);
-        //await MainApiClient.UpdatePlugVariableData(OutputMapping);
+    // ========================= ParseOutputValue =========================
 
-        //CLog.Information(erd.Ids.PlugDefinitionId,PlugDataZone.PDZId);
-
-        return await ReportCompletedResult(erd);
+    /// <summary>
+    /// 使用 RESTPlug 专用 <see cref="DataParser"/> 解析 OutputMapping 的值。
+    /// </summary>
+    protected override string? ParseOutputValue(string resultString, string? readSchemaValue)
+    {
+        return DataParser.GetParsedResult(resultString, readSchemaValue ?? "");
     }
 }
-

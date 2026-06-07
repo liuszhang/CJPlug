@@ -45,6 +45,12 @@ internal class Program
                 await StationApiClient.SendResult(ExecuteRequest, null, JobSubStatus.出错);
                 return;
             }
+
+            // 使用 StationApiServer 的实际端口（而非硬编码的 7660）
+            StationApiClient = new StationApiClient(new HttpClient()
+            {
+                BaseAddress = new Uri($"http://localhost:{ExecuteRequest.StationApiPort}")
+            });
             //await ApiService.SendLog("ExecuteRequest IDs: " + JsonSerializer.Serialize(ExecuteRequest.ExecuteResultData.Ids));
 
         }

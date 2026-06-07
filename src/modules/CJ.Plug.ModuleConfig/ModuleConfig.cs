@@ -10,6 +10,12 @@ using CJ.Plug.LoginApiClient.ApiClients;
 using CJ.Plug.LoginApis.Apis;
 using CJ.Plug.LoginApis.Contracts;
 using CJ.Plug.LoginApis.Services;
+using CJ.Plug.KnowledgeManage;
+using CJ.Plug.KnowledgeManageApi;
+using CJ.Plug.LlmConfig;
+using CJ.Plug.LlmConfigApi;
+using CJ.Plug.ModelManage;
+using CJ.Plug.ModelManageApi;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using CJ.Plug.MCPToolsManage;
@@ -51,6 +57,7 @@ namespace CJ.Plug.ModuleConfig
             services.AddUserManagePageModuleServices();
             services.AddMCPToolsModuleServices();
             services.AddSkillsModuleServices();
+            services.AddKnowledgeModuleServices();
 
             // 授权管理模块
             services.AddAuthModulePageServices();
@@ -60,6 +67,12 @@ namespace CJ.Plug.ModuleConfig
 
             // Guacamole 远程桌面模块
             services.AddGuacamoleUIPageServices();
+
+            // 模型管理模块
+            services.AddOntologyManagePageModuleServices();
+
+            // LLM 配置模块
+            services.AddLlmConfigPageModuleServices();
 
             //放在最后，因为用户名需要放在最后
             services.AddLoginModulePageServices();
@@ -88,6 +101,7 @@ namespace CJ.Plug.ModuleConfig
             services.AddUserManageModuleApiServices();
             services.AddMCPToolsApiServices();
             services.AddSkillsApiServices();
+            services.AddKnowledgeApiServices();
 
             // 授权管理模块API
             services.AddAuthModuleApiServices();
@@ -97,6 +111,12 @@ namespace CJ.Plug.ModuleConfig
 
             // Guacamole 远程桌面模块API
             services.AddGuacamoleApiServices();
+
+            // 模型管理模块API
+            services.AddOntologyManageModuleApiServices();
+
+            // LLM 配置模块API
+            services.AddLlmConfigModuleApiServices();
 
             return services;
         }
@@ -118,6 +138,7 @@ namespace CJ.Plug.ModuleConfig
             app.AddUserManageModuleApi();
             app.AddMCPToolsApi();
             app.AddSkillsApi();
+            app.AddKnowledgeApi();
 
             // 授权管理模块API
             app.AddAuthModuleApi();
@@ -127,6 +148,12 @@ namespace CJ.Plug.ModuleConfig
 
             // Guacamole 远程桌面模块API
             app.AddGuacamoleApi();
+
+            // 模型管理模块API
+            app.AddOntologyManageModuleApi();
+
+            // LLM 配置模块API
+            app.AddLlmConfigModuleApi();
 
             return app;
         }

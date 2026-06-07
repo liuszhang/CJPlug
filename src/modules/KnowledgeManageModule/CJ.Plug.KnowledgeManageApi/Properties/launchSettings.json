@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "CJ.Plug.KnowledgeManageApi": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:26651;http://localhost:26652"
+    }
+  }
+}

@@ -42,6 +42,12 @@ namespace CJ.Plug.SharedPages.Services
             await LocalStorageService.SetItemAsStringAsync("username", userName);
         }
 
+        public async Task ClearCurrentUser()
+        {
+            await LocalStorageService.RemoveItemAsync("userid");
+            await LocalStorageService.RemoveItemAsync("username");
+        }
+
         public async Task SetItemValue(string key, string value)
         {
             await LocalStorageService.SetItemAsStringAsync(key, value);

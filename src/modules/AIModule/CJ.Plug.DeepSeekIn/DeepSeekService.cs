@@ -392,5 +392,215 @@ namespace CJ.Plug.DeekSeekIn
             return string.Empty;
         }
 
+        // ---- 带参数的重载方法，支持从 LLM 配置动态指定模型 ----
+
+        public async IAsyncEnumerable<string> Ask(string Question, Uri modelEndpoint, string modelName)
+        {
+            if (string.IsNullOrEmpty(Question))
+            {
+                yield return "请输入您的问题？";
+                yield break;
+            }
+
+            var chatClient = new OllamaApiClient(modelEndpoint, modelName);
+            var chat = new Chat(chatClient);
+            chat.AllowRecursiveToolCalls = true;
+            chat.Think = true;
+
+            var output = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+
+            chat.OnThink += (s, e) =>
+            {
+                output.Writer.TryWrite($"{e}");
+            };
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await foreach (var answerToken in chat.SendAsync(Question))
+                    {
+                        await output.Writer.WriteAsync(answerToken.ToString());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    output.Writer.TryWrite($"[Error] {ex.Message}");
+                }
+                finally
+                {
+                    output.Writer.Complete();
+                }
+            });
+
+            await foreach (var item in output.Reader.ReadAllAsync())
+            {
+                yield return item;
+            }
+        }
+
+        public async IAsyncEnumerable<string> AskWithTool(string Question, Uri modelEndpoint, string modelName)
+        {
+            if (string.IsNullOrEmpty(Question))
+            {
+                yield return "请输入您的问题？";
+                yield break;
+            }
+
+            var chatClient = new OllamaApiClient(modelEndpoint, modelName);
+            var chat = new Chat(chatClient);
+            chat.AllowRecursiveToolCalls = true;
+            chat.Think = true;
+            chat.OnToolCall += (s, e) =>
+            {
+                Console.WriteLine($"[DeepSeekService] AskWithTool OnToolCall: {e.Function?.Name}");
+            };
+
+            var config = new McpServerConfiguration
+            {
+                Name = "test",
+                Command = "http://localhost:3001",
+                TransportType = McpServerTransportType.Sse
+            };
+
+            var toolList = await OllamaSharp.ModelContextProtocol.Tools.GetFromMcpServers(config);
+
+            var output = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+
+            chat.OnThink += (s, e) =>
+            {
+                output.Writer.TryWrite($"{e}");
+            };
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await foreach (var answerToken in chat.SendAsync(Question, toolList))
+                    {
+                        await output.Writer.WriteAsync(answerToken.ToString());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    output.Writer.TryWrite($"[Error] {ex.Message}");
+                }
+                finally
+                {
+                    output.Writer.Complete();
+                }
+            });
+
+            await foreach (var item in output.Reader.ReadAllAsync())
+            {
+                yield return item;
+            }
+        }
+
+        public async IAsyncEnumerable<string> StreamReasoningFromContentAsync(string content, string apiKey, string model)
+        {
+            int chunkSize = 64;
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                yield break;
+            }
+
+            var messages = new List<(string role, string content)>
+            {
+                ("system", ""),
+                ("user", content)
+            };
+
+            string jsonResponse;
+            try
+            {
+                jsonResponse = await CallOpenRouterChatAsync(messages, apiKey, model);
+            }
+            catch (Exception)
+            {
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(jsonResponse))
+            {
+                yield break;
+            }
+
+            using var doc = JsonDocument.Parse(jsonResponse);
+            var root = doc.RootElement;
+
+            var foundAny = false;
+
+            if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var choice in choices.EnumerateArray())
+                {
+                    if (choice.TryGetProperty("message", out var messageEl))
+                    {
+                        if (messageEl.TryGetProperty("content", out var reasoningEl) && reasoningEl.ValueKind == JsonValueKind.String)
+                        {
+                            var reasoning = reasoningEl.GetString() ?? string.Empty;
+                            if (!string.IsNullOrEmpty(reasoning))
+                            {
+                                foundAny = true;
+                                for (int i = 0; i < reasoning.Length; i += chunkSize)
+                                {
+                                    var len = Math.Min(chunkSize, reasoning.Length - i);
+                                    yield return reasoning.Substring(i, len);
+                                    await Task.Yield();
+                                }
+                            }
+                        }
+                        else if (messageEl.TryGetProperty("reasoning", out var reasoningEl2) && reasoningEl2.ValueKind == JsonValueKind.String)
+                        {
+                            var reasoning = reasoningEl2.GetString() ?? string.Empty;
+                            if (!string.IsNullOrEmpty(reasoning))
+                            {
+                                foundAny = true;
+                for (int i = 0; i < reasoning.Length; i += chunkSize)
+                                {
+                                    var len = Math.Min(chunkSize, reasoning.Length - i);
+                                    yield return reasoning.Substring(i, len);
+                                    await Task.Yield();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!foundAny)
+            {
+                yield return "oops!";
+            }
+        }
+
+        public async Task<string> ChatCompletionAsync(string systemPrompt, string userPrompt, string apiKey, string model, CancellationToken cancellationToken = default)
+        {
+            var messages = new List<(string role, string content)>
+            {
+                ("system", systemPrompt),
+                ("user", userPrompt)
+            };
+
+            var responseJson = await CallOpenRouterChatAsync(messages, apiKey, model, maxTokens: 4096, temperature: 0.3);
+
+            using var doc = JsonDocument.Parse(responseJson);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var choice in choices.EnumerateArray())
+                {
+                    if (choice.TryGetProperty("message", out var message) &&
+                        message.TryGetProperty("content", out var contentEl))
+                    {
+                        return contentEl.GetString() ?? string.Empty;
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
     }
 }

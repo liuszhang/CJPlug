@@ -17,5 +17,25 @@ namespace CJ.Plug.DeekSeekIn
         /// 用于工作流生成等需要一次性拿到完整响应的场景。
         /// </summary>
         Task<string> ChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 使用指定模型端点进行问答（Ollama 类型）
+        /// </summary>
+        IAsyncEnumerable<string> Ask(string Question, Uri modelEndpoint, string modelName);
+
+        /// <summary>
+        /// 使用指定模型端点进行带工具的问答（Ollama 类型）
+        /// </summary>
+        IAsyncEnumerable<string> AskWithTool(string Question, Uri modelEndpoint, string modelName);
+
+        /// <summary>
+        /// 使用指定模型配置进行 OpenRouter 流式问答
+        /// </summary>
+        IAsyncEnumerable<string> StreamReasoningFromContentAsync(string content, string apiKey, string model);
+
+        /// <summary>
+        /// 使用指定模型配置进行非流式 Chat Completion
+        /// </summary>
+        Task<string> ChatCompletionAsync(string systemPrompt, string userPrompt, string apiKey, string model, CancellationToken cancellationToken = default);
     }
 }

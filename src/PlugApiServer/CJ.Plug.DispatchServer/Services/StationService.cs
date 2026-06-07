@@ -36,13 +36,17 @@ namespace CJ.Plug.DispatchServer.Services
                 return null;
             }
 
-            if (stationStatus.StartsWith("http"))
+            if (stationStatus.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                stationStatus.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 return stationStatus;
             }
+            else if (stationStatus.StartsWith("://"))
+            {
+                return "http" + stationStatus;
+            }
             else
             {
-                //return "http://" + stationStatus.Split(":")[0] + ":6060";
                 return "http://" + stationStatus;
             }
         }

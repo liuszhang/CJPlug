@@ -1,5 +1,6 @@
 ﻿
 using CJ.Plug.Models.Station;
+using CJ.Plug.StationAndToolApi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +20,6 @@ using System.Threading.Tasks;
 
         Task<string?> GetToolPathOnIp(string ip, string toolName, string? version);
         Task<string?> GetToolPathByFilter(ToolConfigFilter filter);
-
+        Task<ToolDeploySettingModel?> GetToolDeploySetting(ToolConfigFilter filter);
     }
 

@@ -158,16 +158,15 @@ builder.AddExecutable(
     ).WithEnvironment(Utf8EnvKey, Utf8EnvVal)
      .WithUrl("http://localhost:8686");
 
-builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice")
-    .WithEnvironment(Utf8EnvKey, Utf8EnvVal);
+//builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice").WithEnvironment(Utf8EnvKey, Utf8EnvVal);
 //builder.AddProject("apiservice", @"../PlugApiServer/CJ.Plug.ApiServer/CJ.Plug.ApiServer.csproj");
 //builder.AddProject("apiservice", apiServer);
-//builder.AddExecutable("apiservice", "dotnet", apiServerDirectory, apiServerDllName).WithUrl("http://localhost:6661");
+builder.AddExecutable("apiservice", "dotnet", apiServerDirectory, apiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:8687");
 
 //builder.AddProject<Projects.CJ_Plug_StationApiServer>("stationapi");
 //builder.AddProject("stationapi", @"../PlugStation/CJ.Plug.StationApiServer/CJ.Plug.StationApiServer.csproj");
 //builder.AddProject("stationapi", stationApiServer);
-//builder.AddExecutable("stationapi", "dotnet", stationApiServerDirectory, stationApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:7660");
+builder.AddExecutable("stationapi", "dotnet", stationApiServerDirectory, stationApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:7660");
 
 
 //builder.AddProject<Projects.CJ_Plug_ElsaApiServer>("elsaapiserver");
@@ -180,16 +179,10 @@ builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApi
 //builder.AddProject("elsastudio", elsaStudio);
 builder.AddExecutable("elsastudio", "dotnet", elsaStudioDirectory, elsaStudioDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5010");
 
-builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal);
+//builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
 //builder.AddProject("webfrontend", @"../PlugWebHost/CJ.Plug.HostWebServer/CJ.Plug.HostWebServer.csproj");
 //builder.AddProject("webfrontend", webFrontend);
-//builder.AddExecutable("webfrontend", "dotnet", webFrontendDirectory, webFrontendDllName).WithUrl("http://localhost:5066");
-
-//builder.AddProject<Projects.CJ_Plug_HostWasm>("hostwasm");
-//builder.AddProject("hostwasm", @"../PlugWebHost/CJ.Plug.HostWasm/CJ.Plug.HostWasm.csproj");
-
-//builder.AddProject<Projects.MC_SLM_F>("mc-slm");
-//builder.AddProject("mc-slm", mcSlm);
+builder.AddExecutable("webfrontend", "dotnet", webFrontendDirectory, webFrontendDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
 
 //builder.AddProject<Projects.CJ_Plug_McpServer>("cj-plug-mcpserver");
 //builder.AddProject("cj-plug-mcpserver", @"../PlugApiServer/CJ.Plug.McpServer/CJ.Plug.McpServer.csproj");
@@ -197,7 +190,7 @@ builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironmen
 builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:3001");
 
 
-
+//MCP TOOL测试工具：mcp inspector，基于 @modelcontextprotocol/inspector 实现的 MCP 协议调试工具，提供可视化界面查看 MCP 消息交互
 builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:6274");
 
 //打开浏览器
@@ -209,7 +202,7 @@ try
         FileName = url.ToString(),
         UseShellExecute = true
     };
-    Process.Start(psi);
+    //Process.Start(psi);
 }
 catch (Exception ex)
 {

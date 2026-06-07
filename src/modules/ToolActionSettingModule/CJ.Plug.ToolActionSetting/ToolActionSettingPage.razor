@@ -5,15 +5,17 @@
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.GUIDesigner
-@using CJ.Plug.Models.EventAggregator
+@using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugAction
 @using CJ.Plug.Models.PlugProcess
 @using CJ.Plug.Models.Services
 @using CJ.Plug.Models.Shared
+@using CJ.Plug.Models.EventAggregator
 @using CJ.Plug.PlugBaseCore.Contracts
 @using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Dialogs
 @using CJ.Plug.SharedPages.Layout
 @using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.TASApiClient
@@ -58,6 +60,14 @@
         <MudButton StartIcon="@Icons.Material.Filled.Javascript" Variant="Variant.Filled" Color="Color.Primary">创建脚本类插头</MudButton> *@
         <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" Color="Color.Primary">导入</MudButton>
         <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" Color="Color.Primary">导出</MudButton>
+        @if (IsSelectedPlugPublished())
+        {
+            <MudButton OnClick="UnpublishSelectedPlug" StartIcon="@Icons.Material.Filled.CancelPresentation" Variant="Variant.Outlined" Color="Color.Warning">取消发布MCP</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="PublishSelectedPlug" Disabled="@(SelectedPlug == null)" StartIcon="@Icons.Material.Filled.Publish" Variant="Variant.Outlined" Color="Color.Tertiary">发布为MCP Tool</MudButton>
+        }
         <MudButton OnClick="GetSysInitRootPlugs" StartIcon="@Icons.Material.Filled.DevicesFold" Variant="Variant.Outlined" Color="Color.Primary">重置默认插头</MudButton>
         <MudSpacer></MudSpacer>
         <MudTextField T="string"
@@ -74,7 +84,7 @@
 
     <MudDivider />
 
-    <MudDropContainer T="Plug" Items="RootPlugsToShow" @key="RootPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
+    <MudDropContainer T="Plug" Items="AllPlugsToShow" @key="AllPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
 
 
         <ChildContent>
@@ -83,22 +93,27 @@
                 <RadzenSplitter Style="height: 100%;">
                     <RadzenSplitterPane Size="25%" Min="200px" Collapsed="PlugListPanelCollapsed">
 
-                        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
-                            <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键插入</MudButton>
-                            <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键拔出</MudButton>
-                            <MudCheckBox T="bool" Dense Value="IsShowSystemTool" ValueChanged="OnShowSystemToolChanged" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
-
-                        </MudStack>
                         <VerticalWell ExtraPadding="100">
 
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                <MudSelect T="int" Dense Margin="Margin.Dense" Variant="Variant.Outlined" @bind-Value="_plugListTabIndex" Style="width:120px">
+                                    <MudSelectItem Value="0">插头</MudSelectItem>
+                                    <MudSelectItem Value="1">动作</MudSelectItem>
+                                </MudSelect>
+                                @if (_plugListTabIndex == 0)
+                                {
+                                    <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键插入</MudButton>
+                                    <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">一键拔出</MudButton>
+                                    <MudCheckBox T="bool" Dense Value="IsShowSystemTool" ValueChanged="OnShowSystemToolChanged" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
+                                }
+                            </MudStack>
 
                             <MudStack AlignItems="AlignItems.Stretch">
-
                                 @if (isItemLoading)
                                 {
                                     <MudProgressCircular Color="Color.Primary" Indeterminate="true"></MudProgressCircular>
                                 }
-                                else
+                                else if (_plugListTabIndex == 0)
                                 {
                                     <MudList T="Plug" SelectedValue="SelectedPlug" SelectedValueChanged="OnPlugSelected" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
                                         <MudDropZone T="Plug" Identifier="@("Plug")" AllowReorder="true">
@@ -106,8 +121,19 @@
                                         </MudDropZone>
                                     </MudList>
                                 }
-
+                                else
+                                {
+                                    <MudList T="Plug" SelectedValue="SelectedPlug" SelectedValueChanged="OnPlugSelected" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
+                                        @foreach (var actionItem in ActionItemsToShow)
+                                        {
+                                            <MudListItem T="Plug" Value="@actionItem">
+                                                <TASPlugActionItem SelectedPlug="SelectedPlug" PlugActionItem="@actionItem" OnDelete="() => RemovePlugActionItem(actionItem)"></TASPlugActionItem>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                }
                             </MudStack>
+
                         </VerticalWell>
                     </RadzenSplitterPane>
                     <RadzenSplitterPane Size="75%" Min="200px">
@@ -115,7 +141,7 @@
                             <RadzenSplitterPane Size="65%" Min="100px">
                                 <RadzenSplitter Style="height: 100%;">
                                     <RadzenSplitterPane Size="70%" Min="100px">
-                                        <MudStack Style="height:100%">                                            
+                                        <MudStack Style="height:100%;overflow:auto">                                            
                                             @* <MudStack Row>
                                                 <MudButton Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary >保存</MudButton>
                                                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.ZoomOutMap" Color=Color.Primary></MudIconButton>
@@ -233,9 +259,14 @@
 
     private List<Plug>? RootPlugs { get; set; } = new();
     private List<Plug>? RootPlugsToShow { get; set; } = new();
+    private List<Plug>? PlugItemsToShow { get; set; } = new();
+    private List<Plug>? ActionItemsToShow { get; set; } = new();
+    private List<Plug>? AllPlugsToShow { get; set; } = new();
+    private int _plugListTabIndex = 0;
     private List<Plug>? ShadowPlugActions { get; set; } = new();
     private Plug? SelectedPlug { get; set; }
     private Plug? SelectedToolActionItem { get; set; }
+    private List<MCPTool> _mcpTools = new();
 
     private bool PlugListPanelCollapsed { get; set; } = false;
     private bool PlugVariablePanelCollapsed { get; set; } = false;
@@ -325,6 +356,7 @@
         if (firstRender)
         {
             await GetAllRootPlugs();
+            await LoadMcpTools();
             _actionPanelPlug = SelectedPlug;
             StateHasChanged();
         }
@@ -469,6 +501,26 @@
                 //Console.WriteLine(JsonSerializer.Serialize(result));
                 RootPlugs.Add(result);
             }
+
+            // 创建/更新默认子插头（预置动作）
+            var defaultChildren = await pcsc.GetDefaultChildPlugs();
+            if (defaultChildren != null && defaultChildren.Count > 0)
+            {
+                var parentDefId = PlugFromSetting.DefinitionId;
+                var existingChildren = await MainApiClient.GetPlugActionsByPlugDefinitionIdAsync(parentDefId) ?? new();
+                foreach (var child in defaultChildren)
+                {
+                    var exists = existingChildren.Any(c => c.Name == child.Name);
+                    if (!exists)
+                    {
+                        child.DefinitionId = RandomLongIdentityGenerator.GenerateId();
+                        child.Tag = parentDefId + "Action";
+                        var newChild = await MainApiClient.CreateNewPlug(child);
+                        if (newChild != null)
+                            RootPlugs.Add(newChild);
+                    }
+                }
+            }
         }
 
 
@@ -557,7 +609,10 @@
         // 根据显示系统插头选项过滤
         if (!IsShowSystemTool)
         {
-            query = query.Where(p => p.CreateType != PlugCreateTypeEnum.SystemInitPlug.ToString()).ToList();
+            query = query.Where(p =>
+                p.CreateType != PlugCreateTypeEnum.SystemInitPlug.ToString() &&
+                p.CreateType != PlugCreateTypeEnum.SystemInitActionPlug.ToString()
+            ).ToList();
         }
 
         // 根据搜索关键字过滤
@@ -574,7 +629,20 @@
             ).ToList();
         }
 
-        RootPlugsToShow = query.ToList(); // 确保创建新的列表引用
+        // 按插头类型分类：插头 vs 动作
+        PlugItemsToShow = query.Where(p =>
+            p.CreateType == PlugCreateTypeEnum.RootPlug.ToString() ||
+            p.CreateType == PlugCreateTypeEnum.RootAdminPlug.ToString() ||
+            p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()
+        ).ToList();
+
+        ActionItemsToShow = query.Where(p =>
+            p.CreateType == PlugCreateTypeEnum.ActionRootPlug.ToString() ||
+            p.CreateType == PlugCreateTypeEnum.SystemInitActionPlug.ToString()
+        ).ToList();
+
+        AllPlugsToShow = PlugItemsToShow.Concat(ActionItemsToShow).ToList();
+        RootPlugsToShow = AllPlugsToShow;
         StateHasChanged();
         _container.Refresh();
     }
@@ -613,7 +681,8 @@
         try
         {
             RootPlugs?.Remove(toolItem);
-            RootPlugsToShow?.Remove(toolItem);
+            PlugItemsToShow?.Remove(toolItem);
+            AllPlugsToShow?.Remove(toolItem);
             await MainApiClient.DeletePlug(toolItem.Id);
             //await WorkflowDefinitionService.DeleteAsync(toolItem.DefinitionId);
             await ElsaEngineService.DeleteWorkflowByDefinitionId(toolItem.DefinitionId);
@@ -686,7 +755,8 @@
     private async void RemovePlugActionItem(Plug toolActionItem)
     {
         RootPlugs?.Remove(toolActionItem);
-        RootPlugsToShow?.Remove(toolActionItem);
+        ActionItemsToShow?.Remove(toolActionItem);
+        AllPlugsToShow?.Remove(toolActionItem);
         await MainApiClient.DeletePlug(toolActionItem.Id);
         UpdateFilteredPlugs();
         StateHasChanged();
@@ -803,4 +873,102 @@
         await dialog.Result;
     }
 
+    // ---- MCP Tool 发布/取消发布 ----
+
+    private async Task LoadMcpTools()
+    {
+        try
+        {
+            var tools = await MainApiClient.GetAllMCPToolsAsync();
+            _mcpTools = tools?.Where(t => t != null).Cast<MCPTool>().ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LoadMcpTools error: {ex.Message}");
+            _mcpTools = new();
+        }
+    }
+
+    private bool IsSelectedPlugPublished()
+    {
+        if (SelectedPlug == null || string.IsNullOrEmpty(SelectedPlug.DefinitionId))
+            return false;
+        return _mcpTools.Any(t => t.SourcePlugId == SelectedPlug.DefinitionId);
+    }
+
+    private async Task PublishSelectedPlug()
+    {
+        if (SelectedPlug == null)
+        {
+            Snackbar.Add("请先选择一个插头", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var mcpTool = new MCPTool
+            {
+                Name = SelectedPlug.Name,
+                Description = SelectedPlug.Description ?? $"{SelectedPlug.Name} - 由插头管理发布",
+                SourcePlugId = SelectedPlug.DefinitionId,
+                IsEnabled = true,
+                Version = SelectedPlug.ToolVersion ?? "1.0",
+                Author = SelectedPlug.Creater ?? "System",
+                Category = SelectedPlug.Category,
+                GroupName = SelectedPlug.GroupName,
+                Type = SelectedPlug.Type,
+                ToolType = "Plugin",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            var result = await MainApiClient.CreateMCPToolAsync(mcpTool);
+            await LoadMcpTools();
+
+            if (result != null)
+            {
+                var successParams = new DialogParameters<PublishSuccessDialog>
+                {
+                    { x => x.Tool, result },
+                    { x => x.EntryVariables, SelectedPlug.PlugVariables }
+                };
+                await DialogService.ShowAsync<PublishSuccessDialog>("发布成功", successParams);
+            }
+            else
+            {
+                Snackbar.Add($"已发布 '{SelectedPlug.Name}' 为 MCP Tool", Severity.Success);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"发布失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UnpublishSelectedPlug()
+    {
+        if (SelectedPlug == null || string.IsNullOrEmpty(SelectedPlug.DefinitionId))
+            return;
+
+        var existing = _mcpTools.FirstOrDefault(t => t.SourcePlugId == SelectedPlug.DefinitionId);
+        if (existing == null)
+        {
+            Snackbar.Add("该插头未发布", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            await MainApiClient.DeleteMCPToolAsync(existing.Id);
+            await LoadMcpTools();
+            Snackbar.Add($"已取消发布 '{SelectedPlug.Name}' 的 MCP Tool", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"取消发布失败: {ex.Message}", Severity.Error);
+        }
+    }
 }

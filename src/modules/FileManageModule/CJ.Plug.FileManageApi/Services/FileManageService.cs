@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Claims;
@@ -176,7 +177,7 @@ namespace CJ.Plug.FileManageApi.Services
         {
             if (rootPath == null)
             {
-                rootPath = GlobalData.MainFileServerPathRoot;
+                rootPath = GlobalData.PDZsRootPath;
             }
             if (rootPath == "all")
             {
@@ -224,22 +225,12 @@ namespace CJ.Plug.FileManageApi.Services
             }
 
             //请求体是相对路径，需要拼接上服务器的根路径
-            rootPath = Path.Combine(GlobalData.MainFileServerPathRoot, rootPath);
+            rootPath = Path.Combine(GlobalData.PDZsRootPath, rootPath);
             try
             {
                 if (!Directory.Exists(rootPath)) Directory.CreateDirectory(rootPath);
                 var rootNode = new FileSystemNode(rootPath, rootPath, true);
-                var subItems = Directory.GetFileSystemEntries(rootPath);
-                foreach (var subItem in subItems)
-                {
-                    var item = new FileSystemNode(
-                        Path.GetRelativePath(GlobalData.MainFileServerPathRoot, subItem),   //返回相对路径
-                        Path.GetFileName(subItem),
-                        Directory.Exists(subItem));
-                    PopulateFileMetadata(item, subItem);
-                    item.FolderDisplayName = Path.GetFileName(subItem);
-                    rootNode.Children.Add(item);
-                }
+                PopulateFolderRecursive(rootNode, rootPath, GlobalData.PDZsRootPath);
                 return rootNode;
             }
             catch (Exception ex)
@@ -251,6 +242,35 @@ namespace CJ.Plug.FileManageApi.Services
 
         /// <summary>
         /// 创建上传文件的信息数据
+        /// <summary>
+        /// 递归填充文件夹内容
+        /// </summary>
+        private static void PopulateFolderRecursive(FileSystemNode parentNode, string physicalPath, string rootPath)
+        {
+            if (!Directory.Exists(physicalPath)) return;
+            
+            var subItems = Directory.GetFileSystemEntries(physicalPath);
+            foreach (var subItem in subItems)
+            {
+                var isDirectory = Directory.Exists(subItem);
+                var relativePath = Path.GetRelativePath(rootPath, subItem);
+                var item = new FileSystemNode(relativePath, Path.GetFileName(subItem), isDirectory)
+                {
+                    RelativePath = relativePath,
+                    FolderDisplayName = Path.GetFileName(subItem)
+                };
+                PopulateFileMetadata(item, subItem);
+                
+                if (isDirectory)
+                {
+                    PopulateFolderRecursive(item, subItem, rootPath);
+                }
+                
+                parentNode.Children ??= new List<FileSystemNode>();
+                parentNode.Children.Add(item);
+            }
+        }
+
         /// </summary>
         /// <param name="fileInformation"></param>
         /// <returns></returns>
@@ -449,13 +469,13 @@ namespace CJ.Plug.FileManageApi.Services
         /// </summary>
         private string GetContentType(string fileExtension)
         {
-            // 简单的MIME类型映射，实际应用中可使用更完整的映射表
             return fileExtension switch
             {
                 ".txt" => "text/plain",
                 ".csv" => "text/csv",
                 ".json" => "application/json",
                 ".xml" => "application/xml",
+                ".pdf" => "application/pdf",
                 _ => "application/octet-stream"
             };
         }
@@ -633,7 +653,7 @@ namespace CJ.Plug.FileManageApi.Services
                 // 临时文件路径和最终文件路径（将路径分隔符替换为_，避免子目录不存在导致创建失败）
                 var safeFileName = fileName.Replace('/', '_').Replace('\\', '_');
                 var tempFilePath = Path.Combine(GlobalData.MainWebFileServer, $"{fileId}_{safeFileName}.temp");
-                var finalFilePath = Path.Combine(GlobalData.MainFileServerPathRoot, request.UploadPath, request.FileName);
+                var finalFilePath = Path.Combine(GlobalData.PDZsRootPath, request.UploadPath, request.FileName);
 
                 // 检查临时文件是否存在
                 if (!File.Exists(tempFilePath))
@@ -692,17 +712,26 @@ namespace CJ.Plug.FileManageApi.Services
         public async Task<FileInformation?> DeleteFile(FileDeleteRequest fileDeleteRequest)
         {
             string FilePath = fileDeleteRequest.FilePath;
-            //string? PlugDefinitionId = fileDeleteRequest.PlugDefinitionId;
-            string fileName= fileDeleteRequest.FileName;
-            //var PlugDataZone= await _dbContext.Set<PlugDataZone>().FirstOrDefaultAsync(p => p.PDZId == plugDataZoneId);
-            //var PDZWorkPath = PlugDataZone?.PDZWorkPath;
-            var filePath = Path.Combine(GlobalData.MainFileServerPathRoot, FilePath, fileName);
+            string fileName = fileDeleteRequest.FileName;
+            
+            // 支持两种调用方式：
+            // 1. FilePath 含目录，FileName 含文件名（传统方式）
+            // 2. FilePath 含完整路径（含文件名），FileName 为空（简化方式）
+            string filePath;
+            if (string.IsNullOrEmpty(fileName))
+            {
+                filePath = Path.Combine(GlobalData.PDZsRootPath, FilePath?.TrimStart('/', '\\') ?? string.Empty);
+            }
+            else
+            {
+                filePath = Path.Combine(GlobalData.PDZsRootPath, FilePath ?? string.Empty, fileName);
+            }
+            
             try
             {
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
-                    //以下代码并不能获取到文件信息，后续再处理
                     var fileInformation = await _dbContext.Set<FileInformation>().FirstOrDefaultAsync(f => f.FilePath == filePath);
                     if (fileInformation != null)
                     {
@@ -710,7 +739,8 @@ namespace CJ.Plug.FileManageApi.Services
                         await _dbContext.SaveChangesAsync();
                         return fileInformation;
                     }
-                    return null;
+                    // 文件已删除，数据库无记录时返回占位对象表示成功
+                    return new FileInformation { FilePath = filePath, FileName = fileName };
                 }
                 else
                 {
@@ -742,6 +772,44 @@ namespace CJ.Plug.FileManageApi.Services
             };
         }
 
+        public async Task<(Stream? fileStream, string? fileName, string? errorMessage)> DownloadToolAsync(string toolName, string toolVersion, string toolPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(toolPath))
+                    return (null, null, "工具路径不能为空");
+
+                // 拼接完整路径
+                var fullPath = Path.Combine(GlobalData.MainFileServerPathRoot, toolPath);
+
+                if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
+                    return (null, null, $"工具路径不存在: {fullPath}");
+
+                var tempDir = Path.GetTempPath();
+                var zipFileName = $"{toolName}_{toolVersion}.zip";
+                var tempZipPath = Path.Combine(tempDir, $"tool_download_{Guid.NewGuid()}.zip");
+
+                if (Directory.Exists(fullPath))
+                {
+                    ZipFile.CreateFromDirectory(fullPath, tempZipPath);
+                }
+                else
+                {
+                    using var zipStream = new FileStream(tempZipPath, FileMode.Create);
+                    using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
+                    archive.CreateEntryFromFile(fullPath, Path.GetFileName(fullPath));
+                }
+
+                var fileStream = new FileStream(tempZipPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+                return (fileStream, zipFileName, null);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"打包下载工具失败: {toolName}({toolVersion}), 路径: {toolPath}");
+                return (null, null, $"打包下载工具失败: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 为 FileSystemNode 填充文件元数据（大小、上传人、最后修改时间）
         /// </summary>
@@ -755,6 +823,7 @@ namespace CJ.Plug.FileManageApi.Services
                 {
                     node.Size = fileInfo.Length;
                     node.LastWriteTime = fileInfo.LastWriteTime;
+                    node.FileType = Path.GetExtension(physicalPath).TrimStart('.');
                     // 尝试获取文件所有者（Windows 特有，跨平台时忽略）
                     try
                     {

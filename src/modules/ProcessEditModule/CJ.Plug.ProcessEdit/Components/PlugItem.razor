@@ -14,7 +14,7 @@
 
 <MudMenu ActivationEvent="@MudBlazor.MouseEvent.RightClick" PositionAtCursor="true">
     <ActivatorContent>
-        <MudTooltip Text="@ActivityDescriptor?.Description">
+        <MudTooltip Text="@TooltipText">
 
             @if (ShowModel == "apps")
             {
@@ -90,6 +90,16 @@
     private string? FallbackImagePath { get; set; } = "defultplug.ico";
     private string _color = default!;
     private string? _icon;
+
+    // 过滤掉 Description 中的 [DefinitionId:xxx] 前缀，用于 tooltip 显示
+    private string? TooltipText
+    {
+        get
+        {
+            var desc = ActivityDescriptor?.Description ?? "";
+            return System.Text.RegularExpressions.Regex.Replace(desc, @"\[DefinitionId:[^\]]+\]", "").Trim();
+        }
+    }
 
     //备用图标设计
     public string IconPath = "M 0 0 L 0 -7 L 8 -7 L 8 0 L 0 0 M 0 2 L 1 0 L 2 2 M 5 0 L 3 1 L 5 2 M 6 0 L 6 2 L 8 1 L 6 0";

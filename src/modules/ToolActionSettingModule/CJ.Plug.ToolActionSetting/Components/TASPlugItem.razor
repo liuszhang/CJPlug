@@ -1,9 +1,10 @@
-﻿
+
 @using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugAction
 @using System.Text.Json
 @using CJ.Plug.SharedPages.PlugSettingPages
+@using CJ.Plug.ToolActionSetting.Dialogs
 @using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
 @using Elsa.Api.Client.Resources.WorkflowDefinitions.Requests
 @using Elsa.Api.Client.Shared.Models
@@ -15,6 +16,7 @@
 @inject IWorkflowDefinitionEditorService WorkflowDefinitionEditorService
 @inject ISnackbar Snackbar
 @inject IElsaStudioService ElsaEngineService
+@inject IDialogService DialogService
 
 @* <MudBadge Dot="true" Color="Color.Info" Visible="@toolItem.ShowInPlugLibrary"> *@
 <MudPaper>
@@ -53,49 +55,18 @@
             }
         </MudStack>
     </MudStack>
-    @if (showDetails)
-    {
-        <MudTextField FullWidth @bind-text="Plug.Name" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="插头名称"></MudTextField>
-        <MudTextField FullWidth @bind-text="Plug.Type" ReadOnly Margin="Margin.Dense" Variant="Variant.Filled" T="string" Label="插头类型"></MudTextField>
-        <MudTextField FullWidth @bind-text="Plug.GroupName" Margin="Margin.Dense" Variant="Variant.Outlined" T="string" Label="插头分组"></MudTextField>
-        
-        <MudTextField FullWidth @bind-text="Plug.ToolDisplayName" ReadOnly Margin="Margin.Dense" Variant="Variant.Filled" T="string" Label="绑定工具"></MudTextField>
-
-        <MudStack Justify="@Justify.Center"
-        Class="mud-width-full">
-
-            <MudCheckBox Dense @bind-Value="Plug.ShowInPlugLibrary" Label="插入插座" Color="Color.Primary"></MudCheckBox>
-            <MudCheckBox Dense @bind-Value="Plug.OnlyExecuteAction" Label="仅执行插头动作" Color="Color.Error"></MudCheckBox>
-
-            <MudStack Spacing="1">
-                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>                
-                <MudCollapse Expanded="_expanded">
-                    <MudTextField @bind-Value="Plug.PlugTypeKey" Label="唯一标识符(开发人员)" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
-                </MudCollapse>
-                <MudDivider />
-            </MudStack>
-
-
-            <StationPlugSettingContent Plug="Plug" OnSaveClick="SaveToolItem"></StationPlugSettingContent>
-        </MudStack>
-
-    }
-    else
-    {
-
-    }
 </MudPaper>
 
 
 @code {
     public string toolVersion { get; set; } = "12.0";
     public string? tmpVersion { get; set; }
-    public bool showDetails { get; set; } = false;    
     public string? toolName { get; set; } = "NX";
 
     public Dictionary<string,string?>? versonPathDic { get; set; } = new();
     [Parameter]
     public Plug? Plug { get; set; } = new();
+    private bool IsDesktopCategory => Plug?.Category?.Contains("桌面") == true;
     public PlugSettings? PlugSettings { get; set; }
     [CascadingParameter]
     public Plug? SelectedToolItem { get; set; } = new();
@@ -108,7 +79,6 @@
     private readonly List<string> toolVersions = ["11.0", "12.0"];
     private int _numberOfColors = Enum.GetValues(typeof(Color)).Length;
 
-    bool _expanded = false;
     bool _processing = false;
 
 
@@ -121,8 +91,13 @@
 
     private async Task ShowDetails()
     {
-        showDetails = !showDetails;
-        //StateHasChanged();
+        var parameters = new DialogParameters { ["Plug"] = Plug };
+        var dialog = await DialogService.ShowAsync<EditPlugDialog>("编辑插头", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            StateHasChanged();
+        }
     }
     private async Task DeleteToolItem()
     {
@@ -148,19 +123,6 @@
         //tmpVersionPath = versonPathDic[version];
         await OnChangeVersion.InvokeAsync();
     }
-
-    private async Task SaveToolItem(Plug Plug)
-    {
-        Console.WriteLine(JsonSerializer.Serialize(Plug.GetPlugSettings()));
-
-        //await ElsaEngineService.CreateOrUpdateWorkflowFromPlug(Plug);
-        await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
-        Console.WriteLine("update done!");
-        showDetails = false;
-
-        StateHasChanged();
-    }
-
 
     private async Task CreateAndPublishWorkflow(Plug item,bool publish)
     {

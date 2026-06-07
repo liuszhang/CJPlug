@@ -29,13 +29,17 @@
     <ProjectReference Include="..\ProcessManageModule\ProcessManageModule\CJ.Plug.ProcessManage.csproj" />
     <ProjectReference Include="..\ProcessToExternalModule\CJ.Plug.ToExternal\CJ.Plug.ToExternal.csproj" />
     <ProjectReference Include="..\RelationManageModule\CJ.Plug.Relation\CJ.Plug.Relation.csproj" />
-    <ProjectReference Include="..\SkillsModule\CJ.Plug.SkillsManage\CJ.Plug.SkillsManage.csproj" />
+    <ProjectReference Include="..\SkillsManageModule\CJ.Plug.SkillsManage\CJ.Plug.SkillsManage.csproj" />
     <ProjectReference Include="..\StationAndToolModule\CJ.Plug.StationAndTool\CJ.Plug.StationAndTool.csproj" />
     <ProjectReference Include="..\ToolActionSettingModule\CJ.Plug.ToolActionSetting\CJ.Plug.ToolActionSetting.csproj" />
     <ProjectReference Include="..\UnitTestModule\CJ.Plug.UnitTest\CJ.Plug.UnitTest.csproj" />
     <ProjectReference Include="..\UserManageModule\CJ.Plug.UserManage\CJ.Plug.UserManage.csproj" />
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleApi\CJ.Plug.GuacamoleApi.csproj" />
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
+    <ProjectReference Include="..\KnowledgeManageModule\CJ.Plug.KnowledgeManage\CJ.Plug.KnowledgeManage.csproj" />
+    <ProjectReference Include="..\ModelManageModule\CJ.Plug.ModelManage\CJ.Plug.ModelManage.csproj" />
+    <ProjectReference Include="..\LlmConfigModule\CJ.Plug.LlmConfig\CJ.Plug.LlmConfig.csproj" />
+    <ProjectReference Include="..\LlmConfigModule\CJ.Plug.LlmConfigApi\CJ.Plug.LlmConfigApi.csproj" />
   </ItemGroup>
 
 </Project>

@@ -20,6 +20,7 @@
 
 @inject MainApiClient MainApiClient
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 
 
 
@@ -58,6 +59,7 @@
         </TemplateColumn>
         <TemplateColumn Title="操作">
             <CellTemplate>
+                <MudButton OnClick="()=>DownloadTool(context.Item)" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">下载</MudButton>
                 <MudButton OnClick="()=>DeleteTool(context.Item.Id)" Variant="Variant.Outlined" Color="Color.Error">删除</MudButton>
             </CellTemplate>
         </TemplateColumn>
@@ -76,10 +78,9 @@
 @code {
     private List<MCPTool>? mcpTools = new();
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
-        LoadSampleData();
-        return base.OnInitializedAsync();
+        await LoadSampleData();
     }
 
     private async Task LoadSampleData()
@@ -88,20 +89,18 @@
         mcpTools = result?.ToList();
     }
 
-    private void Refresh()
+    private async Task Refresh()
     {
-        // For now just reload sample data. Replace with API refresh logic.
-        LoadSampleData();
+        await LoadSampleData();
+        try { await MainApiClient.NotifyRefreshAsync(); } catch { }
+        Snackbar.Add("已通知 McpServer 刷新工具列表", Severity.Info);
     }
 
     private async Task DeleteTool(int id)
     {
         await MainApiClient.DeleteMCPToolAsync(id);
-        
-        // Implement delete logic here.
-        // For now, just log a message.
         Snackbar.Add("DeleteTool clicked.");
-        LoadSampleData();
+        await LoadSampleData();
     }
 
     private async Task UpdateTool(MCPTool tool,bool isEnable)
@@ -128,6 +127,12 @@
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
         await DialogService.ShowAsync<DeployGuideDialog>("配置指南", parameters, options);
         //return Task.CompletedTask;
+    }
+
+    private async Task DownloadTool(MCPTool tool)
+    {
+        var url = $"/api/file/downloadTool?name={Uri.EscapeDataString(tool.Name!)}&version={Uri.EscapeDataString(tool.Version ?? "latest")}&path={Uri.EscapeDataString(tool.ToolSettingsJson ?? "")}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 
     // private class MCPToolDto

@@ -76,7 +76,7 @@
 @code{
     [CascadingParameter]
     public PlugDataZone? PlugDataZone { get; set; }
-    [CascadingParameter]
+    [CascadingParameter(Name = "SelectedPlugDefinitionId")]
     public string? SelectedPlugDefinitionId { get; set; }
     [Parameter]
     public double HeightPercent { get; set; } = 30.00;

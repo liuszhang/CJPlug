@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
+    <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
     <ProjectReference Include="..\..\RelationManageModule\CJ.Plug.RelationApiClient\CJ.Plug.RelationApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.PlugMarketApiClient\CJ.Plug.PlugMarketApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.PlugMarketApi\CJ.Plug.PlugMarketApi.csproj" />

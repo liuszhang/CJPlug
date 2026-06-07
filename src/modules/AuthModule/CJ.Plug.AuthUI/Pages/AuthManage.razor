@@ -2,11 +2,15 @@
 
 @using CJ.Plug.AuthModels
 @using CJ.Plug.AuthApiClient
+@using CJ.Plug.UserManageApiClient
 @using CJ.Plug.SharedPages.Contracts
+@using CJ.Plug.Models.Shared
+@using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
-@using System.Globalization
 
 @inject IAuthApiClient AuthApiClient
+@inject IUserManageApiClient UserManageApiClient
+@inject IRoleManageApiClient RoleManageApiClient
 @inject IDomInteropService DomInteropService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -37,6 +41,9 @@
                 <MudNavLink Icon="@Icons.Material.Filled.History"
                             OnClick="@(() => SwitchTab("all"))"
                             IsActive="@(_activeTab == "all")">全部记录</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.LockOpen"
+                            OnClick="@(() => SwitchTab("unlock"))"
+                            IsActive="@(_activeTab == "unlock")">账号解锁</MudNavLink>
             </MudNavMenu>
         </MudItem>
 
@@ -46,72 +53,108 @@
                 <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">@GetTabTitle()</MudText>
                     <MudSpacer />
+                    @if (_activeTab == "unlock")
+                    {
+                        <MudButton OnClick="OpenUnlockDialog" StartIcon="@Icons.Material.Filled.LockOpen" Variant="Variant.Filled" Color="Color.Primary">解锁账号</MudButton>
+                    }
                     <MudButton OnClick="RefreshData" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
                 </MudStack>
 
-                <MudDataGrid @ref="_dataGrid"
-                             T="AuthRequestDto"
-                             ServerData="LoadData"
-                             Dense="true"
-                             Hover="true"
-                             Elevation="0"
-                             SortMode="SortMode.Single"
-                             RowStyle="cursor: default;">
-                    <ToolBarContent>
-                        <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索目标、请求人"
-                                      Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
-                                      Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
-                    </ToolBarContent>
-                    <Columns>
-                        <TemplateColumn Title="操作类型">
-                            <CellTemplate>
-                                <MudChip Size="Size.Small" Color="@GetOperationColor(context.Item.OperationType)">@context.Item.OperationTypeName</MudChip>
-                            </CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="操作目标">
-                            <CellTemplate><MudText>@context.Item.TargetDescription</MudText></CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="请求人">
-                            <CellTemplate>@context.Item.RequestedBy</CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="请求时间">
-                            <CellTemplate>@context.Item.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="状态">
-                            <CellTemplate>
-                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.StatusName</MudChip>
-                            </CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="审批人">
-                            <CellTemplate>@(context.Item.ApprovedBy ?? "-")</CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="审批时间">
-                            <CellTemplate>@(context.Item.ApprovedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Title="备注">
-                            <CellTemplate>@(context.Item.Remark ?? "-")</CellTemplate>
-                        </TemplateColumn>
-                        <TemplateColumn Style="text-align:right" Title="操作">
-                            <CellTemplate>
-                                @if (context.Item.Status == AuthRequestStatus.Pending)
-                                {
-                                    
-                                        <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, true))" Icon="@Icons.Material.Outlined.Check">批准</MudIconButton>
-                                    <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, false))" Icon="@Icons.Material.Outlined.Close">拒绝</MudIconButton>
-                                    <MudIconButton Size="Size.Small" OnClick="@(() => CancelRequest(context.Item))" Icon="@Icons.Material.Outlined.Undo">撤回</MudIconButton>
-                                   
-                                }
-                                else
-                                {
-                                    <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
-                                }
-                            </CellTemplate>
-                        </TemplateColumn>
-                    </Columns>
-                    <NoRecordsContent><MudText>没有授权记录</MudText></NoRecordsContent>
-                    <LoadingContent><MudText>加载中...</MudText></LoadingContent>
-                    <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
-                </MudDataGrid>
+                @if (_activeTab == "unlock")
+                {
+                    <MudPaper Class="pa-4 mb-4" Elevation="1">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">系统管理员账号解锁</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4">此功能用于解锁因多次登录失败而被锁定的系统管理员账号。请确保您有相应权限。</MudText>
+                        
+                        <MudTable Items="@_lockedSystemAdmins" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>用户名</MudTh>
+                                <MudTh>邮箱</MudTh>
+                                <MudTh>锁定状态</MudTh>
+                                <MudTh>操作</MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="user">
+                                <MudTd>@user.UserName</MudTd>
+                                <MudTd>@user.Email</MudTd>
+                                <MudTd>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">已锁定</MudChip>
+                                </MudTd>
+                                <MudTd>
+                                    <MudIconButton Size="Size.Small" OnClick="@(() => UnlockUser(user.UserName))" Icon="@Icons.Material.Filled.LockOpen" Color="Color.Primary" Title="解锁账号" />
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText>当前没有锁定的系统管理员账号</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudDataGrid @ref="_dataGrid"
+                                 T="AuthRequestDto"
+                                 ServerData="LoadData"
+                                 Dense="true"
+                                 Hover="true"
+                                 Elevation="0"
+                                 SortMode="SortMode.Single"
+                                 RowStyle="cursor: default;">
+                        <ToolBarContent>
+                            <MudTextField T="string" @bind-Value="_searchString" Margin="Margin.Dense" Placeholder="搜索目标、请求人"
+                                          Variant="Variant.Outlined" AdornmentIcon="@Icons.Material.Outlined.Search"
+                                          Adornment="Adornment.End" Clearable="true" DebounceInterval="500" Immediate="true" Class="me-3" />
+                        </ToolBarContent>
+                        <Columns>
+                            <TemplateColumn Title="操作类型">
+                                <CellTemplate>
+                                    <MudChip Size="Size.Small" Color="@GetOperationColor(context.Item.OperationType)">@context.Item.OperationTypeName</MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="操作目标">
+                                <CellTemplate><MudText>@context.Item.TargetDescription</MudText></CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="请求人">
+                                <CellTemplate>@context.Item.RequestedBy</CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="请求时间">
+                                <CellTemplate>@context.Item.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="状态">
+                                <CellTemplate>
+                                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">@context.Item.StatusName</MudChip>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="审批人">
+                                <CellTemplate>@(context.Item.ApprovedBy ?? "-")</CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="审批时间">
+                                <CellTemplate>@(context.Item.ApprovedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Title="备注">
+                                <CellTemplate>@(context.Item.Remark ?? "-")</CellTemplate>
+                            </TemplateColumn>
+                            <TemplateColumn Style="text-align:right" Title="操作">
+                                <CellTemplate>
+                                    @if (context.Item.Status == AuthRequestStatus.Pending)
+                                    {
+                                        
+                                            <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, true))" Icon="@Icons.Material.Outlined.Check">批准</MudIconButton>
+                                        <MudIconButton Size="Size.Small" OnClick="@(() => OpenApproveDialog(context.Item, false))" Icon="@Icons.Material.Outlined.Close">拒绝</MudIconButton>
+                                        <MudIconButton Size="Size.Small" OnClick="@(() => CancelRequest(context.Item))" Icon="@Icons.Material.Outlined.Undo">撤回</MudIconButton>
+                                       
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
+                                    }
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                        <NoRecordsContent><MudText>没有授权记录</MudText></NoRecordsContent>
+                        <LoadingContent><MudText>加载中...</MudText></LoadingContent>
+                        <PagerContent><MudDataGridPager RowsPerPageString="每页展示条数" /></PagerContent>
+                    </MudDataGrid>
+                }
             </div>
         </MudItem>
     </MudGrid>
@@ -122,6 +165,8 @@
     private string _activeTab = "pending";
     private string? _searchString;
     private int _pendingCount = 0;
+    private List<User> _lockedSystemAdmins = new();
+    private string _currentUser = string.Empty;
 
     private string GetTabTitle() => _activeTab switch
     {
@@ -129,13 +174,27 @@
         "approved" => "已批准记录",
         "rejected" => "已拒绝记录",
         "all" => "全部授权记录",
+        "unlock" => "账号解锁",
         _ => "授权管理"
     };
 
-    private void SwitchTab(string tab)
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _currentUser = await DomInteropService.GetCurrentUserName() ?? "admin";
+    }
+
+    private async Task SwitchTab(string tab)
     {
         _activeTab = tab;
-        _dataGrid.ReloadServerData();
+        if (tab == "unlock")
+        {
+            await LoadLockedSystemAdmins();
+        }
+        else
+        {
+            _dataGrid.ReloadServerData();
+        }
     }
 
     private async Task RefreshData()
@@ -241,6 +300,96 @@
         else
         {
             Snackbar.Add("撤回失败，只有请求人可以撤回", Severity.Error);
+        }
+    }
+
+    // ===== 账号解锁相关 =====
+
+    private async Task LoadLockedSystemAdmins()
+    {
+        try
+        {
+            var users = await UserManageApiClient.GetAllUsersAsync();
+            Console.WriteLine($"[AuthManage] GetAllUsersAsync 返回 {users.Count()} 个用户");
+            
+            var lockedCount = 0;
+            var lockedAdmins = new List<User>();
+            foreach (var user in users)
+            {
+                if (user == null) continue;
+                
+                var isLockedOut = user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+                if (!isLockedOut) continue;
+                
+                lockedCount++;
+                Console.WriteLine($"[AuthManage] 用户={user.UserName}, 锁定, LockoutEnd={user.LockoutEnd}");
+                
+                var roles = await UserManageApiClient.GetUserRolesAsync(user.Id);
+                Console.WriteLine($"[AuthManage] 用户={user.UserName}, 角色=[{string.Join(",", roles)}]");
+                
+                var roleNames = await RoleManageApiClient.GetAllAsync();
+                var isSystemAdmin = roles.Any(r =>
+                {
+                    var role = roleNames.FirstOrDefault(x => x.Id.ToString() == r || x.Name == r);
+                    return role?.Name == "系统管理员" || r == "系统管理员";
+                });
+                
+                if (isSystemAdmin)
+                {
+                    lockedAdmins.Add(user);
+                    Snackbar.Add($"找到锁定的系统管理员: {user.UserName}", Severity.Info);
+                }
+                else
+                {
+                    Snackbar.Add($"锁定用户 {user.UserName} 角色=[{string.Join(",", roles)}], 非SystemAdmin", Severity.Warning);
+                }
+            }
+            
+            Snackbar.Add($"共{users.Count()}个用户, {lockedCount}个锁定, {lockedAdmins.Count}个SystemAdmin锁定", Severity.Info);
+            _lockedSystemAdmins = lockedAdmins;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async void OpenUnlockDialog()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UnlockSystemAdminDialog>("解锁系统管理员", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var userName = result.Data as string;
+            if (!string.IsNullOrEmpty(userName))
+            {
+                await UnlockUser(userName);
+            }
+        }
+    }
+
+    private async Task UnlockUser(string userName)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认解锁",
+            $"确定要解锁系统管理员账号 '{userName}' 吗？",
+            yesText: "解锁", cancelText: "取消");
+
+        if (confirm != true) return;
+
+        var success = await AuthApiClient.UnlockSystemAdminAsync(userName, _currentUser);
+        if (success)
+        {
+            Snackbar.Add($"已成功解锁系统管理员账号 '{userName}'", Severity.Success);
+            LoadLockedSystemAdmins();
+        }
+        else
+        {
+            Snackbar.Add($"解锁失败", Severity.Error);
         }
     }
 }

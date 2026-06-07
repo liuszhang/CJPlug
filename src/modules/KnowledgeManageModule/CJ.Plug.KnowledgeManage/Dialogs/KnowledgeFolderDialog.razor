@@ -1,0 +1,124 @@
+@using CJ.Plug.Models.Knowledge
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField Label="文件夹名称" @bind-Value="_model.Name" Required="true"
+                                  RequiredError="文件夹名称为必填项" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="父文件夹" @bind-Value="_model.ParentId"
+                               Placeholder="无（根级文件夹）">
+                        <MudSelectItem T="int?" Value="@((int?)null)">无（根级文件夹）</MudSelectItem>
+                        @foreach (var folder in Folders)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)folder.Id)">
+                                @GetFolderDisplayName(folder)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="描述" @bind-Value="_model.Description" Lines="3" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="图标" @bind-Value="_model.Icon"
+                                  Placeholder="Material Icons 名称（可选）" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudNumericField T="int" Label="排序" @bind-Value="_model.Order" Min="0" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>
+    /// 是否编辑模式
+    /// </summary>
+    [Parameter] public bool IsEdit { get; set; }
+
+    /// <summary>
+    /// 编辑时的原始数据
+    /// </summary>
+    [Parameter] public KnowledgeFolder? EditItem { get; set; }
+
+    /// <summary>
+    /// 所有文件夹列表（用于父文件夹选择）
+    /// </summary>
+    [Parameter] public List<KnowledgeFolder> Folders { get; set; } = new();
+
+    /// <summary>
+    /// 父文件夹ID（新建时预选）
+    /// </summary>
+    [Parameter] public int? ParentId { get; set; }
+
+    private KnowledgeFolder _model = new();
+    private MudForm? _form;
+
+    protected override void OnParametersSet()
+    {
+        if (IsEdit && EditItem is not null)
+        {
+            _model = new KnowledgeFolder
+            {
+                Id = EditItem.Id,
+                Name = EditItem.Name,
+                ParentId = EditItem.ParentId,
+                Description = EditItem.Description,
+                Icon = EditItem.Icon,
+                Order = EditItem.Order
+            };
+        }
+        else
+        {
+            _model = new KnowledgeFolder
+            {
+                ParentId = ParentId
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        if (_form is not null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid) return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    /// <summary>
+    /// 获取文件夹显示名称（支持层级缩进）
+    /// </summary>
+    private string GetFolderDisplayName(KnowledgeFolder folder)
+    {
+        var prefix = GetFolderPrefix(folder, 0);
+        return $"{prefix}{folder.Name}";
+    }
+
+    private string GetFolderPrefix(KnowledgeFolder folder, int depth)
+    {
+        if (folder.ParentId is null || depth > 10) return "";
+        var parent = Folders.FirstOrDefault(f => f.Id == folder.ParentId);
+        if (parent is null) return "";
+        return GetFolderPrefix(parent, depth + 1) + "  ";
+    }
+}

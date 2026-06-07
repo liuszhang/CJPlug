@@ -1,0 +1,57 @@
+@using CJ.Plug.Models.Knowledge
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6" Color="Color.Primary">@Item.Title</MudText>
+
+            @if (!string.IsNullOrWhiteSpace(Item.Tags))
+            {
+                <MudStack Row Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">标签：</MudText>
+                    @foreach (var tag in Item.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@tag</MudChip>
+                    }
+                </MudStack>
+            }
+
+            <MudDivider />
+
+            <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); max-height: 50vh; overflow-y: auto;">
+                <MudText Typo="Typo.body1" Style="white-space: pre-wrap; line-height: 1.7;">@Item.Content</MudText>
+            </MudPaper>
+
+            <MudDivider />
+
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">创建者：@Item.CreatedBy</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">创建时间：@Item.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">更新时间：@Item.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">状态：@(Item.IsEnabled ? "已启用" : "已禁用")</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public KnowledgeItem Item { get; set; } = default!;
+
+    private void Close() => MudDialog.Close();
+}

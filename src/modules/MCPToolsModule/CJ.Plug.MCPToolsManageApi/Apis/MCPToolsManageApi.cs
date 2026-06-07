@@ -16,6 +16,14 @@ namespace CJ.Plug.MCPToolsManageApi.Apis
             api.MapPost("/addTool", async (IMCPToolsManageService service, [FromBody] MCPTool request) => await service.PublishToolAsync(request));
             api.MapPut("/updateTool", async (IMCPToolsManageService service, [FromBody] MCPTool request) => await service.UpdateAsync(request));
             api.MapDelete("/deleteTool/{toolId}", async (IMCPToolsManageService service, int toolId) => await service.DeleteAsync(toolId));
+
+            // 通知 McpServer 刷新工具列表
+            api.MapPost("/notifyRefresh", async (IMcpToolChangeNotifier? notifier) =>
+            {
+                if (notifier != null)
+                    await notifier.NotifyAsync("*", "refresh");
+                return Results.Ok();
+            });
             ////获取流程的任务，只获取一个，用于测试
             //api.MapGet("/getJobByWorkflowId/{workflowId}", async (IJobManageService service, string workflowId) => await service.GetJobByWorkflowId(workflowId));
             ////弃用，使用createNewJob统一处理不同的子类（TPH）

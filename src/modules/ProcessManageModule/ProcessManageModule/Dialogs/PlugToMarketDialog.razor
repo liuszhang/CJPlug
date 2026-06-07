@@ -1,4 +1,4 @@
-﻿@using System.Net.Http.Json
+@using System.Net.Http.Json
 @using System.Text
 @using System.Text.Json
 @using Blazored.LocalStorage
@@ -20,25 +20,17 @@
         @* <div id="workflow-file-upload-button-wrapper" class="d-none">
             <MudFileUpload T="IBrowserFile" FilesChanged="@StreamToBytes" />
         </div> *@
-        <MudFileUpload T="IBrowserFile" FilesChanged="@StreamToBytes" Context="buttonContext">
+        <MudFileUpload T="IBrowserFile" FilesChanged="@StreamToBytes">
             <SelectedTemplate>
-                @if (buttonContext != null)
-                {                    
+                                  
                     <MudImage Src="@Base64ImageUrl" />
 
-                    @* <MudText>@buttonContext.Name</MudText> *@
-                    @* <MudText>@File.Name</MudText> *@
-                }
-                else
-                {
-                    @* <MudText>@element.Value</MudText> *@
-                }
             </SelectedTemplate>
             <CustomContent>
-                <MudIconButton Color="Color.Success"
+                <MudIconButton Color="Color.Success" OnClick="@context.OpenFilePickerAsync"
                 Icon="@Icons.Material.Filled.AttachFile" />
             </CustomContent>
-        </MudFileUpload>
+        </MudFileUpload>        
         <MudTextField @bind-Value="@element.MarketName" Label="发布名称" Variant="Variant.Outlined" Margin="Margin.Dense" />
         <MudTextField @bind-Value="@element.Description" Label="描述" Variant="Variant.Outlined" Margin="Margin.Dense" />
 
@@ -92,7 +84,7 @@
         if (IconFileTmp != null)
         {
             // 读取IBrowserFile的内容到内存流
-            Stream stream = IconFileTmp.OpenReadStream();
+            Stream stream = IconFileTmp.OpenReadStream(maxAllowedSize: 10485760); // 10MB
             if (stream != null)
             {
                 using (var memoryStream = new MemoryStream())

@@ -1,4 +1,5 @@
 ﻿using CJ.Plug.Models.Station;
+using CJ.Plug.StationAndToolApi.Models;
 using Serilog;
 using System.Net.Http.Json;
 
@@ -110,21 +111,74 @@ namespace CJ.Plug.StationAndToolApiClient
                 }
             }
 
-
-            public async Task<Station?> GetStationToUseByTool(string toolName, string? version = null, CancellationToken cancellationToken = default)
+            public async Task<ToolDeploySettingModel?> GetToolDeploySettingAsync(ToolConfigFilter filter)
             {
-                var filter = new ToolConfigFilter()
+                var response = await httpClient.PostAsJsonAsync($"api/stationConfig/GetToolDeploySetting", filter);
+                if (response.IsSuccessStatusCode)
                 {
-                    ToolName = toolName,
-                    ToolVersion = version
-                };
-                var stationIp = await GetStationToUse(cancellationToken);
-                if (string.IsNullOrEmpty(stationIp))
+                    var result = await response.Content.ReadFromJsonAsync<ToolDeploySettingModel>();
+                    return result;
+                }
+                else
                 {
-                    Log.Warning("暂无可用图站，请稍后再试1");
                     return null;
                 }
-                return await GetStationByIpAsync(stationIp, cancellationToken);
+            }
+
+
+            public async Task<Station?> GetStationToUseByTool(string toolName, string? version = null, string? specifiedStationIp = null, CancellationToken cancellationToken = default)
+            {
+                // 如果用户手动指定了图站，优先使用
+                if (!string.IsNullOrEmpty(specifiedStationIp))
+                {
+                    var specifiedStation = await GetStationByIpAsync(specifiedStationIp, cancellationToken);
+                    if (specifiedStation != null)
+                    {
+                        Log.Information("使用用户指定的图站: {StationIp}", specifiedStationIp);
+                        return specifiedStation;
+                    }
+                    else
+                    {
+                        Log.Warning("用户指定的图站 {StationIp} 不存在或不可用，将自动选择", specifiedStationIp);
+                    }
+                }
+
+                // 获取所有在线图站
+                var onlineStationIpsJson = await DispatcherClient.GetStringAsync("api/dispatch/GetAllOnlineStation", cancellationToken);
+                var onlineStationIps = string.IsNullOrEmpty(onlineStationIpsJson)
+                    ? new List<string>()
+                    : System.Text.Json.JsonSerializer.Deserialize<List<string>>(onlineStationIpsJson) ?? new List<string>();
+
+                if (onlineStationIps.Count == 0)
+                {
+                    Log.Warning("暂无可用图站，请稍后再试");
+                    return null;
+                }
+
+                // 优先选择已部署该工具的图站
+                foreach (var ip in onlineStationIps)
+                {
+                    var station = await GetStationByIpAsync(ip, cancellationToken);
+                    if (station?.Id == null) continue;
+
+                    var deploySetting = await GetToolDeploySettingAsync(new ToolConfigFilter
+                    {
+                        ToolName = toolName,
+                        ToolVersion = version,
+                        StationId = station.Id
+                    });
+
+                    if (deploySetting?.IsDeployed == true)
+                    {
+                        Log.Information("选择已部署工具 {ToolName} 的图站: {StationIp}", toolName, ip);
+                        return station;
+                    }
+                }
+
+                // 未找到已部署的图站，降级使用第一个在线图站（将自动触发下载）
+                var fallbackIp = onlineStationIps[0];
+                Log.Information("未找到已部署工具 {ToolName} 的图站，使用默认图站: {StationIp}", toolName, fallbackIp);
+                return await GetStationByIpAsync(fallbackIp, cancellationToken);
             }
         
     }

@@ -205,7 +205,8 @@
     protected override async Task OnInitializedAsync()
     {
         //Console.WriteLine(">>>>>>>>>>>>>>start init");
-        await MudDialog.SetOptionsAsync(diaOption);
+        if (MudDialog != null)
+            await MudDialog.SetOptionsAsync(diaOption);
 
         // 从插头参数加载配置，设置默认值
         waitType = Plug.GetVariableValue(InitVariableNames.WaitType.ToString()) ?? "waitforever";
@@ -242,6 +243,9 @@
 
     protected override Task OnParametersSetAsync()
     {
+        if (PlugDataZone == null || DefinitionId == null)
+            return base.OnParametersSetAsync();
+
         CMDCommand = PlugDataZone.GetVariableValue(DefinitionId, InitVariableNames.CMDCommand.ToString());
         if (string.IsNullOrEmpty(CMDCommand))
         {
@@ -349,7 +353,7 @@
         {
             var model = await _editor.GetModel();
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.CMDCommand.ToString(), editorCode);
+            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.CMDCommand.ToString(), editorCode);
             _isDirty = false;
             StateHasChanged();
         }
@@ -360,15 +364,15 @@
     private async void UpdatePlugSettings()
     {
         // 将所有配置保存到插头参数（PDZ变量）
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WaitType.ToString(), waitType);
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.ExecutionTimeout.ToString(), waitTime);
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessType.ToString(), watchProcessType);
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessName.ToString(), watchProcessName);
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.AutoCloseProcess.ToString(), autoCloseProcess.ToString());
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.CloseProcessWhenError.ToString(), closeProcessWhenError.ToString());
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.ShowConsole.ToString(), showConsole.ToString());
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.RedirectOutput.ToString(), redirectOutput.ToString());
-        this.PlugDataZone.SetVariableValue(DefinitionId, InitVariableNames.RedirectWorkPath.ToString(), redirectWorkPath.ToString());
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.WaitType.ToString(), waitType);
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.ExecutionTimeout.ToString(), waitTime);
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessType.ToString(), watchProcessType);
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.WatchProcessName.ToString(), watchProcessName);
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.AutoCloseProcess.ToString(), autoCloseProcess.ToString());
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.CloseProcessWhenError.ToString(), closeProcessWhenError.ToString());
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.ShowConsole.ToString(), showConsole.ToString());
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.RedirectOutput.ToString(), redirectOutput.ToString());
+        this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.RedirectWorkPath.ToString(), redirectWorkPath.ToString());
     }
 
 }

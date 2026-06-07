@@ -1,0 +1,21 @@
+@using CJ.Plug.Models.Plug
+@using Microsoft.AspNetCore.Components
+@using NXPlug
+
+<div>
+    <h3>设置NX模型参数 - 通用设置</h3>
+    <p>这里是NX设置参数插头的通用设置页面。</p>
+
+    @if (SettingContext != null)
+    {
+        <div class="plug-setting-container">
+            <MudText Typo="Typo.body2">插件类型: @SettingContext.PlugTypeKey</MudText>
+            <MudText Typo="Typo.body2">定义ID: @SettingContext.PlugDefinitionId</MudText>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+}

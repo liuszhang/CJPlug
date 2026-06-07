@@ -39,8 +39,10 @@
     </div>
 
     <div style="width:400px; min-width:200px; border-left:1px solid #ccc; padding-left:12px;">
-        <MudStack>
-            <MudText Typo="Typo.h6">依赖 DLL 管理</MudText>
+        <MudTabs>
+            <MudTabPanel Text="依赖 DLL 管理">
+                <MudStack>
+                    <MudText Typo="Typo.h6">依赖 DLL 管理</MudText>
             <MudText Typo="Typo.caption" Color="Color.Secondary">上传编译所需的第三方 DLL 库（添加/删除自动保存）</MudText>
 
             <MudStack Row>
@@ -99,7 +101,42 @@
                     </MudTreeView>
                 }
             </MudPaper>
-        </MudStack>
+                </MudStack>
+            </MudTabPanel>
+            <MudTabPanel Text="环境变量定义">
+                <MudStack>
+                    <MudText Typo="Typo.h6">环境变量定义</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">为桥接执行模式配置子进程环境变量（添加/编辑/删除自动保存）</MudText>
+                    <MudButton OnClick="AddEnvVar" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add">
+                        <MudText Typo="Typo.body2">添加环境变量</MudText>
+                    </MudButton>
+                    <MudDivider></MudDivider>
+                    @if (envVariables.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default" Class="pa-2">暂无环境变量，请添加</MudText>
+                    }
+                    else
+                    {
+                        <MudPaper Height="300px" Style="overflow:auto; padding: 4px;">
+                            @for (int i = 0; i < envVariables.Count; i++)
+                            {
+                                var idx = i;
+                                <MudStack Row AlignItems="AlignItems.Center" Class="mb-1">
+                                    <MudTextField @bind-Value="envVariables[idx].Key" Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense" Label="变量名" Style="flex:1"
+                                                  OnBlur="AutoSaveEnvVariables" />
+                                    <MudTextField @bind-Value="envVariables[idx].Value" Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense" Label="变量值" Style="flex:2"
+                                                  OnBlur="AutoSaveEnvVariables" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="@(() => RemoveEnvVar(idx))" />
+                                </MudStack>
+                            }
+                        </MudPaper>
+                    }
+                </MudStack>
+            </MudTabPanel>
+        </MudTabs>
     </div>
 </div>
 
@@ -200,6 +237,14 @@
         public long Size { get; set; }
     }
 
+    public class EnvVariableEntry
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+    }
+
+    private List<EnvVariableEntry> envVariables = new();
+
     protected override async Task OnParametersSetAsync()
     {
         var newPlugDefinitionId = SettingContext?.PlugDefinitionId;
@@ -218,6 +263,8 @@
                 }
 
                 await LoadDllReferences();
+
+                await LoadEnvVariables();
 
                 var savedFlag = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.UseDotNetFramework.ToString());
                 UseDotNetFramework = string.Equals(savedFlag, "true", StringComparison.OrdinalIgnoreCase);
@@ -274,6 +321,60 @@
         catch (Exception ex)
         {
             Log.Warning($"加载 DLL 引用失败: {ex.Message}");
+        }
+    }
+
+    private async Task LoadEnvVariables()
+    {
+        try
+        {
+            if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
+            {
+                var json = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.EnvironmentVariables.ToString());
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var vars = JsonSerializer.Deserialize<List<EnvVariableEntry>>(json);
+                    if (vars != null)
+                    {
+                        envVariables = vars;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"加载环境变量失败: {ex.Message}");
+        }
+    }
+
+    private async Task AutoSaveEnvVariables()
+    {
+        try
+        {
+            if (PlugDataZone == null || string.IsNullOrEmpty(PlugDefinitionId))
+                return;
+
+            var json = JsonSerializer.Serialize(envVariables);
+            PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.EnvironmentVariables.ToString(), json);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"自动保存环境变量失败: {ex.Message}");
+        }
+    }
+
+    private void AddEnvVar()
+    {
+        envVariables.Add(new EnvVariableEntry { Key = "", Value = "" });
+        _ = AutoSaveEnvVariables();
+    }
+
+    private void RemoveEnvVar(int index)
+    {
+        if (index >= 0 && index < envVariables.Count)
+        {
+            envVariables.RemoveAt(index);
+            _ = AutoSaveEnvVariables();
         }
     }
 
@@ -520,15 +621,19 @@
                     .Select(d => d.LocalPath!)
                     .ToList();
 
+                var envVars = envVariables
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Key))
+                    .ToDictionary(e => e.Key, e => e.Value);
+
                 if (dllPaths.Count > 0)
                 {
                     if (UseDotNetFramework)
                     {
-                        codeResult = await CodeRunner.RunCSharpCodeViaBridgeAsync(code, dllPaths);
+                        codeResult = await CodeRunner.RunCSharpCodeViaBridgeAsync(code, dllPaths, envVars);
                     }
                     else
                     {
-                        codeResult = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths);
+                        codeResult = await CodeRunner.RunCSharpCodeWithDllsAsync(code, dllPaths, envVars);
                     }
                 }
                 else

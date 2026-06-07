@@ -63,6 +63,12 @@ namespace CJ.Plug.JobManageApiClient
             {
                 Console.WriteLine("start to execute:" + JsonSerializer.Serialize(request));
 
+                // 确保 stationIp 是完整的 URI 格式（兼容纯 IP 地址或缺少 scheme 的情况）
+                if (stationIp.StartsWith("://"))
+                    stationIp = "http" + stationIp;
+                else if (!stationIp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                         !stationIp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    stationIp = "http://" + stationIp;
                 StationApiClient stationApiClient = new StationApiClient(new HttpClient() { BaseAddress = new Uri(stationIp) });
                 try
                 {

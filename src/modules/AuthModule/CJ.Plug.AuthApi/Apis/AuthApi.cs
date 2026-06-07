@@ -61,9 +61,24 @@ namespace CJ.Plug.AuthApi.Apis
                 return Results.Ok(exists);
             });
 
+            // 解锁系统管理员账号
+            api.MapPost("/unlockSystemAdmin", async ([FromBody] UnlockSystemAdminRequest request, IAuthService service) =>
+            {
+                try
+                {
+                    var result = await service.UnlockSystemAdminAsync(request);
+                    return result ? Results.Ok() : Results.BadRequest("解锁失败，用户不存在、非系统管理员或未锁定");
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            });
+
             return app;
         }
-    }
+        }
+    
 
     public class CancelRequest
     {

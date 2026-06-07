@@ -148,7 +148,7 @@
         {
             ConditionExpression.PlugDefinitionId = plug.DefinitionId;
             ConditionExpression.PlugName = plug.Name;
-            VariablesOfSelectedPlug = PlugDataZone.GetVariablesOfPlug(plug.DefinitionId);
+            VariablesOfSelectedPlug = PlugDataZone?.GetVariablesOfPlug(plug.DefinitionId);
         }
         else
         {

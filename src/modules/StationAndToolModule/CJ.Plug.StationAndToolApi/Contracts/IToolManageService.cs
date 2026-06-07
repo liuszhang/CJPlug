@@ -15,6 +15,9 @@ using System.Threading.Tasks;
         Task<Tool?> CreateToolAsync(Tool newTool, CancellationToken cancellationToken = default);
         Task<bool> DeleteToolAsync(int ToolId, CancellationToken cancellationToken = default);
         Task<Tool?> UpdateToolAsync(Tool updatedTool, CancellationToken cancellationToken = default);
+        Task<int> ImportDefaultToolsAsync(CancellationToken cancellationToken = default);
 
+        Task<bool> MoveToolFilesFromTmpAsync(string toolName, bool isSystemTool, string userName);
+        Task<bool> DeleteToolTmpFilesAsync();
     }
 

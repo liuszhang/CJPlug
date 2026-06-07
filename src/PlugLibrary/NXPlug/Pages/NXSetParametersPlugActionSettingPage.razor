@@ -1,0 +1,21 @@
+@using CJ.Plug.Models.Plug
+@using Microsoft.AspNetCore.Components
+@using NXPlug
+
+<div>
+    <h3>设置NX模型参数 - 动作设置</h3>
+    <p>这里是NX设置参数插头的动作设置页面。</p>
+    
+    @if (Plug != null)
+    {
+        <div class="plug-action-setting-container">
+            <p>插件名称: @Plug.Name</p>
+            <p>插件类型: @Plug.PlugTypeKey</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Plug? Plug { get; set; }
+}

@@ -13,11 +13,15 @@ namespace CJ.Plug.ProcessManageApiClient
         }
 
 
-        public async Task<Process[]> GetWorkflowsAsync(int maxItems = 20, CancellationToken cancellationToken = default)
+        public async Task<Process[]> GetWorkflowsAsync(int maxItems = 20, string? userName = null, CancellationToken cancellationToken = default)
         {
             List<Process>? Workflows = null;
 
-            await foreach (var workflow in httpClient.GetFromJsonAsAsyncEnumerable<Process>("/api/process/getWorkflows", cancellationToken))
+            var url = "/api/process/getWorkflows";
+            if (!string.IsNullOrEmpty(userName))
+                url += $"?userName={Uri.EscapeDataString(userName)}";
+
+            await foreach (var workflow in httpClient.GetFromJsonAsAsyncEnumerable<Process>(url, cancellationToken))
             {
                 if (Workflows?.Count >= maxItems)
                 {

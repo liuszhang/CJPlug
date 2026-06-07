@@ -12,6 +12,7 @@ namespace CJ.Plug.AuthApiClient
         Task<AuthRequestDto?> ApproveAsync(ApproveAuthRequestDto request, CancellationToken cancellationToken = default);
         Task<AuthRequestDto?> CancelAsync(int id, string cancelledBy, CancellationToken cancellationToken = default);
         Task<bool> HasPendingRequestAsync(AuthOperationType operationType, string target, CancellationToken cancellationToken = default);
+        Task<bool> UnlockSystemAdminAsync(string userName, string unlockedBy, string? remark = null, CancellationToken cancellationToken = default);
     }
 
     public class AuthApiClient : BaseApiClient, IAuthApiClient
@@ -55,6 +56,12 @@ namespace CJ.Plug.AuthApiClient
         public async Task<bool> HasPendingRequestAsync(AuthOperationType operationType, string target, CancellationToken cancellationToken = default)
         {
             return await httpClient.GetFromJsonAsync<bool>($"/api/auth/hasPending?operationType={operationType}&target={target}", cancellationToken);
+        }
+
+        public async Task<bool> UnlockSystemAdminAsync(string userName, string unlockedBy, string? remark = null, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/auth/unlockSystemAdmin", new { userName, unlockedBy, remark }, cancellationToken);
+            return response.IsSuccessStatusCode;
         }
     }
 }

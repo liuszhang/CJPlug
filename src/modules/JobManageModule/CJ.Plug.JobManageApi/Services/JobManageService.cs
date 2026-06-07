@@ -211,18 +211,79 @@ namespace CJ.Plug.JobManageApi.Services
         {
             IQueryable<BaseJob> query = _dbContext.Set<BaseJob>();
 
-            // 应用过滤条件
+            // 只显示顶层作业：ProcessJob 和无父作业的 ToolJob
+            query = query.Where(j =>
+                j.JobCategory == JobCategoryEnum.ProcessJob.ToString() ||
+                (j.JobCategory == JobCategoryEnum.ToolJob.ToString() && string.IsNullOrEmpty(j.ParentJobCorrelationId)));
+
+            // 模糊搜索：Name、JobCorrelationId、EngineInstanceId
+            if (!string.IsNullOrEmpty(filter.SearchTerm))
+            {
+                var term = filter.SearchTerm;
+                query = query.Where(j =>
+                    (j.Name != null && j.Name.Contains(term)) ||
+                    (j.JobCorrelationId != null && j.JobCorrelationId.Contains(term)) ||
+                    (j.EngineInstanceId != null && j.EngineInstanceId.Contains(term)));
+            }
+
+            // 精确匹配条件
             if (!string.IsNullOrEmpty(filter.JobName))
             {
-                query = query.Where(j => j.Name.Contains(filter.JobName));
+                query = query.Where(j => j.Name != null && j.Name.Contains(filter.JobName));
             }
             if (!string.IsNullOrEmpty(filter.CorrelationId))
             {
                 query = query.Where(j => j.JobCorrelationId == filter.CorrelationId);
             }
-            // 其他条件...
 
-            return await query.ToListAsync(); // 自动包含所有子类
+            // 状态筛选（支持多选，逗号分隔）
+            if (!string.IsNullOrEmpty(filter.JobStatus))
+            {
+                var statuses = filter.JobStatus.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                query = query.Where(j => j.JobStatus != null && statuses.Contains(j.JobStatus));
+            }
+            if (!string.IsNullOrEmpty(filter.JobSubStatus))
+            {
+                var subStatuses = filter.JobSubStatus.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                query = query.Where(j => j.JobSubStatus != null && subStatuses.Contains(j.JobSubStatus));
+            }
+
+            // 是否有错误
+            if (filter.HasError == true)
+            {
+                query = query.Where(j => j.IncidentCount > 0);
+            }
+            else if (filter.HasError == false)
+            {
+                query = query.Where(j => j.IncidentCount == 0);
+            }
+
+            // 是否运行中
+            if (filter.IsRunning == true)
+            {
+                query = query.Where(j => j.FinishedAt == null);
+            }
+            else if (filter.IsRunning == false)
+            {
+                query = query.Where(j => j.FinishedAt != null);
+            }
+
+            // 时间范围筛选和排序需要客户端评估（SQLite 不支持 DateTimeOffset 成员访问）
+            var results = await query.ToListAsync();
+
+            if (filter.DateFrom.HasValue)
+            {
+                results = results.Where(j => j.CreatedAt >= filter.DateFrom.Value).ToList();
+            }
+            if (filter.DateTo.HasValue)
+            {
+                results = results.Where(j => j.CreatedAt <= filter.DateTo.Value).ToList();
+            }
+
+            // 按创建时间降序排列
+            results = results.OrderByDescending(j => j.CreatedAt).ToList();
+
+            return results;
         }
 
 

@@ -1,0 +1,185 @@
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.PlugBaseCore.Models
+@using JavaPlug
+@using JavaPlug.Services
+@using MudBlazor
+@using System.Text
+
+@inject MainApiClient MainApiClient
+
+<MudStack Row AlignItems="AlignItems.Center">
+    <MudTooltip>
+        <ChildContent>
+            <MudIconButton Icon="@Icons.Material.Filled.MedicalInformation" />
+        </ChildContent>
+        <TooltipContent>
+            <MudText Typo="Typo.h6">参数集成格式说明</MudText>
+            <MudText Typo="Typo.body2">Java代码需要包含一个Main类和main方法。</MudText>
+            <MudText Typo="Typo.body2">示例：</MudText>
+            <MudText Typo="Typo.body2">public class Main {</MudText>
+            <MudText Typo="Typo.body2">    public static void main(String[] args) {</MudText>
+            <MudText Typo="Typo.body2">        System.out.println("Hello World");</MudText>
+            <MudText Typo="Typo.body2">    }</MudText>
+            <MudText Typo="Typo.body2">}</MudText>
+        </TooltipContent>
+    </MudTooltip>
+    <MudSwitch @bind-Value="@AutoSaveCode" Color="Color.Primary" Label="自动保存" />
+    <MudBadge Color="@(_isDirty ? Color.Warning : Color.Success)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+        <MudButton OnClick="@OnSaveClick" Variant="Variant.Outlined" Color="Color.Primary">保存</MudButton>
+    </MudBadge>
+    <MudButton OnClick="ResetCode" Variant="Variant.Outlined" Color="Color.Primary">重置</MudButton>
+</MudStack>
+
+<MudStack Row Justify="Justify.SpaceBetween">
+    <MudStack Style="width:100%;">
+        <StandaloneCodeEditor @ref="_editor"
+                              CssClass="studio-monaco-editor-large-border"
+                              Id="my-java-editor"
+                              ConstructionOptions="EditorConstructionOptions"
+                              OnDidInit="EditorOnDidInit"
+                              OnDidChangeModelContent="TextChanged" />
+    </MudStack>
+
+    <MudStack>
+        <MudStack Row Style="width:188px;">
+            <MudButton OnClick="TestJava" Disabled="Loading" Variant="Variant.Outlined" Color="Color.Primary">
+                @if (Loading)
+                {
+                    <MudProgressCircular Indeterminate Size="MudBlazor.Size.Small"></MudProgressCircular>
+                    <MudText>执行中</MudText>
+                }
+                else
+                {
+                    <MudText>执行测试</MudText>
+                }
+            </MudButton>
+            <MudButton OnClick="@(()=>{javaExeResult="";})" Variant="Variant.Outlined" Color="Color.Primary">清空</MudButton>
+        </MudStack>
+        <MudTextField T="string" Label="结果预览" ReadOnly Variant="Variant.Outlined" Text="@javaExeResult" Lines="12" />
+    </MudStack>
+</MudStack>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    public string? DefinitionId { get; set; }
+
+    private StandaloneCodeEditor _editor = null!;
+    private string editorCode = "";
+    private string javaExeResult = "";
+    private string iniValue = "";
+    private string DefaultValue = @"public class Main {
+    public static void main(String[] args) {
+        System.out.println(""Hello World"");
+    }
+}";
+    private bool AutoSaveCode = true;
+    private bool _isDirty = false;
+    private bool Loading = false;
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (SettingContext != null)
+        {
+            DefinitionId = SettingContext.PlugDefinitionId;
+        }
+        var javaCode = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.JavaCode.ToString());
+        if (!string.IsNullOrEmpty(javaCode))
+        {
+            iniValue = javaCode;
+        }
+        return base.OnParametersSetAsync();
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+            {
+                AutomaticLayout = true,
+                GlyphMargin = true,
+                Language = "java",
+                Value = iniValue
+            };
+    }
+
+    private async void TextChanged()
+    {
+        _isDirty = true;
+        if (AutoSaveCode)
+        {
+            await Task.Delay(500);
+            await OnSaveClick();
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditorOnDidInit()
+    {
+        if (string.IsNullOrEmpty(iniValue))
+        {
+            iniValue = DefaultValue;
+        }
+        if (iniValue != null)
+        {
+            await _editor.SetValue(iniValue);
+        }
+    }
+
+    private async Task TestJava()
+    {
+        Loading = true;
+        try
+        {
+            var model = await _editor.GetModel();
+            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+
+            PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
+            stationExecutionRequest.PlugType = PlugKeySetting.CommonExecuteKey;
+            stationExecutionRequest.ExecuteMode = ExecuteMode.Standalone;
+            stationExecutionRequest.ToolName = "Java";
+            var base64Code = Convert.ToBase64String(Encoding.UTF8.GetBytes(editorCode));
+            stationExecutionRequest.RequestCommand = "$d=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('" 
+                 + base64Code + "'));"
+                 + "$dir=$env:TEMP + '\\java_' + (Get-Random);"
+                 + "New-Item -ItemType Directory -Path $dir -Force | Out-Null;"
+                 + "$f=$dir + '\\Main.java';"
+                 + "Set-Content -Path $f -Value $d -Encoding UTF8;"
+                 + "javac $f 2>&1;"
+                 + "if($LASTEXITCODE -eq 0){ Push-Location $dir; java Main 2>&1; Pop-Location; };"
+                 + "Remove-Item $dir -Recurse -Force";
+
+            var result = await MainApiClient.ExecuteOnStation(stationExecutionRequest);
+            CLog.Information($"执行结果：{result.ResultString}");
+            javaExeResult += result.ResultString;
+        }
+        catch (Exception ex)
+        {
+            CLog.Information(ex.Message);
+        }
+        Loading = false;
+        StateHasChanged();
+    }
+
+    private async Task ResetCode()
+    {
+        await _editor.SetValue(DefaultValue);
+        StateHasChanged();
+    }
+
+    private async Task OnSaveClick()
+    {
+        if (_editor != null)
+        {
+            var model = await _editor.GetModel();
+            editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.JavaCode.ToString(), editorCode);
+            _isDirty = false;
+            StateHasChanged();
+        }
+    }
+}

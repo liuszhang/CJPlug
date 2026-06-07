@@ -25,6 +25,12 @@ namespace CJ.Plug.Models.Shared
         /// 状态：-1=授权中，0=禁用，1=启用
         /// </summary>
         public int Status { get; set; } = 1;
+
+        /// <summary>
+        /// 是否锁定（锁定后用户无法登录）
+        /// </summary>
+        public bool IsLocked { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>

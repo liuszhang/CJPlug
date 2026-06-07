@@ -127,5 +127,72 @@ namespace CMDPlug.Services
 
             return Task.FromResult<PlugSettings?>(PlugSettings);
         }
+
+        /// <summary>
+        /// CMD 插头的默认子插头：4 个常用命令，开箱即用。
+        /// </summary>
+        public Task<List<Plug>?> GetDefaultChildPlugs()
+        {
+            var children = new List<Plug>
+            {
+                new()
+                {
+                    Name = "启动记事本",
+                    Type = PlugKeySetting.CommonSettingPageKey,
+                    PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
+                    Category = PlugCategorys.桌面类动作.ToString(),
+                    CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
+                    Creater = PlugCreateTypeEnum.SystemInitPlug.ToString(),
+                    ShowInPlugLibrary = false,
+                    PlugVariables = new List<PlugVariable>
+                    {
+                        new() { Name = InitVariableNames.CMDCommand.ToString(), Value = "notepad", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true }
+                    }
+                },
+                new()
+                {
+                    Name = "查看IP配置",
+                    Type = PlugKeySetting.CommonSettingPageKey,
+                    PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
+                    Category = PlugCategorys.桌面类动作.ToString(),
+                    CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
+                    Creater = PlugCreateTypeEnum.SystemInitPlug.ToString(),
+                    ShowInPlugLibrary = false,
+                    PlugVariables = new List<PlugVariable>
+                    {
+                        new() { Name = InitVariableNames.CMDCommand.ToString(), Value = "ipconfig /all", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true }
+                    }
+                },
+                new()
+                {
+                    Name = "列出目录文件",
+                    Type = PlugKeySetting.CommonSettingPageKey,
+                    PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
+                    Category = PlugCategorys.桌面类动作.ToString(),
+                    CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
+                    Creater = PlugCreateTypeEnum.SystemInitPlug.ToString(),
+                    ShowInPlugLibrary = false,
+                    PlugVariables = new List<PlugVariable>
+                    {
+                        new() { Name = InitVariableNames.CMDCommand.ToString(), Value = "dir", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true }
+                    }
+                },
+                new()
+                {
+                    Name = "系统信息",
+                    Type = PlugKeySetting.CommonSettingPageKey,
+                    PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
+                    Category = PlugCategorys.桌面类动作.ToString(),
+                    CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
+                    Creater = PlugCreateTypeEnum.SystemInitPlug.ToString(),
+                    ShowInPlugLibrary = false,
+                    PlugVariables = new List<PlugVariable>
+                    {
+                        new() { Name = InitVariableNames.CMDCommand.ToString(), Value = "systeminfo", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true }
+                    }
+                }
+            };
+            return Task.FromResult<List<Plug>?>(children);
+        }
     }
 }

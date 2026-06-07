@@ -12,6 +12,8 @@ namespace CJ.Plug.Models.Relation
 
         UserToMarketPlug,
         PlugToPlugAction,
-        ToolToStation
+        ToolToStation,
+        RuleToOntology,
+        RuleToBehavior
     }
 }

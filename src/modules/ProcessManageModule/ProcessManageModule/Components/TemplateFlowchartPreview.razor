@@ -1,0 +1,117 @@
+@using System.Text.Json
+@using CJ.Plug.Models.LogModels
+@using CJ.Plug.ProcessManage.Models
+
+<div style="background:var(--mud-palette-background-grey, #f5f5f5);border-radius:8px;padding:8px 6px;overflow:hidden;">
+    @{
+        var acts = ParseActivities(TemplateJson);
+        if (acts.Count > 0)
+        {
+            <div style="display:flex;justify-content:center;align-items:center;min-height:48px;gap:0;">
+                @for (int idx = 0; idx < acts.Count; idx++)
+                {
+                    var (actName, actType) = acts[idx];
+                    var count = acts.Count;
+                    var isFirst = idx == 0;
+                    var isLast = idx == count - 1;
+                    var isSingle = count == 1;
+                    var bg = isSingle ? "#e8eaf6" : isFirst ? "#e8f5e9" : isLast ? "#fff3e0" : "#e8eaf6";
+                    var brd = isSingle ? "#5c6bc0" : isFirst ? "#43a047" : isLast ? "#ef6c00" : "#5c6bc0";
+
+                    @* 前置箭头 *@
+                    if (!isFirst)
+                    {
+                        <div style="display:flex;align-items:center;flex-shrink:0;width:20px;">
+                            <div style="height:1.5px;background:#90a4ae;flex:1;"></div>
+                            <div style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:6px solid #90a4ae;margin-left:-1px;"></div>
+                        </div>
+                    }
+
+                    @* 节点 *@
+                    <div style="background:@bg; border:2px solid @brd; border-radius:8px; padding:5px 10px; text-align:center; min-width:60px; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div style="font-size:11px;font-weight:600;color:#37474f;white-space:nowrap;line-height:1.2;">@actName</div>
+                        <div style="font-size:9px;color:#78909c;white-space:nowrap;line-height:1.2;">@Abbreviate(actType)</div>
+                    </div>
+
+                    @* 后置箭头 *@
+                    if (!isLast)
+                    {
+                        <div style="display:flex;align-items:center;flex-shrink:0;width:20px;">
+                            <div style="height:1.5px;background:#90a4ae;flex:1;"></div>
+                            <div style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:6px solid #90a4ae;margin-left:-1px;"></div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <div style="text-align:center;color:#90a4ae;font-size:12px;padding:12px;">暂无活动</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string TemplateJson { get; set; } = "";
+
+    private static List<(string Name, string Type)> ParseActivities(string json)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            CLog.Warning("TemplateFlowchartPreview: TemplateJson 为空");
+            return [];
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("activities", out var actsEl) || actsEl.ValueKind != JsonValueKind.Array)
+            {
+                CLog.Warning("TemplateFlowchartPreview: JSON 中未找到 activities 数组");
+                return [];
+            }
+
+            var result = new List<(string Name, string Type)>();
+            foreach (var a in actsEl.EnumerateArray())
+            {
+                var name = a.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String
+                    ? n.GetString() ?? ""
+                    : "";
+                var type = a.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String
+                    ? t.GetString() ?? ""
+                    : "";
+                if (!string.IsNullOrEmpty(name))
+                    result.Add((name, type));
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"TemplateFlowchartPreview JSON 解析失败: {ex.Message}");
+            return [];
+        }
+    }
+
+    private static string Abbreviate(string key) => key switch
+    {
+        "TextReaderPlug" => "TextReader",
+        "TextWriterPlug" => "TextWriter",
+        "PythonPlug" => "Python",
+        "AiAgentPlug" => "AI Agent",
+        "RESTPlug" => "REST",
+        "WordPlug" => "Word",
+        "WordToPdf" => "转PDF",
+        "ExcelPlug" => "Excel",
+        "CMDPlug" => "CMD",
+        "NXPlug" => "NX",
+        "NXGetParameters" => "NX读取",
+        "NXSetParameters" => "NX写入",
+        "ForPlug" => "For",
+        "IfPlug" => "If",
+        "WhilePlug" => "While",
+        "SendHttpRequestPlug" => "HTTP",
+        "FileDownloadPlug" => "下载",
+        "CommonToolExecute" => "通用工具",
+        _ => key.Length > 10 ? key[..10] : key,
+    };
+}

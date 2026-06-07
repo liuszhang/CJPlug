@@ -115,7 +115,7 @@
     {
         if (firstRender)
         {
-            HubConnectionManagerService._hubConnection.On<string, string>("StatusInfo", (ip, status) =>
+            HubConnectionManagerService._hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>
               {
                   //Console.WriteLine($"[客户端2收到消息]NewLogs2：{logModel.Description}");
                   // 将新日志添加到本地列表并触发UI更新

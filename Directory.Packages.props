@@ -6,16 +6,17 @@
   <ItemGroup>
     <PackageVersion Include="Anthropic.SDK" Version="5.4.2" />
     <PackageVersion Include="Aspose.Cells" Version="26.5.1" />
+    <PackageVersion Include="Aspose.Slides.NET" Version="26.5.0" />
     <PackageVersion Include="Aspose.Words" Version="26.5.0" />
     <PackageVersion Include="BlazorMonaco" Version="3.4.0" />
     <PackageVersion Include="Crane.MethodHook" Version="1.1.1" />
     <PackageVersion Include="Elsa.Agents.Api" Version="3.3.5" />
-    <PackageVersion Include="Elsa.Agents.Core" Version="3.6.1" />
+    <PackageVersion Include="Elsa.Agents.Core" Version="3.7.0" />
     <PackageVersion Include="Elsa.JavaScript" Version="3.5.3" />
     <PackageVersion Include="Elsa.Liquid" Version="3.5.3" />
     <PackageVersion Include="Elsa.Persistence.EFCore" Version="3.7.0" />
     <PackageVersion Include="Elsa.Persistence.EFCore.Sqlite" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Agents" Version="3.6.1" />
+    <PackageVersion Include="Elsa.Studio.Agents" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.DomInterop" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.Localization.BlazorServer" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.Localization.BlazorWasm" Version="3.6.1" />
@@ -58,12 +59,12 @@
     <PackageVersion Include="OllamaSharp.ModelContextProtocol" Version="5.4.19" />
     <PackageVersion Include="PdfPig" Version="0.1.14" />
     <PackageVersion Include="PDFsharp" Version="6.2.4" />
-    <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.BrowserConsole" Version="8.0.0" />
     <PackageVersion Include="SSH.NET" Version="2025.1.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="8.1.0" />
     <PackageVersion Include="Proto.Persistence.Sqlite" Version="1.7.0" />
-    <PackageVersion Include="MudBlazor" Version="9.4.0" />
+    <PackageVersion Include="MudBlazor" Version="9.5.0" />
     <PackageVersion Include="Prism.Core" Version="9.0.537" />
     <PackageVersion Include="HelixToolkit" Version="2.25.0" />
     <PackageVersion Include="HelixToolkit.Core.Wpf" Version="2.25.0" />
@@ -79,7 +80,7 @@
     <PackageVersion Include="Blazored.LocalStorage" Version="4.5.0" />
     <PackageVersion Include="CodeBeam.MudBlazor.Extensions" Version="9.1.0" />
     <PackageVersion Include="FluentValidation" Version="11.10.0" />
-    <PackageVersion Include="Radzen.Blazor" Version="10.4.3" />
+    <PackageVersion Include="Radzen.Blazor" Version="10.4.7" />
     <PackageVersion Include="ShortGuid" Version="2.0.1" />
     <PackageVersion Include="System.Linq.Async" Version="7.0.1" />
     <PackageVersion Include="ThrottleDebounce" Version="2.0.0" />
@@ -88,6 +89,12 @@
     <PackageVersion Include="Serilog" Version="4.3.1" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageVersion Include="MaterialDesignThemes" Version="5.2.0" />
+    <PackageVersion Include="MaterialDesignColors" Version="5.2.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0-preview.5.25277.114" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3065.39" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="9.0.0" />
     <PackageVersion Include="WorkflowCore" Version="3.18.0" />
     <PackageVersion Include="WorkflowCore.DSL" Version="3.18.0" />
     <PackageVersion Include="WorkflowCore.Persistence.EntityFramework" Version="3.18.0" />
@@ -149,10 +156,10 @@
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="9.0.1" />
     <PackageVersion Include="System.Drawing.Common" Version="10.0.8" />
     <PackageVersion Include="Microsoft.JSInterop" Version="8.0.10" />
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.3.5" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.0" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.1.0" />
-    <PackageVersion Include="Aspire.Npgsql" Version="13.3.5" />
-    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.3.5" />
+    <PackageVersion Include="Aspire.Npgsql" Version="13.4.0" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />

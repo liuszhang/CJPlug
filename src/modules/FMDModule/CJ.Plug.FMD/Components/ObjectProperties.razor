@@ -1,12 +1,14 @@
 ﻿@using CJ.Plug.Models.PlugProcess
 @using Microsoft.JSInterop
 @using System.Text.Json
+@using CJ.Plug.SharedPages.Contracts
 
 @inject HttpClient Http
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject MainApiClient MainApiClient
 @inject ISnackbar Snackbar
+@inject IDomInteropService DomInteropService
 
 @inject IJSRuntime JSRuntime
 
@@ -139,7 +141,8 @@
 
     private async Task<TableData<Process>> LoadData(TableState state, CancellationToken cancellationToken)
     {
-        var workflows = await MainApiClient.GetWorkflowsAsync();
+        var userName = await DomInteropService.GetCurrentUserName();
+        var workflows = await MainApiClient.GetWorkflowsAsync(userName: userName);
         workflows = workflows.Where(element =>
         {
             //Console.WriteLine(">>>>>>>>>>>searchString:" + searchString);

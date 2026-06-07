@@ -148,10 +148,11 @@
         HubConnectionManagerService._hubConnection.On<string, string>(eventName,
         (receiver, message) =>
            {
-               if (string.IsNullOrEmpty(Receiver))
+               // 当 Receiver 为空时显示所有日志；否则只显示匹配的日志
+               // 将 null 和空字符串视为等价，避免因 null != "" 导致日志丢失
+               if (string.IsNullOrEmpty(Receiver) || string.IsNullOrEmpty(receiver) || receiver == Receiver)
                {
                    var logModel = JsonSerializer.Deserialize<LogModel>(message);
-                   // 将新日志添加到本地列表并触发UI更新
                    InvokeAsync(async () =>
                    {
                        _items.Insert(0, logModel);
@@ -159,17 +160,6 @@
                        StateHasChanged();
                    });
                }
-               else if (receiver==Receiver)
-               {
-                   var logModel = JsonSerializer.Deserialize<LogModel>(message);
-                   // 将新日志添加到本地列表并触发UI更新
-                   InvokeAsync(async () =>
-                   {
-                       _items.Insert(0, logModel);
-                       GetLogToShow(logModel);
-                       StateHasChanged();
-                   });
-               }
-           });        
+           });
     }
 }

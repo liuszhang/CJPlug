@@ -1,6 +1,10 @@
+using CJ.Plug.PlugBaseCore.Contracts;
+using CJ.Plug.StationAndToolApiClient;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -77,40 +81,73 @@ namespace CSharpPlug.Services
             }
         }
 
-        public static async Task<string> RunCSharpCodeWithDllsAsync(string code, List<string> dllPaths)
+        public static async Task<string> RunCSharpCodeWithDllsAsync(string code, List<string> dllPaths, Dictionary<string, string>? envVars = null)
         {
-            var references = new List<MetadataReference>(GetFrameworkReferences());
-
-            foreach (var dllPath in dllPaths)
+            // 为直接执行模式设置进程级环境变量
+            var previousValues = new Dictionary<string, string?>();
+            if (envVars != null)
             {
-                if (!File.Exists(dllPath)) continue;
-                try
+                foreach (var kv in envVars)
                 {
-                    AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
-                    references.Add(MetadataReference.CreateFromFile(dllPath));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"加载 DLL 失败: {dllPath}, 错误: {ex.Message}");
+                    previousValues[kv.Key] = Environment.GetEnvironmentVariable(kv.Key);
+                    Environment.SetEnvironmentVariable(kv.Key, kv.Value);
                 }
             }
-
-            var options = ScriptOptions.Default
-                .WithReferences(references)
-                .WithImports("System", "System.Collections.Generic", "System.Linq", "System.IO", "System.Text");
-
-            code = WrapCodeIfHasMain(code);
 
             try
             {
-                var result = await CSharpScript.EvaluateAsync(code, options);
-                return result?.ToString() ?? "执行成功，但无返回值";
+                var references = new List<MetadataReference>(GetFrameworkReferences());
+
+                foreach (var dllPath in dllPaths)
+                {
+                    if (!File.Exists(dllPath)) continue;
+                    try
+                    {
+                        AssemblyLoadContext.Default.LoadFromAssemblyPath(dllPath);
+                        references.Add(MetadataReference.CreateFromFile(dllPath));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"加载 DLL 失败: {dllPath}, 错误: {ex.Message}");
+                    }
+                }
+
+                var options = ScriptOptions.Default
+                    .WithReferences(references)
+                    .WithImports("System", "System.Collections.Generic", "System.Linq", "System.IO", "System.Text");
+
+                code = WrapCodeIfHasMain(code);
+
+                try
+                {
+                    var result = await CSharpScript.EvaluateAsync(code, options);
+                    return result?.ToString() ?? "执行成功，但无返回值";
+                }
+                catch (Exception ex)
+                {
+                    return $"执行错误: {ex.Message}";
+                }
+                finally
+                {
+                    // 恢复进程环境变量
+                    if (envVars != null)
+                    {
+                        foreach (var kv in envVars)
+                        {
+                            if (previousValues.TryGetValue(kv.Key, out var prevVal))
+                                Environment.SetEnvironmentVariable(kv.Key, prevVal);
+                            else
+                                Environment.SetEnvironmentVariable(kv.Key, null);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                return $"执行错误: {ex.Message}";
+                return $"执行错误（环境变量设置失败）: {ex.Message}";
             }
         }
+        
 
         /// <summary>
         /// 如果代码包含 static void Main，提取 Main 方法体作为脚本执行
@@ -218,8 +255,51 @@ namespace CSharpPlug.Services
 
         /// <summary>
         /// 通过 .NET Framework 4.8 桥接进程执行代码（适用于依赖 Framework-only DLL 的场景）
+        /// 优先使用工具调度系统，失败时回退到本地查找
         /// </summary>
-        public static async Task<string> RunCSharpCodeViaBridgeAsync(string code, List<string> dllPaths)
+        public static async Task<string> RunCSharpCodeViaBridgeAsync(
+            string code, 
+            List<string> dllPaths, 
+            Dictionary<string, string>? envVars = null,
+            IServiceProvider? serviceProvider = null,
+            string pdzId = "",
+            string plugDefinitionId = "",
+            string correlationId = "")
+        {
+            // 优先尝试通过工具调度系统执行
+            if (serviceProvider != null)
+            {
+                try
+                {
+                    var bridgeToolService = serviceProvider.GetService<BridgeToolService>();
+                    if (bridgeToolService != null)
+                    {
+                        Log.Information("尝试通过工具调度系统执行桥接程序...");
+                        var result = await bridgeToolService.ExecuteViaToolSystemAsync(
+                            code, dllPaths, envVars, pdzId, plugDefinitionId, correlationId);
+                        
+                        // 如果不是以 BRIDGE_TOOL_FAILED 开头，说明工具调度成功
+                        if (!result.StartsWith("BRIDGE_TOOL_FAILED:"))
+                        {
+                            return result;
+                        }
+                        Log.Warning($"工具调度失败，回退到本地桥接程序: {result}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"工具调度执行异常，回退到本地桥接程序: {ex.Message}");
+                }
+            }
+
+            // 回退到本地桥接程序执行（原始逻辑）
+            return await RunCSharpCodeViaLocalBridgeAsync(code, dllPaths, envVars);
+        }
+
+        /// <summary>
+        /// 本地桥接程序执行（兜底方案）
+        /// </summary>
+        private static async Task<string> RunCSharpCodeViaLocalBridgeAsync(string code, List<string> dllPaths, Dictionary<string, string>? envVars = null)
         {
             var bridgeExe = FindBridgeExe();
             if (bridgeExe == null)
@@ -242,6 +322,20 @@ namespace CSharpPlug.Services
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
+
+                // 设置用户配置的环境变量，并收集目录路径供桥接进程 DLL 搜索
+                var dllDirs = new List<string>();
+                if (envVars != null)
+                {
+                    foreach (var kv in envVars)
+                    {
+                        psi.Environment[kv.Key] = kv.Value;
+                        if (Directory.Exists(kv.Value) && !dllDirs.Contains(kv.Value, StringComparer.OrdinalIgnoreCase))
+                            dllDirs.Add(kv.Value);
+                    }
+                }
+                if (dllDirs.Count > 0)
+                    psi.Environment["BRIDGE_DLL_DIRS"] = string.Join(";", dllDirs);
 
                 using var process = Process.Start(psi);
                 if (process == null)

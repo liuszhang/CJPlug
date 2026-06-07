@@ -37,9 +37,11 @@
         }
     }
 
-    private void Logout()
+    private async Task Logout()
     {
+        // 清除本地存储的登录状态
+        await DomInteropService.ClearCurrentUser();
         AuthenticationState = null;
-        NavigationManager.NavigateTo("/login");
+        NavigationManager.NavigateTo("/login", forceLoad: true);
     }
 }

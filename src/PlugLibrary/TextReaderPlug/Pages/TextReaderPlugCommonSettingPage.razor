@@ -209,7 +209,7 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
             {                
                 (FileRealPath,var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
                 //Plug.SetVariableValue(InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + fileId);
-                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + fileId);
+                PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + fileId);
 
                 //Log.Information("Plug.RealValuePath is:" + Plug.RealValuePath);
                 //browserFile = null;
@@ -359,9 +359,10 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
     {     
         //await CheckKeywords();
         TextMappings.Add(textMapping);
-        PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
         //如果有新增的参数，则添加到变量列表
-        PlugDataZone.SetVariableValue(PlugDefinitionId, textMapping.BindingVariableName, PlugDataZone.GetVariableValue(PlugDefinitionId, textMapping.BindingVariableName));
+        if (PlugDataZone != null)
+            PlugDataZone.SetVariableValue(PlugDefinitionId, textMapping.BindingVariableName, PlugDataZone.GetVariableValue(PlugDefinitionId, textMapping.BindingVariableName));
         StateHasChanged();
     }
 

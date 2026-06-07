@@ -20,14 +20,22 @@ public partial class PlugManageService : IPlugManageService
         //var toolItem = JsonSerializer.Deserialize<ToolItem>(request);
         if(string.IsNullOrEmpty(request.ParentPlugDefinitionId))
         {
+            var creator = string.IsNullOrEmpty(request.Creater) ? "Default" : request.Creater;
             request.WorkPath = Path.Combine(
-            request.Creater,
-            FileFolderType.Design.ToString(),
-            request.DefinitionId);
+                creator,
+                FileFolderType.Design.ToString(),
+                request.DefinitionId);
         }
         else
         {
-            var parentWorkPath = _dbContext.Set<Plug>().Where(p => p.DefinitionId== request.ParentPlugDefinitionId).FirstOrDefault()?.WorkPath;
+            var parentWorkPath = _dbContext.Set<Plug>()
+                .Where(p => p.DefinitionId == request.ParentPlugDefinitionId)
+                .Select(p => p.WorkPath)
+                .FirstOrDefault();
+            if (string.IsNullOrEmpty(parentWorkPath))
+            {
+                throw new InvalidOperationException($"父插头 '{request.ParentPlugDefinitionId}' 不存在或 WorkPath 为空，无法创建子插头。");
+            }
             request.WorkPath = Path.Combine(
                 parentWorkPath,
                 request.DefinitionId);

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\LlmConfigModule\CJ.Plug.LlmConfigApiClient\CJ.Plug.LlmConfigApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.AIChat\CJ.Plug.AIChat.csproj" />
     <ProjectReference Include="..\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
   </ItemGroup>

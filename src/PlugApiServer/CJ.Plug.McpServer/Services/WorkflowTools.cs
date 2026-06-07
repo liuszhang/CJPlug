@@ -90,17 +90,15 @@ public sealed class WorkflowTools
         {
             var inputVariables = ParseParameters(parameters);
 
-            // 构造 PlugExecutionRequest，走 MCP 专用执行端点
-            // 该端点会从 Use PDZ 复制为 Job3，填充参数后执行
-            var request = new PlugExecutionRequest
+            var request = new McpToolExecutionRequest
             {
                 PlugDefinitionId = workflowDefinitionId,
+                ToolType = "Workflow",
                 InputVariables = inputVariables,
-                ExecuteMode = ExecuteMode.Plug,
             };
 
             var response = await _httpClient.PostAsJsonAsync(
-                "/api/plug/executeMcpWorkflow", request);
+                "/api/plug/executeMcpTool", request);
 
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadAsStringAsync();
@@ -238,6 +236,42 @@ public sealed class WorkflowTools
         catch (Exception ex)
         {
             return $"获取工作流 Schema 失败: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// 查询工作流执行状态
+    /// </summary>
+    [McpServerTool, Description("查询工作流执行状态。传入执行后返回的 workflowInstanceId，获取当前执行进度和结果。")]
+    public static async Task<string> GetExecutionStatus(
+        [Description("工作流实例 ID（从 ExecutePublishedWorkflow 返回的结果中获取）")] string workflowInstanceId)
+    {
+        try
+        {
+            var status = await _httpClient.GetFromJsonAsync<ExecutionStatusDto>(
+                $"/api/plug/executionStatus/{workflowInstanceId}");
+
+            if (status == null)
+                return "未找到执行记录";
+
+            var result = new System.Text.StringBuilder();
+            result.AppendLine($"执行状态: {status.Status}");
+            if (!string.IsNullOrEmpty(status.SubStatus))
+                result.AppendLine($"子状态: {status.SubStatus}");
+            if (status.CreatedAt.HasValue)
+                result.AppendLine($"创建时间: {status.CreatedAt:yyyy-MM-dd HH:mm:ss}");
+            if (status.FinishedAt.HasValue)
+                result.AppendLine($"完成时间: {status.FinishedAt:yyyy-MM-dd HH:mm:ss}");
+            if (!string.IsNullOrEmpty(status.ResultMessage))
+                result.AppendLine($"结果消息: {status.ResultMessage}");
+            if (!string.IsNullOrEmpty(status.ResultString))
+                result.AppendLine($"结果内容: {status.ResultString}");
+
+            return result.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"查询执行状态失败: {ex.Message}";
         }
     }
 }

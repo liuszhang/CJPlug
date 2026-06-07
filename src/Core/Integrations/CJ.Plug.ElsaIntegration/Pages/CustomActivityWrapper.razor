@@ -235,6 +235,22 @@
             request.ExecuteResultData.Ids.PlugDefinitionId = Activity.GetId();
             request.ExecuteResultData.Ids.PDZId = PDZId;
             request.ExecuteMode = ExecuteMode.Plug;
+
+            // 尝试从 localStorage 获取用户手动选择的图站 IP
+            try
+            {
+                var selectedStationIp = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "cj-plug-selected-station");
+                if (!string.IsNullOrEmpty(selectedStationIp))
+                {
+                    request.SpecifiedStationIp = selectedStationIp;
+                    Log.Information($"使用用户指定的图站: {selectedStationIp}");
+                }
+            }
+            catch
+            {
+                // localStorage 读取失败时忽略，使用自动分配
+            }
+
             await MainApiClient.ExecutePlug(request);
         }
         catch (Exception ex)
@@ -242,7 +258,7 @@
             CLog.Error(ex.Message);
             return;
         }
-        
+
     }
 
 

@@ -192,7 +192,7 @@ HubConnectionManagerService._hubConnection.On<string>("CompleteActivityContext",
         }
 
         // 2. 通过 IBookmarkResumer 直接恢复书签（避免 RunInstanceAsync 触发工作流重新反序列化）
-        var resumer = sp.GetRequiredService<IBookmarkResumer>();
+        var resumer = sp.GetRequiredService<IWorkflowResumer>();
         var resumeFilter = new BookmarkFilter
         {
             BookmarkId = bookmarkId,
@@ -202,7 +202,7 @@ HubConnectionManagerService._hubConnection.On<string>("CompleteActivityContext",
         var options = new ResumeBookmarkOptions { Input = null, Properties = null };
         Log.Information($"通过 BookmarkResumer 恢复书签: InstanceId={instance.Id}, BookmarkId={bookmarkId}");
         var result = await resumer.ResumeAsync(resumeFilter, options);
-        Log.Information($"书签恢复{(result.Matched ? "成功" : "失败(Matched=false)")}: {bookmarkId}");
+        Log.Information($"书签恢复{(result.ToString() == "True" ? "成功" : "失败(Matched=false)")}: {bookmarkId}；result={result}");
     }
     catch (Exception ex)
     {

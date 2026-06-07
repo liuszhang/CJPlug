@@ -15,14 +15,47 @@
         <!-- 工具栏 -->
         <Border Grid.Row="0" Background="#F5F5F5" Padding="8" 
                 BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="BtnRefresh" Content="刷新" Width="70" Margin="0,0,10,0"
-                        Click="BtnRefresh_Click"/>
-                <Button x:Name="BtnClearDone" Content="清除已完成" Width="90"
-                        Click="BtnClearDone_Click"/>
-                <TextBlock x:Name="TxtStatus" Text="" 
-                           VerticalAlignment="Center" Margin="15,0,0,0" 
-                           Foreground="Gray" FontSize="12"/>
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <Button x:Name="BtnRefresh" Content="刷新" Width="70" Margin="0,0,10,0"
+                            Click="BtnRefresh_Click"/>
+                    <Button x:Name="BtnClearDone" Content="清除已完成" Width="90"
+                            Click="BtnClearDone_Click"/>
+                    <TextBlock x:Name="TxtStatus" Text="" 
+                               VerticalAlignment="Center" Margin="15,0,0,0" 
+                               Foreground="Gray" FontSize="12"/>
+                </StackPanel>
+
+                <!-- 筛选条件栏 -->
+                <Border Background="White" Padding="6" CornerRadius="3"
+                        BorderBrush="#D0D0D0" BorderThickness="1">
+                    <WrapPanel>
+                        <TextBlock Text="状态:" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="12"/>
+                        <ComboBox x:Name="CmbStatusFilter" Width="90" Height="24" FontSize="12"
+                                  SelectionChanged="Filter_Changed">
+                            <ComboBoxItem Content="全部" Tag="all" IsSelected="True"/>
+                            <ComboBoxItem Content="待执行" Tag="pending"/>
+                            <ComboBoxItem Content="执行中" Tag="running"/>
+                            <ComboBoxItem Content="已完成" Tag="completed"/>
+                            <ComboBoxItem Content="失败" Tag="failed"/>
+                        </ComboBox>
+
+                        <TextBlock Text="工具:" VerticalAlignment="Center" Margin="12,0,4,0" FontSize="12"/>
+                        <TextBox x:Name="TxtToolFilter" Width="100" Height="24" FontSize="12"
+                                 TextChanged="Filter_Changed"/>
+
+                        <TextBlock Text="类型:" VerticalAlignment="Center" Margin="12,0,4,0" FontSize="12"/>
+                        <TextBox x:Name="TxtTypeFilter" Width="80" Height="24" FontSize="12"
+                                 TextChanged="Filter_Changed"/>
+
+                        <TextBlock Text="关键词:" VerticalAlignment="Center" Margin="12,0,4,0" FontSize="12"/>
+                        <TextBox x:Name="TxtKeywordFilter" Width="140" Height="24" FontSize="12"
+                                 TextChanged="Filter_Changed"/>
+
+                        <Button x:Name="BtnClearFilter" Content="清除筛选" Width="70" Height="24"
+                                FontSize="11" Margin="12,0,0,0" Click="BtnClearFilter_Click"/>
+                    </WrapPanel>
+                </Border>
             </StackPanel>
         </Border>
 

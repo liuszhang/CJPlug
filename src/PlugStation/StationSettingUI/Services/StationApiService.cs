@@ -206,23 +206,81 @@ public class StationApiService
     }
 
     /// <summary>
-    /// 从平台主服务器获取所有工具列表
+    /// 通过本地 StationApiServer 代理获取主服务器上的所有工具列表
     /// </summary>
     public async Task<List<Tool>?> FetchToolsFromServerAsync()
     {
         try
         {
-            using var client = CreateMainServerClient();
-            var response = await client.GetAsync("/api/Tool/GetAllTools");
+            var response = await _stationClient.GetAsync("/api/station/tools");
             if (!response.IsSuccessStatusCode)
-                return null;
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                var errorMsg = string.IsNullOrWhiteSpace(errorBody)
+                    ? $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}"
+                    : errorBody.Trim();
+                throw new HttpRequestException($"获取工具列表失败: {errorMsg}");
+            }
 
             return await response.Content.ReadFromJsonAsync<List<Tool>>(JsonOptions);
+        }
+        catch (HttpRequestException)
+        {
+            throw; // 直接向上抛出，保留原始信息
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"获取工具列表失败: {ex.Message}");
-            return null;
+            throw new HttpRequestException($"获取工具列表失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 通过 StationApiServer 检查图站上指定文件是否存在
+    /// </summary>
+    public async Task<bool> CheckFileExistsAsync(string filePath)
+    {
+        try
+        {
+            var body = new { filePath };
+            var json = JsonSerializer.Serialize(body);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _stationClient.PostAsync("/api/station/fileExists", content);
+            if (!response.IsSuccessStatusCode)
+                return false;
+            var result = await response.Content.ReadAsStringAsync();
+            return bool.TryParse(result, out var exists) && exists;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"检查文件存在性失败: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 通过 StationApiServer 从主服务器下载工具包并解压到图站的指定目录
+    /// </summary>
+    public async Task<bool> DownloadToolToStationAsync(string toolName, string toolVersion, string targetPath, string? toolFilePath = null)
+    {
+        try
+        {
+            var body = new
+            {
+                targetPath,
+                toolName,
+                toolVersion,
+                toolFilePath
+            };
+            var json = JsonSerializer.Serialize(body);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _stationClient.PostAsync("/api/station/downloadTool", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"下载工具到图站失败: {ex.Message}");
+            return false;
         }
     }
 

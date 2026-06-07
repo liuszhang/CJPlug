@@ -11,12 +11,14 @@
 @using Elsa.Studio.Workflows.Domain.Contracts
 @using Elsa.Studio.Workflows.Domain.Extensions
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @using Elsa.Workflows.Management.Features
 
 @inject IActivityRegistry ActivityRegistry
 @inject IDomInteropService DomInteropService
 @inject IElsaStudioService ElsaStudioService
 @inject ElsaApiClient ElsaApiClient
+@inject MainApiClient MainApiClient
 @inject NavigationManager NavigationManager
 
 <MudPaper Class="pa-0" Style="min-width:220px">
@@ -131,14 +133,19 @@
     public string ShowModel = "list";
     public string? CurrentUser { get; set; }
 
+    [CascadingParameter]
+    public string? ProcessDefinitionId { get; set; }
+
     public IEnumerable<ActivityDescriptor>? ActivityDescriptors { get; set; } = new List<ActivityDescriptor>();
     private string _searchText = "";
 
     private IEnumerable<IGrouping<string, ActivityDescriptor>> GroupedActivityDescriptors
     {
         get
-        {            
-            var ActivityDescriptors2 = ActivityDescriptors.Where(item => !(item.Category.Contains("流程") && item.Category!=PlugGroupEnum.流程控制.ToString()));
+        {
+            var ActivityDescriptors2 = (ActivityDescriptors ?? Enumerable.Empty<ActivityDescriptor>())
+                .Where(item => string.IsNullOrEmpty(item.Category)
+                    || !(item.Category.Contains("流程") && item.Category != PlugGroupEnum.流程控制.ToString()));
             if (string.IsNullOrWhiteSpace(_searchText))
                 return ActivityDescriptors2.GroupBy(x => x.Category); // Return all items grouped by category
 
@@ -146,7 +153,7 @@
                 item.Name.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
                 item.TypeName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
                 (item.DisplayName != null && item.DisplayName.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase)) ||
-                item.Category.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
+                (item.Category != null && item.Category.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase)) ||
                 (item.Description != null && item.Description.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase))
             );
             Console.WriteLine(">>>>>>>>>>>>>>>>>search find activities:" + items.Count());
@@ -160,9 +167,29 @@
 
         get
         {
-            var sharedActivities = ActivityDescriptors?.Where(item => (item.Category.Contains("流程") && item.Category!=PlugGroupEnum.流程控制.ToString()));
+            var sharedActivities = (ActivityDescriptors ?? Enumerable.Empty<ActivityDescriptor>())
+                .Where(item => !string.IsNullOrEmpty(item.Category)
+                    && item.Category.Contains("流程")
+                    && item.Category != PlugGroupEnum.流程控制.ToString());
+
+            // 过滤掉当前正在编辑的流程，防止自己拖入自己导致死循环
+            if (!string.IsNullOrEmpty(ProcessDefinitionId))
+            {
+                sharedActivities = sharedActivities.Where(item =>
+                {
+                    // 从 Description 中提取 DefinitionId 进行匹配
+                    var desc = item.Description ?? "";
+                    var match = Regex.Match(desc, @"\[DefinitionId:([^\]]+)\]");
+                    if (match.Success)
+                    {
+                        return match.Groups[1].Value != ProcessDefinitionId;
+                    }
+                    return true;
+                });
+            }
+
             if (string.IsNullOrWhiteSpace(_searchText))
-                return sharedActivities; // Return all items grouped by category
+                return sharedActivities.ToList(); // 立即求值，避免多次遍历时数据变化
 
             var items = sharedActivities.Where(item =>
                 item.Name.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase) ||
@@ -172,29 +199,65 @@
                 (item.Description != null && item.Description.Contains(_searchText, StringComparison.InvariantCultureIgnoreCase))
             );
             Console.WriteLine(">>>>>>>>>>>>>>>>>search find activities:" + items.Count());
-            return items;
+            return items.ToList();
 
         }
     }
     private async Task Refresh()
-    {      
+    {
         //获取组件库数据
         ActivityDescriptors = new List<ActivityDescriptor>();
         StateHasChanged();
-        //ActivityDescriptors = await ElsaStudioService.GetElsaActivityDescriptors();
-        //var loginResult = await ElsaApiClient.LoginToElsaAsync();
-        //Console.WriteLine($"Log in To Elsa Result:{loginResult.IsAuthenticated}");
-        //ActivityDescriptors = await ElsaApiClient.ListAllActivityDescriptorsAsync();
-        //Console.WriteLine(">>>>>>>>>>>>>>>>>picker page find activities:" + ActivityDescriptors.Count());
-        //ActivityDescriptors = new List<ActivityDescriptor>();
-        await ActivityRegistry.RefreshAsync();
-        await ActivityRegistry.EnsureLoadedAsync();
-        ActivityDescriptors = ActivityRegistry.ListBrowsable();
-        Console.WriteLine(">>>>>>>>>>>>>>>>>activity picker find activities:" + ActivityDescriptors.Count());
-        // foreach(var a in ActivityDescriptors)
-        // {
-        //     Console.WriteLine(a.Name);
-        // }
+        try
+        {
+            // 1. 从 ActivityRegistry 获取组件库（引擎自带活动）
+            await ActivityRegistry.RefreshAsync();
+            await ActivityRegistry.EnsureLoadedAsync();
+            var registryDescriptors = ActivityRegistry.ListBrowsable() ?? Enumerable.Empty<ActivityDescriptor>();
+
+            // 2. 从 MainApiClient 直接获取插头，构建共享流程的 ActivityDescriptor
+            //    绕过 ElsaApiClient/ActivityRegistry，确保共享流程一定可见
+            var allPlugs = await MainApiClient.GetPlugs();
+            var sharedProcessDescriptors = (allPlugs ?? Enumerable.Empty<Plug>())
+                .Where(p => (p.CreateType == PlugCreateTypeEnum.ProcessToPlug.ToString()
+                          || p.CreateType == PlugCreateTypeEnum.新建流程.ToString())
+                         && p.ShowInPlugLibrary)
+                .Select(p => PlugToActivityDescriptor(p))
+                .ToList();
+
+            Console.WriteLine($"[SharedFlowDiag] Registry={registryDescriptors.Count()}, SharedPlugs={sharedProcessDescriptors.Count}");
+
+            // 3. 合并：组件库用 registry 数据，共享流程用 MainApiClient 数据
+            //    去重：如果 registry 已有共享流程，以 MainApiClient 的为准
+            var sharedDefinitionIds = new HashSet<string>(
+                sharedProcessDescriptors
+                    .Select(d => ExtractDefinitionId(d.Description))
+                    .Where(id => !string.IsNullOrEmpty(id)));
+
+            var merged = registryDescriptors
+                .Where(d => string.IsNullOrEmpty(ExtractDefinitionId(d.Description))
+                         || !sharedDefinitionIds.Contains(ExtractDefinitionId(d.Description)))
+                .Concat(sharedProcessDescriptors)
+                .ToList();
+
+            ActivityDescriptors = merged;
+            Console.WriteLine(">>>>>>>>>>>>>>>>>activity picker find activities:" + ActivityDescriptors.Count());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SharedFlowDiag] Refresh FAILED: {ex.Message}");
+            // 降级：仅使用 ActivityRegistry
+            try
+            {
+                await ActivityRegistry.RefreshAsync();
+                await ActivityRegistry.EnsureLoadedAsync();
+                ActivityDescriptors = ActivityRegistry.ListBrowsable() ?? Enumerable.Empty<ActivityDescriptor>();
+            }
+            catch
+            {
+                ActivityDescriptors = Enumerable.Empty<ActivityDescriptor>();
+            }
+        }
         StateHasChanged();
     }
 
@@ -216,7 +279,35 @@
                 //NavigationManager.Refresh(forceReload: true);
                 
             }
-        
+
         }
+    }
+
+    /// <summary>
+    /// 将 Plug 转换为客户端 ActivityDescriptor（仅用于显示和拖拽）
+    /// </summary>
+    private ActivityDescriptor PlugToActivityDescriptor(Plug plug)
+    {
+        return new ActivityDescriptor
+        {
+            TypeName = plug.Type ?? plug.Name,
+            Name = plug.Name ?? "",
+            Namespace = "CJ",
+            DisplayName = plug.Name ?? "",
+            Category = plug.GroupName ?? "",
+            Description = $"[DefinitionId:{plug.DefinitionId}]插头描述：" + (plug.Description ?? ""),
+            IsBrowsable = plug.ShowInPlugLibrary,
+            IsContainer = plug.IsContainerPlug,
+        };
+    }
+
+    /// <summary>
+    /// 从 Description 中提取 DefinitionId
+    /// </summary>
+    private string? ExtractDefinitionId(string? description)
+    {
+        if (string.IsNullOrEmpty(description)) return null;
+        var match = Regex.Match(description, @"\[DefinitionId:([^\]]+)\]");
+        return match.Success ? match.Groups[1].Value : null;
     }
 }

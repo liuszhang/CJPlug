@@ -8,19 +8,32 @@
 @using CJ.Plug.Models.Services
 @using CJ.Plug.GUIDesigner.Models
 @using CJ.Plug.GUIDesigner.Models.Shared
+@using CJ.Plug.PlugBaseCore.Contracts
+@using CJ.Plug.PlugBaseCore.Models
 @using CJ.Plug.TASApiClient
 @using MudBlazor
 
 @inject ITASApiClient TASApiClient
+@inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 
 @if (true)
 {
     <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
-        <MudText>自定义插头执行界面（@SelectedPlug?.Name）</MudText>
+        @if (HasBuiltInSettingContent)
+        {
+            <MudText>插头配置界面（@SelectedPlug?.Name）</MudText>
+        }
+        else
+        {
+            <MudText>自定义插头执行界面（@SelectedPlug?.Name）</MudText>
+        }
         <MudSpacer></MudSpacer>
-        <MudButton OnClick="EditGui" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>编辑</MudButton>
-        <MudButton OnClick="SaveGui" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>保存</MudButton>
-        <MudButton OnClick="ShowAmis" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>Amis</MudButton>
+        @if (!HasBuiltInSettingContent)
+        {
+            <MudButton OnClick="EditGui" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>编辑</MudButton>
+            <MudButton OnClick="SaveGui" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>保存</MudButton>
+            <MudButton OnClick="ShowAmis" Size="Size.Small" Variant=Variant.Outlined Color=Color.Primary>Amis</MudButton>
+        }
         <MudToggleIconButton Toggled="IsGuiDesignerMaximized"
         ToggledChanged="MaxGuiDesigner"
         Icon="@Icons.Material.Filled.ZoomOutMap"
@@ -28,7 +41,11 @@
         ToggledIcon="@Icons.Material.Filled.ZoomInMap"
         ToggledColor="@Color.Primary"/>
     </MudStack>
-    @if(ShowGuiDesigner)
+    @if (HasBuiltInSettingContent)
+    {
+        @BuiltInSettingContent
+    }
+    else if(ShowGuiDesigner)
     {
         <CascadingValue Value="_draggedType">
             <MudStack Row>
@@ -42,7 +59,7 @@
     {
         <Amis @key="@($"amis-{SelectedPlug?.Id}")" JsonStringData="@PlugGuiJsonData"></Amis>
     }
-    if (ShowAmisEditor)
+    else if (ShowAmisEditor)
     {
         <iframe id="amis-editor" style="width:100%;height:100%;" src="_content/CJ.Plug.GUIDesigner/demo-6.7.0/index.html#/edit/0"></iframe>
     }
@@ -77,6 +94,8 @@ else
     public Plug? SelectedPlug { get; set; }
     public string? PlugGuiJsonData { get; set; }
     private bool IsGuiDesignerMaximized { get; set; } = false;
+    private bool HasBuiltInSettingContent { get; set; } = false;
+    private RenderFragment? BuiltInSettingContent { get; set; }
 
 
     private Plug? _lastSelectedPlug;
@@ -90,8 +109,30 @@ else
             _lastSelectedPlug = SelectedPlug;
             _isEditingGui = false;
             GetJsonStringData();
+            await ResolveBuiltInSettingContent();
         }
         StateHasChanged();
+    }
+
+    private async Task ResolveBuiltInSettingContent()
+    {
+        BuiltInSettingContent = null;
+        HasBuiltInSettingContent = false;
+
+        if (SelectedPlug == null || string.IsNullOrWhiteSpace(SelectedPlug.PlugTypeKey))
+            return;
+
+        foreach (var pcsc in PlugCommonSettingContent)
+        {
+            var context = new GetSettingContext(SelectedPlug.PlugTypeKey, SelectedPlug.DefinitionId, null, SelectedPlug);
+            var content = await pcsc.GetPlugCommonSettingContent(context);
+            if (content != null)
+            {
+                BuiltInSettingContent = content;
+                HasBuiltInSettingContent = true;
+                return;
+            }
+        }
     }
 
     public Task OnSelectedNodeChanged(BaseGuiItemModel? selectedNode)

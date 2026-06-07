@@ -2,6 +2,7 @@ using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
+using CJ.Plug.StationAndTool.Services;
 using CJ.Plug.StationAndToolApi.DbContext;
 using CJ.Plug.StationAndToolApi.Services;
 using CJ.Plug.StationAndToolApiClient;
@@ -19,6 +20,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IModule, Module>();
         services.AddScoped<IMenuService, StationAndToolMenu>();
+        services.AddScoped<StationSelectionService>();
 
         services.AddHttpClient<IStationAndToolApiClient, StationAndToolApiClient>(client =>
         {

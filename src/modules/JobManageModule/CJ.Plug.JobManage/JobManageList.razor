@@ -1,4 +1,4 @@
-﻿@page "/JobManageList"
+@page "/JobManageList"
 
 @using CJ.Plug.JobManage.Components
 @using CJ.Plug.JobManageApiClient
@@ -48,7 +48,8 @@
                  Class="instances-table">
         <ToolBarContent>
             <MudTextField T="string"
-                          @bind-Value="searchString"
+                          Value="searchString"
+                          ValueChanged="@OnSearchChanged"
                           Margin="Margin.Dense"
                           Placeholder="可搜索： 名称, ID, 版本, 流程"
                           Variant="Variant.Outlined"
@@ -59,28 +60,14 @@
                           Immediate="true"
                           Class="me-3" />
 
-            <MudSelect Margin="Margin.Dense" Dense T="@(bool?)" Label="是否出错" Class="me-3" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents">
+            <MudSelect Margin="Margin.Dense" Dense T="@(bool?)"
+                       Label="是否出错"
+                       Value="hasError"
+                       ValueChanged="@OnHasErrorChanged"
+                       Class="me-3" PopoverClass="mw-300" Variant="Variant.Outlined" OuterClass="mud-select-has-incidents">
                 <MudSelectItem T="@(bool?)" Value="@(default(bool?))">-</MudSelectItem>
                 <MudSelectItem T="@(bool?)" Value="@(true)">是</MudSelectItem>
                 <MudSelectItem T="@(bool?)" Value="@(false)">否</MudSelectItem>
-            </MudSelect>
-
-
-            <MudSelect T="ProcessDefinitionSummary"
-                       Label="流程筛选"
-                       Margin="Margin.Dense"
-                       AdornmentIcon="@Icons.Material.Outlined.PlayArrow"
-                       MultiSelection="true"
-                       AnchorOrigin="Origin.BottomCenter"
-                       Variant="Variant.Outlined"
-                       Clearable="true"
-                       Dense="true"
-                       InputMode="InputMode.search"
-                       Immediate="true"
-                       PopoverClass="mw-300"
-                       InputClass="me-3">
-
-
             </MudSelect>
 
             <MudSelect T="JobStatus"
@@ -93,7 +80,9 @@
                        Dense="true"
                        Clearable="true"
                        PopoverClass="mw-300"
-                       InputClass="me-3">
+                       InputClass="me-3"
+                       SelectedValues="selectedStatuses"
+                       SelectedValuesChanged="@OnStatusesChanged">
 
                 <MudSelectItem Value="JobStatus.执行中">运行中</MudSelectItem>
                 <MudSelectItem Value="JobStatus.完成">已结束</MudSelectItem>
@@ -109,7 +98,9 @@
                        Dense="true"
                        Clearable="true"
                        PopoverClass="mw-300"
-                       InputClass="me-3">
+                       InputClass="me-3"
+                       SelectedValues="selectedSubStatuses"
+                       SelectedValuesChanged="@OnSubStatusesChanged">
                 <MudSelectItem Value="JobSubStatus.执行中">运行中</MudSelectItem>
                 <MudSelectItem Value="JobSubStatus.Suspended">中断</MudSelectItem>
                 <MudSelectItem Value="JobSubStatus.已完成">已完成</MudSelectItem>
@@ -117,11 +108,21 @@
                 <MudSelectItem Value="JobSubStatus.已取消">取消</MudSelectItem>
             </MudSelect>
 
-            <MudBadge Color="Color.Primary" Overlap="true">
-                <MudButton StartIcon="@Icons.Material.Outlined.DateRange" IconSize="Size.Large">
+            <MudBadge Content="@dateFilterCount" Color="Color.Primary" Overlap="true" Visible="@(dateFilterCount > 0)">
+                <MudButton StartIcon="@Icons.Material.Outlined.DateRange" IconSize="Size.Large" OnClick="@ToggleDateFilter">
                     时间筛选
                 </MudButton>
             </MudBadge>
+            <MudPopover Open="@isDateFilterOpen" AnchorOrigin="Origin.BottomCenter" OverflowBehavior="OverflowBehavior.FlipAlways" Class="px-4 pt-4">
+                <MudStack Spacing="2" Class="pa-2" Style="min-width: 320px;">
+                    <MudDatePicker Label="开始日期" @bind-Date="dateFrom" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudDatePicker Label="结束日期" @bind-Date="dateTo" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                        <MudButton OnClick="@OnClearDateFilter" Size="Size.Small">清除</MudButton>
+                        <MudButton OnClick="@OnApplyDateFilter" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small">应用</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPopover>
 
         </ToolBarContent>
 
@@ -134,7 +135,7 @@
                 <CellTemplate>
                     @if (string.IsNullOrEmpty(context.Item.EngineInstanceId))
                     {
-                        <MudText>@context.Item.JobCorrelationId</MudText>                        
+                        <MudText>@context.Item.JobCorrelationId</MudText>
                     }
                     else
                     {
@@ -142,7 +143,7 @@
                             @context.Item.JobCorrelationId
                         </MudLink>
                     }
-                    
+
                 </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="作业类型">
@@ -188,7 +189,7 @@
                 <CellTemplate>
                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
                         <MudMenuItem OnClick="JobDetails" Icon="@Icons.Material.Outlined.ZoomIn">详情</MudMenuItem>
-                        <MudMenuItem Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
+                        <MudMenuItem OnClick="() => DeleteSingleJob(context.Item)" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
                         <MudMenuItem Icon="@Icons.Material.Outlined.Cancel" Disabled="@(context.Item.FinishedAt != null)">取消</MudMenuItem>
                     </MudMenu>
                 </CellTemplate>
@@ -219,73 +220,99 @@
 
 
 @code {
-    public double? Amount { get; set; }
-    public int? Weight { get; set; }
-    public string? searchString { get; set; }
-
+    private string? searchString;
+    private bool? hasError;
+    private HashSet<JobStatus> selectedStatuses = new();
+    private HashSet<JobSubStatus> selectedSubStatuses = new();
+    private DateTime? dateFrom;
+    private DateTime? dateTo;
+    private bool isDateFilterOpen;
+    private int dateFilterCount => (dateFrom.HasValue ? 1 : 0) + (dateTo.HasValue ? 1 : 0);
 
     public HashSet<BaseJob> SelectedJobs { get; set; } = new HashSet<BaseJob>();
-    public bool ReadOnly;
-
 
     private MudDataGrid<BaseJob> dataGrid;
-    public IEnumerable<BaseJob> data { get; set; }
-    public IEnumerable<BaseJob> AllData { get; set; }
 
     private async Task<GridData<BaseJob>> LoadData(GridState<BaseJob> state, CancellationToken token)
     {
-        AllData = await MainApiClient.GetAllJobsAsync();
-        data = AllData.Where(
-            d => d.JobCategory == JobCategoryEnum.ProcessJob.ToString() ||
-                 (d.JobCategory == JobCategoryEnum.ToolJob.ToString() && string.IsNullOrEmpty(d.ParentJobCorrelationId)) // 只显示顶层工具作业
-            )
-    .Where(element =>
-                {
-                    if (string.IsNullOrWhiteSpace(searchString))
-                        return true;
-                    if (element.JobCorrelationId.Contains(searchString, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                    if (element.EngineInstanceId.Contains(searchString, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                    if ($"{element.CreatedAt} {element.UpdatedAt} {element.FinishedAt}".Contains(searchString))
-                        return true;
-                    return false;
-                }).ToArray();
-        var totalItems = data.Count();
-        data = data.OrderByDescending(o => o.CreatedAt);
-        //await dataGrid.SetSortAsync(nameof(BaseJob.CreatedAt), SortDirection.Descending, x=>x.CreatedAt);
-        @* var sortDefinition = state.SortDefinitions.FirstOrDefault();
-        switch (sortDefinition?.SortBy)
+        var filter = new JobFilter
         {
-            case nameof(BaseJob.CreatedAt):
-                data = data.OrderByDirection(SortDirection.Descending, o => o.CreatedAt);
-                break;
-        } *@
+            SearchTerm = searchString,
+            HasError = hasError,
+            JobStatus = selectedStatuses.Any()
+                ? string.Join(",", selectedStatuses.Select(s => s.ToString()))
+                : null,
+            JobSubStatus = selectedSubStatuses.Any()
+                ? string.Join(",", selectedSubStatuses.Select(s => s.ToString()))
+                : null,
+            DateFrom = dateFrom.HasValue ? new DateTimeOffset(dateFrom.Value) : null,
+            DateTo = dateTo.HasValue ? new DateTimeOffset(dateTo.Value.AddDays(1).AddTicks(-1)) : null,
+        };
 
-        var pagedData = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
+        var allData = await MainApiClient.GetJobsByFilter(filter) ?? new List<BaseJob>();
+
+        var totalItems = allData.Count;
+        var pagedData = allData
+            .Skip(state.Page * state.PageSize)
+            .Take(state.PageSize)
+            .ToArray();
+
         return new GridData<BaseJob>() { TotalItems = totalItems, Items = pagedData };
-
-
-
-        //return new TableData<BaseJob> { TotalItems = rows.Length, Items = rows };
     }
 
+    #region 筛选事件处理
+
+    private async Task OnSearchChanged(string? value)
+    {
+        searchString = value;
+        await dataGrid.ReloadServerData();
+    }
+
+    private async Task OnHasErrorChanged(bool? value)
+    {
+        hasError = value;
+        await dataGrid.ReloadServerData();
+    }
+
+    private async Task OnStatusesChanged(IEnumerable<JobStatus> values)
+    {
+        selectedStatuses = values.ToHashSet();
+        await dataGrid.ReloadServerData();
+    }
+
+    private async Task OnSubStatusesChanged(IEnumerable<JobSubStatus> values)
+    {
+        selectedSubStatuses = values.ToHashSet();
+        await dataGrid.ReloadServerData();
+    }
+
+    private void ToggleDateFilter()
+    {
+        isDateFilterOpen = !isDateFilterOpen;
+    }
+
+    private async Task OnApplyDateFilter()
+    {
+        isDateFilterOpen = false;
+        await dataGrid.ReloadServerData();
+    }
+
+    private async Task OnClearDateFilter()
+    {
+        dateFrom = null;
+        dateTo = null;
+        isDateFilterOpen = false;
+        await dataGrid.ReloadServerData();
+    }
+
+    #endregion
 
     private void OnRowClick(DataGridRowClickEventArgs<BaseJob> e)
     {
         if (string.IsNullOrEmpty(e.Item.EngineInstanceId))
         {
             Snackbar.Add("还未生成作业ID，请稍后重试", Severity.Error);
-            //NavigationManager.NavigateTo($"JobMonitor3/{e.Item!.JobCorrelationId}");
-            //return;
         }
-        else
-        {
-            @* var jobDefinitionId = e.Item!.JobDefinitionId;
-            var plugDefinitionId = e.Item!.JobCorrelationId?.GetPlugDefinitionId();
-            NavigationManager.NavigateTo($"process/{plugDefinitionId}/execute/{jobDefinitionId}"); *@
-        }
-
     }
 
 
@@ -296,16 +323,18 @@
             await MainApiClient.DeleteJobAsync(j);
         }
         await dataGrid.ReloadServerData();
-        //StateHasChanged();
     }
 
 
+    private async Task DeleteSingleJob(BaseJob job)
+    {
+        await MainApiClient.DeleteJobAsync(job);
+        await dataGrid.ReloadServerData();
+    }
+
     private void JobDetails()
     {
-        //NavigationManager.NavigateTo($"workflows/instances/{e.Item!.JobCorrelationId}/view");
-        //NavigationManager.NavigateTo($"workflows/instances/{e.Item!.JobCorrelationId}/view");
     }
 
 
 }
-

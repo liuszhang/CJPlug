@@ -16,5 +16,7 @@ namespace CJ.Plug.UserManageApiClient
         Task<User?> UpdateUserAsync(UpdateUserRequest request, CancellationToken cancellationToken = default);
         Task<bool> AssignRolesAsync(AssignRolesRequest request, CancellationToken cancellationToken = default);
         Task<List<string>> GetUserRolesAsync(int userId, CancellationToken cancellationToken = default);
+        Task<bool> SetUserStatusAsync(int userId, DataStatus status, CancellationToken cancellationToken = default);
+        Task<bool> SetUserLockoutAsync(int userId, bool isLocked, CancellationToken cancellationToken = default);
     }
 }

@@ -1,0 +1,772 @@
+@using CJ.Plug.Models.Skills
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SkillApiClient
+@using MudBlazor
+@using CJ.Plug.SharedPages.SharedComponents
+@using CJ.Plug.SharedPages.Services
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject ISnackbar Snackbar
+
+<MudDrawer @bind-Open="IsOpen"
+           Anchor="Anchor.Right"
+           Variant="DrawerVariant.Temporary"
+           OverlayAutoClose="true"
+           Width="650px">
+    <MudContainer>
+        <div class="d-flex align-center justify-space-between mt-4 mb-2">
+            <MudText Typo="Typo.h5">@(Skill?.DisplayName ?? Skill?.Name)</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           OnClick="CloseDrawer"
+                           Size="Size.Small"
+                           Color="Color.Default" />
+        </div>
+
+        @if (Skill is not null)
+        {
+            <MudChip T="string"
+                     Color="@(Skill.IsEnabled ? Color.Success : Color.Error)"
+                     Variant="Variant.Filled"
+                     Size="Size.Small"
+                     Class="mb-4">
+                @(Skill.IsEnabled ? "已启用" : "已禁用")
+            </MudChip>
+        }
+
+        <MudTabs @bind-ActivePanelIndex="_activeTabIndex" Class="mt-2">
+            <MudTabPanel Text="技能描述">
+                @if (Skill is not null)
+                {
+                    <div class="markdown-body" style="max-height: calc(100vh - 280px); overflow-y: auto; padding-right: 8px;">
+                        @if (_readmeLoading)
+                        {
+                            <div class="d-flex justify-center pa-8">
+                                <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+                            </div>
+                        }
+                        else if (_readmeContent is not null)
+                        {
+                            @RenderMarkdown(_readmeContent)
+                        }
+                        else
+                        {
+                            <MudPaper Elevation="0" Class="pa-8" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Color="Color.Default" />
+                                    <MudText Typo="Typo.body2" Class="text-muted">
+                                        尚未创建技能描述文件 (@($"{Skill.Name}.md"))
+                                    </MudText>
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Add"
+                                               OnClick="CreateReadme"
+                                               Disabled="_readmeCreating">
+                                        @if (_readmeCreating)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                            @:创建中...
+                                        }
+                                        else
+                                        {
+                                            @:创建描述文件
+                                        }
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </div>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="文件列表">
+                @if (Skill is not null)
+                {
+                    <div class="skill-file-list" style="max-height: calc(100vh - 280px); overflow-y: auto; padding-right: 8px;">
+                        @if (_fileNodes.Any())
+                        {
+                            <div class="d-flex align-center justify-space-between mb-3">
+                                <MudText Typo="Typo.subtitle2" Class="text-muted">
+                                    共 @_fileNodes.Count 个文件
+                                </MudText>
+                                <div class="d-flex align-center gap-2">
+                                    @if (_uploading)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                        <MudText Typo="Typo.caption" Class="text-muted">上传中...</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                       Multiple="true"
+                                                       FilesChanged="HandleMudFileUpload"
+                                                       Accept="*/*"
+                                                       MaxFileSize="512000000">
+                                            <CustomContent>
+                                                <MudButton Variant="Variant.Outlined"
+                                                           OnClick="@context.OpenFilePickerAsync"
+                                                           Color="Color.Primary"
+                                                           Size="Size.Small"
+                                                           StartIcon="@Icons.Material.Filled.Upload">
+                                                    上传文件
+                                                </MudButton>
+                                            </CustomContent>
+                                            <SelectedTemplate></SelectedTemplate>
+                                        </MudFileUpload>
+                                        <FolderUploader ButtonText="上传文件夹"
+                                                       OnFilesSelected="HandleFolderUpload"
+                                                       Disabled="@(Skill == null)"
+                                                       ShowFileList="false"
+                                                       @ref="_folderUploader" />
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.Archive"
+                                                   OnClick="DownloadAllFiles">
+                                            打包下载
+                                        </MudButton>
+                                    }
+                                </div>
+                            </div>
+
+                            <FileTree Items="@_fileNodes"
+                                      ShowDownloadButton="true"
+                                      ShowDeleteButton="true"
+                                      Class="mb-2" />
+                        }
+                        else
+                        {
+                            <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudStack Spacing="2">
+                                    <div class="d-flex justify-center mb-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.FolderOff" Size="Size.Large" Color="Color.Error" />
+                                    </div>
+                                    <MudText Typo="Typo.body2" Class="text-muted text-center">
+                                        暂无关联文件
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Class="text-muted text-center">
+                                        上传文件或文件夹到该 Skill
+                                    </MudText>
+                                    <div class="d-flex justify-center gap-2 mt-2">
+                                        @if (_uploading)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                            <MudText Typo="Typo.caption" Class="text-muted">上传中...</MudText>
+                                        }
+                                        else
+                                        {
+                                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                           Multiple="true"
+                                                           FilesChanged="HandleMudFileUpload"
+                                                           Accept="*/*"
+                                                           MaxFileSize="512000000">
+                                                <CustomContent>
+                                                    <MudButton Variant="Variant.Outlined"
+                                                               Color="Color.Primary"
+                                                               Size="Size.Small"
+                                                               StartIcon="@Icons.Material.Filled.Upload">
+                                                        上传文件
+                                                    </MudButton>
+                                                </CustomContent>
+                                                <SelectedTemplate></SelectedTemplate>
+                                            </MudFileUpload>
+                                            <FolderUploader ButtonText="上传文件夹"
+                                                           OnFilesSelected="HandleFolderUpload"
+                                                           Disabled="@(Skill == null)"
+                                                           ShowFileList="false"
+                                                           @ref="_folderUploader" />
+                                        }
+                                    </div>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </div>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </MudContainer>
+</MudDrawer>
+
+@code {
+    [Parameter] public Skill? Skill { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public ISkillApiClient SkillApiClient { get; set; } = default!;
+    [Parameter] public FileDownloadService FileDownloadService { get; set; } = default!;
+
+    private int _activeTabIndex;
+    private List<FileSystemNode> _fileNodes = new();
+    private FolderUploader? _folderUploader;
+    private bool _filesLoaded;
+    private int? _lastSkillId;
+
+    // ===== 技能描述 =====
+    private string? _readmeContent;
+    private bool _readmeLoaded;
+    private bool _readmeLoading;
+    private bool _readmeCreating;
+
+    // ===== 上传状态 =====
+    private bool _uploading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && Skill is not null)
+        {
+            // 如果 Skill 变化了，重置加载状态
+            if (_lastSkillId != Skill.Id)
+            {
+                _filesLoaded = false;
+                _readmeLoaded = false;
+                _lastSkillId = Skill.Id;
+            }
+
+            if (!_filesLoaded)
+            {
+                _filesLoaded = true;
+                _activeTabIndex = 0;
+                _fileNodes = await LoadFileNodesAsync(Skill);
+            }
+
+            if (!_readmeLoaded)
+            {
+                _readmeLoaded = true;
+                _ = LoadReadmeAsync(Skill);
+            }
+        }
+        else if (!IsOpen)
+        {
+            _filesLoaded = false;
+            _readmeLoaded = false;
+            _lastSkillId = null;
+            _fileNodes.Clear();
+            _readmeContent = null;
+        }
+    }
+
+    private async Task CloseDrawer()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    // ===== 技能描述文件操作 =====
+
+    private async Task LoadReadmeAsync(Skill skill)
+    {
+        try
+        {
+            _readmeLoading = true;
+            StateHasChanged();
+            _readmeContent = await SkillApiClient.GetSkillReadmeAsync(skill.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载描述文件失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _readmeLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateReadme()
+    {
+        if (Skill == null) return;
+        try
+        {
+            _readmeCreating = true;
+            StateHasChanged();
+            _readmeContent = await SkillApiClient.CreateSkillReadmeAsync(Skill.Id, DefaultReadmeContent);
+            if (_readmeContent != null)
+                Snackbar.Add("描述文件创建成功", Severity.Success);
+            else
+                Snackbar.Add("描述文件创建失败", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建描述文件失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _readmeCreating = false;
+            StateHasChanged();
+        }
+    }
+
+    private const string DefaultReadmeContent = @"# 公益财务相关法规原文索引
+
+> 本文件夹收录了「票据与财务整理助手」（charity-finance-assistant）引用的核心法律法规原文，供公益机构工作人员查阅。
+
+---
+
+## 法律法规清单
+
+| 编号 | 文件名称 | 文号 | 发布机关 | 效力层级 | 施行日期 |
+|:---:|---------|------|---------|---------|---------|
+| 01 | [中华人民共和国慈善法（2023年修订版）](./01-中华人民共和国慈善法（2023年修订版）.md) | 主席令第十四号 | 全国人大常委会 | 法律 | 2024-09-05 |
+| 02 | [中华人民共和国公益事业捐赠法](./02-中华人民共和国公益事业捐赠法.md) | 主席令第十九号 | 全国人大常委会 | 法律 | 1999-09-01 |
+| 03 | [基金会管理条例](./03-基金会管理条例（国务院令第400号）.md) | 国务院令第400号 | 国务院 | 行政法规 | 2004-06-01 |
+| 04 | [关于慈善组织开展慈善活动年度支出和管理费用的规定](./04-关于慈善组织开展慈善活动年度支出和管理费用的规定（民发2016-189号）.md) | 民发〔2016〕189号 | 民政部、财政部、国税总局 | 部门规范性文件 | 2016-08-31 |
+| 05 | [公益事业捐赠票据使用管理办法](./05-公益事业捐赠票据使用管理办法（财综2024-1号）.md) | 财综〔2024〕1号 | 财政部 | 部门规章 | 2024-02-01 |
+| 06 | [关于非营利组织免税资格认定管理有关问题的通知](./06-关于非营利组织免税资格认定管理有关问题的通知（财税2018-13号）.md) | 财税〔2018〕13号 | 财政部、税务总局 | 部门规范性文件 | 2018-01-01 |
+| 07 | [关于公益性捐赠税前扣除有关事项的公告](./07-关于公益性捐赠税前扣除有关事项的公告（2020年第27号）.md) | 2020年第27号 | 财政部、税务总局、民政部 | 部门规范性文件 | 2020-01-01 |
+| 08 | [慈善组织信息公开办法（2025年修订）](./08-慈善组织信息公开办法（民政部令第81号-2025修订）.md) | 民政部令第81号 | 民政部 | 部门规章 | 2026-01-01 |
+
+---
+
+## 效力层级说明
+
+```
+法律（全国人大/常委会）
+  └─ 01 慈善法、02 公益事业捐赠法
+
+行政法规（国务院）
+  └─ 03 基金会管理条例
+
+部门规章（国务院部委令）
+  └─ 05 捐赠票据管理办法、08 信息公开办法
+
+部门规范性文件（部委通知/公告）
+  └─ 04 支出和管理费用规定、06 免税资格认定、07 税前扣除公告
+```
+
+---
+
+## 主题分类速查
+
+### 📋 票据与捐赠管理
+- **05** 公益事业捐赠票据使用管理办法 — 票据开具、领用、核销全流程
+- **02** 公益事业捐赠法 — 捐赠行为的基本法律框架
+- **01** 慈善法 — 慈善捐赠的上位法规定
+
+### 💰 支出与管理费用
+- **04** 慈善活动年度支出和管理费用的规定 — **核心文件**，管理费比例上限
+- **01** 慈善法第60条 — 年度慈善活动支出和管理费用标准的授权条款
+
+### 🏛 税务相关
+- **06** 非营利组织免税资格认定 — 免税资格9项条件、5年有效期
+- **07** 公益性捐赠税前扣除 — 税前扣除资格8项条件、3年有效期
+- **01** 慈善法第80-82条 — 税收优惠基本规定
+
+### 📢 信息公开与合规
+- **08** 慈善组织信息公开办法 — 30条信息公开义务（2025年修订版）
+- **03** 基金会管理条例 — 基金会治理与信息披露
+
+---
+
+## ⚠️ 重要提示
+
+1. **两个资格不要混淆**
+   - **非营利组织免税资格**（06号文）：有效期 5 年，影响组织自身所得税
+   - **公益性捐赠税前扣除资格**（07号文）：有效期 3 年，影响捐赠人税前扣除
+
+2. **管理费比例因组织类型而异**（详见 04 号文）
+   - 公募基金会：≤10%
+   - 公募社会团体/社会服务机构：≤13%
+   - 非公募基金会：按净资产规模分档 12%~20%
+   - 非公募社会团体/社会服务机构：按净资产规模分档 15%~25%
+
+3. **文件更新追踪**
+   - 08号文（信息公开办法）为 2025 年新修订版，2026年1月1日起施行
+   - 05号文（票据管理办法）为 2024 年新发布，替代 2010 年暂行办法
+
+---
+
+> **免责声明：** 本文件夹中的法规文本根据政府公开网站整理，仅供学习参考。如涉及具体法律适用，请以各发布机关官方网站的最新版本为准。
+>
+> **整理日期：** 2026年4月
+";
+
+    // ===== 文件操作 =====
+
+    private async Task<List<FileSystemNode>> LoadFileNodesAsync(Skill skill)
+    {
+        try
+        {
+            // 使用 Skills 自己的文件列表 API（路径基于 MainFileServerPathRoot）
+            var skillFiles = await SkillApiClient.GetSkillFilesAsync(skill.Id);
+
+            if (skillFiles == null || skillFiles.Count == 0)
+                return new List<FileSystemNode>();
+
+            // 将 SkillFileInfo 列表转换为 FileSystemNode 树结构
+            var rootNodes = BuildFileTreeFromSkillFiles(skill.Id, skillFiles);
+
+            // 为每个文件节点设置 GetStreamAsync 和 DeletePath
+            SetupFileNodeCallbacks(rootNodes);
+
+            return rootNodes;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载文件列表失败: {ex.Message}", Severity.Error);
+            return new();
+        }
+    }
+
+    /// <summary>
+    /// 将 SkillFileInfo 平面列表转换为 FileSystemNode 树结构
+    /// </summary>
+    private List<FileSystemNode> BuildFileTreeFromSkillFiles(int skillId, List<SkillFileInfo> skillFiles)
+    {
+        var rootNodes = new List<FileSystemNode>();
+        var directoryMap = new Dictionary<string, FileSystemNode>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fileInfo in skillFiles)
+        {
+            var relativePath = fileInfo.FilePath ?? fileInfo.FileName;
+            var parts = relativePath.Replace('\\', '/').Split('/');
+            var skillBasePath = $"Skills/{skillId}";
+
+            if (parts.Length == 1)
+            {
+                // 根级文件
+                var fullPath = $"{skillBasePath}/{fileInfo.FileName}";
+                var node = new FileSystemNode(fullPath, fileInfo.FileName, false)
+                {
+                    FullPath = fullPath,
+                    Name = fileInfo.FileName,
+                    IsDirectory = false,
+                    Size = fileInfo.FileSize,
+                    FileType = fileInfo.FileType,
+                    LastWriteTime = fileInfo.ModifiedTime
+                };
+                rootNodes.Add(node);
+            }
+            else
+            {
+                // 有子目录的文件，逐级创建目录节点
+                var currentPath = skillBasePath;
+                FileSystemNode? parentDir = null;
+
+                for (int i = 0; i < parts.Length - 1; i++)
+                {
+                    currentPath = $"{currentPath}/{parts[i]}";
+                    if (!directoryMap.TryGetValue(currentPath, out var dirNode))
+                    {
+                        dirNode = new FileSystemNode(currentPath, parts[i], true)
+                        {
+                            FullPath = currentPath,
+                            Name = parts[i],
+                            IsDirectory = true
+                        };
+                        directoryMap[currentPath] = dirNode;
+
+                        if (parentDir == null)
+                            rootNodes.Add(dirNode);
+                        else
+                            parentDir.Children!.Add(dirNode);
+                    }
+                    parentDir = dirNode;
+                }
+
+                // 添加文件节点
+                var fileFullPath = $"{currentPath}/{parts[^1]}";
+                var fileNode = new FileSystemNode(fileFullPath, parts[^1], false)
+                {
+                    FullPath = fileFullPath,
+                    Name = parts[^1],
+                    IsDirectory = false,
+                    Size = fileInfo.FileSize,
+                    FileType = fileInfo.FileType,
+                    LastWriteTime = fileInfo.ModifiedTime
+                };
+                parentDir?.Children!.Add(fileNode);
+            }
+        }
+
+        return rootNodes;
+    }
+
+    private async Task DownloadAllFiles()
+    {
+        if (!_fileNodes.Any()) { Snackbar.Add("没有可下载的文件。", Severity.Warning); return; }
+        if (Skill == null) return;
+        try
+        {
+            var stream = await SkillApiClient.DownloadSkillFilesArchiveAsync(Skill.Id);
+            if (stream == null) { Snackbar.Add("打包下载失败", Severity.Error); return; }
+            var zipFileName = $"{Skill.Name}_files.zip";
+            await FileDownloadService.DownloadFileFromStreamAsync(zipFileName, stream);
+            Snackbar.Add($"打包下载成功，共 {_fileNodes.Count} 个文件", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add($"打包下载失败: {ex.Message}", Severity.Error); }
+    }
+
+    // ===== 递归设置文件节点回调 =====
+    private void SetupFileNodeCallbacks(List<FileSystemNode> nodes)
+    {
+        var skillBasePrefix = $"Skills/{Skill?.Id}/";
+        foreach (var node in nodes)
+        {
+            if (!node.IsDirectory)
+            {
+                var fullPath = node.FullPath;
+                // 从 FullPath 中提取相对于 Skill 目录的文件名（用于 Skills 专用 API）
+                var relativeFileName = fullPath?.StartsWith(skillBasePrefix) == true
+                    ? fullPath.Substring(skillBasePrefix.Length)
+                    : fullPath;
+                node.GetStreamAsync = async () =>
+                {
+                    try
+                    {
+                        return await SkillApiClient.DownloadSkillFileAsync(Skill!.Id, relativeFileName!);
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"获取文件流失败: {ex.Message}", Severity.Error);
+                        return null;
+                    }
+                };
+                // 使用 DeleteAsync 委托调用 Skills 专用删除 API（而非 DeletePath 走 FileManage 模块）
+                node.DeleteAsync = async () =>
+                {
+                    try
+                    {
+                        return await SkillApiClient.DeleteSkillFileAsync(Skill!.Id, relativeFileName!);
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"删除文件失败: {ex.Message}", Severity.Error);
+                        return false;
+                    }
+                };
+            }
+            else
+            {
+                // 文件夹节点：支持打包下载和递归删除
+                var fullPath = node.FullPath;
+                var relativeFolderPath = fullPath?.StartsWith(skillBasePrefix) == true
+                    ? fullPath.Substring(skillBasePrefix.Length)
+                    : fullPath;
+                node.GetStreamAsync = async () =>
+                {
+                    try
+                    {
+                        return await SkillApiClient.DownloadSkillFolderArchiveAsync(Skill!.Id, relativeFolderPath!);
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"打包下载文件夹失败: {ex.Message}", Severity.Error);
+                        return null;
+                    }
+                };
+                node.DeleteAsync = async () =>
+                {
+                    try
+                    {
+                        return await SkillApiClient.DeleteSkillFolderAsync(Skill!.Id, relativeFolderPath!);
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"删除文件夹失败: {ex.Message}", Severity.Error);
+                        return false;
+                    }
+                };
+
+                if (node.Children?.Any() == true)
+                {
+                    SetupFileNodeCallbacks(node.Children);
+                }
+            }
+        }
+    }
+
+    // ===== 文件上传 =====
+
+    private async Task HandleMudFileUpload(IReadOnlyList<IBrowserFile> files)
+    {
+        if (Skill == null || files.Count == 0 || _uploading) return;
+        _uploading = true;
+        StateHasChanged();
+        try
+        {
+            await UploadFilesInternal(files.ToList());
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleFolderUpload(List<FolderUploader.FolderFileEntry> entries)
+    {
+        if (Skill == null || entries.Count == 0 || _uploading) return;
+        _uploading = true;
+        StateHasChanged();
+        try
+        {
+            await UploadFolderFilesInternal(entries);
+            if (_folderUploader != null)
+                await _folderUploader.ClearSelectionAsync();
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task UploadFolderFilesInternal(List<FolderUploader.FolderFileEntry> entries)
+    {
+        if (Skill == null) return;
+        var fileItems = new List<(Stream Stream, string FileName, string? RelativePath)>();
+        var streamsToDispose = new List<Stream>();
+        try
+        {
+            if (_folderUploader == null)
+            {
+                Snackbar.Add("文件夹上传组件未初始化，请重新选择文件夹", Severity.Error);
+                return;
+            }
+            foreach (var entry in entries)
+            {
+                try
+                {
+                    var bytes = await _folderUploader.GetFileBytesAsync(entry.RelativePath);
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        var stream = new MemoryStream(bytes);
+                        streamsToDispose.Add(stream);
+                        // 保留相对路径信息
+                        fileItems.Add((stream, entry.FileName, entry.RelativePath));
+                    }
+                    else { Snackbar.Add($"文件 '{entry.FileName}' 读取失败，请重新选择", Severity.Warning); }
+                }
+                catch (Exception ex) { Snackbar.Add($"读取 '{entry.FileName}' 失败: {ex.Message}", Severity.Warning); }
+            }
+            if (fileItems.Count == 0) { Snackbar.Add("没有可上传的文件", Severity.Warning); return; }
+            await UploadSkillFilesWithPathsAsync(Skill.Id, fileItems);
+            Snackbar.Add($"成功上传 {fileItems.Count} 个文件", Severity.Success);
+            _fileNodes = await LoadFileNodesAsync(Skill);
+            StateHasChanged();
+        }
+        catch (Exception ex) { Snackbar.Add($"上传失败: {ex.Message}", Severity.Error); }
+        finally { foreach (var s in streamsToDispose) await s.DisposeAsync(); }
+    }
+
+    private async Task UploadFilesInternal(List<IBrowserFile> files)
+    {
+        if (Skill == null) return;
+        var fileItems = new List<(Stream Stream, string FileName, string? RelativePath)>();
+        var streamsToDispose = new List<Stream>();
+        try
+        {
+            foreach (var file in files)
+            {
+                var stream = file.OpenReadStream(maxAllowedSize: 512000000);
+                streamsToDispose.Add(stream);
+                fileItems.Add((stream, file.Name, null)); // 单个文件没有相对路径
+            }
+            await UploadSkillFilesWithPathsAsync(Skill.Id, fileItems);
+            Snackbar.Add($"成功上传 {files.Count} 个文件", Severity.Success);
+            _fileNodes = await LoadFileNodesAsync(Skill);
+            StateHasChanged();
+        }
+        catch (Exception ex) { Snackbar.Add($"上传失败: {ex.Message}", Severity.Error); }
+        finally { foreach (var s in streamsToDispose) await s.DisposeAsync(); }
+    }
+
+    private async Task UploadSkillFilesWithPathsAsync(int skillId, List<(Stream Stream, string FileName, string? RelativePath)> fileItems)
+    {
+        await SkillApiClient.UploadSkillFilesWithPathsAsync(skillId, fileItems);
+    }
+
+    // ===== Markdown 渲染 =====
+
+    private MarkupString RenderMarkdown(string? markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return new MarkupString("<span class='text-muted'>暂无内容</span>");
+        var html = ConvertMarkdownToHtml(markdown);
+        return new MarkupString(html);
+    }
+
+    private string ConvertMarkdownToHtml(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown)) return string.Empty;
+        var lines = markdown.Split('\n');
+        var result = new System.Text.StringBuilder();
+        bool inCodeBlock = false;
+        var codeBlockLang = string.Empty;
+        var codeBlockContent = new System.Text.StringBuilder();
+        bool inList = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (line.TrimStart().StartsWith("```"))
+            {
+                if (!inCodeBlock) {
+                    if (inList) { result.AppendLine("</ul>"); inList = false; }
+                    inCodeBlock = true;
+                    codeBlockLang = line.TrimStart().Substring(3).Trim();
+                    codeBlockContent.Clear();
+                    continue;
+                }
+                else {
+                    inCodeBlock = false;
+                    var langAttr = string.IsNullOrEmpty(codeBlockLang) ? "" : $" class=\"language-{EscapeHtml(codeBlockLang)}\"";
+                    result.AppendLine($"<pre><code{langAttr}>{EscapeHtml(codeBlockContent.ToString().TrimEnd())}</code></pre>");
+                    continue;
+                }
+            }
+            if (inCodeBlock) { codeBlockContent.AppendLine(line); continue; }
+            if (string.IsNullOrWhiteSpace(line)) { if (inList) { result.AppendLine("</ul>"); inList = false; } continue; }
+
+            var trimmed = line.TrimStart();
+            if (trimmed == "---" || trimmed == "***" || trimmed == "___") { if (inList) { result.AppendLine("</ul>"); inList = false; } result.AppendLine("<hr />"); continue; }
+            if (trimmed.StartsWith("# ") || trimmed.StartsWith("## ") || trimmed.StartsWith("### ") || trimmed.StartsWith("#### "))
+            {
+                if (inList) { result.AppendLine("</ul>"); inList = false; }
+                int level = 1;
+                var content = trimmed;
+                while (content.StartsWith("#")) { content = content.Substring(1); level++; }
+                content = content.Trim();
+                if (level > 4) level = 4;
+                if (level == 1) level = 1;
+                result.AppendLine($"<h{Math.Min(level, 4)}>{ProcessInlineMarkdown(content)}</h{Math.Min(level, 4)}>");
+                continue;
+            }
+            if ((trimmed.StartsWith("- ") || trimmed.StartsWith("* ")) && !trimmed.StartsWith("**")) {
+                if (!inList) { result.AppendLine("<ul>"); inList = true; }
+                result.AppendLine($"<li>{ProcessInlineMarkdown(trimmed.Substring(2).Trim())}</li>");
+                continue;
+            }
+            var olMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"^(\d+)\.\s+(.*)");
+            if (olMatch.Success) {
+                if (!inList) { result.AppendLine("<ul>"); inList = true; }
+                result.AppendLine($"<li>{ProcessInlineMarkdown(olMatch.Groups[2].Value)}</li>");
+                continue;
+            }
+            if (inList) { result.AppendLine("</ul>"); inList = false; }
+            if (trimmed.StartsWith("> ")) {
+                result.AppendLine($"<blockquote style=\"margin:8px 0;padding:8px 16px;border-left:3px solid var(--mud-palette-primary);background:var(--mud-palette-background-grey);\">{ProcessInlineMarkdown(trimmed.Substring(2).Trim())}</blockquote>");
+                continue;
+            }
+            result.AppendLine($"<p style=\"margin:4px 0;\">{ProcessInlineMarkdown(trimmed)}</p>");
+        }
+        if (inCodeBlock) {
+            var langAttr = string.IsNullOrEmpty(codeBlockLang) ? "" : $" class=\"language-{EscapeHtml(codeBlockLang)}\"";
+            result.AppendLine($"<pre><code{langAttr}>{EscapeHtml(codeBlockContent.ToString().TrimEnd())}</code></pre>");
+        }
+        if (inList) result.AppendLine("</ul>");
+        return result.ToString();
+    }
+
+    private string ProcessInlineMarkdown(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        text = EscapeHtml(text);
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", "<em>$1</em>");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"`([^`]+)`", "<code style=\"background:var(--mud-palette-background-grey);padding:1px 4px;border-radius:3px;font-family:monospace;font-size:0.9em;\">$1</code>");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\[([^\]]+)\]\(([^)]+)\)", "<a href=\"$2\" target=\"_blank\" style=\"color:var(--mud-palette-primary);\">$1</a>");
+        return text;
+    }
+
+    private string EscapeHtml(string text)
+    {
+        return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+    }
+}

@@ -1,7 +1,9 @@
 ﻿using CJ.Plug.FileManageApi.Contracts;
 
 using CJ.Plug.Models.Shared;
+using CJ.Plug.Models.Station;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace CJ.Plug.FileManageApi.Apis
@@ -81,6 +83,41 @@ namespace CJ.Plug.FileManageApi.Apis
             api.MapPost("/completeupload", async (IFileManageService service, [FromForm] FileUploadRequest? request) => await service.CompleteUpload(request)).DisableAntiforgery();
 
             api.MapPost("/delete", async (IFileManageService service, [FromBody] FileDeleteRequest? request) => await service.DeleteFile(request));
+
+            // 以 zip 方式打包下载工具
+            api.MapGet("/downloadTool", async (string name, string version, string? path) =>
+            {
+                if (string.IsNullOrEmpty(name))
+                    return Results.BadRequest("工具名称不能为空");
+
+                using var scope = app.ServiceProvider.CreateScope();
+                var fileManageService = scope.ServiceProvider.GetRequiredService<IFileManageService>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+
+                // 如果 path 为空，从工具表中查询 ToolBasePath（工具完整包目录）
+                string toolPath = path ?? "";
+                if (string.IsNullOrEmpty(toolPath))
+                {
+                    var tool = await dbContext.Set<Tool>().FirstOrDefaultAsync(t => t.ToolName == name && t.ToolVersion == version);
+                    if (tool == null)
+                        return Results.BadRequest($"未找到工具: {name} (版本: {version})");
+                    
+                    // 优先使用 ToolBasePath（工具包根目录），否则用 ToolPath 的父目录
+                    toolPath = !string.IsNullOrEmpty(tool.ToolBasePath) 
+                        ? tool.ToolBasePath 
+                        : (tool.ToolPath != null ? Path.GetDirectoryName(tool.ToolPath)?.Replace('\\', '/') : null) ?? "";
+                    
+                    if (string.IsNullOrEmpty(toolPath))
+                        return Results.BadRequest($"工具 {name} 的路径为空，无法下载");
+                }
+
+                var (fileStream, fileName, errorMessage) = await fileManageService.DownloadToolAsync(name, version ?? "latest", toolPath);
+
+                if (fileStream == null)
+                    return Results.BadRequest(errorMessage ?? "下载失败");
+
+                return Results.File(fileStream, "application/zip", fileName);
+            });
 
             return app;
         }

@@ -1,0 +1,75 @@
+@using CJ.Plug.ModelManageModel.Models
+
+<MudDrawer Open="@Open" OpenChanged="@OnDrawerOpenChanged" Anchor="Anchor.Right" Width="400px" Variant="DrawerVariant.Temporary" Elevation="8">
+    <MudDrawerHeader>
+        <MudText Typo="Typo.h6">规则详情</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="OnClose" Size="Size.Small" />
+    </MudDrawerHeader>
+    <MudDrawerContent>
+        @if (Rule == null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Default">暂无规则数据</MudText>
+        }
+        else
+        {
+            <MudStack Spacing="3" Class="pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ID</MudText>
+                    <MudText Typo="Typo.body1">@Rule.Id</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">规则名称</MudText>
+                    <MudText Typo="Typo.body1">@(Rule.Name ?? "-")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">规则描述</MudText>
+                    <MudText Typo="Typo.body1" Style="white-space:pre-wrap;">@(Rule.Description ?? "-")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">启用状态</MudText>
+                    <MudChip T="string" Label="true" Size="Size.Small"
+                             Color="@(Rule.IsEnabled ? Color.Success : Color.Default)">
+                        @(Rule.IsEnabled ? "已启用" : "已禁用")
+                    </MudChip>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">生效开始</MudText>
+                    <MudText Typo="Typo.body1">@(Rule.EffectiveFrom?.ToString("yyyy-MM-dd") ?? "-")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">生效结束</MudText>
+                    <MudText Typo="Typo.body1">@(Rule.EffectiveTo?.ToString("yyyy-MM-dd") ?? "-")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">排序</MudText>
+                    <MudText Typo="Typo.body1">@Rule.SortOrder</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">创建时间</MudText>
+                    <MudText Typo="Typo.body1">@Rule.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">更新时间</MudText>
+                    <MudText Typo="Typo.body1">@Rule.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </div>
+            </MudStack>
+        }
+    </MudDrawerContent>
+</MudDrawer>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public OntologyRule? Rule { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task OnDrawerOpenChanged(bool isOpen)
+    {
+        if (!isOpen)
+        {
+            await OpenChanged.InvokeAsync(false);
+            await OnClose.InvokeAsync();
+        }
+    }
+}

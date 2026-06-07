@@ -12,7 +12,8 @@ namespace CJ.Plug_Aspire.StationApiService.Services
     {
         private readonly HttpClient _httpClient = new HttpClient();
         private HubConnection? _hubConnection;
-        private readonly string _webApiBaseUrl = GlobalData.MainDispatcherServer;
+        private readonly string _webApiBaseUrl =
+            StaticData.MainServerUrl ?? GlobalData.MainDispatcherServer;
         private volatile bool _isHubConnected;
 
         // 重试配置
@@ -97,9 +98,11 @@ namespace CJ.Plug_Aspire.StationApiService.Services
                     {
                         try
                         {
+                            var tellScheme = string.IsNullOrEmpty(StaticData.ToolAgentServerHttpScheme) ? "http" : StaticData.ToolAgentServerHttpScheme;
                             await _hubConnection.InvokeAsync("SendStationStatus",
-                                StaticData.ToolAgentServerHttpScheme + "://" + ipv4.ToString() + ":" + StaticData.ToolAgentServerHttpPort,
-                                "running");
+                                tellScheme + "://" + ipv4.ToString() + ":" + StaticData.ToolAgentServerHttpPort,
+                                "running",
+                                StaticData.ToolsRootPath ?? "");
                         }
                         catch (Exception ex)
                         {
@@ -160,9 +163,10 @@ namespace CJ.Plug_Aspire.StationApiService.Services
             {
                 if (_hubConnection?.State == HubConnectionState.Connected)
                 {
-                    var stationUrl = StaticData.ToolAgentServerHttpScheme + "://" + ipv4.ToString() + ":" + StaticData.ToolAgentServerHttpPort;
-                    await _hubConnection.InvokeAsync("SendStationStatus", stationUrl, "running");
-                    Console.WriteLine($"[StationHub] 已注册图站: {stationUrl}");
+                    var scheme = string.IsNullOrEmpty(StaticData.ToolAgentServerHttpScheme) ? "http" : StaticData.ToolAgentServerHttpScheme;
+                    var stationUrl = scheme + "://" + ipv4.ToString() + ":" + StaticData.ToolAgentServerHttpPort;
+                    await _hubConnection.InvokeAsync("SendStationStatus", stationUrl, "running", StaticData.ToolsRootPath ?? "");
+                    Console.WriteLine($"[StationHub] 已注册图站: {stationUrl}, ToolsRootPath: {StaticData.ToolsRootPath}");
                 }
             }
             catch (Exception ex)

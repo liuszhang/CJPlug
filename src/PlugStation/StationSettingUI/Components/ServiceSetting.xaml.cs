@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
+using Microsoft.Win32;
 using StationSettingUI.Helpers;
 using StationSettingUI.Models;
 using StationSettingUI.Services;
@@ -13,11 +16,13 @@ namespace StationSettingUI.Components;
 /// </summary>
 public partial class ServiceSetting : UserControl
 {
-    private readonly StationConfigService _configService;
-    private readonly StationApiService _apiService;
+    private readonly StationSettingUI.Services.StationConfigService _configService;
+    private readonly StationSettingUI.Services.StationApiService _apiService;
     private AppConfig _config;
     private Process? _serviceProcess;
     private bool _isInitialized;
+    private readonly DispatcherTimer _autoSaveTimer;
+    private bool _suppressAutoSave;
 
     // StationApiServer 的可能进程名
     private static readonly string[] StationProcessNames = new[]
@@ -28,16 +33,25 @@ public partial class ServiceSetting : UserControl
 
     public ServiceSetting()
     {
+        _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _autoSaveTimer.Tick += OnAutoSaveTimerTick;
+        _suppressAutoSave = true;
+
         InitializeComponent();
-        _configService = new StationConfigService();
+
+        _configService = new StationSettingUI.Services.StationConfigService();
         _config = _configService.LoadConfig();
         _apiService = new StationApiService(_config);
+
+        _suppressAutoSave = false;
     }
 
     public async Task InitializeAsync()
     {
         if (_isInitialized) return;
         _isInitialized = true;
+
+        _suppressAutoSave = true;
 
         TxtMainServerUrl.Text = _config.MainServerUrl;
         TxtStationFolder.Text = _config.StationApiFolder;
@@ -46,6 +60,8 @@ public partial class ServiceSetting : UserControl
         TxtVersion.Text = AppConfig.AppVersion;
         ChkAutoStart.IsChecked = _config.AutoStartService;
         TxtStationApiUrl.Text = $"({_config.StationApiUrl})";
+
+        _suppressAutoSave = false;
 
         await RefreshServiceStatusAsync();
     }
@@ -127,6 +143,107 @@ public partial class ServiceSetting : UserControl
         }
     }
 
+    private void ConfigField_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressAutoSave) return;
+        StartAutoSaveTimer();
+    }
+
+    private void BtnImport_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "导入配置",
+            Filter = "JSON 配置文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+            DefaultExt = ".json"
+        };
+
+        if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        try
+        {
+            var json = File.ReadAllText(dlg.FileName);
+            var imported = JsonSerializer.Deserialize<AppConfig>(json);
+            if (imported == null)
+            {
+                SetStatusMessage("导入失败: JSON 格式不正确或配置数据为空", true);
+                return;
+            }
+
+            // 基本校验
+            if (string.IsNullOrWhiteSpace(imported.MainServerUrl))
+            {
+                SetStatusMessage("导入失败: 缺少必填字段 MainServerUrl", true);
+                return;
+            }
+            if (imported.StationApiPort <= 0 || imported.StationApiPort > 65535)
+            {
+                SetStatusMessage("导入失败: StationApiPort 端口号无效", true);
+                return;
+            }
+
+            // 更新配置
+            _config.MainServerUrl = imported.MainServerUrl;
+            _config.StationApiPort = imported.StationApiPort;
+            _config.StationApiFolder = imported.StationApiFolder ?? "";
+            _config.ToolsRootPath = imported.ToolsRootPath ?? @"C:\Program Files\CJTools";
+            _config.AutoStartService = imported.AutoStartService;
+            _config.LastKnownVersion = imported.LastKnownVersion;
+
+            // 更新 UI（抑制自动保存）
+            _suppressAutoSave = true;
+            TxtMainServerUrl.Text = _config.MainServerUrl;
+            TxtStationFolder.Text = _config.StationApiFolder;
+            TxtStationPort.Text = _config.StationApiPort.ToString();
+            TxtToolsRootPath.Text = _config.ToolsRootPath;
+            ChkAutoStart.IsChecked = _config.AutoStartService;
+            _suppressAutoSave = false;
+
+            _configService.SaveConfig();
+            SetStatusMessage("配置导入成功", false);
+        }
+        catch (JsonException)
+        {
+            SetStatusMessage("导入失败: JSON 格式不正确", true);
+        }
+        catch (Exception ex)
+        {
+            SetStatusMessage($"导入失败: {ex.Message}", true);
+        }
+    }
+
+    private void BtnExport_Click(object sender, RoutedEventArgs e)
+    {
+        // 先将当前 UI 值同步到配置对象
+        _config.MainServerUrl = TxtMainServerUrl.Text.Trim();
+        _config.StationApiFolder = TxtStationFolder.Text.Trim();
+        if (int.TryParse(TxtStationPort.Text.Trim(), out var port))
+            _config.StationApiPort = port;
+        _config.ToolsRootPath = TxtToolsRootPath.Text.Trim();
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "导出配置",
+            Filter = "JSON 配置文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+            DefaultExt = ".json",
+            FileName = "StationConfig.json"
+        };
+
+        if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var json = JsonSerializer.Serialize(_config, options);
+            File.WriteAllText(dlg.FileName, json);
+            SetStatusMessage($"配置已导出到: {dlg.FileName}", false);
+        }
+        catch (Exception ex)
+        {
+            SetStatusMessage($"导出失败: {ex.Message}", true);
+        }
+    }
+
     private async void BtnTestConnection_Click(object sender, RoutedEventArgs e)
     {
         BtnTestConnection.IsEnabled = false;
@@ -156,7 +273,8 @@ public partial class ServiceSetting : UserControl
 
             var isDll = stationPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
             var fileName = isDll ? "dotnet" : stationPath;
-            var arguments = isDll ? stationPath : "";
+            var portArg = $"--port {_config.StationApiPort}";
+            var arguments = isDll ? $"{stationPath} {portArg}" : portArg;
 
             var startInfo = new ProcessStartInfo
             {
@@ -170,7 +288,6 @@ public partial class ServiceSetting : UserControl
                 StandardErrorEncoding = System.Text.Encoding.UTF8,
                 WorkingDirectory = Path.GetDirectoryName(stationPath) ?? "",
             };
-            startInfo.Environment["ASPNETCORE_URLS"] = $"http://*:{_config.StationApiPort}";
 
             logService.AppendLine($"========== 启动 StationApiServer ==========");
             logService.AppendLine($"命令: {fileName} {arguments}");
@@ -221,7 +338,7 @@ public partial class ServiceSetting : UserControl
         BtnRestartService.IsEnabled = false;
         SetStatusMessage("正在停止图站服务...", false);
 
-        var killed = await KillStationServiceAsync();
+        var killed = await KillStationServiceAsync(_config.StationApiPort);
 
         await Task.Delay(500);
         await RefreshServiceStatusAsync();
@@ -239,7 +356,7 @@ public partial class ServiceSetting : UserControl
         BtnStopService.IsEnabled = false;
         SetStatusMessage("正在重启图站服务...", false);
 
-        await KillStationServiceAsync();
+        await KillStationServiceAsync(_config.StationApiPort);
         await Task.Delay(1000);
 
         BtnStartService_Click(sender, e);
@@ -281,8 +398,40 @@ public partial class ServiceSetting : UserControl
 
     private void ChkAutoStart_Changed(object sender, RoutedEventArgs e)
     {
-        _config.AutoStartService = ChkAutoStart.IsChecked == true;
-        _configService.SaveConfig();
+        if (_suppressAutoSave) return;
+        StartAutoSaveTimer();
+    }
+
+    // ==================== 自动保存（防抖 500ms）====================
+
+    private void StartAutoSaveTimer()
+    {
+        _autoSaveTimer.Stop();
+        _autoSaveTimer.Start();
+    }
+
+    private void OnAutoSaveTimerTick(object? sender, EventArgs e)
+    {
+        _autoSaveTimer.Stop();
+
+        try
+        {
+            _config.MainServerUrl = TxtMainServerUrl.Text.Trim();
+            _config.StationApiFolder = TxtStationFolder.Text.Trim();
+            if (int.TryParse(TxtStationPort.Text.Trim(), out var port))
+                _config.StationApiPort = port;
+            _config.ToolsRootPath = TxtToolsRootPath.Text.Trim();
+            _config.AutoStartService = ChkAutoStart.IsChecked == true;
+
+            _configService.SaveConfig();
+            _apiService.UpdateBaseAddress();
+            TxtStationApiUrl.Text = $"({_config.StationApiUrl})";
+            SetStatusMessage("配置已自动保存", false);
+        }
+        catch (Exception ex)
+        {
+            SetStatusMessage($"自动保存失败: {ex.Message}", true);
+        }
     }
 
     // ==================== 服务进程管理 ====================
@@ -290,7 +439,7 @@ public partial class ServiceSetting : UserControl
     /// <summary>
     /// 杀掉 StationApiServer 进程（多种策略尝试）
     /// </summary>
-    private static async Task<bool> KillStationServiceAsync()
+    internal static async Task<bool> KillStationServiceAsync(int port = 7660)
     {
         // 策略 1: 按进程名杀
         foreach (var name in StationProcessNames)
@@ -335,7 +484,7 @@ public partial class ServiceSetting : UserControl
         catch { }
 
         // 策略 3: 用 taskkill 暴力杀（通过端口去查 PID）
-        try { return await KillByPortAsync(7660); }
+        try { return await KillByPortAsync(port); }
         catch { }
 
         return false;

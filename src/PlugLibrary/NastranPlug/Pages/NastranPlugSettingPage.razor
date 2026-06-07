@@ -1,0 +1,107 @@
+@using BlazorMonaco.Editor
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.VariableType
+@using CJ.Plug.PlugBaseCore.Models
+@using CJ.Plug.SharedPages.SharedComponents
+@using Elsa.Api.Client.Extensions
+@using Elsa.Api.Client.Resources.ActivityDescriptors.Models
+@using Elsa.Api.Client.Shared.Models
+@using Humanizer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text.Json.Nodes
+@using System.Text.Json
+@using System.Text
+@using MudExtensions
+@using Radzen.Blazor
+@using Serilog
+
+
+<RadzenSplitter>
+    <RadzenSplitterPane Size="50%" Min="336px">
+        <MudDataGrid T="DefaultInputMapping" Items="inputMappings" EditMode="DataGridEditMode.Cell" ReadOnly="false" Dense Height="600px">
+            <ToolBarContent>
+                <MudButton OnClick="AddMapping" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">添加</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">预览</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">测试</MudButton>
+                <MudSpacer />
+                <MudTextField @bind-Value="_searchString" Placeholder="关键字检索" Adornment="Adornment.Start" Immediate="true" Margin="Margin.Dense" Clearable="true"
+                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x=>x.Keywords" Title="关键字">
+                    <EditTemplate>
+                        <MudSelect T="string" @bind-Value="context.Item.Keywords" Dense Variant="Variant.Outlined" Style="max-width:300px;">
+                            <MudSelectItem Value="@("InputFile")">InputFile</MudSelectItem>
+                            <MudSelectItem Value="@("OutputDir")">OutputDir</MudSelectItem>
+                            <MudSelectItem Value="@("NastranPath")">NastranPath</MudSelectItem>
+                        </MudSelect>
+                    </EditTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x=>x.Value" Title="设定值">
+                    <EditTemplate>
+                        <MudStack Row AlignItems="AlignItems.Center">
+                            @if (context.Item.IsValueFromOtherVariable)
+                            {
+                                <MudSelectExtended T="string" AnchorOrigin="Origin.BottomCenter" @bind-Value="context.Item.SourceVariableName">
+                                    @foreach (var plug in PlugDataZone?.PlugDatas)
+                                    {
+                                        <MudSelectItemGroupExtended T="string" Text="@plug.Name">
+                                            @foreach (var variable in PlugDataZone?.GetVariablesOfPlug(plug.PlugDefinitionId))
+                                            {
+                                                <MudSelectItemExtended Value="@variable.Name" />
+                                            }
+                                        </MudSelectItemGroupExtended>
+                                    }
+                                </MudSelectExtended>
+                            }
+                            else
+                            {
+                                <MudTextField Typo="Typo.caption" Margin="Margin.Dense"
+                                              @bind-Value="context.Item.Value"></MudTextField>
+                            }
+                            <MudCheckBox T="bool" Label="参数" Dense Size="Size.Small"
+                                         @bind-Value="context.Item.IsValueFromOtherVariable" />
+                        </MudStack>
+
+                    </EditTemplate>
+                </PropertyColumn>
+            </Columns>
+        </MudDataGrid>
+    </RadzenSplitterPane>
+    <RadzenSplitterPane Size="50%">
+        @* <RadzenText Text="脚本预览" /> *@
+        @* <MonacoEditorWrapper></MonacoEditorWrapper> *@
+        <MudTextField @bind-Value="@SESText" ReadOnly Label="脚本预览" Variant="Variant.Outlined" Lines="32" AutoGrow="false"/>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+
+
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    private string? SESText { get; set; } = "test";
+
+    private List<DefaultInputMapping> inputMappings = new();
+
+    private string _searchString;
+
+    private Task AddMapping()
+    {
+        var newMapping = new DefaultInputMapping
+        {
+            Keywords = "NewKeyword",
+            Value = "NewValue"
+        };
+        inputMappings.Add(newMapping);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+}

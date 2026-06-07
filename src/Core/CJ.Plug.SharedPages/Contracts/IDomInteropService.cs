@@ -12,6 +12,7 @@ namespace CJ.Plug.SharedPages.Contracts
         Task<int?> GetCurrentUserId();
         Task SetCurrentUserId(int id);
         Task SetCurrentUserName(string userName);
+        Task ClearCurrentUser();
         Task<string?> GetItemValue(string key);
         Task SetItemValue(string key,string value);
 

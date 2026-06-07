@@ -199,7 +199,7 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
             try
             {                
                 (FileRealPath,FileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
-                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + FileId);
+                PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextFile.ToString(), browserFile.Name + ":" + FileId);
             }
             catch (Exception ex)
             {
@@ -333,9 +333,10 @@ EditTrigger="@(DataGridEditTrigger.Manual)" EditMode="DataGridEditMode.Cell">
     {     
         //await CheckKeywords();
         TextMappings.Add(textMapping);
-        PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
+        PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.TextMapping.ToString(), JsonSerializer.Serialize(TextMappings));
         //如果有新增的参数，则添加到变量列表
-        PlugDataZone.SetVariableValue(PlugDefinitionId, textMapping.BindingVariableName, PlugDataZone.GetVariableValue(PlugDefinitionId, textMapping.BindingVariableName));
+        if (PlugDataZone != null)
+            PlugDataZone.SetVariableValue(PlugDefinitionId, textMapping.BindingVariableName, PlugDataZone.GetVariableValue(PlugDefinitionId, textMapping.BindingVariableName));
         StateHasChanged();
     }
 

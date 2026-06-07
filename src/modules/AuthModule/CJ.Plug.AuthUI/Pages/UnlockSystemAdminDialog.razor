@@ -1,0 +1,45 @@
+@using CJ.Plug.UserManageModels
+@using CJ.Plug.UserManageApiClient
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">解锁系统管理员</MudText>
+        <MudText Typo="Typo.body2" Class="mb-4">请输入要解锁的系统管理员用户名：</MudText>
+        
+        <MudTextField @bind-Value="_userName" 
+                      Label="用户名" 
+                      Variant="Variant.Outlined" 
+                      FullWidth="true"
+                      Class="mb-3" />
+
+        <MudTextField @bind-Value="_remark" 
+                      Label="备注（可选）" 
+                      Variant="Variant.Outlined" 
+                      FullWidth="true"
+                      Class="mb-4" 
+                      Lines="3" 
+                      Text="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Default">取消</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Disabled="@string.IsNullOrWhiteSpace(_userName)">解锁</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    private string _userName = string.Empty;
+    private string _remark = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (!string.IsNullOrWhiteSpace(_userName))
+        {
+            MudDialog.Close(_userName);
+        }
+    }
+}

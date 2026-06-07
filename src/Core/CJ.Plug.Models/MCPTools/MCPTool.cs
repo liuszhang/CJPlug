@@ -18,6 +18,8 @@ namespace CJ.Plug.Models.MCPTools
         public string? GroupName { get; set; }
         public string? Type { get; set; }
         public string? ToolSettingsJson { get; set; }
+        /// <summary>工具类型: "Workflow"（工作流）或 "Plugin"（单插头）</summary>
+        public string? ToolType { get; set; } = "Workflow";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }

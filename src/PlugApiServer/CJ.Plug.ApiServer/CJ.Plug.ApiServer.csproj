@@ -74,6 +74,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="NSwag.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,6 +82,7 @@
     <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
     <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
+    <ProjectReference Include="..\CJ.Plug.DispatchServer\CJ.Plug.DispatchServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

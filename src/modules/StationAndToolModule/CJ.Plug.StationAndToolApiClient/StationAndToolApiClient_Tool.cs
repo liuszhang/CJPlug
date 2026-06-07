@@ -73,5 +73,33 @@ namespace CJ.Plug.StationAndToolApiClient
         {
             return await httpClient.PutAsJsonAsync("api/Tool/UpdateTool", updatedTool, cancellationToken).Result.Content.ReadFromJsonAsync<Tool>(cancellationToken: cancellationToken);
         }
+
+        public async Task<Stream> DownloadToolAsync(string toolName, string version, CancellationToken cancellationToken = default)
+        {
+            var downloadUrl = $"api/file/downloadTool?name={Uri.EscapeDataString(toolName)}&version={Uri.EscapeDataString(version)}";
+            var response = await httpClient.GetAsync(downloadUrl, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStreamAsync();
+        }
+
+        public async Task<bool> MoveToolFilesFromTmpAsync(string toolName, bool isSystemTool, string userName)
+        {
+            var request = new { ToolName = toolName, IsSystemTool = isSystemTool, UserName = userName };
+            var response = await httpClient.PostAsJsonAsync("api/Tool/MoveToolFilesFromTmp", request);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> DeleteToolTmpFilesAsync()
+        {
+            var response = await httpClient.PostAsync("api/Tool/DeleteToolTmpFiles", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<int> ImportDefaultToolsAsync(CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsync("api/Tool/ImportDefaultTools", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<int>(cancellationToken: cancellationToken);
+        }
     }
 }

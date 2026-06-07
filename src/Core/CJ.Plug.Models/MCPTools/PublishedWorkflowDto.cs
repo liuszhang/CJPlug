@@ -17,6 +17,9 @@ public class PublishedWorkflowDto
 
     /// <summary>工作流入口参数列表（IsInput = true 的 PDZ 变量）</summary>
     public List<EntryVariableDto> EntryVariables { get; set; } = new();
+
+    /// <summary>工具类型: "Workflow" 或 "Plugin"</summary>
+    public string? ToolType { get; set; } = "Workflow";
 }
 
 /// <summary>

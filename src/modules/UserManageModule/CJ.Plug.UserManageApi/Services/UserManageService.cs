@@ -63,7 +63,13 @@ namespace CJ.Plug.UserManageApi.Services
 
         public async Task<List<User>> GetAllUsersAsync(CancellationToken cancellationToken = default)
         {
-            return await _userManager.Users.ToListAsync(cancellationToken);
+            var users = await _userManager.Users.ToListAsync(cancellationToken);
+            foreach (var u in users)
+            {
+                Log.Information("[GetAllUsers] 用户={UserName}, LockoutEnabled={LockoutEnabled}, LockoutEnd={LockoutEnd}", 
+                    u.UserName, u.LockoutEnabled, u.LockoutEnd);
+            }
+            return users;
         }
 
         public async Task<User?> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
@@ -78,12 +84,15 @@ namespace CJ.Plug.UserManageApi.Services
                     return null;
                 }
 
-                // 检查邮箱是否已存在
-                var existingEmail = await _userManager.FindByEmailAsync(request.Email);
-                if (existingEmail != null)
+                // 检查邮箱是否已存在（仅非空邮箱才检查唯一性）
+                if (!string.IsNullOrEmpty(request.Email))
                 {
-                    Log.Warning("创建用户失败：邮箱 {Email} 已存在", request.Email);
-                    return null;
+                    var existingEmail = await _userManager.FindByEmailAsync(request.Email);
+                    if (existingEmail != null)
+                    {
+                        Log.Warning("创建用户失败：邮箱 {Email} 已存在", request.Email);
+                        return null;
+                    }
                 }
 
                 var user = MapToEntity(request);
@@ -203,6 +212,100 @@ namespace CJ.Plug.UserManageApi.Services
 
             var roles = await _userManager.GetRolesAsync(user);
             return roles.ToList();
+        }
+
+        public async Task<bool> SetUserStatusAsync(int userId, DataStatus status, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(userId.ToString());
+                if (user == null)
+                {
+                    Log.Warning("设置用户状态失败：用户 {Id} 不存在", userId);
+                    return false;
+                }
+
+                if (user.IsSystem)
+                {
+                    Log.Warning("系统用户 {UserName} 不允许修改状态", user.UserName);
+                    throw new InvalidOperationException($"系统用户 \"{user.UserName}\" 不允许修改状态");
+                }
+
+                user.Status = (int)status;
+                var result = await _userManager.UpdateAsync(user);
+                if (!result.Succeeded)
+                {
+                    foreach (var error in result.Errors)
+                        Log.Error("设置用户状态错误：{Error}", error.Description);
+                    return false;
+                }
+
+                Log.Information("已将用户 {UserName} 状态设置为 {Status}", user.UserName, status.GetDisplayName());
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "设置用户状态时发生异常");
+                return false;
+            }
+        }
+
+        public async Task<bool> SetUserLockoutAsync(int userId, bool isLocked, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(userId.ToString());
+                if (user == null)
+                {
+                    Log.Warning("设置用户锁定状态失败：用户 {Id} 不存在", userId);
+                    return false;
+                }
+
+                if (user.IsSystem)
+                {
+                    Log.Warning("系统用户 {UserName} 不允许锁定/解锁", user.UserName);
+                    throw new InvalidOperationException($"系统用户 \"{user.UserName}\" 不允许锁定/解锁");
+                }
+
+                if (isLocked)
+                {
+                    // 锁定：启用 LockoutEnabled 并设置 LockoutEnd 为未来 100 年
+                    user.LockoutEnabled = true;
+                    user.LockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
+                    Log.Information("锁定用户 {UserName}: LockoutEnabled={LockoutEnabled}, LockoutEnd={LockoutEnd}", 
+                        user.UserName, user.LockoutEnabled, user.LockoutEnd);
+                }
+                else
+                {
+                    // 解锁：清空 LockoutEnd
+                    user.LockoutEnd = null;
+                    Log.Information("解锁用户 {UserName}: LockoutEnd={LockoutEnd}", user.UserName, user.LockoutEnd ?? (object)"null");
+                }
+                
+                var result = await _userManager.UpdateAsync(user);
+                if (!result.Succeeded)
+                {
+                    foreach (var error in result.Errors)
+                        Log.Error("设置用户锁定状态错误：{Error}", error.Description);
+                    return false;
+                }
+
+                Log.Information("已将用户 {UserName} 锁定状态设置为 {IsLocked}", user.UserName, isLocked ? "锁定" : "解锁");
+                return true;
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "设置用户锁定状态时发生异常");
+                return false;
+            }
         }
     }
 }

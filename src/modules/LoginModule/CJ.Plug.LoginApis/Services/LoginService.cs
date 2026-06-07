@@ -70,6 +70,12 @@ namespace CJ.Plug.LoginApis.Services
             {
                 return null;
             }
+            // 检查账号是否已被锁定
+            if (user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            {
+                Console.WriteLine("账号已被锁定: " + user.UserName);
+                return null;
+            }
             Console.WriteLine("user: " + user?.UserName);
             Console.WriteLine("password: " + user?.Password);
             Console.WriteLine("user: " + dto?.UserName);

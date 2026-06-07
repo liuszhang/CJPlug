@@ -95,7 +95,17 @@
 
 
     //包装编辑器自带动作
-    public async Task SetValue(string newValue) => await _editor.SetValue(newValue);
+    public async Task SetValue(string newValue)
+    {
+        try
+        {
+            await _editor.SetValue(newValue);
+        }
+        catch (JSException ex)
+        {
+            CLog.Warning($"Monaco editor SetValue failed (editor may not be ready): {ex.Message}");
+        }
+    }
     public async Task<Selection> GetSelection() => await _editor.GetSelection(); 
     public async Task SetSelection(Selection selection, string source) => await _editor.SetSelection(selection, source);
     public async Task<TextModel> GetModel() => await _editor.GetModel();

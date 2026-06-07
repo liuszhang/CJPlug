@@ -6,6 +6,7 @@ using CJ.Plug.Models.Shared;
 using Elsa.Studio.Workflows.UI.Models;
 using Elsa.Workflows;
 using Elsa.Workflows.Activities.Flowchart.Attributes;
+using Elsa.Workflows.Activities.Flowchart.Models;
 using Elsa.Workflows.Attributes;
 using Elsa.Workflows.Exceptions;
 using Elsa.Workflows.Memory;
@@ -44,12 +45,10 @@ public class CommonCorePlugActivity : CodeActivity
                 PlugDefinitionId = context.Activity.Id
             };
 
-            CLog.Information("============CREATE BOOKMARK,WAIT FOR EXECUTING...============");
-
             var erd = await MainApiClient.ExecutePlug(request);
             CLog.Information($"执行输出：{string.Join("|", erd?.Outcome)}", jobCorrelationId);
 
-            // 判断同步/异步：ExecuteStatus == 完成 → 同步完成，否则 → 创建书签等待
+            // 判断同步/异步：ExecuteStatus == 完成 → 同步完成，否则（需要等待图站完成时的图站执行中状态） → 创建书签等待
             // 注意：不能基于 Outcome.Length 判断，因为默认值 ["Done"] 会导致异步插头也走同步分支
             if (erd?.ExecuteStatus == JobStatus.完成)
             {
@@ -59,7 +58,14 @@ public class CommonCorePlugActivity : CodeActivity
                 return;
             }
 
+            //由于Elsa的书签机制目前有BUG（6430），为了保证流程能继续进行，暂时先不创建书签，等官方修复后再启用书签功能
+            CLog.Warning($"由于Elsa书签机制BUG，暂不创建书签，直接完成活动，Outcome: {string.Join(",", erd?.Outcome)}", jobCorrelationId);
+            await context.CompleteActivityWithOutcomesAsync(["Done"]);
+            return;
+
             // 异步执行：创建 Elsa 书签，释放线程，等待外部唤醒
+            CLog.Information("============CREATE BOOKMARK,WAIT FOR EXECUTING...============");
+
             var bookmarkArgs = new CreateBookmarkArgs
             {
                 BookmarkId = bookmarkId,

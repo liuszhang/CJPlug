@@ -44,6 +44,7 @@ namespace CJ.Plug.Login
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequireLowercase = false;
                 options.Password.RequireUppercase = false;
+                options.Password.RequireDigit = false;
 
             });
 

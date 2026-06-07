@@ -9,6 +9,7 @@
 @inject IEnumerable<IPlugActionSettingContent> PlugActionSettingContent
 @inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 @inject MainApiClient MainApiClient
+@inject IDialogService DialogService
 
 @if (Loading)
 {
@@ -33,28 +34,21 @@
 
 </MudStack>
 
-<MudExpansionPanels MultiExpansion="true">
+<MudList T="ActionData">
     @foreach (var a in CurrentPlugActionDatas)
     {
-        <MudExpansionPanel>
-            <TitleContent>
-                <MudStack Row AlignItems="AlignItems.Center">
-                    <MudIcon Icon="@Icons.Material.Filled.ResetTv" class="mr-3"></MudIcon>
-                    <MudText>(@a.SN)</MudText>
-                    <MudText>@a.Name</MudText>
-                    <MudSpacer></MudSpacer>
-                    <MudIconButton OnClick="()=>RemoveActionFromPlug(a)" Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
-                </MudStack>
-            </TitleContent>
-            <ChildContent>
-                @if (PlugActionSettingContents.ContainsKey(a.ActionIdentityId))
-                {
-                    @PlugActionSettingContents?[a.ActionIdentityId]
-                }
-            </ChildContent>
-        </MudExpansionPanel>
+        <MudListItem T="ActionData">
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.ResetTv" class="mr-3"></MudIcon>
+                <MudText>(@a.SN)</MudText>
+                <MudText>@a.Name</MudText>
+                <MudSpacer></MudSpacer>
+                <MudIconButton OnClick="()=>OpenActionConfigDialog(a)" Icon="@Icons.Material.Filled.Settings" Size="Size.Small" aria-label="config"></MudIconButton>
+                <MudIconButton OnClick="()=>RemoveActionFromPlug(a)" Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="delete"></MudIconButton>
+            </MudStack>
+        </MudListItem>
     }
-</MudExpansionPanels>
+</MudList>
 
 @code {
     [Parameter]
@@ -197,5 +191,34 @@
     {
         PlugDataZone.ActionDatas.RemoveAll(v => v.ActionIdentityId == action.ActionIdentityId);
         await PDZUpdated.InvokeAsync(PlugDataZone);
+    }
+
+    /// <summary>
+    /// 打开动作配置弹窗
+    /// </summary>
+    private async Task OpenActionConfigDialog(ActionData action)
+    {
+        var parameters = new DialogParameters<PlugActionConfigDialog>
+        {
+            { x => x.ActionItem, action },
+            { x => x.PlugDataZone, PlugDataZone },
+            { x => x.PDZId, PlugDataZone?.PDZId },
+        };
+
+        var diaOption = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            Position = DialogPosition.Center,
+            BackdropClick = false,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<PlugActionConfigDialog>($"配置动作 - {action.Name}", parameters, diaOption);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            // 配置已更新，刷新界面
+            StateHasChanged();
+        }
     }
 }

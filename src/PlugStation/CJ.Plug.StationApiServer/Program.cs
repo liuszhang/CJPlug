@@ -19,7 +19,32 @@ using System.Text;
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-var builder = WebApplication.CreateBuilder(args);
+// 解析命令行 --port 参数
+int? commandLinePort = null;
+var builderArgs = new List<string>();
+for (int i = 0; i < args.Length; i++)
+{
+    if (args[i] == "--port" && i + 1 < args.Length && int.TryParse(args[i + 1], out var p))
+    {
+        commandLinePort = p;
+        i++; // 跳过端口值
+    }
+    else
+    {
+        builderArgs.Add(args[i]);
+    }
+}
+
+// 确定服务端口：命令行 --port > SQLite配置 > appsettings默认7660
+int servicePort = commandLinePort ?? 7660;
+if (commandLinePort == null)
+{
+    var dbPortStr = StationConfigHelper.ReadStationApiPort();
+    if (int.TryParse(dbPortStr, out var dbPort))
+        servicePort = dbPort;
+}
+
+var builder = WebApplication.CreateBuilder(builderArgs.ToArray());
 var configuration = builder.Configuration;
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetValue<string>("env"));
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
@@ -35,10 +60,24 @@ Log.Logger = new LoggerConfiguration()
 //StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
 StaticData.MainServerHostIp = GlobalData.MainDispatcherServer;
 Console.WriteLine("the main serverIp is:" + StaticData.MainServerHostIp);
+
+// 从 StationSettingUI 共享的 SQLite 配置读取用户设置的平台服务地址
+StaticData.MainServerUrl = StationConfigHelper.ReadMainServerUrl() ?? GlobalData.MainDispatcherServer;
+Console.WriteLine("the main serverUrl is:" + StaticData.MainServerUrl);
 //StaticData.ToolAgentServerHttpsPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Https").GetSection("Url").Value.Split(':')[2];
-StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
+//StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
 //StaticData.ToolAgentServerHttpPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[2];
 StaticData.ToolAgentServer = configuration.GetSection("FileServer").GetSection("ToolAgentServer").Value.ToString();
+
+// 从 StationSettingUI 共享的 SQLite 配置读取用户设置的工具安装根目录
+StaticData.ToolsRootPath = StationConfigHelper.ReadToolsRootPath() ?? "";
+Console.WriteLine("the ToolsRootPath is:" + StaticData.ToolsRootPath);
+
+StaticData.ToolAgentServerHttpPort = servicePort.ToString();
+Console.WriteLine("the service port is:" + servicePort);
+
+// 覆盖 appsettings.json 中的 Kestrel 端口配置
+builder.WebHost.UseUrls($"http://*:{servicePort}");
 
 
 

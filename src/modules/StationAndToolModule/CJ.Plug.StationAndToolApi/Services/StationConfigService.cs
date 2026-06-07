@@ -175,6 +175,33 @@ public class StationConfigService:IStationConfigService
         }
     }
 
+    public async Task<ToolDeploySettingModel?> GetToolDeploySetting(ToolConfigFilter filter)
+    {
+        try
+        {
+            var dbQuery = _dbContext.Set<CommonRelation>()
+                .FirstOrDefault(c =>
+                    c.RelationCategory == RelationCategory.ToolToStation.ToString() &&
+                    c.RoleAId == filter.ToolId &&
+                    c.RoleBId == filter.StationId
+                );
+
+            if (dbQuery == null)
+            {
+                return new ToolDeploySettingModel();
+            }
+
+            var toolDeploySetting = JsonSerializer.Deserialize<ToolDeploySettingModel>(dbQuery.RelationSetting);
+            return toolDeploySetting ?? new ToolDeploySettingModel();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            CLog.Error(ex.Message);
+            return new ToolDeploySettingModel();
+        }
+    }
+
     public async Task<string?> GetToolDefaultPath(string? toolName,string? toolVersion)
     {
         if(toolName == null)

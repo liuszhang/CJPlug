@@ -64,9 +64,10 @@
 
 <CascadingValue Value="PlugDataZone">
     <CascadingValue Value="ActivityStats">
-        <CascadingValue Value="SelectedPlugDefinitionId">
+        <CascadingValue Value="SelectedPlugDefinitionId" Name="SelectedPlugDefinitionId">
             <CascadingValue Value="ActivitySelectedNotify">
                 <CascadingValue Value="SetDataGridShowNotify">
+                <CascadingValue Value="ProcessDefinitionId">
 
                 <MudStack Row StretchItems="StretchItems.Start">
                     <RadzenSplitter Orientation="Orientation.Horizontal" Style="height: calc(100vh - var(--mud-appbar-height));">
@@ -116,6 +117,7 @@
                     </RadzenSplitter>
                 </MudStack>
 
+                </CascadingValue>
                 </CascadingValue>
             </CascadingValue>
         </CascadingValue>
@@ -240,12 +242,18 @@
                                     PlugDefinitionId = plugData.PlugDefinitionId,
                                     Name = v.Name,
                                     Type = v.Type,
-                                    // 只取参数定义，不带默认值；实际值从PDZ获取
+                                    DisplayName = v.DisplayName,
+                                    Description = v.Description,
+                                    Category = v.Category,
+                                    // 只取参数定义，不带运行时值；实际值从PDZ获取
                                     Value = null,
-                                    DefaultValue = null,
+                                    DefaultValue = v.DefaultValue,
+                                    IsInput = v.IsInput,
+                                    IsOutput = v.IsOutput,
+                                    IsRequired = v.IsRequired,
+                                    IsArray = v.IsArray,
                                     IsInitVariable = v.IsInitVariable,
                                     IsBrowsable = v.IsBrowsable,
-                                    IsArray = v.IsArray,
                                 });
                             }
                             needSave = true;
@@ -350,14 +358,18 @@
         HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
 
         //通过长连接添加活动状态监听
-        HubConnectionManagerService._hubConnection.On<string, string, string>(LogTypeEnum.ActivityStatusNow.ToString() + PDZId,            
+        HubConnectionManagerService._hubConnection.On<string, string, string>(LogTypeEnum.ActivityStatusNow.ToString() + PDZId,
             (PDZId, DefinitionId, status) =>
            {
-               Console.WriteLine($"NewStatus:{PDZId}-{DefinitionId}-{status}");               
-               InvokeAsync(() =>
+               Console.WriteLine($"NewStatus:{PDZId}-{DefinitionId}-{status}");
+               InvokeAsync(async () =>
                {
                    var tmpStats = JsonSerializer.Deserialize<ActivityStats>(status);
                    ActivityStats[DefinitionId] = tmpStats ?? new ActivityStats();
+                   if (diagramDesignerWrapper != null)
+                   {
+                       await diagramDesignerWrapper.UpdateActivityStatsAsync(DefinitionId, ActivityStats[DefinitionId]);
+                   }
                    StateHasChanged();
                });
            });

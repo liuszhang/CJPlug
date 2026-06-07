@@ -1,12 +1,15 @@
 @page "/ProcessManageList"
 
+@using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugProcess
 @using CJ.Plug.ProcessManage.Dialogs
+@using CJ.Plug.SharedPages.Dialogs
 @using System.Text.Json
 @using Microsoft.JSInterop
 @using Size=MudBlazor.Size
 @using ProcessManage.Components
+@using CJ.Plug.SharedPages.Contracts
 
 
 @inject HttpClient Http
@@ -14,6 +17,7 @@
 @inject NavigationManager NavigationManager
 @inject MainApiClient MainApiClient
 @inject ISnackbar Snackbar
+@inject IDomInteropService DomInteropService
 
 @inject IJSRuntime JSRuntime
 
@@ -33,33 +37,22 @@
     SelectOnRowClick="true"
     SelectedItemsChanged="OnSelectedItemsChanged"
     Height="80%"
-    FixedHeader="true"              
+    FixedHeader="true"
+    Loading="@_isPageLoading"
     >
 
         <ToolBarContent>
             <MudStack Row>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Tertiary" StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="OpenAiDialog">AI 生成</MudButton>
                 <MudButtonGroup Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
                     <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Create" OnClick="NewProcess">新建流程</MudButton>
                     <MudMenu Size="Size.Small" Icon="@Icons.Material.Filled.ArrowDropDown" Style="align-self: auto;">
                         <MudMenuItem OnClick="NewProcess">新建流程</MudMenuItem>
                         <MudMenuItem>导入流程</MudMenuItem>
-                        <MudMenuItem>模板创建</MudMenuItem>
+                        <MudMenuItem OnClick="CreateFromTemplate">模板创建</MudMenuItem>
                         <MudMenuItem>复制选中</MudMenuItem>
                     </MudMenu>
                 </MudButtonGroup>
-                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Tertiary" StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="OpenAiDialog">AI 生成</MudButton>
-                <MudButton OnClick="EditProcess" Disabled="(selectedItemNow == null) || Loading" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">
-                    
-                    @if (Loading)
-    {
-        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
-                        <MudText>流程设计</MudText>
-    }
-    else
-    {
-                        <MudText>流程设计</MudText>
-    }
-                    </MudButton>
                 <MudButton OnClick="() => DeleteProcess(null)" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Delete">删除流程</MudButton>
                 <MudButton Size="Size.Small" Variant="Variant.Filled" Disabled="selectedItemNow == null" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ImportExport">导出流程</MudButton>
                 <MudButton OnClick="@(() => PublishToMarket(selectedItemNow))" Disabled="selectedItemNow == null" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Restore">发布到市场</MudButton>
@@ -101,7 +94,7 @@
                 <MudTableSortLabel SortLabel="UpdatedAt" T="Process">更新于</MudTableSortLabel>
             </MudTh>
             <MudTh>显示到组件库</MudTh>
-            <MudTh></MudTh>
+            <MudTh>操作</MudTh>
         </HeaderContent>
 
         <RowTemplate>
@@ -124,6 +117,14 @@
             </MudTd>
             <MudTd Style="text-align:right">
                 <MudStack Row AlignItems="AlignItems.Center">
+                    <MudTooltip Text="流程设计" Delay="100">
+                        <MudIconButton OnClick="()=>EditProcessFromRow(context)" Disabled="@_isPageLoading" Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" >
+                            @if (_isPageLoading)
+                            {
+                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            }
+                        </MudIconButton>
+                    </MudTooltip>
                     <MudTooltip Text="已有流程实例在运行中,可在作业列表查看,点击启动一个新实例" Delay="100">
                         <MudBadge Color="Color.Warning" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
                             <MudLink Href="@($"/process/{context.DefinitionId}/execute/")" Target="_blank">
@@ -168,6 +169,8 @@
     public double? Amount { get; set; }
     public int? Weight { get; set; }
     public string searchString { get; set; } = "";
+    private bool _isPageLoading { get; set; } = true;
+
     private HashSet<Process> selectedItems1 = new HashSet<Process>();
     private Process? selectedItemNow;
 
@@ -181,7 +184,8 @@
     private async Task<TableData<Process>> LoadData(TableState state, CancellationToken cancellationToken)
     {        
         Console.WriteLine(">>>>>>>>>>>>>> LoadData called");
-        var workflows = await MainApiClient.GetWorkflowsAsync();
+        var userName = await DomInteropService.GetCurrentUserName();
+        var workflows = await MainApiClient.GetWorkflowsAsync(userName: userName);
         workflows = workflows.Where(element =>
         {
             //Console.WriteLine(">>>>>>>>>>>searchString:" + searchString);
@@ -229,6 +233,37 @@
     }
     private async Task DeleteProcess(Process? workflow)
     {
+        bool? confirmed;
+        if (workflow == null && selectedItemNow != null)
+        {
+            // 工具栏按钮：单选时显示流程名称
+            confirmed = await DialogService.ShowMessageBoxAsync(
+                "确认删除",
+                $"确定要删除流程「{selectedItemNow.Name}」吗？此操作不可撤销。",
+                yesText: "确认删除",
+                cancelText: "取消");
+        }
+        else if (workflow == null)
+        {
+            var count = selectedItems1.Count;
+            confirmed = await DialogService.ShowMessageBoxAsync(
+                "确认删除",
+                $"确定要删除选中的 {count} 个流程吗？此操作不可撤销。",
+                yesText: "确认删除",
+                cancelText: "取消");
+        }
+        else
+        {
+            confirmed = await DialogService.ShowMessageBoxAsync(
+                "确认删除",
+                $"确定要删除流程「{workflow.Name}」吗？此操作不可撤销。",
+                yesText: "确认删除",
+                cancelText: "取消");
+        }
+
+        if (confirmed != true)
+            return;
+
         if (workflow==null)
         {
             foreach (var w in selectedItems1)
@@ -275,6 +310,16 @@
         //OnSearch(searchString);
     }
 
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {            
+            _isPageLoading = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task PlugInProcess(Process workflow,bool ShowInLib)
     {
         workflow.ShowInPlugLibrary = ShowInLib;
@@ -305,6 +350,14 @@
 
     }
 
+    private async Task EditProcessFromRow(Process process)
+    {
+        _isPageLoading = true;
+        await InvokeAsync(StateHasChanged);
+
+        NavigationManager.NavigateTo($"/ProcessEdit/{process.DefinitionId}");
+    }
+
     private void ExeProcess(Process process)
     {
         var CorrelationId = RandomLongIdentityGenerator.GenerateId();
@@ -330,12 +383,35 @@
         if (item == null)
         {
             Snackbar.Add("请选择一条数据发布。");
+            return;
         }
         var parameters = new DialogParameters<PublishToMCPServerDialog> { { x => x.Plug, item } };
         var dialog = await DialogService.ShowAsync<PublishToMCPServerDialog>("发布到MCPServer", parameters);
         var result = await dialog.Result;
-        //await InitPlugData();
+        if (!result.Canceled && result.Data is MCPTool createdTool)
+        {
+            var successParams = new DialogParameters<PublishSuccessDialog>
+            {
+                { x => x.Tool, createdTool },
+                { x => x.EntryVariables, item.PlugVariables }
+            };
+            await DialogService.ShowAsync<PublishSuccessDialog>("发布成功", successParams);
+        }
         StateHasChanged();
+    }
+
+    private async Task CreateFromTemplate()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateFromTemplateDialog>("模板创建流程", options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var newProcess = (Process)result.Data;
+            Console.WriteLine($"从模板创建流程: {newProcess.Name}");
+            await _table.ReloadServerData();
+            Snackbar.Add($"流程 \"{newProcess.Name}\" 已创建", Severity.Success);
+        }
     }
 
     private async Task OpenAiDialog()

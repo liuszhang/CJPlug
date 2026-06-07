@@ -23,4 +23,9 @@ public partial class MainApiClient : IPlugMarketApiClient
         await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Other, "查询所有市场插件");
         return result;
     }
+
+    public async Task<CJ.Plug.Models.Plug.Plug?> GetSourcePlugByMarketPlugIdAsync(int marketPlugId, CancellationToken cancellationToken = default)
+    {
+        return await PlugMarketApiClient.Value.GetSourcePlugByMarketPlugIdAsync(marketPlugId, cancellationToken);
+    }
 }

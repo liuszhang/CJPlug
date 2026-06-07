@@ -20,66 +20,48 @@
 
 <MudSlider @bind-Value="spacing" Min="0" Max="10" Color="Color.Info" Class="mb-6">APP间距: @spacing.ToString()</MudSlider>
 
-<MudExpansionPanels Style="flex:1">
-    <MudExpansionPanel Expanded="true" Text="开发库">
-        <MudGrid Spacing="@(spacing)">
-            @foreach (var element in tmpElements)
-            {
-                <MudItem>
-                    <MudCard>
-                        @* <MudImage Src="@Base64ImageUrl" /> *@
-                        @if (element.Base64ImageUrl == string.Empty)
+<MudGrid Spacing="@(spacing)">
+    @foreach (var element in tmpElements)
+    {
+        <MudItem>
+            <MudCard>
+                @* <MudImage Src="@Base64ImageUrl" /> *@
+                @if (element.Base64ImageUrl == string.Empty)
+                {
+                    <MudCardMedia Image="img/plug.png" Height="220" />
+                }
+                else
+                {
+                    <MudCardMedia Image="@(element.Base64ImageUrl)" Height="220" />
+                }
+
+                <MudCardContent>
+                    <MudStack Style="width:220px;height:175px;">
+                        <MudText Typo="Typo.h5">@element.MarketName</MudText>
+                        @* <MudText Typo="Typo.body2">@element.Description</MudText> *@
+                        <MudTextField ReadOnly T="string" AutoGrow Margin="Margin.Dense" Variant="Variant.Outlined" Text="@element.Description" Lines="2" MaxLines="2"></MudTextField>
+                        <MudText Typo="Typo.subtitle2">创建人：@element.Creater (root id:@element.RootPlugID)</MudText>
+                        <MudText Typo="Typo.subtitle2">下载数：@element.UsersCount</MudText>
+                    </MudStack>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton OnClick="@((e)=>AddToMyPlug(element))" Variant="Variant.Text" Color="Color.Primary">加入我的库</MudButton>
+                    <MudButton OnClick="@((e)=>ShowPlugDetail(element))" Variant="Variant.Text" Color="Color.Primary">详细信息</MudButton>
+                    @{
+                        if (CurrentUser == element.Creater)
                         {
-                            <MudCardMedia Image="img/plug.png" Height="220" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(()=>DeleteMarketPlug(element))" Size="Size.Small" Color="Color.Error"></MudIconButton>
                         }
-                        else
-                        {
-                            <MudCardMedia Image="@(element.Base64ImageUrl)" Height="220" />
-                        }
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
 
-                        <MudCardContent>
-                            <MudStack Style="width:220px;height:175px;">
-                                <MudText Typo="Typo.h5">@element.MarketName</MudText>
-                                @* <MudText Typo="Typo.body2">@element.Description</MudText> *@
-                                <MudTextField ReadOnly T="string" AutoGrow Margin="Margin.Dense" Variant="Variant.Outlined" Text="@element.Description" Lines="2" MaxLines="2"></MudTextField>
-                                <MudText Typo="Typo.subtitle2">创建人：@element.Creater (root id:@element.RootPlugID)</MudText>
-                                <MudText Typo="Typo.subtitle2">下载数：@element.UsersCount</MudText>
-                            </MudStack>
-                        </MudCardContent>
-                        <MudCardActions>
-                            <MudButton OnClick="@((e)=>AddToMyPlug(element))" Variant="Variant.Text" Color="Color.Primary">加入我的库</MudButton>
-                            <MudButton OnClick="@((e)=>ShowPlugDetail(element))" Variant="Variant.Text" Color="Color.Primary">详细信息</MudButton>
-                            @{
-                                if (CurrentUser == element.Creater)
-                                {
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(()=>DeleteMarketPlug(element))" Size="Size.Small" Color="Color.Error"></MudIconButton>
-                                }
-                            }
-                        </MudCardActions>
-                    </MudCard>
-                </MudItem>
-            }
-
-        </MudGrid>
-
-    </MudExpansionPanel>
-    <MudExpansionPanel Text="产品库">
-        <MudText Typo="@Typo.body2">
-            桌面类插头：
-            程序路径
-            工作目录
-            数据接口方式：文件/启动参数
-            数据接口目录（文件）
-            启动参数
-            WEB类插头：
-            程序地址
-            参数
-            输入参数
-            获取输出接口
-        </MudText>
-    </MudExpansionPanel>
-</MudExpansionPanels>
-
+<PlugDetailDrawer @bind-IsOpen="_detailDrawerOpen"
+                  MarketPlug="_selectedPlug"
+                  PlugMarketApiClient="PlugMarketApiClient" />
 
 
 
@@ -89,6 +71,10 @@
     private string Base64ImageUrl { get; set; } = string.Empty;
     private string[]? Base64ImageUrls { get; set; }
     private string? CurrentUser {get;set;}
+
+    // 详情抽屉相关
+    private bool _detailDrawerOpen;
+    private MarketPlug? _selectedPlug;
 
     //private Wrap _wrap = Wrap.Wrap;
 
@@ -154,12 +140,11 @@
 
     }
 
-    public async void ShowPlugDetail(MarketPlug marketPlug)
+    public void ShowPlugDetail(MarketPlug marketPlug)
     {
-        Snackbar.Add("插头详情");     
-        //MyCon1sole.WriteLine(marketPlug.RootPlugID);
-        //MyCon1sole.WriteLine(marketPlug.Creater);
-        //MyCon1sole.WriteLine(_HttpHostIp.CurrentUser);        
+        _selectedPlug = marketPlug;
+        _detailDrawerOpen = true;
+        StateHasChanged();
     }
 
     public async Task DeleteMarketPlug(MarketPlug marketPlug)

@@ -1,4 +1,4 @@
-﻿namespace CJ.Plug.StationAndToolApiClient
+namespace CJ.Plug.StationAndToolApiClient
 {
     public partial class StationAndToolApiClient : BaseApiClient, IStationAndToolApiClient
     {

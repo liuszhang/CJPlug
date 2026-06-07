@@ -1,4 +1,5 @@
 ﻿using CJ.Plug.Models.LogModels;
+using CJ.Plug.Models.Shared;
 using Serilog;
 using System.Text.RegularExpressions;
 
@@ -88,12 +89,11 @@ namespace CJ.Plug.Models.Services
         }
 
         /// <summary>
-        /// 将图站的基础路径和工具的相对路径拼接成完整的工具路径，区分绝对路径和相对路径
+        /// 服务端：将 MainFileServerPathRoot 和工具的相对路径拼接成完整的工具路径，区分绝对路径和相对路径
         /// </summary>
-        /// <param name="tool"></param>
-        /// <param name="station"></param>
+        /// <param name="toolPath">Tool.ToolPath，存储相对路径</param>
         /// <returns></returns>
-        public static string? GenerateToolPath(string toolPath, Station.Station station)
+        public static string? GenerateToolPath(string toolPath)
         {
             if (string.IsNullOrEmpty(toolPath))
             {
@@ -104,17 +104,10 @@ namespace CJ.Plug.Models.Services
             {
                 return toolPath;
             }
-            //相对路径，拼接图站的根目录
+            //相对路径，基于 MainFileServerPathRoot 拼接
             else
             {
-                if (station.StationBasePath != null)
-                {
-                    return Path.Combine(station.StationBasePath, toolPath);
-                }
-                else
-                {
-                    return null;
-                }
+                return Path.Combine(GlobalData.MainFileServerPathRoot, toolPath);
             }
         }
 

@@ -4,6 +4,7 @@
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.Models.Station
 @using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
 @using CJ.Plug.StationAndToolApiClient
 @using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
 @using System.Text.Json.Nodes
@@ -15,6 +16,7 @@
 @inject IJSRuntime JsRuntime
 @inject IDialogService DialogService
 @inject IElsaDomToolService ElsaDomToolService
+@inject IDomInteropService DomInteropService
 
 
 
@@ -24,11 +26,13 @@
     //console.log("初始化");
     document.getElementById("filepicker").addEventListener(
     "change",
-    (event) => {
+    async (event) => {
+    // 上传前从C#获取正确的工具包上传路径前缀
+    var uploadPath = await dotNet.invokeMethodAsync('GetToolUploadPath');
     const fileInfos = [];
     for (const file of event.target.files) {
     fileInfos.push(file.webkitRelativePath);
-    uploadFileToServer(file, toolAgentIp);
+    uploadFileToServer(file, toolAgentIp, uploadPath);
     //console.log(file);
     dotNet.invokeMethodAsync('ProcessSelectedFiles',file.webkitRelativePath);
     }
@@ -39,13 +43,11 @@
 
     };
 
-    async function uploadFileToServer(file, toolAgentIp) {
+    async function uploadFileToServer(file, toolAgentIp, uploadPath) {
     console.log(file);
     const formData = new FormData();
-    var username = localStorage.getItem('username');
-    //formData.append('file', file);
     //下面三个字段是API接口需要的三个字段，最好保持大小写也一致
-    formData.append('UploadPath', username+'//Tools');
+    formData.append('UploadPath', uploadPath);
     formData.append('FileName', file.webkitRelativePath);
     formData.append('FileStream', file);
     try {
@@ -86,20 +88,15 @@
             </MudStack>
 
 
-            <MudSelect @bind-Value="@Tool.ToolType" T="string" Label="工具类型" Margin="Margin.Dense" Dense FullWidth Variant="Variant.Outlined">
-                @foreach (var c in Enum.GetNames(typeof(ToolTypeEnum)).ToList())
-                {
-                    <MudSelectItem T="string" Value=@c>@c</MudSelectItem>
-                }
-            </MudSelect>
+            <MudCheckBox @bind-Value="@Tool.SkipDownloadToStation" T="bool" Label="无需工具下载（勾选后工具无需下载至图站，适用于纯接口调用或工具已在服务器本地的场景）" Color="Color.Secondary"></MudCheckBox>
             @if (Tool.ToolType.Contains("桌面类"))
             {       
                 <MudTextField @bind-Value="@Tool.CommandParameter" Margin="Margin.Dense" Label="命令行配置" Variant="Variant.Outlined"></MudTextField>
 
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudTextField T="string" @bind-Value="Tool.ToolPath" Margin="Margin.Dense" Label="工具路径" Variant="Variant.Outlined"></MudTextField>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="CheckRemoteFiles">选择</MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="UploadToolFiles">上传程序包</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="CheckRemoteFiles" Disabled="@Tool.SkipDownloadToStation">选择</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="UploadToolFiles" Disabled="@Tool.SkipDownloadToStation">上传程序包</MudButton>
                 </MudStack>
                 <MudText Align="Align.Center">运行环境包 @RunTimeFiles.Count() 个文件已经上传成功</MudText>
                 @foreach (var file in RunTimeFiles)
@@ -200,9 +197,38 @@
     private bool SubmitDisabled = false;
     private Tool Tool { get; set; } = new();
     private bool Testing = false;
+    private bool _hasUploadedFiles = false;
+    private string? _toolExecutableRelativePath = null; // 记录从临时工具包中选择的可执行文件相对路径
     public List<PDZVariable>? RequestDatas { get; set; } = new List<PDZVariable>();
 
+    [Parameter]
+    public Tool? ExistingTool { get; set; }
+
     List<string>? RunTimeFiles = new List<string>();
+
+    protected override void OnParametersSet()
+    {
+        if (ExistingTool != null)
+        {
+            Tool = new Tool
+            {
+                Id = ExistingTool.Id,
+                ToolName = ExistingTool.ToolName,
+                ToolVersion = ExistingTool.ToolVersion,
+                ToolCompany = ExistingTool.ToolCompany,
+                ToolPath = ExistingTool.ToolPath,
+                ToolBasePath = ExistingTool.ToolBasePath,
+                CommandParameter = ExistingTool.CommandParameter,
+                ToolType = ExistingTool.ToolType,
+                ToolLocation = ExistingTool.ToolLocation,
+                SkipDownloadToStation = ExistingTool.SkipDownloadToStation,
+                IsEnabled = ExistingTool.IsEnabled,
+                IsSystemInitTool = ExistingTool.IsSystemInitTool,
+                IsBrowsable = ExistingTool.IsBrowsable,
+                ToolDescription = ExistingTool.ToolDescription,
+            };
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -224,11 +250,30 @@
     {
         //MyCon1sole.WriteLine("open new dialog");
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium ,FullWidth=true};
-        var dialog = await DialogService.ShowAsync<ChooseServerFiles>("选择服务端文件", options);
-        var result = await dialog.Result;
-        if (!result.Canceled)
+
+        if (_hasUploadedFiles)
         {
-            Tool.ToolPath = result.Data.ToString();
+            // 如果已上传工具包，使用临时工具包选择对话框
+            var parameters = new DialogParameters<ChooseToolExecutable>
+            {
+                { x => x.IsTemporaryToolPackage, true }
+            };
+            var dialog = await DialogService.ShowAsync<ChooseToolExecutable>("选择临时工具包中的可执行文件", parameters, options);
+            var result = await dialog.Result;
+            if (!result.Canceled)
+            {
+                Tool.ToolPath = result.Data.ToString();
+                _toolExecutableRelativePath = Tool.ToolPath; // 记录原始相对路径，用于提交时转换
+            }
+        }
+        else
+        {
+            var dialog = await DialogService.ShowAsync<ChooseServerFiles>("选择服务端文件", options);
+            var result = await dialog.Result;
+            if (!result.Canceled)
+            {
+                Tool.ToolPath = result.Data.ToString();
+            }
         }
     }
     private Task UploadToolFiles()
@@ -237,9 +282,16 @@
     }
 
     [JSInvokable]
+    public Task<string> GetToolUploadPath()
+    {
+        // 上传到临时目录 Tools/Tmp
+        return Task.FromResult("Tools/Tmp");
+    }
+
+    [JSInvokable]
     public async Task ProcessSelectedFiles(string file)
     {
-        //MyCon1sole.WriteLine(file);
+        _hasUploadedFiles = true;
         RunTimeFiles.Add(file);
         StateHasChanged();
     }
@@ -262,10 +314,62 @@
     private async Task Submit()
     {        
         SubmitDisabled = true;
-        await MainApiClient.CreateToolAsync(Tool);
+
+        // 如果勾选了"无需工具下载"，直接使用用户手动输入的工具路径，跳过上传/选择程序包的处理
+        if (!Tool.SkipDownloadToStation)
+        {
+            // 如果有上传的工具包文件，先从 Tmp 拷贝到最终路径
+            if (_hasUploadedFiles && RunTimeFiles.Any())
+            {
+                var currentUser = await DomInteropService.GetCurrentUserName();
+                await MainApiClient.MoveToolFilesFromTmpAsync(Tool.ToolName, Tool.IsSystemInitTool, currentUser);
+                
+                // 将临时路径转换为正式路径
+                if (!string.IsNullOrEmpty(_toolExecutableRelativePath))
+                {
+                    // 获取临时路径的相对路径（相对于 MainFileServerPathRoot）
+                    var tmpRelativePath = Path.GetRelativePath(GlobalData.MainFileServerPathRoot,
+                        Path.Combine(GlobalData.ToolsRootPath, "Tmp"));
+                    var selectedFullPath = _toolExecutableRelativePath;
+                    
+                    if (selectedFullPath.StartsWith(tmpRelativePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 计算相对于Tmp文件夹的相对路径
+                        var relativePart = Path.GetRelativePath(tmpRelativePath, selectedFullPath);
+                        
+                        // 构建正式路径
+                        string formalPath;
+                        if (Tool.IsSystemInitTool)
+                        {
+                            formalPath = Path.Combine("Tools", "0System", Tool.ToolName, relativePart);
+                        }
+                        else
+                        {
+                            formalPath = Path.Combine("Tools", currentUser, Tool.ToolName, relativePart);
+                        }
+                        
+                        Tool.ToolPath = formalPath;
+                        Tool.ToolBasePath = Path.GetDirectoryName(formalPath);
+                    }
+                }
+            }
+        }
+
+        if (ExistingTool != null)
+            await MainApiClient.UpdateToolAsync(Tool);
+        else
+            await MainApiClient.CreateToolAsync(Tool);
         Console.WriteLine($"succuse create plug:{Tool.ToolName}");
         MudDialog.Close(DialogResult.Ok(Tool));
     }
 
-    private void Cancel() => MudDialog.Cancel();
+    private async Task Cancel()
+    {
+        // 删除 Tmp 中的临时文件
+        if (_hasUploadedFiles)
+        {
+            await MainApiClient.DeleteToolTmpFilesAsync();
+        }
+        MudDialog.Cancel();
+    }
 }

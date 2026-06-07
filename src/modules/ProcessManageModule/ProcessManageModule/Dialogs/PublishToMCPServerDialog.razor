@@ -56,9 +56,7 @@
             return;
         }
 
-        Snackbar.Add($"发布{result?.Name}为MCP Tool成功！", Severity.Success);
-
-        MudDialog.Close();
+        MudDialog.Close(DialogResult.Ok(result));
     }
 
 

@@ -18,7 +18,10 @@ public static class ProcessManageApi
     {
         var api = app.MapGroup("api/process").WithTags("流程管理");
 
-        api.MapGet("/getWorkflows", async (IProcessManageService service) => await service.GetAllWorkflowsAsync());
+        api.MapGet("/getWorkflows", async (IProcessManageService service, [FromQuery] string? userName) =>
+        {
+            return await service.GetAllWorkflowsAsync(userName);
+        });
         api.MapGet("/getWorkflow/{Id}", async (IProcessManageService service, int Id) => await service.GetWorkflowById(Id));
         api.MapGet("/getWorkflowJson/{Id}", async (IProcessManageService service, int Id) => await service.GetWorkflowJsonAsync(Id));
         api.MapPost("/createWorkflow", async (IProcessManageService service, [FromBody] Process request) => await service.CreateWorkflowAsync(request));

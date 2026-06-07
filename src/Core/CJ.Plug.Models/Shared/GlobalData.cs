@@ -18,5 +18,16 @@ namespace CJ.Plug.Models.Shared
         public static string MainWebFileServer = "C://tmp//Web";
 
         public static string StationFileRootPath = Path.Combine("C:", "tmp", "StationTmpFiles");
+
+        // 工具根路径
+        public static string ToolsRootPath => Path.Combine(MainFileServerPathRoot, "Tools");
+        // 系统工具路径（所有人可见）
+        public static string SystemToolsPath => Path.Combine(ToolsRootPath, "0System");
+        // 获取用户工具路径
+        public static string GetUserToolsPath(string userName) => Path.Combine(ToolsRootPath, userName);
+        // PDZ 根路径
+        public static string PDZsRootPath => Path.Combine(MainFileServerPathRoot, "PDZs");
+        // 获取用户 PDZ 路径
+        public static string GetUserPDZPath(string userName) => Path.Combine(PDZsRootPath, userName);
     }
 }

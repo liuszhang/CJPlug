@@ -1,0 +1,75 @@
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages.Contracts
+@using MudBlazor
+@inject MainApiClient MainApiClient
+@inject IDomInteropService DomInteropService
+
+@if (Node.Value.IsDirectory)
+{
+    <MudTreeViewItem
+        Text="@Node.Text"
+        Value="@Node.Value"
+        Expanded="@Node.Expanded"
+        ExpandedChanged="@OnExpandedChanged"
+        Icon="@Icons.Material.Filled.Folder">
+        <ChildContent>
+            @if (Node.Children != null)
+            {
+                @foreach (var child in Node.Children)
+                {
+                    <ServerFileTreeItem Node="child" ToolAgentHostToUse="ToolAgentHostToUse" />
+                }
+            }
+        </ChildContent>
+    </MudTreeViewItem>
+}
+else
+{
+    <MudTreeViewItem
+        Text="@Node.Text"
+        Value="@Node.Value"
+        Icon="@Icons.Custom.FileFormats.FileDocument">
+    </MudTreeViewItem>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ITreeItemData<FileSystemNode> Node { get; set; } = default!;
+
+    [Parameter]
+    public string ToolAgentHostToUse { get; set; } = string.Empty;
+
+    private async Task OnExpandedChanged(bool expanded)
+    {
+        if (expanded && Node.Value.IsDirectory && (Node.Children == null || Node.Children.Count == 0))
+        {
+            Node.Expanded = false;
+            StateHasChanged();
+            await Task.Yield();
+
+            var currentUser = await DomInteropService.GetCurrentUserName();
+            var childItems = await MainApiClient.GetFolderFiles(Node.Value, currentUser, ToolAgentHostToUse);
+            var children = new HashSet<TreeItemData<FileSystemNode>>();
+            if (childItems != null)
+            {
+                foreach (var t in childItems)
+                {
+                    children.Add(new TreeItemData<FileSystemNode>
+                    {
+                        Value = t,
+                        Expandable = t.IsDirectory,
+                        Text = t.Name
+                    });
+                }
+            }
+            Node.Children = children;
+            if (children.Count == 0)
+            {
+                Node.Expandable = false;
+            }
+
+            Node.Expanded = true;
+            StateHasChanged();
+        }
+    }
+}
