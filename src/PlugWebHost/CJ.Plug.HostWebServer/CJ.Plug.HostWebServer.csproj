@@ -57,12 +57,7 @@
 						Condition="'%(StaticWebAsset.AssetRole)' == 'Primary'
                              And '%(StaticWebAsset.SourceId)' != '$(AssemblyName)'">
 				<!-- 去除 RelativePath 中的指纹标记，如 "icon#[.{fingerprint=abc}]?.png" → "icon.png" -->
-				<CleanName>
-					$([System.Text.RegularExpressions.Regex]::Replace(
-					'%(StaticWebAsset.RelativePath)',
-					'#\[\.\{fingerprint[^}]*\}\]\?',
-					''))
-				</CleanName>
+				<CleanName>$([System.Text.RegularExpressions.Regex]::Replace('%(StaticWebAsset.RelativePath)', '#\[\.\{fingerprint[^}]*\}\]\?', ''))</CleanName>
 			</_RclAssets>
 		</ItemGroup>
 
