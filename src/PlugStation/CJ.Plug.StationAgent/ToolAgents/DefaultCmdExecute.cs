@@ -28,13 +28,13 @@ namespace CJ.Plug.StationAgent.ToolAgents
             {
                 //FileName = stationExecutionRequest.ToolFullPath ?? "C:\\Windows\\System32\\cmd.exe", // 要启动的工具名称                                                                 
                 //FileName = "C:\\Windows\\System32\\cmd.exe", // 要启动的工具名称                                                                 
-                FileName = "powershell", // 要启动的工具名称                                                                 
+                FileName = "cmd.exe", // 要启动的工具名称                                                                 
                 Arguments = $"/c {command}", // /c参数表示执行命令后关闭CMD                                                          
-                //WorkingDirectory = workDirectory, // 设置工作目录，可根据实际情况修改
+                WorkingDirectory = workDirectory, // 设置工作目录，使 exe 能找到同目录下的 dll/config 等依赖
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow = true // 不创建窗口
+                CreateNoWindow = true // 不创建 CMD 窗口（子进程如果是 GUI 程序仍会显示自己的窗口）
             };
             try
             {
@@ -70,9 +70,13 @@ namespace CJ.Plug.StationAgent.ToolAgents
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
 
-                    // 等待进程退出
-                    //process.WaitForExit();
-                    process.WaitForExit(10000);
+                    // 等待进程退出：优先使用 InputVariables 中的 ExecutionTimeout，默认 300 秒（5 分钟）
+                    var timeoutVar = stationExecutionRequest.InputVariables
+                        ?.FirstOrDefault(v => v.Name == "ExecutionTimeout")?.Value;
+                    int timeoutMs = 60_000; // 默认 60 秒
+                    if (!string.IsNullOrEmpty(timeoutVar) && int.TryParse(timeoutVar, out var parsed))
+                        timeoutMs = parsed * 1000;
+                    process.WaitForExit(timeoutMs);
 
                     // 输出进程退出代码
                     //Console.WriteLine("Exit Code: " + process.ExitCode);

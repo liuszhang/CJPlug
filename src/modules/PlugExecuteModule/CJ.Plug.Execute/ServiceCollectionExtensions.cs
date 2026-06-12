@@ -32,6 +32,10 @@ public static class ServiceCollectionExtensions
     {
         //添加插头执行服务
         services.AddScoped<IPlugCommonExecute>(sp => new DefaultPlugExecuteService(sp, sp.GetRequiredService<IToolExecuteService>()));
+        // 接口类 Category 回退处理器
+        services.AddScoped<IPlugCommonExecute, ApiPlugCategoryFallbackHandler>();
+        // 脚本类 Category 回退处理器
+        services.AddScoped<IPlugCommonExecute, ScriptPlugCategoryFallbackHandler>();
 
         services.AddScoped<IPlugExecuteService, PlugExecuteService>();
 

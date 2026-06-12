@@ -40,7 +40,6 @@ namespace DllLoaderPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "DLL集成组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

@@ -195,7 +195,7 @@
             process.Description = _processDescription?.Trim();
             process.Version = 1;
             process.Creater = userName;
-            process.Type = PlugCategorys.流程.ToString();
+            process.PlugTypeKey = PlugCategorys.流程.ToString();
             process.Category = PlugCategorys.流程.ToString();
             process.GroupName = PlugGroupEnum.我的流程.ToString();
             process.ShowInPlugLibrary = false;
@@ -245,7 +245,6 @@
                         PlugDefinitionId = actId,
                         ParentPlugDefinitionId = definitionId,
                         Name = actName,
-                        PlugType = actType,
                         PlugTypeKey = actType,
                         WorkPath = Path.Combine(newPDZ.PDZWorkPath, actId),
                         PlugPosition = $"{x} {y}",
@@ -264,7 +263,6 @@
                                     PlugDefinitionId = actId,
                                     Name = p.Name,
                                     Value = p.Value,
-                                    DefaultValue = p.DefaultValue,
                                     Type = p.Type,
                                     IsInitVariable = p.IsInitVariable,
                                     IsBrowsable = p.IsBrowsable,

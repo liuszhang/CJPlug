@@ -60,9 +60,8 @@
                                 <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
                             }
                             <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="编号" @bind-Text="@Plug.DefinitionId" ReadOnly Variant="Variant.Filled"></MudTextField>
-                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型" @bind-Text="@Plug.Type" ReadOnly Variant="Variant.Filled"></MudTextField>
+                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型/KEY" @bind-Text="@Plug.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>
                             <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="核心类型" @bind-Text="@Plug.CoreType" ReadOnly Variant="Variant.Filled"></MudTextField>
-                            <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="KEY" @bind-Text="@Plug.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>
                             <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="名称" @bind-Text="@Plug.Name" Variant="Variant.Outlined"></MudTextField>
                             <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="描述" @bind-Text="@Plug.Description" Variant="Variant.Outlined" Lines="3"></MudTextField>
                         </MudTabPanel>
@@ -240,7 +239,7 @@
         if (firstRender)
         {
             Plug = await MainApiClient.GetPlugByDefinitionIdAsync(Activity.GetId());
-            var rootPlug = await MainApiClient.GetPlugByTypeNameAsync(Plug.Type);
+            var rootPlug = await MainApiClient.GetPlugByTypeNameAsync(Plug.PlugTypeKey);
             ToolVersions = rootPlug?.ToolVersions ?? new();
             RootPlugActions = await MainApiClient.GetPlugActionsByPlugIdAsync(rootPlug?.Id) ?? new();
             PlugActionsToExecute = await MainApiClient.GetPlugActionsToExecuteByPlugId(Plug.Id) ?? new();

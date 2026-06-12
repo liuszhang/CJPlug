@@ -104,7 +104,7 @@
                         <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary" Label="@context.Item.IsRequired.ToString()"></MudSwitch>
                     </EditTemplate>
                 </PropertyColumn>
-                <PropertyColumn Property="x => x.DefaultValue" Title="操作">
+                <PropertyColumn Property="x => x.Value" Title="操作">
                     <EditTemplate>
                         <MudStack Row>
                             <MudButton OnClick="@(() => DeleteInput(context.Item))" Variant="Variant.Filled">
@@ -278,7 +278,6 @@
         inputs.Add(new PlugVariableData { Name = SendHttpRequestPlug.InitVariableNames.Url.ToString(), Value = UrlData.Value });
         var executeRequest = new PlugExecutionRequest
         {
-            PlugType = SendHttpRequestPlug.PlugKeySetting.PlugTypeName,
             PlugTypeKey = SendHttpRequestPlug.PlugKeySetting.PlugTypeKey,
             PDZId=PlugDataZone?.PDZId,
 PlugDefinitionId=PlugDefinitionId,

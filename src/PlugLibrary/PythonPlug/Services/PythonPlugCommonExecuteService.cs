@@ -17,7 +17,7 @@ public class PythonPlugCommonExecuteService : ScriptPlugExecuteService
     // ====== ScriptPlugExecuteService abstract members ======
 
     protected override string ScriptVariableName =>
-        InitVariableNames.PythonScript.ToString();
+        InitVariableNames.Script.ToString();
 
     protected override string[]? DataPrepareVariableNames =>
         Enum.GetNames(typeof(InitVariableNames));
@@ -124,20 +124,10 @@ public class PythonPlugCommonExecuteService : ScriptPlugExecuteService
                 var val = PlugDataZone.GetVariableValue(plugDefId, paramName);
                 if (!string.IsNullOrEmpty(val)) return val;
 
-                // 优先级2: PDZ 变量 DefaultValue
-                var pdzVar = PlugDataZone.PlugVariableDatas?
-                    .FirstOrDefault(v => v.PlugDefinitionId == plugDefId
-                        && string.Equals(v.Name, paramName, StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrEmpty(pdzVar?.DefaultValue)) return pdzVar.DefaultValue;
-
-                // 优先级3: 根插头定义变量
+                // 优先级2: 根插头定义变量 Value
                 var plugVar = rootPlug?.PlugVariables?
                     .FirstOrDefault(v => string.Equals(v.Name, paramName, StringComparison.OrdinalIgnoreCase));
-                if (plugVar != null)
-                {
-                    if (!string.IsNullOrEmpty(plugVar.Value)) return plugVar.Value;
-                    if (!string.IsNullOrEmpty(plugVar.DefaultValue)) return plugVar.DefaultValue;
-                }
+                if (!string.IsNullOrEmpty(plugVar?.Value)) return plugVar.Value;
 
                 return null;
             });

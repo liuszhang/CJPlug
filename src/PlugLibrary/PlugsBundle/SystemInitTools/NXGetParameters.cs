@@ -18,7 +18,6 @@ namespace PlugsBundle.SystemInitTools.NXGetParameters
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings();
-            settings.PlugType = "NXGetParameters";
             settings.PlugDisplayName = "获取NX模型参数";
             settings.PlugTypeKey = "";  //设为空，走默认实现的插头执行逻辑（CMD）
 

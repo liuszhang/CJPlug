@@ -34,7 +34,6 @@ namespace NXPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var PlugSettings = new PlugSettings(null);
-            PlugSettings.PlugType = PlugKeySetting.NXToStl.CommonSettingPageKey;
             PlugSettings.PlugDisplayName = "NX模型转STL";
             PlugSettings.PlugTypeKey = PlugKeySetting.NXToStl.CommonSettingPageKey;
 
@@ -55,21 +54,21 @@ namespace NXPlug.Services
             {
                 Name = NXToStlVariables.ChordalTol.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
-                DefaultValue = "0.08",
+                Value = "0.08",
                 IsBrowsable = true,
             });
             InitVariables.Add(new BaseVariable()
             {
                 Name = NXToStlVariables.AdjacencyTol.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
-                DefaultValue = "0.08",
+                Value = "0.08",
                 IsBrowsable = true,
             });
             InitVariables.Add(new BaseVariable()
             {
                 Name = NXToStlVariables.AutoNormalGen.ToString(),
                 Type = VariableTypeEnum.Bool.ToString(),
-                DefaultValue = "true",
+                Value = "true",
                 IsBrowsable = true,
             });
             InitVariables.Add(new BaseVariable()

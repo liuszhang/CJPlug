@@ -28,6 +28,8 @@ namespace CJ.Plug.FileManageApi.Contracts
 
         Task<FileInformation?> DeleteFile(FileDeleteRequest fileDeleteRequest);
 
+        Task<bool> MoveDirectory(string sourcePath, string destPath);
+
         Task<(Stream? fileStream, string? fileName, string? errorMessage)> DownloadToolAsync(string toolName, string toolVersion, string toolPath);
     }
 }

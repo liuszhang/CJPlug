@@ -138,6 +138,10 @@
                    StartIcon="@Icons.Material.Filled.Refresh">
             刷新图站状态
         </MudButton>
+        <MudButton OnClick="OpenStationDownloadDialog" Variant="Variant.Filled" Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Download">
+            下载图站部署包
+        </MudButton>
         <MudSwitch @bind-Value="@ShowAllToolAgents" @bind-Value:after="StateHasChanged"
                    Color="Color.Primary" Label="显示所有图站" />
         <MudSpacer />
@@ -357,5 +361,13 @@
         {
             Snackbar.Add("删除失败，请重试", Severity.Error);
         }
+    }
+
+    /// <summary>
+    /// 打开图站部署包下载对话框
+    /// </summary>
+    private async Task OpenStationDownloadDialog()
+    {
+        await DialogService.ShowAsync<StationDownloadDialog>("下载图站部署包");
     }
 }

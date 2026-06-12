@@ -38,7 +38,6 @@ namespace SignaturePadPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "手写板组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

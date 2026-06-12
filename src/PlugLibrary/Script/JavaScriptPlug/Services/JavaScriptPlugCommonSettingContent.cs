@@ -1,10 +1,13 @@
-﻿
+
 using CJ.Plug.Models.Plug;
 using JavaScriptPlug.Pages;
 using Microsoft.AspNetCore.Components;
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
+using JavaScriptPlug;
+using CJ.Plug.Models.Shared;
+using CJ.Plug.Models.VariableType;
 
 namespace JavaScriptPlug.Services
 {
@@ -38,11 +41,24 @@ namespace JavaScriptPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "JavaScript脚本";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.脚本执行.ToString());
+
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.Script.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = true
+            });
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ScriptType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+                Value = "JavaScript"
+            });
 
             return Task.FromResult<PlugSettings?>(settings);
         }

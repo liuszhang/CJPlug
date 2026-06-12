@@ -96,7 +96,6 @@ public class WorkflowTranslator
             Name = result.Name,
             Description = result.Description,
             Creater = userName,
-            Type = "Process",
             PlugTypeKey = "Process",
             CreateType = PlugCreateTypeEnum.ProcessToPlug.ToString(),
             Status = "设计",

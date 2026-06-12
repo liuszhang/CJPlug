@@ -1,4 +1,5 @@
 ﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Station;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,8 +10,16 @@ using System.Threading.Tasks;
 
     public class PlugExecutionRequest
     {
-        public string? PlugType { get; set; }  //插头类型，标识执行的插头类型
-        public string? PlugTypeKey { get; set; }  //插头类型Key，标识执行的插头类型Key
+        /// <summary>插头类型Key，标识执行的插头类型Key</summary>
+        public string? PlugTypeKey { get; set; }
+
+        /// <summary>预解析的工具对象（MCP Plugin 路径通过本地 DB 解析，跳过 HTTP 查询）</summary>
+        [JsonIgnore]
+        public Tool? ResolvedTool { get; set; }
+
+        /// <summary>预解析的工作站对象（MCP Plugin 路径通过本地 DB 解析，跳过 HTTP 查询）</summary>
+        [JsonIgnore]
+        public Station? ResolvedStation { get; set; }
 
 
         public string? ToolName { get; set; }  //执行工具

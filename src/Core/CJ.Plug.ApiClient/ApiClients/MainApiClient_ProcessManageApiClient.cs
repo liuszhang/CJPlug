@@ -14,7 +14,7 @@ public partial class MainApiClient : IProcessManageApiClient
         {
             var result = await ProcessManageApiClient.Value.CreateNewWorkflow(newWorkflow, cancellationToken);
             await AuditLog.LogSuccessAsync(AuditModule.ProcessManage, AuditOperationType.Create, 
-                $"创建流程: {newWorkflow.Name}", JsonSerializer.Serialize(new { newWorkflow.Name, newWorkflow.Type }));
+                $"创建流程: {newWorkflow.Name}", JsonSerializer.Serialize(new { newWorkflow.Name, newWorkflow.PlugTypeKey }));
             return result;
         }
         catch (Exception ex)

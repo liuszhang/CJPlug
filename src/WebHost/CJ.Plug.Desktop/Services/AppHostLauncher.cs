@@ -269,12 +269,7 @@ public class AppHostLauncher : IDisposable
     /// </summary>
     private string? FindAppHostDll()
     {
-        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-        // Desktop 输出: src/WebHost/CJ.Plug.Desktop/bin/Debug/net10.0-windows/
-        // AppHost 输出: 02.Publish/CJ.Plug.AspireHost.AppHost/Debug/net10.0/
-        // 向上 6 层到达项目根 (D:\Pro\CJ.Plug-Aspire)
-        var projectRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", ".."));
+        var projectRoot = FindProjectRoot(AppDomain.CurrentDomain.BaseDirectory);
 
         var candidates = new List<string>
         {
@@ -301,6 +296,34 @@ public class AppHostLauncher : IDisposable
 
         return null;
     }
+
+    /// <summary>
+    /// 从当前程序集所在目录向上查找项目根目录。
+    /// 以同时存在 src 和 02.Publish 子目录作为项目根标志。
+    /// </summary>
+    private static string FindProjectRoot(string startDir)
+    {
+        var dir = Path.GetFullPath(startDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir, "src")) &&
+                Directory.Exists(Path.Combine(dir, "02.Publish")))
+            {
+                return dir;
+            }
+
+            var parent = Path.GetDirectoryName(dir);
+            if (parent == dir) break; // 到达根目录
+            dir = parent;
+        }
+
+        // 兜底：找不到标志目录时，回退到 5 层向上（兼容旧版 bin 输出路径）
+        return Path.GetFullPath(Path.Combine(startDir, "..", "..", "..", ".."));
+    }
+
+        
+    
 
     private void ReadOutputStream(StreamReader reader)
     {

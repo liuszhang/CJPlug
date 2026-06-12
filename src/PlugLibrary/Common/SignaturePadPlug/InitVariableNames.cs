@@ -8,6 +8,6 @@ namespace SignaturePadPlug
 {
     public enum InitVariableNames
     {
-        CSharpCode,
+        Script,
     }
 }

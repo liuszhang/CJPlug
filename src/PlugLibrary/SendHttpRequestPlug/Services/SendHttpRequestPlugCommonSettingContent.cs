@@ -19,7 +19,6 @@ namespace SendHttpRequestPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.PlugTypeName;
             settings.PlugTypeKey = PlugKeySetting.PlugTypeKey;
             settings.PlugDisplayName = "基础HTTP请求";
 

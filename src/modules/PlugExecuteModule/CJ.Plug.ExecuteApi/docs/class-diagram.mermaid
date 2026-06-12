@@ -1,0 +1,65 @@
+classDiagram
+    class IPlugExecuteService {
+        <<interface>>
+        +StartExecutePlug(request) Task~ExecuteResultData?~
+        +ReportExecuteResult(report) Task
+        +ExecuteMcpTool(request) Task~string?~
+        +GetExecutionStatus(id) Task~ExecutionStatusDto?~
+        +ExecutePlug(definitionId) Task~string?~
+        +ExecutePlug(definitionId, request) Task~string?~
+    }
+
+    class PlugExecuteService {
+        -PlugExecutionEngine _engine
+        -PlugBookmarkManager _bookmarkManager
+        -McpWorkflowRunner _mcpRunner
+        -MainDbContext _dbContext
+        -IPlugManageService PlugManageService
+        -IEnumerable~IPlugCommonExecute~ PlugCommonExecutes
+        -IPlugExecuteHandlerService PlugExecuteHandlerService
+        -IPDZManageService PDZManageService
+        -IPlugDataService PlugDataService
+        -MainApiClient MainApiClient
+        -ElsaApiClient ElsaApiClient
+        -IElsaEngineService ElsaEngineService
+        +StartExecutePlug(request) Task~ExecuteResultData?~
+        +ReportExecuteResult(report) Task
+        +ExecuteMcpTool(request) Task~string?~
+        +GetExecutionStatus(id) Task~ExecutionStatusDto?~
+        +ExecutePlug(definitionId) Task~string?~
+        +ExecutePlug(definitionId, request) Task~string?~
+    }
+
+    class PlugExecutionEngine {
+        -MainDbContext _dbContext
+        -IPlugManageService _plugManageService
+        -IPlugExecuteHandlerService _handlerService
+        -IPlugDataService _plugDataService
+        -IPDZManageService _pdzManageService
+        -PlugBookmarkManager _bookmarkManager
+        -McpWorkflowRunner _mcpRunner
+        +StartExecutePlug(request) Task~ExecuteResultData?~
+        +ReportExecuteResult(report) Task
+    }
+
+    class PlugBookmarkManager {
+        -MainApiClient _mainApiClient
+        +ResumeBookmarkAsync(correlationId, plugId, pdzId, outcomes) Task
+        +TryAwakenConvergencePlugs(pdzId, jobCorrelationId) Task
+    }
+
+    class McpWorkflowRunner {
+        -IPDZManageService _pdzManageService
+        -IPlugManageService _plugManageService
+        -MainApiClient _mainApiClient
+        -ElsaApiClient _elsaApiClient
+        +ExecuteMcpWorkflowFromRequest(request, plugData) Task~ExecuteResultData?~
+    }
+
+    IPlugExecuteService <|.. PlugExecuteService : implements
+    PlugExecuteService --> PlugExecutionEngine : "new() 组合"
+    PlugExecuteService --> PlugBookmarkManager : "new() 组合"
+    PlugExecuteService --> McpWorkflowRunner : "new() 组合"
+    PlugExecutionEngine --> PlugBookmarkManager : 引用
+    PlugExecutionEngine --> McpWorkflowRunner : 引用
+    PlugBookmarkManager --> PlugBookmarkManager : ResumeBookmarkAsync() 自调用

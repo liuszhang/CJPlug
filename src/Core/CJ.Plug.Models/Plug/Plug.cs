@@ -22,8 +22,7 @@ namespace CJ.Plug.Models.Plug
         public string? Name { get; set; }
         //插头核心活动类型，用于引擎进行活动执行
         //public string? CoreType { get; set; } = "CJ.CommonCorePlugActivity";
-        public string? Type { get; set; }
-        //用于匹配自定义配置界面和执行方法的类型唯一Key，默认为Type,由插头开发者手动配置
+        /// <summary>插头唯一标识符，用于匹配自定义配置界面和执行方法。内置插头如"CMDPlug"/"PythonPlug"，手动创建可为空。</summary>
         public string? PlugTypeKey { get; set; }
         public string? Category { get; set; } = ToolTypeEnum.桌面类_自研.ToString(); //记录插头的种类，如桌面类，接口类，脚本类等
         public string? GroupName { get; set; }   //记录插头在插头库中的分组名称，对应引擎中的Category
@@ -46,6 +45,9 @@ namespace CJ.Plug.Models.Plug
 
         //用于在插头管理中区分仅动作或插头，以及用于拖拽区域标识
         public string? Tag { get; set; } = "Plug";
+
+        //插头图标（支持 Material Icon 名称或自定义图片路径）
+        public string? Icon { get; set; }
 
         //保存插头的配置信息，由PlugSetting序列化得到，使用时反序列化为PlugSettings类
         public string? PlugSettingsJson { get; set; }
@@ -222,6 +224,7 @@ namespace CJ.Plug.Models.Plug
             }
             return null;
         }
+
 
         /// <summary>
         /// 添加插头参数，需要做唯一性校验

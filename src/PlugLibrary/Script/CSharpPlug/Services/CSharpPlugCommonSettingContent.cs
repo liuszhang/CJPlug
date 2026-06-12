@@ -38,14 +38,13 @@ namespace CSharpPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "C#组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
             //var InitVariables = new List<BaseVariable>();
             settings.InitVariables.Add(new BaseVariable()
             {
-                Name = InitVariableNames.CSharpCode.ToString(),
+                Name = InitVariableNames.Script.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
@@ -66,6 +65,13 @@ namespace CSharpPlug.Services
                 Name = InitVariableNames.UseDotNetFramework.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = false
+            });
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ScriptType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+                Value = "CSharp"
             });
 
             //settings.InitVariables = InitVariables;

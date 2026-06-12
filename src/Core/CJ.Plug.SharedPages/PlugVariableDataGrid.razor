@@ -75,7 +75,7 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
                 </MudSelect>
             </EditTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.DefaultValue" Title="设置参数默认值" Required="false">
+        <PropertyColumn Property="x => x.Value" Title="设置参数默认值" Required="false">
             <EditTemplate>
                 <VariableValueUI PlugDefinitionId="@Plug?.DefinitionId" BaseVariable="@(context.Item)"></VariableValueUI>
             </EditTemplate>

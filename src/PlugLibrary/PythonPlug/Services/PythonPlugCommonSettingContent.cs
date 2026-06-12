@@ -16,7 +16,7 @@ namespace PythonPlug.Services
         public Task<RenderFragment?> GetPlugCommonSettingContent(GetSettingContext context)
         {
 
-            // 根据不同的插件类型返回不同的渲染片段
+            // 鏍规嵁涓嶅悓鐨勬彃浠剁被鍨嬭繑鍥炰笉鍚岀殑娓叉煋鐗囨
             if (context.PlugTypeKey == PlugKeySetting.CommonSettingPageKey)
             {
                 var sequence = 0;
@@ -33,7 +33,7 @@ namespace PythonPlug.Services
                 });
             }
 
-            // 如果没有匹配的插件类型，则返回null或默认的RenderFragment
+            // 濡傛灉娌℃湁鍖归厤鐨勬彃浠剁被鍨嬶紝鍒欒繑鍥瀗ull鎴栭粯璁ょ殑RenderFragment
             return Task.FromResult<RenderFragment?>(null);
         }
 
@@ -41,7 +41,6 @@ namespace PythonPlug.Services
         {
             var settings = new PlugSettings(null);
             settings.PlugDisplayName = "Python脚本组件";
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.脚本执行.ToString());
@@ -49,7 +48,7 @@ namespace PythonPlug.Services
             var InitVariables = new List<BaseVariable>();
             InitVariables.Add(new BaseVariable()
             {
-                Name = InitVariableNames.PythonScript.ToString(),
+                Name = InitVariableNames.Script.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
@@ -65,6 +64,13 @@ namespace PythonPlug.Services
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
+            InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ScriptType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+                Value = "Python"
+            });
 
             settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
                 JsonSerializer.Serialize(InitVariables));
@@ -73,3 +79,4 @@ namespace PythonPlug.Services
         }
     }
 }
+

@@ -42,10 +42,30 @@ public partial class MainWindow : Window
         await MainWebView.EnsureCoreWebView2Async(null);
         MainWebView.CoreWebView2.Navigate(vm.CurrentUrl);
 
-        // WebView2 内部导航时更新地址栏
+        // WebView2 完整页面导航时更新地址栏
         MainWebView.CoreWebView2.NavigationStarting += (s, args) =>
         {
             vm.AddressBarUrl = args.Uri;
+        };
+
+        // 捕获 Blazor 客户端路由（history.pushState/replaceState/popstate）导致的 URL 变化，
+        // 同步到 CurrentUrl 触发 OnCurrentUrlChanged → UpdateBreadcrumb。
+        // 同时检测 /ProcessEdit/ 路由，若缺少 hideMenu=true 则追加参数重定向，
+        // 使其使用 EmbeddedLayout（无菜单按钮），与流程管理列表页保持一致。
+        MainWebView.CoreWebView2.HistoryChanged += (s, args) =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var url = MainWebView.CoreWebView2.Source;
+                vm.CurrentUrl = url;
+
+                if (url.Contains("/ProcessEdit/", StringComparison.OrdinalIgnoreCase)
+                    && !url.Contains("hideMenu=true", StringComparison.OrdinalIgnoreCase))
+                {
+                    var sep = url.Contains('?') ? "&" : "?";
+                    MainWebView.CoreWebView2.Navigate(url + sep + "hideMenu=true");
+                }
+            });
         };
 
         // 初始化服务管理视图（仪表盘 WebView2 + 控制面板）

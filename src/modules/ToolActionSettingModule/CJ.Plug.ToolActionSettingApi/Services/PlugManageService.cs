@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.PlugAction;
 using CJ.Plug.Models.Relation;
 using CJ.Plug.Models.Shared;
@@ -22,8 +22,8 @@ public partial class PlugManageService : IPlugManageService
         {
             var creator = string.IsNullOrEmpty(request.Creater) ? "Default" : request.Creater;
             request.WorkPath = Path.Combine(
+                "Plugs",
                 creator,
-                FileFolderType.Design.ToString(),
                 request.DefinitionId);
         }
         else
@@ -157,13 +157,26 @@ public partial class PlugManageService : IPlugManageService
             p.CreateType==PlugCreateTypeEnum.RootPlug.ToString()||
             p.CreateType == PlugCreateTypeEnum.RootAdminPlug.ToString() ||
             p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString())
-            .Where(p=>EF.Functions.Like(p.Type, typeName))
+            .Where(p=>EF.Functions.Like(p.PlugTypeKey, typeName))
             .FirstOrDefaultAsync();
         if (item == null)
         {
-            Log.Information($"未找到类型为{typeName}的插头");
+            Console.WriteLine($"未找到类型为{typeName}的插头");
             return null;
         }
+        return item;
+    }
+
+    public async Task<Plug?> GetPlugByNameAsync(string name)
+    {
+        var item = await _dbContext.Set<Plug>()
+            .Include(v => v.PlugVariables)
+            .Where(p =>
+                p.CreateType == PlugCreateTypeEnum.RootPlug.ToString() ||
+                p.CreateType == PlugCreateTypeEnum.RootAdminPlug.ToString() ||
+                p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString())
+            .Where(p => p.Name == name)
+            .FirstOrDefaultAsync();
         return item;
     }
 
@@ -184,7 +197,6 @@ public partial class PlugManageService : IPlugManageService
         
 
         item.Name = request.Name;
-        item.Type = request.Type;
         item.Category = request.Category;
         item.Description = request.Description;
         item.GroupName = request.GroupName;
@@ -200,6 +212,7 @@ public partial class PlugManageService : IPlugManageService
         //item.IsCustomeToolPlug = request.IsCustomeToolPlug;
         //item.IsSystemInitPlug = request.IsSystemInitPlug;
         item.CreateType = request.CreateType;
+        item.Icon = request.Icon;
         item.PlugTypeKey = request.PlugTypeKey;
         item.ShowInPlugLibrary= request.ShowInPlugLibrary;
         item.ToolVersions = request.ToolVersions;

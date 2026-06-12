@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.Models.Plug;
 using MatlabPlug.Pages;
 using Microsoft.AspNetCore.Components;
@@ -38,7 +38,6 @@ namespace MatlabPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "Matlab组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -48,3 +47,4 @@ namespace MatlabPlug.Services
         }
     }
 }
+

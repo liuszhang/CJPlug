@@ -8,8 +8,9 @@ namespace PythonPlug
 {
     public enum InitVariableNames
     {
-        PythonScript,
+        Script,
         InputData,
         ResultString,
+        ScriptType,
     }
 }

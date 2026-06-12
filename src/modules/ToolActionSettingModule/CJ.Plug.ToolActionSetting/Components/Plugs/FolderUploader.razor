@@ -49,6 +49,9 @@
     /// <summary>上传目标子文件夹（如 plugDefinitionId）</summary>
     [Parameter] public string PlugFolder { get; set; } = "";
 
+    /// <summary>是否为系统插头，决定上传到 Tools/0System 还是 Tools/{Username}</summary>
+    [Parameter] public bool IsSystemPlug { get; set; }
+
     /// <summary>当前用户名</summary>
     [Parameter] public string Username { get; set; } = "";
 
@@ -170,7 +173,8 @@
 
         try
         {
-            var uploadPath = $"{Username}//Plugs//{PlugFolder}";
+            var userNameOrSystem = IsSystemPlug ? "0System" : Username;
+            var uploadPath = $"Tools/{userNameOrSystem}";
             var count = await JsRuntime.InvokeAsync<int>(
                 "window._folderUploaderUpload", _inputId, ServerBaseUrl, uploadPath);
 
@@ -195,6 +199,9 @@
 
     /// <summary>是否有选中的文件</summary>
     public bool HasSelection => _selectedFileCount > 0;
+
+    /// <summary>用户选择的文件夹名称（不含路径）</summary>
+    public string? SelectedFolderName => _selectedFolderName;
 
     public void Dispose()
     {

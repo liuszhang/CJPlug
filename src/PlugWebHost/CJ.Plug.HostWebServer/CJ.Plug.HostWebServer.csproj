@@ -1,75 +1,78 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
-	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
-		<!-- Disable build-time compression of static web assets to avoid MSB4018 DiscoverPrecompressedAssets duplicate-key errors -->
-		<DisableBuildCompression>true</DisableBuildCompression>
-	</PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <!-- Disable build-time compression of static web assets to avoid MSB4018 DiscoverPrecompressedAssets duplicate-key errors -->
+    <DisableBuildCompression>true</DisableBuildCompression>
+  </PropertyGroup>
 
-	<ItemGroup>
-		<PackageReference Include="CodeBeam.MudBlazor.Extensions" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
-	</ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CodeBeam.MudBlazor.Extensions" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />    
+  </ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
-		<ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
-		<ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
-		<ProjectReference Include="..\CJ.Plug.MainPageContent\CJ.Plug.MainPageContent.csproj" />
-		<ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
-	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
+    <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
+    <ProjectReference Include="..\CJ.Plug.MainPageContent\CJ.Plug.MainPageContent.csproj" />
+    <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
+  </ItemGroup>
 
-	<ItemGroup>
-		<Content Update="appsettings.json">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-		<Content Update="wwwroot\app.css">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Update="wwwroot\defultplug1.ico">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-	</ItemGroup>
+  <ItemGroup>
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="wwwroot\app.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="wwwroot\defultplug1.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
-	<!--
+<!--
     Build 模式下 SDK 不将 RCL 的 _content/ 静态资源复制到输出目录。
     本 Target 利用已解析的 StaticWebAsset items，将 RCL 主资源（Primary）
     复制到 wwwroot/_content/，配合 UseStaticFiles() 提供文件系统兜底。
 
     增量构建：仅当 ProjectReference 比输出目录中的 stamp 文件更新时才执行。
   -->
-	<Target Name="CopyRclStaticAssetsForBuild"
-			AfterTargets="Build"
-			Inputs="@(ProjectReference)"
-			Outputs="$(OutputPath)wwwroot\_content\_rcl_copied.stamp">
+  <Target Name="CopyRclStaticAssetsForBuild"
+          AfterTargets="Build"
+          Inputs="@(ProjectReference)"
+          Outputs="$(OutputPath)wwwroot\_content\_rcl_copied.stamp">
 
-		<PropertyGroup>
-			<_DestBase>$(OutputPath)wwwroot\_content\</_DestBase>
-		</PropertyGroup>
+    <PropertyGroup>
+      <_DestBase>$(OutputPath)wwwroot\_content\</_DestBase>
+    </PropertyGroup>
 
-		<!-- 筛选 RCL 的主资源（AssetRole=Primary），排除主项目自身的资产 -->
-		<ItemGroup>
-			<_RclAssets Include="@(StaticWebAsset)"
-						Condition="'%(StaticWebAsset.AssetRole)' == 'Primary'
+    <!-- 筛选 RCL 的主资源（AssetRole=Primary），排除主项目自身的资产 -->
+    <ItemGroup>
+      <_RclAssets Include="@(StaticWebAsset)"
+                  Condition="'%(StaticWebAsset.AssetRole)' == 'Primary'
                              And '%(StaticWebAsset.SourceId)' != '$(AssemblyName)'">
-				<!-- 去除 RelativePath 中的指纹标记，如 "icon#[.{fingerprint=abc}]?.png" → "icon.png" -->
-				<CleanName>$([System.Text.RegularExpressions.Regex]::Replace('%(StaticWebAsset.RelativePath)', '#\[\.\{fingerprint[^}]*\}\]\?', ''))</CleanName>
-			</_RclAssets>
-		</ItemGroup>
+        <!-- 去除 RelativePath 中的指纹标记，如 "icon#[.{fingerprint=abc}]?.png" → "icon.png" -->
+        <CleanName>$([System.Text.RegularExpressions.Regex]::Replace(
+          '%(StaticWebAsset.RelativePath)',
+          '#\[\.\{fingerprint[^}]*\}\]\?',
+          ''))</CleanName>
+      </_RclAssets>
+    </ItemGroup>
 
-		<Message Importance="high" Text="[RCL-Copy] Copying @(_RclAssets->Count()) RCL assets to wwwroot/_content/" />
+    <Message Importance="high" Text="[RCL-Copy] Copying @(_RclAssets->Count()) RCL assets to wwwroot/_content/" />
 
-		<Copy SourceFiles="@(_RclAssets->'%(FullPath)')"
-			  DestinationFiles="@(_RclAssets->'$(_DestBase)%(SourceId)\%(CleanName)')"
-			  SkipUnchangedFiles="true"
-			  Condition="'@(_RclAssets)' != ''" />
+    <Copy SourceFiles="@(_RclAssets->'%(FullPath)')"
+          DestinationFiles="@(_RclAssets->'$(_DestBase)%(SourceId)\%(CleanName)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_RclAssets)' != ''" />
 
-		<Touch Files="$(OutputPath)wwwroot\_content\_rcl_copied.stamp" AlwaysCreate="true" />
+    <Touch Files="$(OutputPath)wwwroot\_content\_rcl_copied.stamp" AlwaysCreate="true" />
 
-	</Target>
+  </Target>
 
 </Project>

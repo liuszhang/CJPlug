@@ -45,7 +45,6 @@ namespace NXPlug_AIModel.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var PlugSettings = new PlugSettings(null);
-            PlugSettings.PlugType = "NXAIModel";
             PlugSettings.PlugDisplayName = "NXAIModel";
             PlugSettings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
             //PlugSettings.SetSetting(PlugSettingKey.Outcomes.ToString(), "成功|失败");

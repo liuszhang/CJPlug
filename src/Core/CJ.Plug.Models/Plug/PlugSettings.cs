@@ -18,9 +18,10 @@ namespace CJ.Plug.Models.Plug
         }
 
         public string? PlugId { get; set; }
-        public string? PlugType { get; set; } //设置初始化时的插头类型
         public string? PlugDisplayName { get; set; }  //设置初始化时的插头显示名称
         public string? PlugTypeKey { get; set; }
+        //public string? PlugType { get; set; }
+        public string? PlugCategory { get; set; }   //插头类别，决定了执行时走哪个执行器，比如桌面类、接口类、脚本类等
 
         //插头的初始化参数
         public List<BaseVariable>? InitVariables { get; set; } = new();

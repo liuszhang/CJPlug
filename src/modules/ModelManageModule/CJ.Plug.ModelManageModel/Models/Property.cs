@@ -28,7 +28,7 @@ namespace CJ.Plug.ModelManageModel.Models
         public string PropertyType { get; set; } = "Text";
 
         /// <summary>默认值</summary>
-        public string? DefaultValue { get; set; }
+        public string? Value { get; set; }
 
         /// <summary>是否必填</summary>
         public bool IsRequired { get; set; } = false;

@@ -46,7 +46,6 @@ namespace CMDPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var PlugSettings = new PlugSettings(null);
-            PlugSettings.PlugType = PlugKeySetting.CommonSettingPageKey;
             PlugSettings.PlugDisplayName = "CMD命令执行";
             PlugSettings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
             //PlugSettings.SetSetting(PlugSettingKey.Outcomes.ToString(), "成功|失败");
@@ -56,7 +55,7 @@ namespace CMDPlug.Services
             {
                 Name = InitVariableNames.CMDCommand.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
-                DefaultValue = "notepad",
+                Value = "notepad",
             });
             InitVariables.Add(new BaseVariable()
             {
@@ -116,7 +115,7 @@ namespace CMDPlug.Services
             {
                 Name = InitVariableNames.SupportRemoteView.ToString(),
                 Type = VariableTypeEnum.Bool.ToString(),
-                DefaultValue = "true",
+                Value = "true",
                 IsBrowsable = false,
             });
             PlugSettings.InitVariables = InitVariables;
@@ -138,7 +137,6 @@ namespace CMDPlug.Services
                 new()
                 {
                     Name = "启动记事本",
-                    Type = PlugKeySetting.CommonSettingPageKey,
                     PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
@@ -152,7 +150,6 @@ namespace CMDPlug.Services
                 new()
                 {
                     Name = "查看IP配置",
-                    Type = PlugKeySetting.CommonSettingPageKey,
                     PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
@@ -166,7 +163,6 @@ namespace CMDPlug.Services
                 new()
                 {
                     Name = "列出目录文件",
-                    Type = PlugKeySetting.CommonSettingPageKey,
                     PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
@@ -180,7 +176,6 @@ namespace CMDPlug.Services
                 new()
                 {
                     Name = "系统信息",
-                    Type = PlugKeySetting.CommonSettingPageKey,
                     PlugTypeKey = PlugKeySetting.CommonSettingPageKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),

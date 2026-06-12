@@ -56,7 +56,7 @@ public class NXPlugCommonExecuteService(IServiceProvider serviceProvider) : Base
             inputs.Add(new PlugVariableData { Name = PlugGlobalEnum.NXSetParameters.Variables.NewParameterString, Value = newParameters });
             var toolCommandRequest = new PlugExecutionRequest
             {
-                PlugType = PlugGlobalEnum.NXSetParameters.TypeName,
+                PlugTypeKey = PlugGlobalEnum.NXSetParameters.TypeName,
                 //SpecifiedStationIp = stationIp.StationIp,
                 //ExecuteMode = ExecuteMode.Standalone,
                 InputVariables = inputs,

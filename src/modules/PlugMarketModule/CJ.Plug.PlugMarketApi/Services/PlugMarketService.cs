@@ -46,7 +46,7 @@ namespace CJ.Plug.PlugMarketApi.Services
             }
             entity.Name = request.Name;
             entity.Description = request.Description;
-            entity.Type = request.Type;
+            entity.PlugTypeKey = request.PlugTypeKey;
             entity.Status = request.Status;
             await _dbContext.SaveChangesAsync(cancellationToken);
             return entity;

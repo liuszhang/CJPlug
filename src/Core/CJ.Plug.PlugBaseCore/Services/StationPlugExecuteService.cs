@@ -2,6 +2,7 @@ using CJ.Plug.Models.EventAggregator;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Shared;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
 using CJ.Plug.PlugDataZoneApiClient;
@@ -30,6 +31,11 @@ public abstract class StationPlugExecuteService : BasePlugExecuteService
     /// 获取该插头绑定的工具版本，如 "1.0"、"3.12" 等
     /// </summary>
     protected abstract string ToolVersion { get; }
+
+    /// <summary>
+    /// 公开工具信息供 <see cref="PlugExecutionEngine"/> 从本地 DB 预解析 Tool 和 Station。
+    /// </summary>
+    public override (string? toolName, string? toolVersion) GetToolInfo() => (ToolName, ToolVersion);
 
     /// <summary>
     /// 获取用于从 PDZ 读取变量值的变量名数组，传递给 <see cref="BasePlugExecuteService.DataPrepare"/>。
@@ -158,6 +164,12 @@ public abstract class StationPlugExecuteService : BasePlugExecuteService
             ToolName = ToolName,
             ToolVersion = ToolVersion,
             ExecuteMode = source.ExecuteMode,
+            // 复制 InputVariables，确保 MCP Standalone 等路径中 command 参数等输入数据不丢失
+            InputVariables = source.InputVariables ?? new(),
+            // 复制其他在提交阶段可能需要的字段
+            RequestCommand = source.RequestCommand,
+            SpecifiedStationIp = source.SpecifiedStationIp,
+            StationApiPort = source.StationApiPort,
             ExecuteResultData = new ExecuteResultData
             {
                 Ids = source.ExecuteResultData?.Ids,
@@ -223,13 +235,17 @@ public abstract class StationPlugExecuteService : BasePlugExecuteService
     {
         if (identityId == null)
         {
-            return pdz.GetVariableValue(plugDefinitionId, variableName);
+            return VariableResolver.ResolveFromPDZ(variableName, pdz, plugDefinitionId);
         }
         else
         {
-            return pdz.ActionVariableDatas?
+            var actionValue = pdz.ActionVariableDatas?
                 .Where(p => p.ActionIdentityId == identityId)
                 .FirstOrDefault(p => p.Name == variableName)?.Value;
+            if (actionValue != null)
+                return actionValue;
+            // Action 路径也回退到 PDZ 解析链（含 Plug 层 Value 回退）
+            return VariableResolver.ResolveFromPDZ(variableName, pdz, plugDefinitionId);
         }
     }
 }

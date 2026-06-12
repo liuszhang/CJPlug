@@ -51,9 +51,9 @@ Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<
 Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
 Log.Logger = new LoggerConfiguration()
-    //.WriteTo.File("StationLogs/log.txt",
-    //    rollingInterval: RollingInterval.Day,
-    //    rollOnFileSizeLimit: true)
+    .WriteTo.File("StationLogs/log.txt",
+        rollingInterval: RollingInterval.Day,
+        rollOnFileSizeLimit: true)
     .WriteTo.Sink(new SignalRLogSink("Station"))
     .CreateLogger();
 

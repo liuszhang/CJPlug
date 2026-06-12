@@ -15,7 +15,7 @@ namespace PPTPlug.Services
         private PPTPlugCommonSettingPage? _designerWrapper;
         public Task<RenderFragment?> GetPlugCommonSettingContent(GetSettingContext context)
         {
-            // 根据不同的插件类型返回不同的渲染片段
+            // 鏍规嵁涓嶅悓鐨勬彃浠剁被鍨嬭繑鍥炰笉鍚岀殑娓叉煋鐗囨
             if (context.PlugTypeKey == PlugKeySetting.CommonSettingPageKey)
             {
                 var sequence = 0;
@@ -29,7 +29,7 @@ namespace PPTPlug.Services
                 });
             }
 
-            // 如果没有匹配的插件类型，则返回null或默认的RenderFragment
+            // 濡傛灉娌℃湁鍖归厤鐨勬彃浠剁被鍨嬶紝鍒欒繑鍥瀗ull鎴栭粯璁ょ殑RenderFragment
             return Task.FromResult<RenderFragment?>(null);
         }
 
@@ -37,7 +37,6 @@ namespace PPTPlug.Services
         {
             var settings = new PlugSettings(null);
             settings.PlugDisplayName = "PPT组件";
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
@@ -70,3 +69,4 @@ namespace PPTPlug.Services
         }
     }
 }
+

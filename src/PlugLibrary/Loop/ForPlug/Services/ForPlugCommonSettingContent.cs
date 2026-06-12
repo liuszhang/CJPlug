@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Shared;
@@ -38,7 +38,6 @@ namespace ForPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "For循环";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -74,3 +73,4 @@ namespace ForPlug.Services
         }
     }
 }
+

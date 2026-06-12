@@ -2,9 +2,12 @@
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.SharedPages.Contracts
+@using Microsoft.AspNetCore.Components.Forms
 @using CJ.Plug.StationAndToolApiClient
+@using CJ.Plug.Models.VariableType
 @using CJ.Plug.ToolActionSetting.Components.Plugs
 @using Microsoft.JSInterop
+@using System.Text.RegularExpressions
 
 @inject MainApiClient MainApiClient
 @inject ISnackbar Snackbar
@@ -12,47 +15,76 @@
 @inject IJSRuntime JsRuntime
 @inject IDomInteropService DomInteropService
 
+
 <MudDialog>
     <DialogContent>
         <MudStack>
             <MudStack Row AlignItems="AlignItems.Center">
                 <MudTextField @bind-Value="@Plug.Name" Margin="Margin.Dense" Label="插头名称" Variant="Variant.Outlined"></MudTextField>
+                <MudTooltip Text="配置插头图标（从本地选择图片）">
+                    @if (!string.IsNullOrEmpty(Plug.Icon))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Primary" OnClick="OnIconDelete" />
+                        <img src="/webFiles/@Plug.Icon"
+                             style="width:28px;height:28px;object-fit:cover;border-radius:4px;margin-left:6px;" />
+                    }
+                    else
+                    {
+                        <MudFileUpload T="IBrowserFile" FilesChanged="OnIconFileSelected" Accept=".png,.jpg,.jpeg,.ico,.svg,.webp,.bmp">
+                            <CustomContent>
+                                <MudIconButton OnClick="@context.OpenFilePickerAsync"
+                                               Icon="@Icons.Material.Filled.InsertPhoto" Size="Size.Small"
+                                               Color="Color.Default" />
+                            </CustomContent>
+                            <SelectedTemplate></SelectedTemplate>
+                        </MudFileUpload>
+                    }
+                </MudTooltip>
                 <MudTooltip Text="系统插头只有管理员能够创建，创建后所有人可见">
                     <MudSwitch T="bool" @bind-Value="@IsSystemPlug" Label="是否系统插头" Size="Size.Small" Color="Color.Primary"></MudSwitch>
                 </MudTooltip>
             </MudStack>
 
-            <MudSelect T="string" Value="@Plug.Category" Label="插头类型" Required Margin="Margin.Dense" Dense Variant="Variant.Outlined" Disabled="true">
-                <MudSelectItem Value="@PlugCategorys.桌面类.ToString()">桌面类</MudSelectItem>
-                <MudSelectItem Value="@PlugCategorys.接口类.ToString()">接口类</MudSelectItem>
-                <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
-            </MudSelect>
-
-            <MudTextField @bind-Value="@Plug.Type" Margin="Margin.Dense" Label="插头标识" ReadOnly="true" Variant="Variant.Filled"></MudTextField>
-            <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined"></MudTextField>
+            <MudStack Row>
+                <MudSelect T="string" Value="@Plug.Category" Label="插头类型" Required Margin="Margin.Dense" Dense Variant="Variant.Outlined" Disabled="true" Class="flex-grow-1">
+                    <MudSelectItem Value="@PlugCategorys.桌面类.ToString()">桌面类</MudSelectItem>
+                    <MudSelectItem Value="@PlugCategorys.接口类.ToString()">接口类</MudSelectItem>
+                    <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="@Plug.PlugTypeKey" Margin="Margin.Dense" Label="插头标识" ReadOnly="true" Variant="Variant.Filled" Class="flex-grow-1"></MudTextField>
+                <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined" Class="flex-grow-1"></MudTextField>
+            </MudStack>
             <MudTextField @bind-Value="@Plug.Description" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined" Lines="2"></MudTextField>
 
             <MudCheckBox Dense @bind-Value="Plug.ShowInPlugLibrary" Label="插入插座" Color="Color.Primary"></MudCheckBox>
             <MudCheckBox Dense @bind-Value="Plug.OnlyExecuteAction" Label="仅执行插头动作" Color="Color.Error"></MudCheckBox>
 
-            <MudStack Spacing="1">
-                <MudButton OnClick="()=>{_expanded=!_expanded;}">@(_expanded ? "收起" : "高级配置")</MudButton>
-                <MudCollapse Expanded="_expanded">
-                    <MudTextField @bind-Value="Plug.PlugTypeKey" Label="唯一标识符(开发人员)" Margin="Margin.Dense" Variant="Variant.Outlined"></MudTextField>
-                </MudCollapse>
-                <MudDivider />
-            </MudStack>
-
             @if (Plug.Category?.Contains("桌面") == true)
             {
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="@_commandDisplay" Margin="Margin.Dense" Label="执行命令"
+                                  Variant="Variant.Outlined" Class="flex-grow-1"></MudTextField>
+                    <div class="help-tooltip-container">
+                        <MudIcon Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Primary" Class="ml-2" Style="cursor:pointer"></MudIcon>
+                        <div class="help-tooltip-content">
+                            @foreach (var line in _tooltipLines)
+                            {
+                                <div>@line</div>
+                            }
+                        </div>
+                    </div>
+                </MudStack>
                 <DesktopPlugConfig @ref="_desktopConfig"
                                    ServerBaseUrl="@(GlobalData.MainApiServer ?? "")"
                                    PlugFolder="@(Plug.DefinitionId?.ToString())"
-                                   Username="@_currentUserName" />
+                                   Username="@_currentUserName"
+                                   IsSystemPlug="@IsSystemPlug"
+                                   ExistingPlug="Plug"
+                                   CommandDisplayChanged="OnCommandDisplayChanged" />
             }
             else if (Plug.Category?.Contains("接口") == true)
             {
-                <InterfacePlugConfig @ref="_interfaceConfig" />
+                <InterfacePlugConfig @ref="_interfaceConfig" Plug="@Plug" />
             }
             else if (Plug.Category?.Contains("脚本") == true)
             {
@@ -76,6 +108,34 @@
     </DialogActions>
 </MudDialog>
 
+<style>
+    .help-tooltip-container {
+        position: relative;
+        display: inline-flex;
+    }
+    .help-tooltip-content {
+        display: none;
+        position: absolute;
+        right: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #424242;
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 6px;
+        white-space: nowrap;
+        z-index: 9999;
+        margin-right: 10px;
+        font-size: 13px;
+        line-height: 1.8;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        pointer-events: none;
+    }
+    .help-tooltip-container:hover .help-tooltip-content {
+        display: block;
+    }
+</style>
+
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; }
@@ -84,9 +144,61 @@
     public Plug Plug { get; set; } = new();
 
     private bool IsSystemPlug { get; set; }
-    private bool _expanded;
     private bool _submitting;
     private string _currentUserName = "";
+    private string? _commandDisplay;
+    private readonly string[] _tooltipLines = new[]
+    {
+        "通配符预设逻辑：",
+        "[ToolPath]：执行时自动替换为工具入口程序的路径",
+        "  - 手动输入路径：替换为输入的完整路径",
+        "  - 上传文件夹：替换为上传文件夹在服务器上的路径",
+        "[CMDCommand]：执行时自动替换为实际传入的命令行指令",
+        "[ExecutionTimeout]：执行时自动替换为设置的超时时间（秒）",
+        "[WaitType]：等待类型，控制插头等待工具退出的方式",
+        "[WatchProcessName]：监控的进程名称",
+        "[AutoCloseProcess]：执行完成后是否自动关闭进程",
+        "[ShowConsole]：是否显示控制台窗口",
+        "[RedirectOutput]：是否重定向输出到变量",
+        "[RedirectWorkPath]：重定向工作目录路径",
+        "参数类型通配符：[变量名:类型]，默认为 String",
+        "  例：[FilePath:String] 或 [ModelFile:File]",
+    };
+
+    private void OnCommandDisplayChanged(string value)
+    {
+        _commandDisplay = value;
+        StateHasChanged();
+    }
+
+    private async Task OnIconFileSelected(IBrowserFile file)
+    {
+        if (file == null) return;
+        try
+        {
+            var webRoot = GlobalData.MainWebFileServer.Replace("//", "\\").TrimEnd('\\');
+            var iconDir = Path.Combine(webRoot, "Icons", Plug.DefinitionId!);
+            Directory.CreateDirectory(iconDir);
+            var filePath = Path.Combine(iconDir, file.Name);
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var fs = File.Create(filePath);
+            await stream.CopyToAsync(fs);
+
+            Plug.Icon = $"Icons/{Plug.DefinitionId}/{file.Name}";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"图标上传失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnIconDelete()
+    {
+        Plug.Icon = null;
+        StateHasChanged();
+    }
 
     // 子组件引用
     private DesktopPlugConfig? _desktopConfig;
@@ -96,6 +208,7 @@
     protected override void OnInitialized()
     {
         IsSystemPlug = Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString();
+        _commandDisplay = Plug.ToolCommandLineShema;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -114,6 +227,20 @@
             return;
         }
 
+        // 兼容旧数据：PlugTypeKey 为空时默认等于插头名称
+        if (string.IsNullOrWhiteSpace(Plug.PlugTypeKey))
+        {
+            Plug.PlugTypeKey = Plug.Name;
+        }
+
+        // 全局唯一校验：检查 PlugTypeKey（即名称）是否已被其他插头占用
+        var existing = await MainApiClient.GetRootPlugByTypeNameAsync(Plug.PlugTypeKey);
+        if (existing != null && existing.Id != Plug.Id)
+        {
+            Snackbar.Add($"插头标识「{Plug.PlugTypeKey}」已被插头「{existing.Name}」占用，请修改插头名称", Severity.Warning);
+            return;
+        }
+
         _submitting = true;
         StateHasChanged();
 
@@ -129,7 +256,39 @@
                     await _desktopConfig.UploadFolderAsync();
                 }
                 _desktopConfig.ApplyToPlug(Plug);
+                if (!string.IsNullOrWhiteSpace(_commandDisplay) && !(Plug.ToolVersionPath?.StartsWith("uploaded://") ?? false))
+                {
+                    Plug.ToolCommandLineShema = _commandDisplay;
+                }
                 _desktopConfig.ApplyToolVariables(Plug);
+
+                // 从执行命令中解析 [XXX] 变量并自动生成插头变量，跳过 [ToolPath]
+                if (!string.IsNullOrWhiteSpace(_commandDisplay))
+                {
+                    var matches = Regex.Matches(_commandDisplay, @"\[([^\]:]+)(?::([^\]]*))?\]");
+                    foreach (Match match in matches)
+                    {
+                        var varName = match.Groups[1].Value;
+                        if (varName == "ToolPath") continue;
+                        if (!Plug.PlugVariables.Any(v => v.Name == varName))
+                        {
+                            var typeStr = match.Groups[2].Value;
+                            var varType = string.IsNullOrWhiteSpace(typeStr) || typeStr.Equals("String", StringComparison.OrdinalIgnoreCase)
+                                ? VariableTypeEnum.String.ToString()
+                                : typeStr.Equals("File", StringComparison.OrdinalIgnoreCase)
+                                    ? VariableTypeEnum.File.ToString()
+                                    : VariableTypeEnum.String.ToString();
+
+                            Plug.PlugVariables.Add(new PlugVariable
+                            {
+                                Name = varName,
+                                Value = "",
+                                IsInitVariable = true,
+                                Type = varType,
+                            });
+                        }
+                    }
+                }
             }
             else if (Plug.Category?.Contains("接口") == true && _interfaceConfig != null)
             {

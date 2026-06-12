@@ -1,4 +1,4 @@
-﻿using ModelContextProtocol.Server;
+using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
 
@@ -12,7 +12,7 @@ namespace CJ.Plug.McpServer.Tools
         /// 获取系统中所有的作业信息
         /// </summary>
         /// <returns></returns>
-        [McpServerTool, Description("获取系统中所有的作业信息")]
+        //[McpServerTool, Description("获取系统中所有的作业信息")]
         public static async Task<string> ListJob()
         {
             var httpClient = new HttpClient();

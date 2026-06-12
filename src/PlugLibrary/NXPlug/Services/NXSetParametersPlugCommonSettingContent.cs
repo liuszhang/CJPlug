@@ -35,7 +35,6 @@ namespace NXPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var PlugSettings = new PlugSettings(null);
-            PlugSettings.PlugType = PlugKeySetting.NXSetParameters.CommonSettingPageKey;
             PlugSettings.PlugDisplayName = "设置NX模型参数";
             PlugSettings.PlugTypeKey = PlugKeySetting.NXSetParameters.CommonSettingPageKey;
 
@@ -44,13 +43,13 @@ namespace NXPlug.Services
             {
                 Name = NXSetParametersVariables.ModelFilePath.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
-                DefaultValue = "",
+                Value = "",
             });
             InitVariables.Add(new BaseVariable()
             {
                 Name = NXSetParametersVariables.NewParameterString.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
-                DefaultValue = "",
+                Value = "",
             });
             InitVariables.Add(new BaseVariable()
             {
@@ -75,7 +74,6 @@ namespace NXPlug.Services
                 new()
                 {
                     Name = "设置NX模型参数示例",
-                    Type = PlugKeySetting.NXSetParameters.CommonSettingPageKey,
                     PlugTypeKey = PlugKeySetting.NXSetParameters.CommonSettingPageKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),

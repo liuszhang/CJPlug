@@ -33,5 +33,5 @@ public class EntryVariableDto
     public string? Type { get; set; }
     public bool IsRequired { get; set; }
     public bool IsArray { get; set; }
-    public string? DefaultValue { get; set; }
+    public string? Value { get; set; }
 }

@@ -152,6 +152,12 @@ public partial class TASApiClient:BaseApiClient,ITASApiClient
     {
         try
         {
+            if (string.IsNullOrEmpty(typeName))
+            {
+                CLog.Error("GetRootPlugByTypeNameAsync: typeName is null or empty, skipping HTTP call");
+                Console.WriteLine("GetRootPlugByTypeNameAsync: typeName is null or empty");
+                return null;
+            }
             var response = await httpClient.GetFromJsonAsync<Plug?>($"/api/plug/getByType/{typeName}", cancellationToken);
             //Log.Information($"准备执行插头：{response.Name}({response.Id})");
             return response;

@@ -39,7 +39,6 @@ namespace TextWriterPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "文本解析-写";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

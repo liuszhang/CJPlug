@@ -15,22 +15,41 @@ public class StationApiClient(HttpClient httpClient)
         return result;
     }
 
-    public ExecuteResultData StationToolExecutionAsync(PlugExecutionRequest stationExectionRequest)
+    public async Task<ExecuteResultData> StationToolExecutionAsync(PlugExecutionRequest stationExectionRequest)
     {
-        //提交到图站，不等待结果，后续执行结果由图站执行完成后主档推送到服务端(由于引擎恢复活动目前有BUG，后续修复后再改为同步执行)
-        _ =httpClient.PostAsJsonAsync($"/api/station/executeToolCommand", stationExectionRequest);
-        //Console.WriteLine("11"+JsonSerializer.Serialize(result));
-        //Console.WriteLine("22" + JsonSerializer.Serialize(result.Content));
-        //Console.WriteLine("33" + JsonSerializer.Serialize(result.Content.ReadAsStringAsync()));
-        //return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted);
+        // 提交到图站，等待结果或捕获异常（修复发后即忘问题）
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync($"/api/station/executeToolCommand", stationExectionRequest);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return new ExecuteResultData
+                {
+                    Ids = stationExectionRequest.ExecuteResultData.Ids,
+                    ExecuteStatus = JobStatus.完成,
+                    ExecuteSubStatus = JobSubStatus.出错,
+                    ResultString = $"提交执行到图站失败: HTTP {(int)response.StatusCode} {response.StatusCode}, {error}"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ExecuteResultData
+            {
+                Ids = stationExectionRequest.ExecuteResultData.Ids,
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                ResultString = $"提交执行到图站失败: {ex.Message}"
+            };
+        }
+
         return new ExecuteResultData
         {
             Ids = stationExectionRequest.ExecuteResultData.Ids,
             ExecuteStatus = JobStatus.执行中,
             ExecuteSubStatus = JobSubStatus.已提交至图站,
         };
-
-        //return result;
     }
 
     public async Task<ExecuteResultData?> StationExecutionWaitResultAsync(PlugExecutionRequest stationExectionRequest)

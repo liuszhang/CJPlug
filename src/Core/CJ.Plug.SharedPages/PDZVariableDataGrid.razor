@@ -90,7 +90,6 @@
                             </EditTemplate>
                         </PropertyColumn>
                         <PropertyColumn Property="x => x.Value" Title="真实值" Hidden="@(true)" Style="padding:0"/>
-                        <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Hidden="@(true)" Editable="false" Style="padding:0"/>
                         <PropertyColumn Property="x => x.InputAndOutput" Title="" StickyRight="false">
                             <EditTemplate>
                                 <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="()=>EditVariable(context.Item)" />

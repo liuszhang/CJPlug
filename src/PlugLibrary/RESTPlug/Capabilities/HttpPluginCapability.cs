@@ -27,7 +27,7 @@ public class HttpPluginCapability : IPluginCapability
             Name = "method", Type = "String",
             Description = "HTTP 方法: GET, POST, PUT, DELETE, PATCH 等",
             IsRequired = true,
-            DefaultValue = "GET"
+            Value = "GET"
         },
         new()
         {
@@ -43,7 +43,7 @@ public class HttpPluginCapability : IPluginCapability
         {
             Name = "timeout", Type = "Int",
             Description = "请求超时时间（秒）",
-            DefaultValue = "30"
+            Value = "30"
         },
     };
 

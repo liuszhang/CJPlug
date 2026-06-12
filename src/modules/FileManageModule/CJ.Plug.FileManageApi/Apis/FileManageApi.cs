@@ -84,6 +84,13 @@ namespace CJ.Plug.FileManageApi.Apis
 
             api.MapPost("/delete", async (IFileManageService service, [FromBody] FileDeleteRequest? request) => await service.DeleteFile(request));
 
+            api.MapPost("/moveDirectory", async (IFileManageService service, [FromBody] MoveDirectoryRequest? request) =>
+            {
+                if (request == null) return Results.BadRequest("请求为空");
+                var ok = await service.MoveDirectory(request.SourcePath, request.DestPath);
+                return ok ? Results.Ok() : Results.BadRequest("目录移动失败");
+            });
+
             // 以 zip 方式打包下载工具
             api.MapGet("/downloadTool", async (string name, string version, string? path) =>
             {

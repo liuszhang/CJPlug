@@ -1,28 +1,31 @@
-﻿@using BlazorMonaco.Editor
+@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using BlazorMonaco.Editor
 @using CJ.Plug.Models.Plug
+@using CJ.Plug.PlugBaseCore.Models
 @using Elsa.Api.Client.Extensions
 @using Elsa.Api.Client.Resources.ActivityDescriptors.Models
 @using Elsa.Api.Client.Shared.Models
 @using Humanizer
+@using JavaScriptPlug
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using MudBlazor
-@using System.Text.Json.Nodes
-@using System.Text.Json
-@using System.Text
 
 @inject IJSRuntime JSRuntime
 
 <MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Settings">导入本地文件</MudButton>
     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AirlineSeatFlat">导入系统文件</MudButton>
-    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">保存</MudButton>
-    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
+    <MudBadge Color="@(_isDirty ? Color.Warning : Color.Success)" Dot="true" Overlap="true" Origin="Origin.BottomRight" Bordered="true" Class="elsa-toolbar-icon">
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="@OnSaveClick" StartIcon="@Icons.Material.Filled.Save">保存</MudButton>
+    </MudBadge>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="ResetCode" StartIcon="@Icons.Material.Filled.LockReset">重置</MudButton>
     <MudTooltip Text="参数集成说明:setpara(name,value)\getpara(name)">
         <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Help" />
     </MudTooltip>
 </MudStack>
-<MudText>文件内容(WorkPath/test.js)</MudText>
 <MudStack Row Justify="Justify.SpaceBetween">
 
     <MudStack Style="width:100%">
@@ -31,6 +34,7 @@
                               @ref="_editor"
                               Id="my-javascript-editor"
                               OnDidChangeModelContent="TextChanged"
+                              OnDidInit="EditorOnDidInit"
                               ConstructionOptions="EditorConstructionOptions" />
 
     </MudStack>
@@ -46,40 +50,87 @@
 </MudStack>
 
 @code{
+    [CascadingParameter]
+    public PlugDataZone PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    public string? DefinitionId { get; set; }
+
     private StandaloneCodeEditor _editor = null!;
-    private string jsCode = "alert(1)";
+    private string jsCode = "console.log('Hello World')";
     private string jsExeResult = "";
+    private string iniValue = "";
+    private bool _isDirty = false;
 
 
+    protected override Task OnParametersSetAsync()
+    {
+        if (SettingContext != null)
+        {
+            DefinitionId = SettingContext.PlugDefinitionId;
+        }
+        var savedCode = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.Script.ToString());
+        if (!string.IsNullOrEmpty(savedCode))
+        {
+            iniValue = savedCode;
+        }
+        return base.OnParametersSetAsync();
+    }
 
     private async void TextChanged()
     {
-        if (_editor != null)
-        {
-            var model = await _editor.GetModel();
-            jsCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            //StateHasChanged();
-        }
-
+        _isDirty = true;
     }
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
-        //MyCon1sole.WriteLine("编辑器开始构造");
         return new StandaloneEditorConstructionOptions
             {
                 AutomaticLayout = true,
                 GlyphMargin = true,
                 Language = "javascript",
-                Value = jsCode
+                Value = iniValue
             };
+    }
+
+    private async Task EditorOnDidInit()
+    {
+        if (string.IsNullOrEmpty(iniValue))
+        {
+            iniValue = jsCode;
+        }
+        if (iniValue != null)
+        {
+            await _editor.SetValue(iniValue);
+        }
     }
 
     private async Task TestJS()
     {
+        var model = await _editor.GetModel();
+        jsCode = await model.GetValue(EndOfLinePreference.CRLF, default);
         var result = await JSRuntime.InvokeAsync<object>("executeCode", jsCode);
         jsExeResult += result?.ToString() + "\n";
-        //StateHasChanged();
+    }
+
+    private async Task ResetCode()
+    {
+        await _editor.SetValue("console.log('Hello World')");
+        _isDirty = true;
+        StateHasChanged();
+    }
+
+    private async Task OnSaveClick()
+    {
+        if (_editor != null)
+        {
+            var model = await _editor.GetModel();
+            jsCode = await model.GetValue(EndOfLinePreference.CRLF, default);
+            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.Script.ToString(), jsCode);
+            _isDirty = false;
+            StateHasChanged();
+        }
     }
 }
 

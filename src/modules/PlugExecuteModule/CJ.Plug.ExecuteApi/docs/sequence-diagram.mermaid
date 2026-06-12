@@ -1,0 +1,61 @@
+sequenceDiagram
+    participant Caller as 调用方
+    participant Facade as PlugExecuteService<br/>(门面)
+    participant Engine as PlugExecutionEngine<br/>(核心引擎)
+    participant Mcp as McpWorkflowRunner<br/>(MCP工作流)
+    participant Bookmark as PlugBookmarkManager<br/>(书签管理)
+    participant Ext as 外部服务<br/>(PDZ/Elsa/MainApi)
+
+    Note over Caller,Ext: === 场景1: MCP 工作流执行 ===
+
+    Caller->>Facade: ExecuteMcpTool(request)
+    Facade->>Facade: 构造 PlugExecutionRequest
+    Facade->>Engine: StartExecutePlug(request)
+    Engine->>Engine: 检测 McpToolType=="Workflow"
+    Engine->>Mcp: ExecuteMcpWorkflowFromRequest(request, plugData)
+    Mcp->>Ext: PDZManageService.GetByPDZId(UsePDZ)
+    Mcp->>Ext: PlugManageService.GetPlugByDefinitionId()
+    Mcp->>Ext: MainApiClient.SubmitExecute() → JobPDZ
+    Mcp->>Ext: MainApiClient.CreateOrUpdatePDZ(参数填充)
+    Mcp->>Ext: ElsaApiClient.ExecuteWorkflowWithExecuteSetting()
+    Mcp-->>Engine: ExecuteResultData(JobPDZId, 执行中)
+    Engine-->>Facade: ExecuteResultData
+    Facade-->>Caller: result string
+
+    Note over Caller,Ext: === 场景2: 插头执行完成 → 结果汇报 → 书签恢复 ===
+
+    Caller->>Facade: ReportExecuteResult(executeReport)
+    Facade->>Engine: ReportExecuteResult(executeReport)
+    Engine->>Engine: 判断 ExecuteStatus/ExecuteSubStatus 组合
+    alt 需要恢复书签
+        Engine->>Bookmark: ResumeBookmarkAsync(correlationId, plugId, pdzId, outcomes)
+        Bookmark->>Ext: MainApiClient.GetPDZByPDZIdAsync()
+        Bookmark->>Ext: pdz.SetActivityOutcome()
+        Bookmark->>Ext: MainApiClient.CreateOrUpdatePDZ()
+        Bookmark->>Ext: StatusReporter.CompleteActivityContext() [SignalR]
+        Engine->>Bookmark: TryAwakenConvergencePlugs(pdzId, correlationId)
+        Bookmark->>Ext: MainApiClient.GetPDZByPDZIdAsync()
+        Bookmark->>Ext: pdz.GetReadyConvergencePlugIds()
+        loop 每个就绪汇聚插头
+            Bookmark->>Ext: MainApiClient.CreateOrUpdatePDZ(状态+Outcome)
+            Bookmark->>Bookmark: ResumeBookmarkAsync()
+        end
+    else 动作链继续
+        Engine->>Engine: StartExecutePlug(nextRequest)
+        Note over Engine: 递归动作链执行
+    end
+
+    Note over Caller,Ext: === 场景3: MCP Plugin 独立模式 (临时PDZ) ===
+
+    Caller->>Facade: StartExecutePlug(request)
+    Facade->>Engine: StartExecutePlug(request)
+    Engine->>Engine: 检测 McpToolType=="Plugin" + Standalone
+    Engine->>Ext: PlugManageService.GetPlugByDefinitionId()
+    Engine->>Engine: 填充 InputVariables → plug
+    Engine->>Engine: 创建临时 PDZ (MCP_Plugin0_xxx)
+    Engine->>Ext: PDZManageService.CreatePDZ(tempPDZ)
+    Engine->>Ext: PlugExecuteHandlerService.GetExecuteHandler()
+    Engine->>Ext: handler.PlugCommonExecute()
+    Engine->>Ext: PDZManageService.DeletePDZ(tempPDZId) [finally]
+    Engine-->>Facade: ExecuteResultData
+    Facade-->>Caller: ExecuteResultData

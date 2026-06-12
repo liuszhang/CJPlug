@@ -36,7 +36,7 @@ public class CmdPluginCapability : IPluginCapability
         {
             Name = "timeout", Type = "Int",
             Description = "命令超时时间（秒）",
-            DefaultValue = "60"
+            Value = "60"
         },
     };
 

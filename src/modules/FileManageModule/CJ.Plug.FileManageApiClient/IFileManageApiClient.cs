@@ -21,5 +21,7 @@ namespace CJ.Plug.FileManageApiClient
         Task<string?> UploadFileWithOutFileInfo(string filePath);
 
         Task<FileInformation?> DeleteFileWithRequest(FileDeleteRequest fileDeleteRequest);
+
+        Task<bool> MoveDirectory(string sourcePath, string destPath);
     }
 }

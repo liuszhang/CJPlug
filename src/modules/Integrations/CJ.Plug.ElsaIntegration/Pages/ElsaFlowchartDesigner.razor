@@ -1,5 +1,6 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.ElsaIntegration.Services
 @using CJ.Plug.Models.EventAggregator
@@ -437,7 +438,6 @@ draggable="false"
                 Type = t.TypeName,
                 Description = t.Description,
                 Value = valueNode?.ToString(),
-                DefaultValue = valueNode?.ToString(),
                 IsInitVariable = true,
                 IsBrowsable = t.IsBrowsable,
             });
@@ -445,6 +445,17 @@ draggable="false"
         }
         //如果是通过平台根活动创建的插头，则需要从根活动中获取插头参数信息放入PDZ中
         var rootPlug = await TASApiClient.GetRootPlugByTypeNameAsync(newActivity.GetTypeName());
+
+        // 兜底：对于未设置 PlugTypeKey 的插头（如"接口类"），从 Description 中提取 DefinitionId 直接查找根插头
+        if (rootPlug == null)
+        {
+            var definitionId = ExtractDefinitionId(activityDescriptor.Description);
+            if (!string.IsNullOrEmpty(definitionId))
+            {
+                rootPlug = await TASApiClient.GetPlugByDefinitionIdAsync(definitionId);
+                Console.WriteLine($"通过DefinitionId兜底查找根插头: {definitionId} -> {(rootPlug != null ? rootPlug.Name : "未找到")}");
+            }
+        }
         if (rootPlug != null)
         {
             //Log.Information($"获取根插头成功：{rootPlug.DefinitionId}({rootPlug.Id})");
@@ -466,7 +477,6 @@ draggable="false"
                         PlugDefinitionId = newPlug.DefinitionId,
                         Name = p.Name,
                         Value = p.Value,
-                        DefaultValue = p.DefaultValue,
                         Type = p.Type,
                         IsInitVariable = p.IsInitVariable,
                         IsBrowsable = p.IsBrowsable,
@@ -481,7 +491,6 @@ draggable="false"
                 PlugDefinitionId = newActivityId,
                 ParentPlugDefinitionId = ProcessDefinitionId,
                 Name = newActivity.GetName(),
-                PlugType = newActivity.GetTypeName(),
                 PlugTypeKey = rootPlug?.PlugTypeKey,
                 WorkPath=Path.Combine(PlugDataZone.PDZWorkPath,newActivityId),
                 PlugPosition = $"{x} {y}",//记录插头坐标值，用于绘制数据流等功能
@@ -502,6 +511,17 @@ draggable="false"
             CLog.Information(ex.Message);
             CLog.Information(ex.StackTrace);
         }
+    }
+
+    /// <summary>
+    /// 从 ActivityDescriptor 的 Description 中提取 DefinitionId（格式：[DefinitionId:xxx]）
+    /// </summary>
+    private static string? ExtractDefinitionId(string? description)
+    {
+        if (string.IsNullOrEmpty(description))
+            return null;
+        var match = Regex.Match(description, @"\[DefinitionId:([^\]]+)\]");
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     private async Task OnActivityDoubleClick(JsonObject activity)

@@ -12,6 +12,7 @@ public interface IPlugManageService
     Task<Plug?> GetParentPlugById(int? id);
     Task<Plug?> GetPlugByDefinitionId(string definiitonId);
     Task<Plug?> GetPlugByTypeName(string typeName);
+    Task<Plug?> GetPlugByNameAsync(string name);
     Task<Plug?> UpdatePlugAsync(int id, Plug request);
     Task<string?> GetExecuteString(Plug toolItem, PlugAction toolActionItem);
 

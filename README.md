@@ -7,7 +7,7 @@
 
 - [Elsa](https://github.com/elsa-workflows/elsa-core)：一款基于.NET的强大工作流引擎。
 - [Blazor.Diagrams](https://github.com/Blazor-Diagrams/Blazor.Diagrams)：一款基于Blazor实现的工作流编辑器。
-- [MudBlazor](https://github.com/MudBlazor/MudBlazor)：一款个人最喜欢的Blazor前端组件库。
+- [MudBlazor](https://github.com/MudBlazor/MudBlazor)：一款优秀的Blazor前端组件库。
 - [Radzen Blazor](https://github.com/radzenhq/radzen-blazor)：另一款优秀的Blazor前端组件库。
 
 ![CJPlug提供可视化搭建环境](./03.Website/Picture/EditProcess.png)
@@ -16,8 +16,7 @@
 
 - [操作文档](#操作文档)
 - [进展说明](#进展说明)
-- [主要功能](#主要共呢个)
-- [路线图](#路线图)
+- [主要功能](#主要功能)
 - [应用场景](#应用场景)
 - [新增插头](#新增插头)
 - [作业监控](#作业监控)
@@ -30,12 +29,35 @@
 
 [文档完善中]().
 
-基本使用：
-- 下载后打开02.Publish文件夹
-- 双击启动CJ.Plug-Aspire.AppHost/Debug/net9.0/CJ.Plug-Aspire.AppHost.exe
-- 如果是linux环境，使用dotnet运行CJ.Plug-Aspire.AppHost.dll
-- 启动后，访问http://localhost:5066/ 即可访问CJPlug平台。
-- 访问http://localhost:15288/ 即可访问CJPlug平台的服务管理中心（登录密码在启动的控制台中）。
+快速启动：
+- 下载后解压打开02.Publish文件夹
+- 双击启动CJ.Plug.Desktop/Debug/net10.0-windows/CJ.Plug.Desktop.exe
+- 如果是linux环境，使用命令 dotnet CJ.Plug.Desktop.dll 运行
+- 密码admin/123456
+
+![登录页](./03.Website/Picture/登录页.png)
+![插头管理](./03.Website/Picture/插头管理.png)
+
+## 将工具或流程发布为MCP Tool
+- 创建插头后，点击发布为MCP TOOL按钮
+- 在流程管理界面，选中流程，点击发布为MCP TOOL按钮
+![流程管理](./03.Website/Picture/流程管理.png)
+
+## 接入AI客户端使用
+- 进入MCP TOOL管理，点击配置指南，复制配置字符串
+- 进入支持配置MCP的AI客户端（如Trae等），将配置字符串贴入即可
+```json
+{
+  "mcpServers": {
+    "cj-mcpserver": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3001"
+    }
+  }
+}
+```
+![配置指南](./03.Website/Picture/配置指南.png)
+
 
 ## 进展说明
 
@@ -52,6 +74,7 @@
 
 - 可视化集成和管理任意工具，并提供工具的个性化配置，如针对不同图站配置不同安装路径.
 - 支持图站的任意接入和工具的分布式执行.
+- 一键将插头或插头串接的工具流发布为MCP Tools.
 - 持久化保存流程执行数据，随时可以进行结果查看、文件下载等.
 - 提供可视化拖拽方式设计工具链调用流程，实现逻辑执行和数据传递.
 - 支持流程的嵌套调用、流程的发布共享.
@@ -61,9 +84,6 @@
 - 支持第三方通过API接口进行流程执行及获取流程执行结果数据.
 - 支持二次开发插头的热插拔.
 
-## 路线图
-
-工具链调用->多学科仿真优化->大模型集成->基于AI的多学科设计仿真优化。
 
 ## 应用场景
 

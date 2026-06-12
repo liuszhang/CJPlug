@@ -97,7 +97,7 @@ namespace CJ.Plug.JobManageApiClient
                     }
                     //非独立执行模式，只执行提交，不等待结果完成
 
-                    var result = stationApiClient.StationToolExecutionAsync(request);
+                    var result = await stationApiClient.StationToolExecutionAsync(request);
                     return result;
                 }
                 catch (Exception ex)

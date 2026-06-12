@@ -1,6 +1,11 @@
 ﻿<PlugsConfig>
 	<BasePath>Plugs</BasePath>
 	<UserPlugs>
-		<Plug Name="WhilePlug" DllPath="WhilePlug/WhilePlug.dll"/>
+		<!-- <Plug Name="WhilePlug" DllPath="WhilePlug/WhilePlug.dll"/>
+		<Plug1 Name="CalculatorPlug" DllPath="CalculatorPlug/CalculatorPlug.dll"/>
+		<Plug Name="CSharpPlug" DllPath="CSharpPlug/CSharpPlug.dll"/>
+		<Plug Name="SignaturePadPlug" DllPath="SignaturePadPlug/SignaturePadPlug.dll"/>
+		<Plug Name="PatranPlug" DllPath="PatranPlug/PatranPlug.dll"/>
+		<Plug Name="NastranPlug" DllPath="NastranPlug/NastranPlug.dll"/> -->
 	</UserPlugs>
 </PlugsConfig>

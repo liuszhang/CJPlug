@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CJ.Plug.Desktop.Models;
 
 namespace CJ.Plug.Desktop.ViewModels;
 
@@ -15,6 +17,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _addressBarUrl = "http://localhost:15288";
 
+    [ObservableProperty]
+    private bool _showBreadcrumb;
+
+    public ObservableCollection<BreadcrumbItem> BreadcrumbItems { get; } = [];
+
+    /// <summary>
+    /// CurrentUrl 变化时自动解析 URL 更新面包屑（由 CommunityToolkit.Mvvm 源生成器调用）。
+    /// </summary>
+    partial void OnCurrentUrlChanged(string value)
+    {
+        AddressBarUrl = value;
+        UpdateBreadcrumb(value);
+    }
+
     private MenuItemViewModel? _selectedMenuItem;
 
     public MenuItemViewModel? SelectedMenuItem
@@ -28,11 +44,11 @@ public partial class MainViewModel : ObservableObject
                 if (!IsServiceManagement)
                 {
                     CurrentUrl = value.Url;
-                    AddressBarUrl = value.Url;
                 }
                 else
                 {
                     AddressBarUrl = "";
+                    UpdateBreadcrumb("");
                 }
                 foreach (var item in MenuItems)
                     item.IsSelected = item == value;
@@ -78,5 +94,54 @@ public partial class MainViewModel : ObservableObject
     {
         if (item == null) return;
         SelectedMenuItem = item;
+    }
+
+    /// <summary>
+    /// 根据 WebView2 当前 URL 更新面包屑导航。
+    /// </summary>
+    public void UpdateBreadcrumb(string url)
+    {
+        BreadcrumbItems.Clear();
+        ShowBreadcrumb = false;
+
+        if (string.IsNullOrEmpty(url)) return;
+
+        // 流程编辑页：/ProcessEdit/{DefinitionId}
+        var editMatch = Regex.Match(url, @"/ProcessEdit/([^/?#]+)", RegexOptions.IgnoreCase);
+        if (editMatch.Success)
+        {
+            var processId = editMatch.Groups[1].Value;
+            BreadcrumbItems.Add(new BreadcrumbItem
+            {
+                Text = "流程管理",
+                NavigateUrl = "http://localhost:5066/ProcessManageList?hideMenu=true",
+                IsFirst = true
+            });
+            BreadcrumbItems.Add(new BreadcrumbItem
+            {
+                Text = $"流程编辑({processId})",
+                IsFirst = false
+            });
+            ShowBreadcrumb = true;
+            return;
+        }
+
+        // 流程清单页：/ProcessManageList
+        if (url.Contains("/ProcessManageList", StringComparison.OrdinalIgnoreCase))
+        {
+            BreadcrumbItems.Add(new BreadcrumbItem
+            {
+                Text = "流程管理",
+                IsFirst = true
+            });
+            ShowBreadcrumb = true;
+        }
+    }
+
+    [RelayCommand]
+    private void NavigateBreadcrumb(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return;
+        CurrentUrl = url;
     }
 }

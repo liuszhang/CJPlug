@@ -30,7 +30,6 @@ namespace AiAgentPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var PlugSettings = new PlugSettings(null);
-            PlugSettings.PlugType = "AiAgentPlug";
             PlugSettings.PlugDisplayName = "AiAgent";
             PlugSettings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

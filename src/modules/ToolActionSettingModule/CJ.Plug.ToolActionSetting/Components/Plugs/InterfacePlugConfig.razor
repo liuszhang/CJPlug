@@ -46,7 +46,7 @@
                 </EditTemplate>
             </PropertyColumn>
             <PropertyColumn Property="x => x.Name" Title="名称"></PropertyColumn>
-            <PropertyColumn Property="x => x.DefaultValue" Title="默认值"></PropertyColumn>
+            <PropertyColumn Property="x => x.Value" Title="默认值"></PropertyColumn>
             <PropertyColumn Property="x => x.IsRequired" Title="必需">
                 <EditTemplate>
                     <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary"
@@ -64,9 +64,21 @@
 </MudContainer>
 
 @code {
+    [Parameter] public Plug? Plug { get; set; }
+
     private string? InterfaceUrl { get; set; }
     private string HttpMethod { get; set; } = "GET";
     private List<PDZVariable> ServiceParams { get; set; } = new();
+    private bool _loaded;
+
+    protected override void OnParametersSet()
+    {
+        if (Plug != null && !_loaded)
+        {
+            LoadFromPlug();
+            _loaded = true;
+        }
+    }
 
     private void AddServiceParam()
     {
@@ -78,6 +90,30 @@
         ServiceParams.Remove(param);
     }
 
+    private void LoadFromPlug()
+    {
+        if (Plug == null) return;
+
+        var method = Plug.GetVariableValue("Method");
+        if (!string.IsNullOrEmpty(method))
+            HttpMethod = method;
+
+        InterfaceUrl = Plug.Value ?? Plug.GetVariableValue("Url");
+
+        var headersJson = Plug.GetVariableValue("RequestHeaders");
+        if (!string.IsNullOrEmpty(headersJson))
+        {
+            try
+            {
+                ServiceParams = System.Text.Json.JsonSerializer.Deserialize<List<PDZVariable>>(headersJson) ?? new();
+            }
+            catch
+            {
+                ServiceParams = new();
+            }
+        }
+    }
+
     /// <summary>
     /// 将接口类配置写入 Plug 对象。
     /// </summary>
@@ -87,10 +123,9 @@
         plug.Value = InterfaceUrl;
 
         // 添加接口类默认参数（与REST插头一致）
-        plug.AddVariable("Url", VariableTypeEnum.String.ToString());
-        plug.AddVariable("Method", VariableTypeEnum.String.ToString());
-        plug.AddVariable("RequestHeaders", VariableTypeEnum.RequestHeader.ToString());
-        plug.AddVariable("OutputMappings", VariableTypeEnum.DefaultOutputMapping.ToString());
+        plug.PlugVariables.Add(new PlugVariable{ Name = "Url",Type = VariableTypeEnum.String.ToString(),IsInitVariable = true,IsBrowsable = false,});
+        plug.PlugVariables.Add(new PlugVariable { Name = "Method", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true, IsBrowsable = false, });
+        plug.PlugVariables.Add(new PlugVariable { Name = "RequestHeaders", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true, IsBrowsable = false, });
 
         // 设置URL默认值
         if (!string.IsNullOrEmpty(InterfaceUrl))
@@ -106,7 +141,7 @@
             {
                 p.Type,
                 p.Name,
-                p.DefaultValue,
+                p.Value,
                 p.IsRequired
             }));
             plug.SetVariableValue("RequestHeaders", paramsJson);

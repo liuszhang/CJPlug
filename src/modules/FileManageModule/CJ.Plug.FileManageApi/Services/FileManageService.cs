@@ -772,6 +772,39 @@ namespace CJ.Plug.FileManageApi.Services
             };
         }
 
+        public async Task<bool> MoveDirectory(string sourcePath, string destPath)
+        {
+            try
+            {
+                var sourceFull = Path.Combine(GlobalData.MainFileServerPathRoot, sourcePath.TrimStart('/', '\\'));
+                var destFull = Path.Combine(GlobalData.MainFileServerPathRoot, destPath.TrimStart('/', '\\'));
+
+                if (!Directory.Exists(sourceFull))
+                {
+                    Log.Warning($"MoveDirectory: 源目录不存在: {sourceFull}");
+                    return false;
+                }
+
+                // 确保目标上级目录存在
+                var destParent = Path.GetDirectoryName(destFull);
+                if (destParent != null && !Directory.Exists(destParent))
+                    Directory.CreateDirectory(destParent);
+
+                // 如果目标已存在，先删除
+                if (Directory.Exists(destFull))
+                    Directory.Delete(destFull, true);
+
+                Directory.Move(sourceFull, destFull);
+                Log.Information($"MoveDirectory: {sourceFull} → {destFull}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"MoveDirectory 失败: {sourcePath} → {destPath}");
+                return false;
+            }
+        }
+
         public async Task<(Stream? fileStream, string? fileName, string? errorMessage)> DownloadToolAsync(string toolName, string toolVersion, string toolPath)
         {
             try

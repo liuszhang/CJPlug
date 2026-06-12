@@ -39,7 +39,7 @@
                         @(context.Item.IsRequired ? "✓" : "")
                     </CellTemplate>
                 </TemplateColumn>
-                <PropertyColumn Property="x => x.DefaultValue" Title="默认值" />
+                <PropertyColumn Property="x => x.Value" Title="默认值" />
                 <TemplateColumn Style="text-align:right">
                     <CellTemplate>
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditProperty(context.Item))" />

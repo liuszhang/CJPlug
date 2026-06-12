@@ -37,7 +37,7 @@ public class PythonPluginCapability : IPluginCapability
         {
             Name = "pythonPath", Type = "String",
             Description = "Python 解释器路径，默认使用系统 PATH 中的 python",
-            DefaultValue = "python"
+            Value = "python"
         },
     };
 

@@ -1,0 +1,117 @@
+@using CJ.Plug.Models.MCPTools
+@using MudBlazor
+@inject MainApiClient MainApiClient
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3"><strong>基本信息</strong></MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="名称" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.Name" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Tool ID" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.ToolId" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="描述" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.Description" ReadOnly="true" Lines="2" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="版本" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.Version" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="作者" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.Author" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="分类" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.Category" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="工具类型" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.ToolType" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="来源ID" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.SourcePlugId" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="启用状态" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@(Tool.IsEnabled ? "已启用" : "已禁用")" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="发布时间" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField T="string" Label="更新时间" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Text="@Tool.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            @if (_entryVariables != null && _entryVariables.Count > 0)
+            {
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3"><strong>参数列表</strong></MudText>
+                    <MudTable Items="_entryVariables" Dense="true" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>参数名称</MudTh>
+                            <MudTh>显示名称</MudTh>
+                            <MudTh>类型</MudTh>
+                            <MudTh>必填</MudTh>
+                            <MudTh>数组</MudTh>
+                            <MudTh>默认值</MudTh>
+                            <MudTh>描述</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Name</MudTd>
+                            <MudTd>@context.DisplayName</MudTd>
+                            <MudTd>@context.Type</MudTd>
+                            <MudTd>@(context.IsRequired ? "是" : "否")</MudTd>
+                            <MudTd>@(context.IsArray ? "是" : "否")</MudTd>
+                            <MudTd>@context.Value</MudTd>
+                            <MudTd>@context.Description</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body2">无参数</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudPaper>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public MCPTool Tool { get; set; } = default!;
+
+    private List<EntryVariableDto>? _entryVariables;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var workflows = await MainApiClient.GetPublishedWorkflowsAsync();
+            var matched = workflows?.FirstOrDefault(w => w.WorkflowDefinitionId == Tool.SourcePlugId);
+            _entryVariables = matched?.EntryVariables ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MCPToolDetailDialog] Failed to load entry variables: {ex.Message}");
+            _entryVariables = new();
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}

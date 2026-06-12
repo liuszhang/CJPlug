@@ -39,7 +39,6 @@ namespace NXPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.NXPlug.CommonSettingPageKey;
             settings.PlugTypeKey = PlugKeySetting.NXPlug.CommonSettingPageKey;
             settings.PlugDisplayName = "NX组件";
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
@@ -80,7 +79,6 @@ namespace NXPlug.Services
                 new()
                 {
                     Name = "获取NX模型参数",
-                    Type = "NXGetParameters",
                     PlugTypeKey = PlugKeySetting.NXGetParameters.CommonExecuteKey,  // 走 NXGetParametersPlugCommonExecuteService → StationPlugExecuteService
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
@@ -91,7 +89,6 @@ namespace NXPlug.Services
                 new()
                 {
                     Name = "设置NX模型参数",
-                    Type = "NXSetParameters",
                     PlugTypeKey = PlugKeySetting.NXSetParameters.CommonExecuteKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),
@@ -102,7 +99,6 @@ namespace NXPlug.Services
                 new()
                 {
                     Name = "NX模型转STL",
-                    Type = "NXToStl",
                     PlugTypeKey = PlugKeySetting.NXToStl.CommonExecuteKey,
                     Category = PlugCategorys.桌面类动作.ToString(),
                     CreateType = PlugCreateTypeEnum.SystemInitActionPlug.ToString(),

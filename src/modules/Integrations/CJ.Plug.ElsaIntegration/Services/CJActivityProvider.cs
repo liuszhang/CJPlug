@@ -32,7 +32,7 @@ namespace CJ.Plug.ElsaIntegration.Services
 
             var activities = RootPlugs.Select(x =>
             {
-                Console.WriteLine($"{x.Name}(category:{x.Category})(type:{x.Type})(group:{x.GroupName})(show:{x.ShowInPlugLibrary})");
+                Console.WriteLine($"{x.Name}(category:{x.Category})(type:{x.PlugTypeKey})(group:{x.GroupName})(show:{x.ShowInPlugLibrary})");
                 var fullTypeName = $"{x.Name}";
                 var outcomes = x.GetPlugSettings().GetSetting(PlugSettingKey.Outcomes.ToString());
                 var ports = new List<Port>();
@@ -47,7 +47,7 @@ namespace CJ.Plug.ElsaIntegration.Services
                 
                 return new ActivityDescriptor
                 {
-                    TypeName =  x.Type ?? x.Name,
+                    TypeName =  x.PlugTypeKey ?? x.Name,
                     Name = $"{x.Name}",
                     Namespace = "CJ",
                     DisplayName = $"{x.Name}",

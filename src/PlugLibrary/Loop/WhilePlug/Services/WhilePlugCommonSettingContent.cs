@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Shared;
@@ -41,7 +41,6 @@ namespace WhilePlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "While循环";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

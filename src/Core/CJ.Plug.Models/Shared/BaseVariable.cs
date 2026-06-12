@@ -93,8 +93,6 @@ namespace CJ.Plug.Models.Shared
         public string? SourceValue { get; set; }
 
 
-        public string? DefaultValue { get; set; }
-
         //用于展示的值，区别于Value是用于实际执行的值，比如引用参数DisplayValue为{123:test},Value是执行时实际的值，可能会变化，但不影响DisplayValue
         public string? DisplayValue { get; set; }
 

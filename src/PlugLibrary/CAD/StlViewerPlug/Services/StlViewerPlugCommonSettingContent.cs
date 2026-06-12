@@ -30,7 +30,6 @@ public class StlViewerPlugCommonSettingContent : IPlugCommonSettingContent
     public Task<PlugSettings?> GetPlugBaseSetting()
     {
         var settings = new PlugSettings(null);
-        settings.PlugType = PlugKeySetting.CommonSettingPageKey;
         settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
         settings.PlugDisplayName = "STL 查看器";
         settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());

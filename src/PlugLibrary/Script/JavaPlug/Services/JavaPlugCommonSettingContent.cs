@@ -33,7 +33,6 @@ namespace JavaPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "Java脚本组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -41,7 +40,7 @@ namespace JavaPlug.Services
 
             settings.InitVariables.Add(new BaseVariable()
             {
-                Name = InitVariableNames.JavaCode.ToString(),
+                Name = InitVariableNames.Script.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
             });
@@ -50,6 +49,13 @@ namespace JavaPlug.Services
                 Name = InitVariableNames.ResultString.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
+            });
+            settings.InitVariables.Add(new BaseVariable()
+            {
+                Name = InitVariableNames.ScriptType.ToString(),
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false,
+                Value = "Java"
             });
 
             return Task.FromResult<PlugSettings?>(settings);

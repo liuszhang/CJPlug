@@ -49,10 +49,10 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = textFile.Id, Name = "编码格式", Code = "Encoding",         PropertyType = "Select",   SortOrder = 1, DefaultValue = "UTF-8",  IsRequired = true,  SelectOptions = "[\"UTF-8\",\"GBK\",\"ASCII\"]" },
-                new Property { OntologyId = textFile.Id, Name = "文件大小(KB)", Code = "FileSizeKB",   PropertyType = "Number",   SortOrder = 2, DefaultValue = "0",      IsRequired = false },
-                new Property { OntologyId = textFile.Id, Name = "行数",      Code = "LineCount",        PropertyType = "Number",   SortOrder = 3, DefaultValue = "0",      IsRequired = false },
-                new Property { OntologyId = textFile.Id, Name = "内容摘要",  Code = "ContentSummary",   PropertyType = "Text",     SortOrder = 4, DefaultValue = "",       IsRequired = false }
+                new Property { OntologyId = textFile.Id, Name = "编码格式", Code = "Encoding",         PropertyType = "Select",   SortOrder = 1, Value = "UTF-8",  IsRequired = true,  SelectOptions = "[\"UTF-8\",\"GBK\",\"ASCII\"]" },
+                new Property { OntologyId = textFile.Id, Name = "文件大小(KB)", Code = "FileSizeKB",   PropertyType = "Number",   SortOrder = 2, Value = "0",      IsRequired = false },
+                new Property { OntologyId = textFile.Id, Name = "行数",      Code = "LineCount",        PropertyType = "Number",   SortOrder = 3, Value = "0",      IsRequired = false },
+                new Property { OntologyId = textFile.Id, Name = "内容摘要",  Code = "ContentSummary",   PropertyType = "Text",     SortOrder = 4, Value = "",       IsRequired = false }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", textFile.Name, textFile.Code);
@@ -69,13 +69,13 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = threeD.Id, Name = "顶点数",   Code = "VertexCount",   PropertyType = "Number", SortOrder = 1, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = threeD.Id, Name = "面数",     Code = "FaceCount",     PropertyType = "Number", SortOrder = 2, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = threeD.Id, Name = "材质类型", Code = "MaterialType",  PropertyType = "Text",   SortOrder = 3, DefaultValue = "",    IsRequired = false },
-                new Property { OntologyId = threeD.Id, Name = "文件格式", Code = "FileFormat",    PropertyType = "Select", SortOrder = 4, DefaultValue = "OBJ", IsRequired = true,  SelectOptions = "[\"OBJ\",\"FBX\",\"GLB\",\"STL\"]" },
-                new Property { OntologyId = threeD.Id, Name = "长度",     Code = "Length",        PropertyType = "Number", SortOrder = 5, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = threeD.Id, Name = "宽度",     Code = "Width",         PropertyType = "Number", SortOrder = 6, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = threeD.Id, Name = "高度",     Code = "Height",        PropertyType = "Number", SortOrder = 7, DefaultValue = "0",   IsRequired = false }
+                new Property { OntologyId = threeD.Id, Name = "顶点数",   Code = "VertexCount",   PropertyType = "Number", SortOrder = 1, Value = "0",   IsRequired = false },
+                new Property { OntologyId = threeD.Id, Name = "面数",     Code = "FaceCount",     PropertyType = "Number", SortOrder = 2, Value = "0",   IsRequired = false },
+                new Property { OntologyId = threeD.Id, Name = "材质类型", Code = "MaterialType",  PropertyType = "Text",   SortOrder = 3, Value = "",    IsRequired = false },
+                new Property { OntologyId = threeD.Id, Name = "文件格式", Code = "FileFormat",    PropertyType = "Select", SortOrder = 4, Value = "OBJ", IsRequired = true,  SelectOptions = "[\"OBJ\",\"FBX\",\"GLB\",\"STL\"]" },
+                new Property { OntologyId = threeD.Id, Name = "长度",     Code = "Length",        PropertyType = "Number", SortOrder = 5, Value = "0",   IsRequired = false },
+                new Property { OntologyId = threeD.Id, Name = "宽度",     Code = "Width",         PropertyType = "Number", SortOrder = 6, Value = "0",   IsRequired = false },
+                new Property { OntologyId = threeD.Id, Name = "高度",     Code = "Height",        PropertyType = "Number", SortOrder = 7, Value = "0",   IsRequired = false }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", threeD.Name, threeD.Code);
@@ -92,11 +92,11 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = twoD.Id, Name = "图纸比例", Code = "DrawingScale",  PropertyType = "Text",   SortOrder = 1, DefaultValue = "1:1",  IsRequired = false },
-                new Property { OntologyId = twoD.Id, Name = "图层数",   Code = "LayerCount",    PropertyType = "Number", SortOrder = 2, DefaultValue = "0",    IsRequired = false },
-                new Property { OntologyId = twoD.Id, Name = "标注信息", Code = "AnnotationInfo",PropertyType = "Text",   SortOrder = 3, DefaultValue = "",     IsRequired = false },
-                new Property { OntologyId = twoD.Id, Name = "图纸尺寸", Code = "DrawingSize",   PropertyType = "Select", SortOrder = 4, DefaultValue = "A4",   IsRequired = false, SelectOptions = "[\"A0\",\"A1\",\"A2\",\"A3\",\"A4\"]" },
-                new Property { OntologyId = twoD.Id, Name = "文件格式", Code = "FileFormat",    PropertyType = "Select", SortOrder = 5, DefaultValue = "DWG",  IsRequired = true,  SelectOptions = "[\"DWG\",\"DXF\",\"PDF\"]" }
+                new Property { OntologyId = twoD.Id, Name = "图纸比例", Code = "DrawingScale",  PropertyType = "Text",   SortOrder = 1, Value = "1:1",  IsRequired = false },
+                new Property { OntologyId = twoD.Id, Name = "图层数",   Code = "LayerCount",    PropertyType = "Number", SortOrder = 2, Value = "0",    IsRequired = false },
+                new Property { OntologyId = twoD.Id, Name = "标注信息", Code = "AnnotationInfo",PropertyType = "Text",   SortOrder = 3, Value = "",     IsRequired = false },
+                new Property { OntologyId = twoD.Id, Name = "图纸尺寸", Code = "DrawingSize",   PropertyType = "Select", SortOrder = 4, Value = "A4",   IsRequired = false, SelectOptions = "[\"A0\",\"A1\",\"A2\",\"A3\",\"A4\"]" },
+                new Property { OntologyId = twoD.Id, Name = "文件格式", Code = "FileFormat",    PropertyType = "Select", SortOrder = 5, Value = "DWG",  IsRequired = true,  SelectOptions = "[\"DWG\",\"DXF\",\"PDF\"]" }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", twoD.Name, twoD.Code);
@@ -113,11 +113,11 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = sim.Id, Name = "仿真类型",   Code = "SimulationType", PropertyType = "Select",   SortOrder = 1, DefaultValue = "流体", IsRequired = true,  SelectOptions = "[\"流体\",\"结构\",\"热力学\",\"电磁\"]" },
-                new Property { OntologyId = sim.Id, Name = "参数配置",   Code = "ParamConfig",    PropertyType = "JsonText", SortOrder = 2, DefaultValue = "{}",  IsRequired = false },
-                new Property { OntologyId = sim.Id, Name = "输入变量数", Code = "InputCount",     PropertyType = "Number",   SortOrder = 3, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = sim.Id, Name = "输出变量数", Code = "OutputCount",    PropertyType = "Number",   SortOrder = 4, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = sim.Id, Name = "求解器类型", Code = "SolverType",     PropertyType = "Text",     SortOrder = 5, DefaultValue = "",    IsRequired = false }
+                new Property { OntologyId = sim.Id, Name = "仿真类型",   Code = "SimulationType", PropertyType = "Select",   SortOrder = 1, Value = "流体", IsRequired = true,  SelectOptions = "[\"流体\",\"结构\",\"热力学\",\"电磁\"]" },
+                new Property { OntologyId = sim.Id, Name = "参数配置",   Code = "ParamConfig",    PropertyType = "JsonText", SortOrder = 2, Value = "{}",  IsRequired = false },
+                new Property { OntologyId = sim.Id, Name = "输入变量数", Code = "InputCount",     PropertyType = "Number",   SortOrder = 3, Value = "0",   IsRequired = false },
+                new Property { OntologyId = sim.Id, Name = "输出变量数", Code = "OutputCount",    PropertyType = "Number",   SortOrder = 4, Value = "0",   IsRequired = false },
+                new Property { OntologyId = sim.Id, Name = "求解器类型", Code = "SolverType",     PropertyType = "Text",     SortOrder = 5, Value = "",    IsRequired = false }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", sim.Name, sim.Code);
@@ -134,11 +134,11 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = arch.Id, Name = "体系层级",   Code = "ArchLevel",      PropertyType = "Text",     SortOrder = 1, DefaultValue = "",   IsRequired = false },
-                new Property { OntologyId = arch.Id, Name = "关联系统数", Code = "RelatedSysCount", PropertyType = "Number",   SortOrder = 2, DefaultValue = "0",  IsRequired = false },
-                new Property { OntologyId = arch.Id, Name = "接口定义",   Code = "InterfaceDef",   PropertyType = "JsonText", SortOrder = 3, DefaultValue = "{}", IsRequired = false },
-                new Property { OntologyId = arch.Id, Name = "版本号",     Code = "Version",        PropertyType = "Text",     SortOrder = 4, DefaultValue = "1.0",IsRequired = false },
-                new Property { OntologyId = arch.Id, Name = "架构风格",   Code = "ArchStyle",      PropertyType = "Text",     SortOrder = 5, DefaultValue = "",   IsRequired = false }
+                new Property { OntologyId = arch.Id, Name = "体系层级",   Code = "ArchLevel",      PropertyType = "Text",     SortOrder = 1, Value = "",   IsRequired = false },
+                new Property { OntologyId = arch.Id, Name = "关联系统数", Code = "RelatedSysCount", PropertyType = "Number",   SortOrder = 2, Value = "0",  IsRequired = false },
+                new Property { OntologyId = arch.Id, Name = "接口定义",   Code = "InterfaceDef",   PropertyType = "JsonText", SortOrder = 3, Value = "{}", IsRequired = false },
+                new Property { OntologyId = arch.Id, Name = "版本号",     Code = "Version",        PropertyType = "Text",     SortOrder = 4, Value = "1.0",IsRequired = false },
+                new Property { OntologyId = arch.Id, Name = "架构风格",   Code = "ArchStyle",      PropertyType = "Text",     SortOrder = 5, Value = "",   IsRequired = false }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", arch.Name, arch.Code);
@@ -155,12 +155,12 @@ namespace CJ.Plug.ModelManageApi.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             dbContext.Set<Property>().AddRange(
-                new Property { OntologyId = sys.Id, Name = "子系统数", Code = "SubSysCount",    PropertyType = "Number",   SortOrder = 1, DefaultValue = "0",   IsRequired = false },
-                new Property { OntologyId = sys.Id, Name = "依赖关系", Code = "Dependencies",   PropertyType = "JsonText", SortOrder = 2, DefaultValue = "{}",  IsRequired = false },
-                new Property { OntologyId = sys.Id, Name = "边界条件", Code = "BoundaryCond",   PropertyType = "Text",     SortOrder = 3, DefaultValue = "",    IsRequired = false },
-                new Property { OntologyId = sys.Id, Name = "版本号",   Code = "Version",        PropertyType = "Text",     SortOrder = 4, DefaultValue = "1.0", IsRequired = false },
-                new Property { OntologyId = sys.Id, Name = "所属体系", Code = "BelongToArch",   PropertyType = "Text",     SortOrder = 5, DefaultValue = "",    IsRequired = false },
-                new Property { OntologyId = sys.Id, Name = "集成方式", Code = "IntegrationMode",PropertyType = "Text",     SortOrder = 6, DefaultValue = "",    IsRequired = false }
+                new Property { OntologyId = sys.Id, Name = "子系统数", Code = "SubSysCount",    PropertyType = "Number",   SortOrder = 1, Value = "0",   IsRequired = false },
+                new Property { OntologyId = sys.Id, Name = "依赖关系", Code = "Dependencies",   PropertyType = "JsonText", SortOrder = 2, Value = "{}",  IsRequired = false },
+                new Property { OntologyId = sys.Id, Name = "边界条件", Code = "BoundaryCond",   PropertyType = "Text",     SortOrder = 3, Value = "",    IsRequired = false },
+                new Property { OntologyId = sys.Id, Name = "版本号",   Code = "Version",        PropertyType = "Text",     SortOrder = 4, Value = "1.0", IsRequired = false },
+                new Property { OntologyId = sys.Id, Name = "所属体系", Code = "BelongToArch",   PropertyType = "Text",     SortOrder = 5, Value = "",    IsRequired = false },
+                new Property { OntologyId = sys.Id, Name = "集成方式", Code = "IntegrationMode",PropertyType = "Text",     SortOrder = 6, Value = "",    IsRequired = false }
             );
             await dbContext.SaveChangesAsync(cancellationToken);
             Log.Information("[SeedData] 本体定义 {Name}（{Code}）已创建", sys.Name, sys.Code);

@@ -31,13 +31,12 @@ namespace PatranPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
-            settings.PlugDisplayName = "Patran脚本执行";
+            settings.PlugDisplayName = "Patran";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
             var InitVariables = new List<BaseVariable>();
 
-            // 脚本文件（文件类型）
+            // 鑴氭湰鏂囦欢锛堟枃浠剁被鍨嬶級
             InitVariables.Add(new BaseVariable()
             {
                 Name = InitVariableNames.ScriptFile.ToString(),
@@ -45,7 +44,7 @@ namespace PatranPlug.Services
                 IsBrowsable = true,
             });
 
-            // 关键字映射配置（JSON格式，由UI管理，隐藏）
+            // 鍏抽敭瀛楁槧灏勯厤缃紙JSON鏍煎紡锛岀敱UI绠＄悊锛岄殣钘忥級
             InitVariables.Add(new BaseVariable()
             {
                 Name = InitVariableNames.KeywordMappingJson.ToString(),
@@ -53,7 +52,7 @@ namespace PatranPlug.Services
                 IsBrowsable = false,
             });
 
-            // 执行输出结果（隐藏）
+            // 鎵ц杈撳嚭缁撴灉锛堥殣钘忥級
             InitVariables.Add(new BaseVariable()
             {
                 Name = InitVariableNames.ResultString.ToString(),
@@ -61,7 +60,7 @@ namespace PatranPlug.Services
                 IsBrowsable = false,
             });
 
-            // 额外命令行参数（隐藏）
+            // 棰濆鍛戒护琛屽弬鏁帮紙闅愯棌锛?
             InitVariables.Add(new BaseVariable()
             {
                 Name = InitVariableNames.AdditionalArgs.ToString(),
@@ -79,3 +78,4 @@ namespace PatranPlug.Services
         }
     }
 }
+

@@ -110,7 +110,6 @@ public partial class PlugDataZone
                     existing.IsInitVariable = v.IsInitVariable;
                     existing.DisplayName = v.DisplayName;
                     existing.Description = v.Description;
-                    existing.DefaultValue = v.DefaultValue;
                     existing.Category = v.Category;
                 }
                 else
@@ -124,7 +123,6 @@ public partial class PlugDataZone
                         Type = v.Type ?? CJ.Plug.Models.VariableType.VariableTypeEnum.String.ToString(),
                         DisplayName = v.DisplayName,
                         Description = v.Description,
-                        DefaultValue = v.DefaultValue,
                         IsInput = v.IsInput,
                         IsOutput = v.IsOutput,
                         IsRequired = v.IsRequired,
@@ -195,10 +193,9 @@ public partial class PlugDataZone
                     PlugDefinitionId = plug.DefinitionId,
                     Name = plugVar.Name,
                     Type = plugVar.Type,
-                    Value = null, // 运行时值为空
+                    Value = null, // 运行时值为空，执行时回退到 Plug 定义层 Value
                     DisplayName = plugVar.DisplayName,
                     Description = plugVar.Description,
-                    DefaultValue = plugVar.DefaultValue,
                     IsInput = plugVar.IsInput,
                     IsOutput = plugVar.IsOutput,
                     IsRequired = plugVar.IsRequired,
@@ -456,7 +453,6 @@ public partial class PlugDataZone
                     Type = v.Type,
                     DisplayName = v.DisplayName,
                     Description = v.Description,
-                    DefaultValue = v.DefaultValue,
                     DisplayValue = v.DisplayValue,
                     IsInput = v.IsInput,
                     IsOutput = v.IsOutput,
@@ -490,7 +486,6 @@ public partial class PlugDataZone
                     DisplayValue = v.DisplayValue,
                     IsBrowsable = v.IsBrowsable,
                     Type = v.Type,
-                    PlugType = v.PlugType,
                     PlugTypeKey = v.PlugTypeKey,
                     OnlyExecuteAction = v.OnlyExecuteAction,
                     ParentPlugDefinitionId = v.ParentPlugDefinitionId,

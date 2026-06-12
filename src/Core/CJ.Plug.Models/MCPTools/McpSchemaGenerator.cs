@@ -70,9 +70,9 @@ public static class McpSchemaGenerator
         }
 
         // 默认值
-        if (!string.IsNullOrWhiteSpace(v.DefaultValue))
+        if (!string.IsNullOrWhiteSpace(v.Value))
         {
-            prop["default"] = v.DefaultValue;
+            prop["default"] = v.Value;
         }
 
         // DisplayName 作为 title
@@ -120,7 +120,7 @@ public static class McpSchemaGenerator
                 continue;
 
             var prop = BuildPropertySchema(v.Name, v.DisplayName, v.Description,
-                v.DefaultValue, v.IsRequired, v.IsArray, varType);
+                v.Value, v.IsRequired, v.IsArray, varType);
             properties[v.Name] = prop;
 
             if (v.IsRequired == true)

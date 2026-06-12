@@ -1,6 +1,7 @@
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Shared;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
 using CJ.Plug.PlugBaseCore.Services;
@@ -42,24 +43,28 @@ public class CMDPlugCommonExecuteService : StationPlugExecuteService
     }
 
     /// <summary>
-    /// Standalone 模式（MCP Plugin 类型）：从 InputVariables 读取 MCP 传入的参数
+    /// Standalone 模式（MCP Plugin 类型）：使用 VariableResolver.ResolveStandalone() 统一解析参数。
+    /// 解析链：InputVariables → PlugVariables.Value。
     /// </summary>
     private async Task<ExecuteResultData?> SubmitStandalone(PlugExecutionRequest executionRequest)
     {
+        CLog.Information($"[TRACE-CMD] SubmitStandalone开始 — ExecuteMode={executionRequest.ExecuteMode}");
+        CLog.Information($"[TRACE-CMD] InputVariables 数量: {executionRequest.InputVariables?.Count ?? 0}");
+        foreach (var v in executionRequest.InputVariables ?? new())
+            CLog.Information($"[TRACE-CMD]   {v.Name}={v.Value}");
         var inputs = new List<PlugVariableData>();
         var inputVars = executionRequest.InputVariables;
         if (inputVars != null && inputVars.Count > 0)
         {
-            var cmd = inputVars.FirstOrDefault(v => v.Name == "command")?.Value;
-            var args = inputVars.Where(v => v.Name == "arguments")
-                .Select(v => v.Value)
-                .Where(v => !string.IsNullOrEmpty(v));
-            var workingDir = inputVars.FirstOrDefault(v => v.Name == "workingDirectory")?.Value;
-            var timeout = inputVars.FirstOrDefault(v => v.Name == "timeout")?.Value;
+            // 使用 VariableResolver 统一解析入口：InputVariables → PlugVariables.Value
+            var cmd = VariableResolver.ResolveStandalone("command", inputVars, plugVariables: null);
+            var args = VariableResolver.ResolveStandalone("arguments", inputVars, plugVariables: null);
+            var workingDir = VariableResolver.ResolveStandalone("workingDirectory", inputVars, plugVariables: null);
+            var timeout = VariableResolver.ResolveStandalone("timeout", inputVars, plugVariables: null);
 
             var cmdCommand = cmd;
-            if (args.Any())
-                cmdCommand += " " + string.Join(" ", args);
+            if (!string.IsNullOrEmpty(args))
+                cmdCommand += " " + args;
 
             if (!string.IsNullOrEmpty(cmdCommand))
             {
@@ -89,6 +94,9 @@ public class CMDPlugCommonExecuteService : StationPlugExecuteService
 
         executionRequest.InputVariables.Clear();
         executionRequest.InputVariables.AddRange(inputs);
+        CLog.Information($"[TRACE-CMD] ExecuteToolAsync前 — RequestCommand={executionRequest.RequestCommand}");
+        foreach (var v in executionRequest.InputVariables)
+            CLog.Information($"[TRACE-CMD]   最终InputVariable: {v.Name}={v.Value}");
         return await ToolExecuteService!.ExecuteToolAsync(executionRequest);
     }
 
@@ -97,6 +105,8 @@ public class CMDPlugCommonExecuteService : StationPlugExecuteService
     /// </summary>
     private async Task<ExecuteResultData?> SubmitNormal(PlugExecutionRequest executionRequest)
     {
+        CLog.Information($"[TRACE-CMD] SubmitNormal开始 — ExecuteMode={executionRequest.ExecuteMode}");
+        CLog.Information($"[TRACE-CMD] PDZId={executionRequest.ExecuteResultData?.Ids?.PDZId}");
         var resultData = executionRequest.ExecuteResultData!;
         PDZApiClient ??= _serviceProvider.GetRequiredService<IPDZApiClient>();
 
@@ -134,6 +144,9 @@ public class CMDPlugCommonExecuteService : StationPlugExecuteService
         }
 
         executionRequest.InputVariables.AddRange(inputs);
+        CLog.Information($"[TRACE-CMD] ExecuteToolAsync前 — RequestCommand={executionRequest.RequestCommand}");
+        foreach (var v in executionRequest.InputVariables)
+            CLog.Information($"[TRACE-CMD]   最终InputVariable: {v.Name}={v.Value}");
         return await ToolExecuteService!.ExecuteToolAsync(executionRequest);
     }
 

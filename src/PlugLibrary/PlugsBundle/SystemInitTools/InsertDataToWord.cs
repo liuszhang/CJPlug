@@ -15,7 +15,6 @@ namespace PlugsBundle.SystemInitTools
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = "InsertDataToWord";
             settings.PlugDisplayName = "插入数据至Word书签";
             settings.PlugTypeKey = "";
             settings.SetSetting(PlugSettingKey.ToolPath.ToString(), "D:\\99_Pro\\CJ.Plug-Aspire\\PlugToolIntegrations\\WordInsertData\\bin\\Debug\\net8.0\\WordInsertData.exe");

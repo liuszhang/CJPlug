@@ -8,9 +8,10 @@ namespace CSharpPlug
 {
     public enum InitVariableNames
     {
-        CSharpCode,
+        Script,
         DllReferences,
         UseDotNetFramework,
         EnvironmentVariables,
+        ScriptType,
     }
 }

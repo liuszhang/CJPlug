@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Shared;
@@ -39,7 +39,6 @@ namespace IfPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "If";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -62,3 +61,4 @@ namespace IfPlug.Services
         }
     }
 }
+

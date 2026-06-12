@@ -2,7 +2,8 @@ namespace JavaPlug
 {
     public enum InitVariableNames
     {
-        JavaCode,
+        Script,
         ResultString,
+        ScriptType,
     }
 }

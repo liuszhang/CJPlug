@@ -66,7 +66,7 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
 
     public async Task<ExecuteResultData?> ExecutePlugByType(PlugExecutionRequest PlugExecutionRequest, CancellationToken cancellationToken = default)
     {
-        string plugType = PlugExecutionRequest.PlugType;
+        string plugType = PlugExecutionRequest.PlugTypeKey;
         TasApiClient= TasApiClient?? _serviceProvider.GetRequiredService<ITASApiClient>();
         var plug = await TasApiClient.GetRootPlugByTypeNameAsync(plugType);
         if (plug == null)
@@ -156,7 +156,7 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
             {
                 //Log.Information("no wait for result");
                 //Console.WriteLine("no wait for result");
-                return stationApiClient.StationToolExecutionAsync(stationExectionRequest);
+                return await stationApiClient.StationToolExecutionAsync(stationExectionRequest);
             }
 
         }

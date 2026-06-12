@@ -35,7 +35,7 @@
                     <MudCheckBox T="bool" @bind-Value="_model.IsArray" Label="数组" Dense="true"></MudCheckBox>
                 </MudField>
                 <MudTextField Label="值" @bind-Value="_model.Value" HelperText="参数值" Variant="Variant.Outlined" />
-                <MudTextField Label="默认值" @bind-Value="_model.DefaultValue" HelperText="参数默认值" Variant="Variant.Outlined" />
+                <MudTextField Label="默认值" @bind-Value="_model.Value" HelperText="参数默认值" Variant="Variant.Outlined" />
                 <MudSelect T="string" @bind-Value="_model.InputAndOutput" Variant="Variant.Outlined" Dense="false" Label="输入输出">
                     <MudSelectItem T="string" Value="@("I")">输入</MudSelectItem>
                     <MudSelectItem T="string" Value="@("O")">输出</MudSelectItem>

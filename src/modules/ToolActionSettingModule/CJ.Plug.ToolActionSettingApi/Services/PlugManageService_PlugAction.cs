@@ -67,7 +67,6 @@ public partial class PlugManageService : IPlugManageService
         //Console.WriteLine(JsonSerializer.Serialize(request.PlugVariables));
 
         item.Name = request.Name;
-        item.Type = request.Type;
         item.Category = request.Category;
         item.Value = request.Value;
         item.PlugTypeKey = request.PlugTypeKey;
@@ -150,7 +149,7 @@ public partial class PlugManageService : IPlugManageService
             if (v.IsInput)
             {
                 executeString += " ";
-                executeString += v.Value ?? v.DefaultValue;
+                executeString += v.Value;
             }            
         }
         Console.WriteLine($"{executeString}");

@@ -2,16 +2,18 @@
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.SharedPages.Contracts
+@using Microsoft.AspNetCore.Components.Forms
 @using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.TASApiClient
+@using CJ.Plug.Models.VariableType
 @using CJ.Plug.ToolActionSetting.Components.Plugs
 @using Microsoft.JSInterop
+@using System.Text.RegularExpressions
 
 @inject MainApiClient MainApiClient
 @inject ITASApiClient TASApiClient
 @inject IStationAndToolApiClient StationAndToolApiClient
 @inject IJSRuntime JsRuntime
-@inject IDialogService DialogService
 @inject IElsaDomToolService ElsaDomToolService
 @inject IDomInteropService DomInteropService
 @inject ISnackbar Snackbar
@@ -21,8 +23,27 @@
         <MudStack>
             <MudStack Row AlignItems="AlignItems.Center">
                 <MudTextField @bind-Value="@Plug.Name" Margin="Margin.Dense" Label="插头名称" Variant="Variant.Outlined"></MudTextField>
+                <MudTooltip Text="配置插头图标（可选，从本地选择图片）">
+                    @if (!string.IsNullOrEmpty(Plug.Icon))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Primary" OnClick="OnIconDelete" />
+                        <img src="/webFiles/@Plug.Icon"
+                             style="width:28px;height:28px;object-fit:cover;border-radius:4px;margin-left:6px;" />
+                    }
+                    else
+                    {
+                        <MudFileUpload T="IBrowserFile" FilesChanged="OnIconFileSelected" Accept=".png,.jpg,.jpeg,.ico,.svg,.webp,.bmp">
+                            <CustomContent>
+                                <MudIconButton OnClick="@context.OpenFilePickerAsync"
+                                               Icon="@Icons.Material.Filled.InsertPhoto" Size="Size.Small"
+                                               Color="Color.Default" />
+                            </CustomContent>
+                            <SelectedTemplate></SelectedTemplate>
+                        </MudFileUpload>
+                    }
+                </MudTooltip>
                 <MudTooltip Text="系统插头只有管理员能够创建，创建后所有人可见">
-                    <MudSwitch T="bool" Label="是否系统插头" Size="Size.Small" Color="Color.Primary"></MudSwitch>
+                    <MudSwitch T="bool" @bind-Value="@IsSystemPlug" Label="是否系统插头" Size="Size.Small" Color="Color.Primary"></MudSwitch>
                 </MudTooltip>
             </MudStack>
             
@@ -33,20 +54,37 @@
                 <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
             </MudSelect>
 
-            <MudTextField @bind-Value="@Plug.Type" Margin="Margin.Dense" Label="插头类型标识（插头唯一，建议不使用中文）" Variant="Variant.Outlined"></MudTextField>
-            <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined"></MudTextField>
+            <MudStack Row>
+                <MudTextField @bind-Value="@Plug.PlugTypeKey" Margin="Margin.Dense" Label="插头类型标识（插头唯一，建议不使用中文）" Variant="Variant.Outlined" Required="true" RequiredError="插头类型标识不能为空" Class="flex-grow-1"></MudTextField>
+                <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined" Class="flex-grow-1"></MudTextField>
+            </MudStack>
             <MudTextField @bind-Value="@Plug.Description" Margin="Margin.Dense" Label="描述" Variant="Variant.Outlined" Lines="2"></MudTextField>
 
             @if (SelectedCategory == PlugCategorys.桌面类.ToString())
             {
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="@_commandDisplay" Margin="Margin.Dense" Label="执行命令"
+                                  Variant="Variant.Outlined" Class="flex-grow-1"></MudTextField>
+                    <div class="help-tooltip-container">
+                        <MudIcon Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Primary" Class="ml-2" Style="cursor:pointer"></MudIcon>
+                        <div class="help-tooltip-content">
+                            @foreach (var line in _tooltipLines)
+                            {
+                                <div>@line</div>
+                            }
+                        </div>
+                    </div>
+                </MudStack>
                 <DesktopPlugConfig @ref="_desktopConfig"
                                    ServerBaseUrl="@(GlobalData.MainApiServer ?? "")"
                                    PlugFolder="@(Plug.DefinitionId?.ToString())"
-                                   Username="@_currentUserName" />
+                                   Username="@_currentUserName"
+                                   IsSystemPlug="@IsSystemPlug"
+                                   CommandDisplayChanged="OnCommandDisplayChanged" />
             }
             else if (SelectedCategory == PlugCategorys.接口类.ToString())
             {
-                <InterfacePlugConfig @ref="_interfaceConfig" />
+                <InterfacePlugConfig @ref="_interfaceConfig" Plug="@Plug" />
             }
             else if (SelectedCategory == PlugCategorys.脚本类.ToString())
             {
@@ -69,6 +107,34 @@
     </DialogActions>
 </MudDialog>
 
+<style>
+    .help-tooltip-container {
+        position: relative;
+        display: inline-flex;
+    }
+    .help-tooltip-content {
+        display: none;
+        position: absolute;
+        right: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #424242;
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 6px;
+        white-space: nowrap;
+        z-index: 9999;
+        margin-right: 10px;
+        font-size: 13px;
+        line-height: 1.8;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        pointer-events: none;
+    }
+    .help-tooltip-container:hover .help-tooltip-content {
+        display: block;
+    }
+</style>
+
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; }
@@ -77,6 +143,60 @@
     private string SelectedCategory { get; set; } = PlugCategorys.桌面类.ToString();
     private string _currentUserName = "";
     private bool _submitting;
+    private bool IsSystemPlug;
+    private string? _commandDisplay;
+    private readonly string[] _tooltipLines = new[]
+    {
+        "通配符预设逻辑：",
+        "[ToolPath]：执行时自动替换为工具入口程序的路径",
+        "  - 手动输入路径：替换为输入的完整路径",
+        "  - 上传文件夹：替换为上传文件夹在服务器上的路径",
+        "[CMDCommand]：执行时自动替换为实际传入的命令行指令",
+        "[ExecutionTimeout]：执行时自动替换为设置的超时时间（秒）",
+        "[WaitType]：等待类型，控制插头等待工具退出的方式",
+        "[WatchProcessName]：监控的进程名称",
+        "[AutoCloseProcess]：执行完成后是否自动关闭进程",
+        "[ShowConsole]：是否显示控制台窗口",
+        "[RedirectOutput]：是否重定向输出到变量",
+        "[RedirectWorkPath]：重定向工作目录路径",
+        "参数类型通配符：[变量名:类型]，默认为 String",
+        "  例：[FilePath:String] 或 [ModelFile:File]",
+    };
+
+    private void OnCommandDisplayChanged(string value)
+    {
+        _commandDisplay = value;
+        StateHasChanged();
+    }
+
+    private async Task OnIconFileSelected(IBrowserFile file)
+    {
+        if (file == null) return;
+        try
+        {
+            var webRoot = GlobalData.MainWebFileServer.Replace("//", "\\").TrimEnd('\\');
+            var iconDir = Path.Combine(webRoot, "Icons", Plug.DefinitionId!);
+            Directory.CreateDirectory(iconDir);
+            var filePath = Path.Combine(iconDir, file.Name);
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var fs = File.Create(filePath);
+            await stream.CopyToAsync(fs);
+
+            Plug.Icon = $"Icons/{Plug.DefinitionId}/{file.Name}";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"图标上传失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnIconDelete()
+    {
+        Plug.Icon = null;
+        StateHasChanged();
+    }
 
     // 子组件引用
     private DesktopPlugConfig? _desktopConfig;
@@ -105,6 +225,20 @@
             return;
         }
 
+        // PlugTypeKey 未填时，默认等于插头名称，保证执行时能通过 GetRootPlugByTypeNameAsync 找到根插头
+        if (string.IsNullOrWhiteSpace(Plug.PlugTypeKey))
+        {
+            Plug.PlugTypeKey = Plug.Name;
+        }
+
+        // 全局唯一校验：检查 PlugTypeKey（即名称）是否已被占用
+        var existing = await MainApiClient.GetRootPlugByTypeNameAsync(Plug.PlugTypeKey);
+        if (existing != null)
+        {
+            Snackbar.Add($"插头标识「{Plug.PlugTypeKey}」已被插头「{existing.Name}」占用，请修改插头名称", Severity.Warning);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(SelectedCategory))
         {
             Snackbar.Add("请选择插头类型", Severity.Warning);
@@ -116,7 +250,7 @@
 
         try
         {
-            Plug.Type = Plug.Type ?? Plug.Name;
+            Plug.PlugTypeKey = Plug.PlugTypeKey ?? null;
             Plug.Category = SelectedCategory;
 
             // 桌面类：先上传文件夹
@@ -127,6 +261,10 @@
                     await _desktopConfig.UploadFolderAsync();
                 }
                 _desktopConfig.ApplyToPlug(Plug);
+                if (!string.IsNullOrWhiteSpace(_commandDisplay) && !(Plug.ToolVersionPath?.StartsWith("uploaded://") ?? false))
+                {
+                    Plug.ToolCommandLineShema = _commandDisplay;
+                }
             }
             else if (SelectedCategory == PlugCategorys.接口类.ToString() && _interfaceConfig != null)
             {
@@ -138,15 +276,51 @@
             }
 
             Plug.Creater = _currentUserName;
-            Plug.CreateType = PlugCreateTypeEnum.RootPlug.ToString();
+            Plug.CreateType = IsSystemPlug ? PlugCreateTypeEnum.SystemInitPlug.ToString() : PlugCreateTypeEnum.RootPlug.ToString();
             Plug.ShowInPlugLibrary = true;
 
             // 桌面类工具变量
             _desktopConfig?.ApplyToolVariables(Plug);
 
-            await TASApiClient.CreateNewPlug(Plug);
-            Console.WriteLine($"success create plug:{Plug.Name}");
-            MudDialog.Close(DialogResult.Ok(Plug));
+            // 从执行命令中解析 [XXX] 变量并自动生成插头变量，跳过 [ToolPath]
+            if (!string.IsNullOrWhiteSpace(_commandDisplay))
+            {
+                var matches = Regex.Matches(_commandDisplay, @"\[([^\]:]+)(?::([^\]]*))?\]");
+                foreach (Match match in matches)
+                {
+                    var varName = match.Groups[1].Value;
+                    if (varName == "ToolPath") continue;
+                    if (!Plug.PlugVariables.Any(v => v.Name == varName))
+                    {
+                        var typeStr = match.Groups[2].Value;
+                        var varType = string.IsNullOrWhiteSpace(typeStr) || typeStr.Equals("String", StringComparison.OrdinalIgnoreCase)
+                            ? VariableTypeEnum.String.ToString()
+                            : typeStr.Equals("File", StringComparison.OrdinalIgnoreCase)
+                                ? VariableTypeEnum.File.ToString()
+                                : VariableTypeEnum.String.ToString();
+
+                        Plug.PlugVariables.Add(new PlugVariable
+                        {
+                            Name = varName,
+                            Value = "",
+                            IsInitVariable = true,
+                            Type = varType,
+                        });
+                    }
+                }
+            }
+
+            var createdPlug = await TASApiClient.CreateNewPlug(Plug);
+
+            // 将临时目录中的文件搬迁到正式插头目录
+            var tempPath = Path.Combine("Plugs", _currentUserName, "tmp");
+            if (createdPlug != null && !string.IsNullOrEmpty(createdPlug.WorkPath))
+            {
+                await MainApiClient.MoveDirectory(tempPath, createdPlug.WorkPath);
+            }
+
+            Console.WriteLine($"success create plug:{createdPlug?.Name ?? Plug.Name}");
+            MudDialog.Close(DialogResult.Ok(createdPlug ?? Plug));
         }
         catch (Exception ex)
         {
@@ -158,5 +332,19 @@
         }
     }
 
-    private void Cancel() => MudDialog.Cancel();
+    private void Cancel()
+    {
+        if (!string.IsNullOrEmpty(Plug.Icon))
+        {
+            try
+            {
+                var webRoot = GlobalData.MainWebFileServer.Replace("//", "\\").TrimEnd('\\');
+                var iconDir = Path.Combine(webRoot, "Icons", Plug.DefinitionId!);
+                if (Directory.Exists(iconDir))
+                    Directory.Delete(iconDir, true);
+            }
+            catch { }
+        }
+        MudDialog.Cancel();
+    }
 }

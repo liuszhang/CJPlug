@@ -35,4 +35,11 @@ public partial class MainApiClient : IMCPToolApiClient
     {
         await MCPToolApiClient.Value.NotifyRefreshAsync(cancellationToken);
     }
+
+    public async Task<List<PublishedWorkflowDto>> GetPublishedWorkflowsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await ((MCPToolApiClient)MCPToolApiClient.Value).GetPublishedWorkflowsAsync(cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取已发布工作流");
+        return result;
+    }
 }

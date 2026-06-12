@@ -12,7 +12,7 @@ namespace CJ.Plug.Models.Shared
         public static string MainApiServer = "http://localhost:8687";
         public static string ElsaEngineServer = "http://localhost:5001";
         public static string ElsaEngineApiKey = "00000000-0000-0000-0000-000000000000";
-        //public static string MainWebFileServer = "http://localhost:5066";
+        public static string MainWebFileServerUrl = "http://localhost:5066";
 
         public static string MainFileServerPathRoot = "C://tmp//FileServer";
         public static string MainWebFileServer = "C://tmp//Web";
@@ -25,6 +25,10 @@ namespace CJ.Plug.Models.Shared
         public static string SystemToolsPath => Path.Combine(ToolsRootPath, "0System");
         // 获取用户工具路径
         public static string GetUserToolsPath(string userName) => Path.Combine(ToolsRootPath, userName);
+        // Plugs 根路径（与 Tools、Skills、PDZs 平级）
+        public static string PlugsRootPath => Path.Combine(MainFileServerPathRoot, "Plugs");
+        // 获取用户 Plugs 路径
+        public static string GetUserPlugsPath(string userName) => Path.Combine(PlugsRootPath, userName);
         // PDZ 根路径
         public static string PDZsRootPath => Path.Combine(MainFileServerPathRoot, "PDZs");
         // 获取用户 PDZ 路径

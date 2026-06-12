@@ -5,6 +5,7 @@ using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
 using CJ.Plug.PlugDataZoneApiClient;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace CJ.Plug.PlugBaseCore.Services;
@@ -76,11 +77,12 @@ public abstract class ScriptPlugExecuteService : BasePlugExecuteService
     {
         var plugExecutionRequest = context.plugExecutionRequest;
         var erd = plugExecutionRequest?.ExecuteResultData ?? new ExecuteResultData();
+        var plugVariables = context.plugToExecute?.PlugVariables;
 
         // ---- Step 1: DataPrepare ----
         if (DataPrepareVariableNames is { Length: > 0 })
         {
-            if (!await DataPrepare(plugExecutionRequest, DataPrepareVariableNames))
+            if (!await DataPrepare(plugExecutionRequest, DataPrepareVariableNames, plugVariables))
                 return await ReportErrorResult(erd);
         }
 
@@ -124,7 +126,7 @@ public abstract class ScriptPlugExecuteService : BasePlugExecuteService
     /// 非 Standalone：从 PDZ 加载数据空间，读取指定变量。
     /// Standalone：从 InputVariables 中读取。
     /// </summary>
-    protected virtual async Task<string?> GetScriptCodeAsync(PlugExecutionRequest request)
+    protected virtual async Task<string?> GetScriptCodeAsync(PlugExecutionRequest request, List<PlugVariable>? plugVariables = null)
     {
         if (request.ExecuteMode != ExecuteMode.Standalone)
         {
@@ -230,8 +232,6 @@ public abstract class ScriptPlugExecuteService : BasePlugExecuteService
                 string.Equals(v.Name, paramName, StringComparison.OrdinalIgnoreCase));
             if (variable != null && !string.IsNullOrEmpty(variable.Value))
                 return variable.Value;
-            if (variable != null && !string.IsNullOrEmpty(variable.DefaultValue))
-                return variable.DefaultValue;
             return null;
         });
     }

@@ -9,6 +9,7 @@
 @inject IActivityDisplaySettingsRegistry ActivityDisplaySettingsRegistry
 @inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 @inject IDomInteropService DomInteropService
+@inject MainApiClient MainApiClient
 
 
 
@@ -31,10 +32,8 @@
                         }
                         else
                         {
-                            
-                        
-                        <MudAvatar Square="true" Color="Color.Transparent">
-                                <MudImage Src="@PlugIconPath" FallbackSrc="@FallbackImagePath" />
+                            <MudAvatar Square="true" Color="Color.Transparent">
+                                <img src="@CurrentIconPath" @onerror="HandleImageError" style="height:36px; width:36px;" alt="Icon" />
                             </MudAvatar>
                         }
                         <MudText Typo="Typo.body2">@PlugDisplayName</MudText>
@@ -49,16 +48,10 @@
                         {                            
                             <MudIcon Icon="@_icon"></MudIcon>
                         }
-                        else if (XmlPlugIconPath != null)
-                        {
-                            <MudAvatar Square Color="Color.Transparent">
-                                <MudImage Src="@XmlPlugIconPath" FallbackSrc="@FallbackImagePath" />
-                            </MudAvatar>
-                        }
                         else
                         {
-                            <MudAvatar Square="true" Color="Color.Transparent">
-                                <MudImage Src="@PlugIconPath" FallbackSrc="@FallbackImagePath" />
+                            <MudAvatar Square Color="Color.Transparent">
+                                <img src="@CurrentIconPath" @onerror="HandleImageError" style="height:36px; width:36px;" alt="Icon" />
                             </MudAvatar>
                         }
                         <MudText>@PlugDisplayName</MudText>
@@ -85,11 +78,22 @@
     [Parameter]
     public string? ShowModel { get; set; } = "apps";
 
-    private string? PlugIconPath { get; set; }
-    private string? XmlPlugIconPath { get; set; }
-    private string? FallbackImagePath { get; set; } = "defultplug.ico";
+    private string[] _iconPaths = Array.Empty<string>();
+    private int _currentIndex = 0;
+    private string CurrentIconPath => _iconPaths.Length > 0 && _currentIndex < _iconPaths.Length
+        ? _iconPaths[_currentIndex]
+        : "defultplug.ico";
     private string _color = default!;
     private string? _icon;
+
+    private void HandleImageError()
+    {
+        _currentIndex++;
+        if (_currentIndex < _iconPaths.Length)
+        {
+            StateHasChanged();
+        }
+    }
 
     // 过滤掉 Description 中的 [DefinitionId:xxx] 前缀，用于 tooltip 显示
     private string? TooltipText
@@ -116,33 +120,61 @@
 
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            if (!string.IsNullOrEmpty(ActivityDescriptor?.DisplayName))
+            if (!string.IsNullOrEmpty(ActivityDescriptor?.TypeName))
             {
                 var displaySettings = ActivityDisplaySettingsRegistry.GetSettings(ActivityDescriptor.TypeName);
                 _color = displaySettings.Color;
                 _icon = displaySettings.Icon;
 
                 PlugDisplayName = ActivityDescriptor?.DisplayName;
-                PlugIconPath = $"_content/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico";
-                XmlPlugIconPath = $"plugconfig/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico";
 
-                var XmlPlugIconLocalPath = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    $"../../../PlugConfig/Plugs/{ActivityDescriptor?.TypeName}/{ActivityDescriptor?.TypeName}.ico"
-                );
-                if (!File.Exists(XmlPlugIconLocalPath))
+                // 构建图标回退链
+                var paths = new List<string>();
+
+                // 1. 尝试从 API 获取自定义图标
+                try
                 {
-                    XmlPlugIconPath = null;
+                    var plug = await MainApiClient.GetRootPlugByTypeNameAsync(ActivityDescriptor.TypeName);
+                    if (plug != null && !string.IsNullOrEmpty(plug.Icon))
+                    {
+                        if (plug.Icon.Contains("/"))
+                        {
+                            paths.Add($"{GlobalData.MainWebFileServerUrl}/webFiles/{plug.Icon}");
+                        }
+                        else
+                        {
+                            _icon = plug.Icon;
+                        }
+                    }
                 }
-                //Log.Information("PlugTypeName:{0}, PlugIconPath:{1}", PlugTypeName, PlugIconPath);
+                catch { }
+
+                // 2. _content 静态资源路径
+                paths.Add($"_content/{ActivityDescriptor.TypeName}/{ActivityDescriptor.TypeName}.ico");
+
+                // 3. plugconfig 路径（仅当文件存在）
+                var xmlPlugIconLocalPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    $"../../../PlugConfig/Plugs/{ActivityDescriptor.TypeName}/{ActivityDescriptor.TypeName}.ico"
+                );
+                if (File.Exists(xmlPlugIconLocalPath))
+                {
+                    paths.Add($"plugconfig/{ActivityDescriptor.TypeName}/{ActivityDescriptor.TypeName}.ico");
+                }
+
+                // 4. 最终兜底
+                paths.Add("defultplug.ico");
+
+                _iconPaths = paths.ToArray();
+                _currentIndex = 0;
             }
         }
 
-        return base.OnAfterRenderAsync(firstRender);
+        await base.OnAfterRenderAsync(firstRender);
     }
 
 }

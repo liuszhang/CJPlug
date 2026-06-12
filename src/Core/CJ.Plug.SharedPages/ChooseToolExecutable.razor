@@ -56,67 +56,55 @@
         if (IsTemporaryToolPackage)
         {
             // 显示临时工具包文件夹
-            var tmpToolsRelPath = Path.GetRelativePath(
-                GlobalData.MainFileServerPathRoot,
-                Path.Combine(GlobalData.ToolsRootPath, "Tmp"));
-            var tmpRootNode = new FileSystemNode(tmpToolsRelPath, "临时工具包", true);
+            var tmpToolsPath = Path.Combine(GlobalData.ToolsRootPath, "Tmp");
+            var tmpRootNode = new FileSystemNode(tmpToolsPath, "临时工具包", true);
             var tmpRootItem = new TreeItemData<FileSystemNode> { Value = tmpRootNode, Expandable = true, Text = "临时工具包文件夹" };
             var tmpChildren = await MainApiClient.GetFolderFiles(tmpRootNode, currentUser, ToolAgentHostToUse);
-            if (tmpChildren != null)
-            {
-                tmpRootItem.Children = tmpChildren
-                    .Select(c => new TreeItemData<FileSystemNode>
-                    {
-                        Value = c,
-                        Expandable = c.IsDirectory,
-                        Text = c.Name
-                    })
-                    .ToHashSet();
-            }
+            tmpRootItem.Children = ConvertToTreeItems(tmpChildren);
             TreeItems.Add(tmpRootItem);
         }
         else
         {
             // 显示用户工具目录
-            var userToolsRelPath = Path.GetRelativePath(
-                GlobalData.MainFileServerPathRoot,
-                GlobalData.GetUserToolsPath(currentUser));
-            var userRootNode = new FileSystemNode(userToolsRelPath, currentUser, true);
-            var userRootItem = new TreeItemData<FileSystemNode> { Value = userRootNode, Expandable = true, Text = userToolsRelPath };
+            var userToolsPath = GlobalData.GetUserToolsPath(currentUser);
+            var userRootNode = new FileSystemNode(userToolsPath, currentUser, true);
+            var userRootItem = new TreeItemData<FileSystemNode> { Value = userRootNode, Expandable = true, Text = "用户工具包" };
             var userChildren = await MainApiClient.GetFolderFiles(userRootNode, currentUser, ToolAgentHostToUse);
-            if (userChildren != null)
-            {
-                userRootItem.Children = userChildren
-                    .Select(c => new TreeItemData<FileSystemNode>
-                    {
-                        Value = c,
-                        Expandable = c.IsDirectory,
-                        Text = c.Name
-                    })
-                    .ToHashSet();
-            }
+            userRootItem.Children = ConvertToTreeItems(userChildren);
             TreeItems.Add(userRootItem);
 
             // 显示系统工具目录
-            var systemToolsRelPath = Path.GetRelativePath(
-                GlobalData.MainFileServerPathRoot,
-                GlobalData.SystemToolsPath);
-            var systemRootNode = new FileSystemNode(systemToolsRelPath, "0System", true);
-            var systemRootItem = new TreeItemData<FileSystemNode> { Value = systemRootNode, Expandable = true, Text = systemToolsRelPath };
+            var systemToolsPath = GlobalData.SystemToolsPath;
+            var systemRootNode = new FileSystemNode(systemToolsPath, "0System", true);
+            var systemRootItem = new TreeItemData<FileSystemNode> { Value = systemRootNode, Expandable = true, Text = "系统工具包" };
             var systemChildren = await MainApiClient.GetFolderFiles(systemRootNode, currentUser, ToolAgentHostToUse);
-            if (systemChildren != null)
-            {
-                systemRootItem.Children = systemChildren
-                    .Select(c => new TreeItemData<FileSystemNode>
-                    {
-                        Value = c,
-                        Expandable = c.IsDirectory,
-                        Text = c.Name
-                    })
-                    .ToHashSet();
-            }
+            systemRootItem.Children = ConvertToTreeItems(systemChildren);
             TreeItems.Add(systemRootItem);
         }
+    }
+
+    /// <summary>
+    /// 将 FileSystemNode 列表递归转换为 TreeItemData 树
+    /// </summary>
+    private static HashSet<TreeItemData<FileSystemNode>> ConvertToTreeItems(List<FileSystemNode>? nodes)
+    {
+        if (nodes == null || nodes.Count == 0) return new HashSet<TreeItemData<FileSystemNode>>();
+        return nodes.Select(ConvertNode).ToHashSet();
+    }
+
+    private static TreeItemData<FileSystemNode> ConvertNode(FileSystemNode node)
+    {
+        var item = new TreeItemData<FileSystemNode>
+        {
+            Value = node,
+            Expandable = node.IsDirectory,
+            Text = node.Name
+        };
+        if (node.Children is { Count: > 0 })
+        {
+            item.Children = node.Children.Select(ConvertNode).ToHashSet();
+        }
+        return item;
     }
 
     protected async Task Submit()

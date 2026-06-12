@@ -9,6 +9,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>CJ.Plug.Desktop</RootNamespace>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
+      <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

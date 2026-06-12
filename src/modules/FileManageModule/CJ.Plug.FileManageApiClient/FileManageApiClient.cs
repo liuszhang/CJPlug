@@ -642,5 +642,20 @@ namespace CJ.Plug.FileManageApiClient
                 return null;
             }
         }
+
+        public async Task<bool> MoveDirectory(string sourcePath, string destPath)
+        {
+            try
+            {
+                var response = await httpClient.PostAsJsonAsync("api/file/moveDirectory",
+                    new { SourcePath = sourcePath, DestPath = destPath });
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"MoveDirectory 失败: {ex.Message}");
+                return false;
+            }
+        }
     }
 }

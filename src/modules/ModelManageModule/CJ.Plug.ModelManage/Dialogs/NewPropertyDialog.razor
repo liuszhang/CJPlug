@@ -19,7 +19,7 @@
                 <MudSelectItem Value="@("JsonText")">JSON文本(JsonText)</MudSelectItem>
             </MudSelect>
             <MudTextField T="string" Label="描述" @bind-Value="prop.Description" />
-            <MudTextField T="string" Label="默认值" @bind-Value="prop.DefaultValue" />
+            <MudTextField T="string" Label="默认值" @bind-Value="prop.Value" />
             <MudStack Row Spacing="4">
                 <MudCheckBox T="bool" Label="必填" @bind-Checked="prop.IsRequired" />
                 <MudCheckBox T="bool" Label="可浏览" @bind-Checked="prop.IsBrowsable" />

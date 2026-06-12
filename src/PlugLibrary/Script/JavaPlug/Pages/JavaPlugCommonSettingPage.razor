@@ -88,7 +88,7 @@
         {
             DefinitionId = SettingContext.PlugDefinitionId;
         }
-        var javaCode = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.JavaCode.ToString());
+        var javaCode = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.Script.ToString());
         if (!string.IsNullOrEmpty(javaCode))
         {
             iniValue = javaCode;
@@ -139,7 +139,7 @@
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
 
             PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
-            stationExecutionRequest.PlugType = PlugKeySetting.CommonExecuteKey;
+            stationExecutionRequest.PlugTypeKey = PlugKeySetting.CommonExecuteKey;
             stationExecutionRequest.ExecuteMode = ExecuteMode.Standalone;
             stationExecutionRequest.ToolName = "Java";
             var base64Code = Convert.ToBase64String(Encoding.UTF8.GetBytes(editorCode));
@@ -177,7 +177,7 @@
         {
             var model = await _editor.GetModel();
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.JavaCode.ToString(), editorCode);
+            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.Script.ToString(), editorCode);
             _isDirty = false;
             StateHasChanged();
         }

@@ -56,7 +56,7 @@ builder.AddServiceDefaults();
 
 
 // Add services to the container.
-builder.Services.AddRazorComponents()
+builder.Services.AddRazorComponents()    
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
@@ -121,7 +121,7 @@ builder.Services.Configure<CircuitOptions>(options =>
 
 var app = builder.Build();
 
-var serviceProvider = builder.Services.BuildServiceProvider();
+var serviceProvider=builder.Services.BuildServiceProvider();
 // 获取所有注册的 IModule 实例
 var modules = serviceProvider.GetRequiredService<IEnumerable<IModule>>().ToList();
 var moduleAssemblies = modules.Select(m => m.GetType().Assembly).Distinct().ToList();

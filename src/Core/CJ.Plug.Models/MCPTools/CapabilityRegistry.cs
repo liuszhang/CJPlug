@@ -96,7 +96,7 @@ public class CapabilityRegistry
             {
                 var req = p.IsRequired ? "必填" : "可选";
                 var arr = p.IsArray ? "[]" : "";
-                var def = !string.IsNullOrEmpty(p.DefaultValue) ? $" (默认: {p.DefaultValue})" : "";
+                var def = !string.IsNullOrEmpty(p.Value) ? $" (默认: {p.Value})" : "";
                 sb.AppendLine($"  - {p.Name}: {p.Type}{arr} [{req}] — {p.Description}{def}");
             }
         }

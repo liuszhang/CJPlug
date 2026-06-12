@@ -24,7 +24,7 @@ namespace CSharpPlug.Services
 
             var plugDefinitionId = erd.Ids.PlugDefinitionId;
 
-            var code = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.CSharpCode.ToString());
+            var code = PlugDataZone?.GetVariableValue(plugDefinitionId, InitVariableNames.Script.ToString());
             if (string.IsNullOrWhiteSpace(code))
             {
                 Log.Warning("CSharp 代码为空，使用默认示例代码");

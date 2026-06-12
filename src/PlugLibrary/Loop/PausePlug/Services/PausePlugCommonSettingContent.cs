@@ -19,7 +19,6 @@ namespace PausePlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "暂停等待";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -40,3 +39,4 @@ namespace PausePlug.Services
         }
     }
 }
+

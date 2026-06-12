@@ -63,8 +63,8 @@ public sealed class WorkflowTools
                         var required = v.IsRequired ? "(必填)" : "(可选)";
                         var array = v.IsArray ? "[]" : "";
                         result.AppendLine($"  - {v.Name}: {v.Type}{array} {required} — {v.Description}");
-                        if (!string.IsNullOrEmpty(v.DefaultValue))
-                            result.AppendLine($"    默认值: {v.DefaultValue}");
+                        if (!string.IsNullOrEmpty(v.Value))
+                            result.AppendLine($"    默认值: {v.Value}");
                     }
                 }
                 result.AppendLine();
@@ -223,7 +223,7 @@ public sealed class WorkflowTools
                         Type = v.Type,
                         IsRequired = v.IsRequired,
                         IsArray = v.IsArray,
-                        DefaultValue = v.DefaultValue,
+                        Value = v.Value,
                         IsInput = true,
                     }))
             };

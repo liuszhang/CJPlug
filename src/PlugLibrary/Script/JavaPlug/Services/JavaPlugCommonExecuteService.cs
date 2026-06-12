@@ -14,7 +14,7 @@ public class JavaPlugCommonExecuteService : ScriptPlugExecuteService
     // ====== ScriptPlugExecuteService abstract members ======
 
     protected override string ScriptVariableName =>
-        InitVariableNames.JavaCode.ToString();
+        InitVariableNames.Script.ToString();
 
     protected override string[]? DataPrepareVariableNames =>
         Enum.GetNames(typeof(InitVariableNames));

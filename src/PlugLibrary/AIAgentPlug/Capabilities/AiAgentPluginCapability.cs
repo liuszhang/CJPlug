@@ -32,13 +32,13 @@ public class AiAgentPluginCapability : IPluginCapability
         {
             Name = "temperature", Type = "Float",
             Description = "生成温度（0-2），越高越随机，越低越确定",
-            DefaultValue = "0.7"
+            Value = "0.7"
         },
         new()
         {
             Name = "maxTokens", Type = "Int",
             Description = "最大生成 Token 数",
-            DefaultValue = "4096"
+            Value = "4096"
         },
         new()
         {

@@ -38,7 +38,6 @@ namespace NastranPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "Nastran组件";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

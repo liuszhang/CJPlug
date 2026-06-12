@@ -67,7 +67,7 @@
                     </EditTemplate>
                 </PropertyColumn>
                 <PropertyColumn Property="x => x.Name" Title="名称"></PropertyColumn>
-                <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Required="false">
+                <PropertyColumn Property="x => x.Value" Title="默认值" Required="false">
                     <EditTemplate>
                         @if (context.Item.Type == "Body")
                         {
@@ -78,7 +78,7 @@
                         }
                         else
                         {
-                            <MudTextField @bind-Value="context.Item.DefaultValue"></MudTextField>
+                            <MudTextField @bind-Value="context.Item.Value"></MudTextField>
                         }
                     </EditTemplate>
                 </PropertyColumn>
@@ -95,7 +95,7 @@
                         <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary" Label="@context.Item.IsRequired.ToString()"></MudSwitch>
                     </EditTemplate>
                 </PropertyColumn>
-                <PropertyColumn Property="x => x.DefaultValue" Title="操作">
+                <PropertyColumn Property="x => x.Value" Title="操作">
                     <EditTemplate>
                         <MudStack Row>
                             <MudButton OnClick="@(() => DeleteInput(context.Item))" Variant="Variant.Filled">

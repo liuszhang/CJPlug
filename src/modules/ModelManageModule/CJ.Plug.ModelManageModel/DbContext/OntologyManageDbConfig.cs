@@ -1,5 +1,6 @@
 using CJ.Plug.ModelManageModel.Models;
 using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.DbContexts;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.ModelManageModel.DbContext
@@ -8,7 +9,7 @@ namespace CJ.Plug.ModelManageModel.DbContext
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<Ontology>(entity => entity.ToTable("Ontologies"));
+            modelBuilder.Entity<Ontology>(entity => entity.ToTable(DbTableNameEnum.Ontologies.ToString()));
             modelBuilder.Entity<Property>(entity => entity.ToTable("Properties"));
             modelBuilder.Entity<ObjectInstance>(entity => entity.ToTable("ObjectInstances"));
             modelBuilder.Entity<OntologyRelationship>(entity => entity.ToTable("OntologyRelationships"));

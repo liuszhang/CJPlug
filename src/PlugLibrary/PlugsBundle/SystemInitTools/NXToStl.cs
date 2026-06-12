@@ -18,7 +18,6 @@ namespace PlugsBundle.SystemInitTools
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings();
-            settings.PlugType = "NXToStl";
             settings.PlugDisplayName = "NX模型转STL";
             settings.PlugTypeKey = "";
             settings.SetSetting(PlugSettingKey.Category.ToString(),PlugCategorys.桌面类.ToString());

@@ -46,7 +46,7 @@
 
 @code{
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
-    MarketPlug element = new MarketPlug { Name = "EXE执行程序", Type = "桌面类" };
+    MarketPlug element = new MarketPlug { Name = "EXE执行程序", Category = "桌面类" };
     [Parameter] public Plug Plug { get; set; }
     public IBrowserFile? IconFile { get; set; }
 
@@ -120,7 +120,7 @@
         element.DefinitionId = null;
         element.MarketImageBytes = MarketImageBytes;
         element.Base64ImageUrl = Base64ImageUrl;
-        element.Type = Plug.Type + "(M)";
+        element.PlugTypeKey = Plug.PlugTypeKey + "(M)";
         element.Value = Plug.Value;
         element.RootPlugID = Plug.Id;
         element.Creater = Plug.Creater;

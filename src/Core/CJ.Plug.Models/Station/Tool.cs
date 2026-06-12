@@ -32,6 +32,12 @@ namespace CJ.Plug.Models.Station
         /// 勾选后适用于工具已在服务器本地或为纯接口调用、无需在图站部署可执行文件的场景。
         /// </summary>
         public bool SkipDownloadToStation { get; set; } = false;
+
+        /// <summary>
+        /// 工具包 zip 文件的 SHA256 校验值（可选）。
+        /// 下载完成后用于完整性校验，null 则跳过校验。
+        /// </summary>
+        public string? Sha256 { get; set; }
         public bool IsEnabled { get; set; }= true;
         public bool IsSystemInitTool { get; set; }=false;
         public bool? IsBrowsable { get; set; }= true;

@@ -52,6 +52,8 @@ namespace PlugsBundle
         {
             services.AddScoped<IPlugSettingDialogShow, PlugSettingDialogCoreShow>();
             services.AddScoped<IToolExecuteService, ToolExecuteService>();
+            services.AddSingleton<ToolDownloadGuard>();
+            services.AddSingleton<ResilientDownloader>();
 
             services.AddPatran();
             services.AddNX();
@@ -103,6 +105,8 @@ namespace PlugsBundle
         {
             services.AddScoped<IPlugExecuteHandlerService, PlugExecuteHandlerService>();
             services.AddScoped<IToolExecuteService, ToolExecuteService>();
+            services.AddSingleton<ToolDownloadGuard>();
+            services.AddSingleton<ResilientDownloader>();
 
 
             services.AddPatranExecute();

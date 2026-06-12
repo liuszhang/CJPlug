@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.Models.Plug;
 using RESTPlug;
 using Microsoft.AspNetCore.Components;
@@ -38,7 +38,6 @@ namespace RESTPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "REST接口";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -73,3 +72,4 @@ namespace RESTPlug.Services
         }
     }
 }
+

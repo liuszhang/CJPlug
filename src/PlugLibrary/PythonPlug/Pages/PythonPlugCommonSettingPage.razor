@@ -43,7 +43,7 @@
                             {
                                 @foreach (var v in Plug.PlugVariables)
                                 {
-                                    if (v.Name == InitVariableNames.PythonScript.ToString() || v.Name == InitVariableNames.ResultString.ToString())
+                                    if (v.Name == InitVariableNames.Script.ToString() || v.Name == InitVariableNames.ResultString.ToString())
                                         continue;
                                     <MudMenuItem OnClick="@(() => InsertParameterAtCursor(v.Name))">
                                         <MudText>@v.Name <MudText Typo="Typo.caption" Color="Color.Default">@("${" + v.Name + "}")</MudText></MudText>
@@ -151,7 +151,7 @@
             DefinitionId = SettingContext.PlugDefinitionId;
             Plug = SettingContext.Plug;
         }
-        var pythonScript = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.PythonScript.ToString());
+        var pythonScript = PlugDataZone?.GetVariableValue(DefinitionId, InitVariableNames.Script.ToString());
         if (!string.IsNullOrEmpty(pythonScript))
         {
             iniValue = pythonScript;
@@ -178,7 +178,7 @@
                     return;
                 }
             }
-            Plug.PlugVariables.Add(new PlugVariable() { Name = tmpName, Type = "string", DefaultValue = cellContext.Item.DefaultValue });
+            Plug.PlugVariables.Add(new PlugVariable() { Name = tmpName, Type = "string", Value = cellContext.Item.Value });
         }
         else
         {
@@ -275,18 +275,16 @@ if a == 1:
                     if (!string.IsNullOrEmpty(pdzVal))
                         return pdzVal;
                 }
-                // 优先级2: 根插头定义中的 Value / DefaultValue
+                // 优先级2: 根插头定义中的 Value
                 var v = Plug?.PlugVariables?.FirstOrDefault(p =>
                     string.Equals(p.Name, paramName, StringComparison.OrdinalIgnoreCase));
                 if (v != null && !string.IsNullOrEmpty(v.Value))
                     return v.Value;
-                if (v != null && !string.IsNullOrEmpty(v.DefaultValue))
-                    return v.DefaultValue;
                 return null;
             });
 
             PlugExecutionRequest stationExecutionRequest = new PlugExecutionRequest();
-            stationExecutionRequest.PlugType = PlugKeySetting.CommonExecuteKey;
+            stationExecutionRequest.PlugTypeKey = PlugKeySetting.CommonExecuteKey;
             stationExecutionRequest.ExecuteMode = ExecuteMode.Standalone;
             stationExecutionRequest.ToolName = "Python";
             var base64Script = Convert.ToBase64String(Encoding.UTF8.GetBytes(substitutedCode));
@@ -322,7 +320,7 @@ if a == 1:
         {
             var model = await _editor.GetModel();
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.PythonScript.ToString(), editorCode);
+            this.PlugDataZone?.SetVariableValue(DefinitionId, InitVariableNames.Script.ToString(), editorCode);
             _isDirty = false;
             StateHasChanged();
         }

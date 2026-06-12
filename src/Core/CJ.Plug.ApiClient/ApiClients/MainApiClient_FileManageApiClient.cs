@@ -174,4 +174,12 @@ public partial class MainApiClient : IFileManageApiClient
             throw;
         }
     }
+
+    public async Task<bool> MoveDirectory(string sourcePath, string destPath)
+    {
+        var result = await FileManageApiClient.Value.MoveDirectory(sourcePath, destPath);
+        if (result)
+            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"移动目录: {sourcePath} → {destPath}");
+        return result;
+    }
 }

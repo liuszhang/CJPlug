@@ -58,5 +58,5 @@ public class CapabilityParameter
     public bool IsArray { get; set; }
 
     /// <summary>默认值</summary>
-    public string? DefaultValue { get; set; }
+    public string? Value { get; set; }
 }

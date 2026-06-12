@@ -327,7 +327,7 @@
         inputs.Add(fileData);
         var executeRequest = new PlugExecutionRequest
             {                 
-                PlugType = PlugGlobalEnum.NXGetParameters.TypeName,
+                PlugTypeKey = PlugGlobalEnum.NXGetParameters.TypeName,
             //ExecuteMode=ExecuteMode.Standalone,
                 InputVariables = inputs,
                 ExecuteResultData=new ExecuteResultData
@@ -398,7 +398,7 @@
         inputs.Add(new PlugVariableData { Name = PlugGlobalEnum.NXSetParameters.Variables.NewParameterString, Value = newParameters });
         var toolCommandRequest = new PlugExecutionRequest
             {
-                PlugType = PlugGlobalEnum.NXSetParameters.TypeName,
+                PlugTypeKey = PlugGlobalEnum.NXSetParameters.TypeName,
             //SpecifiedStationIp = stationIp.StationIp,
             //ExecuteMode = ExecuteMode.Standalone,
                 InputVariables = inputs,
@@ -474,7 +474,7 @@
 
         var toolCommandRequest = new PlugExecutionRequest
             {
-                PlugType = PlugGlobalEnum.NXToStl.TypeName,
+                PlugTypeKey = PlugGlobalEnum.NXToStl.TypeName,
             //ExecuteMode = ExecuteMode.Standalone,
                 InputVariables = inputs,
                 ExecuteResultData = new ExecuteResultData

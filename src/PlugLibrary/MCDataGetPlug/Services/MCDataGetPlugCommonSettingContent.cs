@@ -38,7 +38,6 @@ namespace MCDataGetPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = "MC数据获取";
             settings.PlugDisplayName = "MC数据获取";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

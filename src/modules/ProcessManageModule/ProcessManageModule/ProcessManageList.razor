@@ -195,7 +195,7 @@
                 return true;
             if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
                 return true;
-            if ($"{element.Description} {element.Type} {element.CreatedAt}".Contains(searchString))
+            if ($"{element.Description} {element.PlugTypeKey} {element.CreatedAt}".Contains(searchString))
                 return true;
             return false;
         }).ToArray();
@@ -353,9 +353,9 @@
     private async Task EditProcessFromRow(Process process)
     {
         _isPageLoading = true;
-        await InvokeAsync(StateHasChanged);
+        //await InvokeAsync(StateHasChanged);
 
-        NavigationManager.NavigateTo($"/ProcessEdit/{process.DefinitionId}");
+        NavigationManager.NavigateTo($"/ProcessEdit/{process.DefinitionId}", true);
     }
 
     private void ExeProcess(Process process)

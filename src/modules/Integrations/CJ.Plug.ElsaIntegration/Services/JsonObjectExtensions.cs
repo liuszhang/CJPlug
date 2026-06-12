@@ -20,7 +20,7 @@ namespace CJ.Plug.ElsaIntegration.Services
             var newPlug=new CJ.Plug.Models.Plug.Plug();
             newPlug.DefinitionId=obj.GetId();
             newPlug.Name=obj.GetName();
-            newPlug.Type=obj.GetTypeName();
+            newPlug.PlugTypeKey=obj.GetTypeName();
             //newPlug.CoreType = obj.GetTypeName();
             newPlug.ActivityNodeId=obj.GetNodeId();
             newPlug.ActivityVersion=obj.GetVersion().ToString();

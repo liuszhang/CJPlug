@@ -40,7 +40,6 @@ namespace CalculatorPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "计算器";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

@@ -1,4 +1,4 @@
-﻿
+
 using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.PlugBaseCore.Contracts;
@@ -46,7 +46,6 @@ namespace FileDownloadPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "文件下载";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 
@@ -57,3 +56,4 @@ namespace FileDownloadPlug.Services
         }
     }
 }
+

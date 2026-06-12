@@ -15,7 +15,6 @@ namespace PlugsBundle.SystemInitTools
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = "WordToPdf";
             settings.PlugDisplayName = "Word转Pdf";
             settings.PlugTypeKey = "";
             settings.SetSetting(PlugSettingKey.Category.ToString(),PlugCategorys.桌面类.ToString());

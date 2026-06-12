@@ -36,7 +36,6 @@ namespace ExcelPlug.Services
         {
             var settings = new PlugSettings(null);
             settings.PlugDisplayName = "Excel组件";
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
             settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
 
@@ -75,3 +74,4 @@ namespace ExcelPlug.Services
         }
     }
 }
+

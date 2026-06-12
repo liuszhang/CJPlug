@@ -1,4 +1,4 @@
-﻿using CJ.Plug.PlugBaseCore.Contracts;
+using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.VariableUIHandler.Contracts;
 using System;
 using System.Collections.Generic;
@@ -8,13 +8,37 @@ using System.Threading.Tasks;
 
 namespace CJ.Plug.PlugBaseCore.Services
 {
-    public class PlugExecuteHandlerService(IEnumerable<IPlugCommonExecute> handlers) : IPlugExecuteHandlerService
+    public class PlugExecuteHandlerService : IPlugExecuteHandlerService
     {
-        public IPlugCommonExecute GetExecuteHandler(string? PlugTypeKey)
+        private readonly IEnumerable<IPlugCommonExecute> _handlers;
+
+        public PlugExecuteHandlerService(IEnumerable<IPlugCommonExecute> handlers)
         {
-            var handler = handlers.FirstOrDefault(x => x.IsThisPlugTypeKey(PlugTypeKey));
-            return handler ?? throw new InvalidOperationException($"No execute handler found for PlugTypeKey: {PlugTypeKey}");
+            _handlers = handlers;
+        }
+
+        public IPlugCommonExecute? GetExecuteHandler(string? PlugTypeKey)
+        {
+            if (string.IsNullOrEmpty(PlugTypeKey))
+                return null;
+
+            return _handlers.FirstOrDefault(x => x.IsThisPlugTypeKey(PlugTypeKey));
+        }
+
+        public IPlugCommonExecute? GetCategoryFallbackHandler(string? category)
+        {
+            if (string.IsNullOrEmpty(category))
+                return null;
+
+            return _handlers
+                .OfType<IPlugCategoryFallbackHandler>()
+                .FirstOrDefault(h => h.Category == category) as IPlugCommonExecute;
+        }
+
+        public IEnumerable<IPlugCategoryFallbackHandler> GetAllCategoryFallbackHandlers()
+        {
+            return _handlers.OfType<IPlugCategoryFallbackHandler>();
         }
     }
-    
+
 }

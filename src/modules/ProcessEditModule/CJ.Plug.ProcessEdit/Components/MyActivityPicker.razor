@@ -290,7 +290,7 @@
     {
         return new ActivityDescriptor
         {
-            TypeName = plug.Type ?? plug.Name,
+            TypeName = plug.PlugTypeKey ?? plug.Name,
             Name = plug.Name ?? "",
             Namespace = "CJ",
             DisplayName = plug.Name ?? "",

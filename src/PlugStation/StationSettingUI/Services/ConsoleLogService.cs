@@ -25,13 +25,14 @@ public class ConsoleLogService : INotifyPropertyChanged
         private set { _totalCount = value; OnPropertyChanged(nameof(TotalCount)); }
     }
 
-    public void AppendLine(string text, bool isError = false)
+    public void AppendLine(string text, bool isError = false, string source = "Station")
     {
         var entry = new ConsoleLogEntry
         {
             Timestamp = DateTime.Now,
             Text = text,
             IsError = isError,
+            Source = source,
         };
 
         Application.Current.Dispatcher.Invoke(() =>
@@ -63,6 +64,7 @@ public class ConsoleLogEntry
     public DateTime Timestamp { get; set; }
     public string Text { get; set; } = "";
     public bool IsError { get; set; }
+    public string Source { get; set; } = "Station";
 
     /// <summary>
     /// 绑定时使用的显示颜色（WPF binding 需要实例属性）

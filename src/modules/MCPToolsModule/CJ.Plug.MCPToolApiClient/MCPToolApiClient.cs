@@ -40,4 +40,10 @@ public class MCPToolApiClient : BaseApiClient, IMCPToolApiClient
         var response = await httpClient.PostAsync("/api/mcptools/notifyRefresh", null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<List<PublishedWorkflowDto>> GetPublishedWorkflowsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<List<PublishedWorkflowDto>>("/api/mcptools/getPublishedWorkflows", cancellationToken);
+        return result ?? new();
+    }
 }

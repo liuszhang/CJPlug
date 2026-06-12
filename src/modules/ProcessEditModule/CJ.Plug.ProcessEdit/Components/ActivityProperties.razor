@@ -1,4 +1,5 @@
-﻿@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json
 @using CJ.Plug.Models.EventAggregator
 @using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
@@ -6,6 +7,7 @@
 @using CJ.Plug.Models.Services
 @using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Layout
+@using CJ.Plug.Models.Shared
 @using Elsa.Api.Client.Extensions
 @using MudExtensions
 @using Serilog
@@ -54,6 +56,21 @@
                     </MudStack>
                     <MudStack Row AlignItems="AlignItems.Center">
                         <MudTextField @bind-Value="SelectedPlugData.Name" @bind-Value:after="UpdatePlugData" Margin="Margin.Dense" Label="名称" Variant="Variant.Outlined"></MudTextField>
+                        @* @if (_hasIcon)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Variant="Variant.Text" OnClick="HandleIconDelete" />
+                        }
+                        else
+                        {
+                            <MudFileUpload T="IBrowserFile" FilesChanged="HandleIconUpload" Accept=".ico,.png,.svg,.jpg,.jpeg">
+                                <CustomContent>
+                                    <MudIconButton OnClick="@context.OpenFilePickerAsync"
+                                                   Icon="@Icons.Material.Filled.InsertPhoto" Size="Size.Small"
+                                                   Variant="Variant.Text" />
+                                </CustomContent>
+                                <SelectedTemplate></SelectedTemplate>
+                            </MudFileUpload>
+                        } *@
                         @if (SelectedPlugDefinitionId != PlugDataZone?.PlugDefinitionId)
                         {
                             <MudCheckBox Value="AsTriggerPlug" ValueChanged="(bool a) => ChooseAsTrigger(a)" Label="起始活动" Color="Color.Primary"></MudCheckBox>
@@ -82,6 +99,7 @@
     public double HeightPercent { get; set; } = 30.00;
 
     private bool _loading = false;
+    private bool _hasIcon = false;
 
     private bool AsTriggerPlug { get; set; } = false;
     private PlugData? SelectedPlugData { get; set; } = new();
@@ -104,6 +122,17 @@
             {
                 AsTriggerPlug = false;
             }
+
+            // 查询插头图标状态
+            // try
+            // {
+            //     var plug = await MainApiClient.GetRootPlugByTypeNameAsync(SelectedPlugData!.PlugType!);
+            //     _hasIcon = plug != null && !string.IsNullOrEmpty(plug.Icon);
+            // }
+            // catch
+            // {
+            //     _hasIcon = false;
+            // }
         }
     }
 
@@ -166,6 +195,67 @@
     }
 
 
+    private async Task HandleIconUpload(IBrowserFile file)
+    {
+        try
+        {
+            if (file == null) return;
+
+            var plug = await MainApiClient.GetRootPlugByTypeNameAsync(SelectedPlugData!.PlugTypeKey!);
+            if (plug == null)
+            {
+                Snackbar.Add("未找到插头定义", Severity.Error);
+                return;
+            }
+
+            var webRoot = GlobalData.MainWebFileServer.Replace("//", "\\").TrimEnd('\\');
+            var iconDir = Path.Combine(webRoot, "Icons", plug.DefinitionId!);
+            Directory.CreateDirectory(iconDir);
+
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.Name)}_{DateTime.Now:yyyyMMddHHmmss}{Path.GetExtension(file.Name)}";
+            var filePath = Path.Combine(iconDir, fileName);
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            await using var fs = File.Create(filePath);
+            await stream.CopyToAsync(fs);
+
+            plug.Icon = $"Icons/{plug.DefinitionId}/{fileName}";
+            await MainApiClient.UpdatePlugAsync(plug.Id, plug);
+
+            _hasIcon = true;
+            Snackbar.Add("图标已上传", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "图标上传失败");
+            Snackbar.Add($"图标上传失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task HandleIconDelete()
+    {
+        try
+        {
+            var plug = await MainApiClient.GetRootPlugByTypeNameAsync(SelectedPlugData!.PlugTypeKey!);
+            if (plug == null || string.IsNullOrEmpty(plug.Icon))
+            {
+                Snackbar.Add("没有可删除的图标", Severity.Warning);
+                return;
+            }
+
+            plug.Icon = null;
+            await MainApiClient.UpdatePlugAsync(plug.Id, plug);
+
+            _hasIcon = false;
+            Snackbar.Add("图标已删除", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "图标删除失败");
+            Snackbar.Add($"图标删除失败: {ex.Message}", Severity.Error);
+        }
+    }
+
     private async Task ExecutePlug()
     {
         try
@@ -177,7 +267,7 @@
             var request = new PlugExecutionRequest();
             request.ExecuteResultData.Ids.PlugDefinitionId = SelectedPlugDefinitionId;
             request.ExecuteResultData.Ids.PDZId = PlugDataZone.PDZId;
-            request.PlugType = SelectedPlugData?.PlugType;
+            request.PlugTypeKey = SelectedPlugData?.PlugTypeKey;
             request.ExecuteMode = ExecuteMode.Plug;
             await MainApiClient.ExecutePlug(request);
             _loading = false;

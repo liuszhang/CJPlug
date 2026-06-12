@@ -100,7 +100,7 @@ namespace CJ.Plug.ModelManageApi.Services
             existing.DisplayName = property.DisplayName;
             existing.Description = property.Description;
             existing.PropertyType = property.PropertyType;
-            existing.DefaultValue = property.DefaultValue;
+            existing.Value = property.Value;
             existing.IsRequired = property.IsRequired;
             existing.SortOrder = property.SortOrder;
             existing.UIHint = property.UIHint;

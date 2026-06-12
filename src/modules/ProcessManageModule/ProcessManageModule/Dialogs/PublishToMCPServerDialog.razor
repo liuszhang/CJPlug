@@ -4,6 +4,7 @@
 @using Blazored.LocalStorage
 @using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.PlugProcess
 @using CJ.Plug.Models.Relation
 @using CJ.Plug.Models.Shared
 @using Elsa.Api.Client.Shared.Models
@@ -49,6 +50,7 @@
         element.SourcePlugId = Plug.DefinitionId;
         element.CreatedAt = DateTime.UtcNow;
         element.Author = Plug.Creater;
+        element.ToolType = (Plug.PlugTypeKey == "Process" || Plug is Process) ? "Workflow" : "Plugin";
         var result = await MainApiClient.CreateMCPToolAsync(element);
         if (result == null)
         {

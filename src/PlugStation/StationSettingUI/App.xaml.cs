@@ -1,5 +1,9 @@
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.AspNetCore.SignalR.Client;
+using CJ.Plug.Models.Shared;
+using CJ.Plug.Models.LogModels;
+using System.Text.Json;
 using StationSettingUI.Services;
 
 namespace StationSettingUI;
@@ -13,6 +17,14 @@ public partial class App : Application
     /// 全局共享的日志服务（供各组件订阅 StationApiServer 的控制台输出）
     /// </summary>
     public ConsoleLogService LogService { get; } = new();
+
+    /// <summary>
+    /// 用于接收 SignalR CommonLog 推送的 Hub 连接
+    /// StationApiServer 通过 SignalRLogSink 将日志推送到 MainHub/CommonLog，
+    /// StationSettingUI 订阅此事件以实时获取日志，无论服务由谁启动
+    /// </summary>
+    public HubConnection? LogHubConnection { get; private set; }
+
     /// <summary>
     /// 全局未处理异常捕获
     /// </summary>
@@ -41,7 +53,7 @@ public partial class App : Application
         e.Handled = true;
     }
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -54,6 +66,56 @@ public partial class App : Application
                 MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
+        }
+
+        // 连接 MainHub 订阅 CommonLog 事件，实时接收 StationApiServer 推送的日志
+        _ = ConnectToLogHubAsync();
+    }
+
+    /// <summary>
+    /// 连接 MainHub 并订阅 CommonLog 事件
+    /// StationApiServer 通过 SignalRLogSink 推送 CommonLog (receiverId, logJson)
+    /// logJson 为 LogModel 的 JSON：{"Type":"Information","Description":"xxx","Date":"HH:mm:ss.fff","Author":"Station"}
+    /// </summary>
+    private async Task ConnectToLogHubAsync()
+    {
+        try
+        {
+            LogHubConnection = new HubConnectionBuilder()
+                .WithUrl($"{GlobalData.MainDispatcherServer}/mainHub")
+                .Build();
+
+            LogHubConnection.On<string, string>("CommonLog", (receiverId, logJson) =>
+            {
+                try
+                {
+                    var log = JsonSerializer.Deserialize<LogModel>(logJson);
+                    if (log != null)
+                    {
+                        // 日志来源标识：优先使用 receiverId（SignalR 推送的第一个参数），
+                        // receiverId 为空时回退到 LogModel.Author（SignalRLogSink 中的 _loggerName）
+                        var source = !string.IsNullOrWhiteSpace(receiverId) ? receiverId : log.Author;
+                        if (string.IsNullOrWhiteSpace(source))
+                        {
+                            LogService.AppendLine($"[{log.Type}] {log.Description}");
+                        }
+                        else
+                        {
+                            LogService.AppendLine($"[{log.Type}] {log.Description}", source: source);
+                        }
+                    }
+                }
+                catch
+                {
+                    // JSON 解析失败时静默忽略该条日志
+                }
+            });
+
+            await LogHubConnection.StartAsync();
+        }
+        catch
+        {
+            // Hub 不可用时静默忽略 — 方案 B（读取日志文件）作为兜底
         }
     }
 }

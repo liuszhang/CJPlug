@@ -40,7 +40,6 @@ namespace TextReaderPlug.Services
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings(null);
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
             settings.PlugDisplayName = "文本解析-读";
             settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
 

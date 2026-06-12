@@ -34,19 +34,19 @@ public class NXToStlPluginCapability : IPluginCapability
         {
             Name = "chordalTol", Type = "Double",
             Description = "弦高公差（mm），控制 STL 网格精度。值越小网格越精细",
-            DefaultValue = "0.08"
+            Value = "0.08"
         },
         new()
         {
             Name = "adjacencyTol", Type = "Double",
             Description = "邻接公差（mm），控制相邻面的缝合精度",
-            DefaultValue = "0.08"
+            Value = "0.08"
         },
         new()
         {
             Name = "autoNormalGen", Type = "Bool",
             Description = "是否自动生成面法线",
-            DefaultValue = "true"
+            Value = "true"
         },
     };
 

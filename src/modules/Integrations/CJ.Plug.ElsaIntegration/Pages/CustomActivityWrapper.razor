@@ -212,6 +212,29 @@
                 "defultplug.ico"
             };
 
+        // 尝试从 Plug.Icon 获取用户自定义图标
+        var definitionId = activity.GetId();
+        try
+        {
+            var plug = await MainApiClient.GetRootPlugByTypeNameAsync(activity.GetTypeName());
+            if (plug != null && !string.IsNullOrEmpty(plug.Icon))
+            {
+                if (plug.Icon.Contains("/"))
+                {
+                    // 自定义图片路径 → 首位优先
+                    var customPaths = new List<string> { $"{GlobalData.MainWebFileServerUrl}/webFiles/{plug.Icon}" };
+                    customPaths.AddRange(_iconPaths);
+                    _iconPaths = customPaths.ToArray();
+                }
+                else
+                {
+                    // Material Icon 名称 → 直接覆盖 _icon
+                    _icon = plug.Icon;
+                }
+            }
+        }
+        catch { /* 获取失败则使用默认路径 */ }
+
         // 开始尝试第一个路径
         _currentIndex = 0;
         CurrentIconPath = _iconPaths[_currentIndex];

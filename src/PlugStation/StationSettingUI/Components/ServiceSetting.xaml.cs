@@ -23,6 +23,7 @@ public partial class ServiceSetting : UserControl
     private bool _isInitialized;
     private readonly DispatcherTimer _autoSaveTimer;
     private bool _suppressAutoSave;
+    private bool _existingLogLoaded;
 
     // StationApiServer 的可能进程名
     private static readonly string[] StationProcessNames = new[]
@@ -78,6 +79,13 @@ public partial class ServiceSetting : UserControl
             BtnStartService.IsEnabled = false;
             BtnStopService.IsEnabled = true;
             BtnRestartService.IsEnabled = true;
+
+            // 加载已有日志 — 仅当进程不是由本工具启动时
+            if (_serviceProcess == null && !_existingLogLoaded)
+            {
+                LoadExistingLogFile();
+                _existingLogLoaded = true;
+            }
 
             var connStatus = await _apiService.GetConnectionStatusAsync();
             if (connStatus != null)
@@ -666,5 +674,36 @@ public partial class ServiceSetting : UserControl
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// 加载 StationApiServer 已有的 StationLogs/log.txt 日志文件内容
+    /// 仅当进程不是由本工具启动时调用，处理文件不存在的情况（静默跳过）
+    /// </summary>
+    private void LoadExistingLogFile()
+    {
+        if (string.IsNullOrWhiteSpace(_config.StationApiFolder))
+            return;
+
+        var logService = ((App)Application.Current).LogService;
+        var logFile = Path.Combine(_config.StationApiFolder, "StationLogs", "log.txt");
+
+        if (!File.Exists(logFile))
+            return;
+
+        try
+        {
+            var lines = File.ReadAllLines(logFile, System.Text.Encoding.UTF8);
+            logService.AppendLine("========== 已加载服务历史日志 ==========");
+            foreach (var line in lines.TakeLast(200))
+            {
+                logService.AppendLine(line);
+            }
+            logService.AppendLine($"========== 共 {Math.Min(lines.Length, 200)} 行 ==========");
+        }
+        catch (Exception ex)
+        {
+            logService.AppendLine($"[WARN] 读取日志文件失败: {ex.Message}", isError: true);
+        }
     }
 }

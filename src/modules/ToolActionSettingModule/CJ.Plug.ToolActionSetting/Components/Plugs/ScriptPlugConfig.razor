@@ -7,7 +7,7 @@
 
 <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
     <MudText Typo="Typo.subtitle2" Color="Color.Primary" Style="margin-right:16px;">脚本类型</MudText>
-    <MudSelect T="string" @bind-Value="@ScriptType" Label="选择脚本类型" Style="width:200px;"
+    <MudSelect @bind-Value="@ScriptType" Label="选择脚本类型" Style="width:200px;"
                Margin="Margin.Dense" Dense Variant="Variant.Outlined">
         <MudSelectItem Value="@("Java")">Java</MudSelectItem>
         <MudSelectItem Value="@("Python")">Python</MudSelectItem>
@@ -102,6 +102,10 @@
 
         // 保存脚本类型到插头配置
         plug.SetPlugSetting("ScriptType", ScriptType);
+
+        // 同步写入 PlugVariables，确保执行时 VariableResolver 可解析
+        plug.AddVariable("ScriptType", VariableTypeEnum.String.ToString());
+        plug.SetVariableValue("ScriptType", ScriptType);
 
         // 添加脚本类默认参数
         plug.AddVariable("Script", VariableTypeEnum.String.ToString());

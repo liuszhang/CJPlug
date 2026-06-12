@@ -157,7 +157,7 @@
                                     <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary" Label="@context.Item.IsRequired.ToString()"></MudSwitch>
                                 </EditTemplate>
                             </PropertyColumn>
-                            <PropertyColumn Property="x => x.DefaultValue" Title="操作">
+                            <PropertyColumn Property="x => x.Value" Title="操作">
                                 <EditTemplate>
                                     <MudStack Row>
                                         <MudButton Variant="Variant.Filled">

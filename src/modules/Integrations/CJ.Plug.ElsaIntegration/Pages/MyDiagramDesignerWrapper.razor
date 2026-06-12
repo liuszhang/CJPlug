@@ -85,6 +85,18 @@ else
 {
     <MudPaper Class="ma-2" Elevation="0" Outlined="true">
         <MudToolBar Dense="true" Style="min-width:672px;">
+            @if (!string.IsNullOrEmpty(Process?.Icon))
+            {
+                if (Process.Icon.Contains("/"))
+                {
+                    <img src="@GlobalData.MainWebFileServerUrl/webFiles/@Process.Icon" style="width:28px;height:28px;object-fit:cover;border-radius:4px;margin-right:6px;" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Process.Icon" Size="Size.Small" Style="margin-right:6px;" />
+                }
+            }
+            <MudText Typo="Typo.body2" Style="margin-right:20px;font-weight:500;">@Process?.Name</MudText>
             <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.FitScreen" OnClick="ZoomToFitAsync"></MudIconButton>
             <MudIconButton Size="MudBlazor.Size.Small" Icon="@Icons.Material.Filled.FilterCenterFocus" OnClick="CenterContentAsync"></MudIconButton>
             <MudIconButton Size="MudBlazor.Size.Small" Style="margin-right:20px;" Icon="@Icons.Material.Outlined.AutoAwesomeMosaic" OnClick="AutoLayoutAsync"></MudIconButton>
@@ -408,7 +420,6 @@ else
                 PlugDefinitionId = plugData.GetId(),
                 ParentPlugDefinitionId = ProcessDefinitionId,
                 Name = plugData.GetName(),
-                PlugType = plugData.GetTypeName(),
                 PlugTypeKey = plugData?.GetTypeName(),
                 WorkPath = Path.Combine(PlugDataZone.PDZWorkPath, plugData.GetId()),
                 PlugPosition = $"{x} {y}",//记录插头坐标值，用于绘制数据流等功能
@@ -424,7 +435,6 @@ else
                         PlugDefinitionId = plugData.GetId(),
                         Name = p.Name,
                         Value = p.Value,
-                        DefaultValue = p.DefaultValue,
                         Type = p.Type,
                         IsInitVariable = p.IsInitVariable,
                         IsBrowsable = p.IsBrowsable,

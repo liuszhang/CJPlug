@@ -256,7 +256,7 @@
 
             if (PlugDataZone != null && !string.IsNullOrEmpty(PlugDefinitionId))
             {
-                var savedCode = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.CSharpCode.ToString());
+                var savedCode = PlugDataZone.GetVariableValue(PlugDefinitionId, InitVariableNames.Script.ToString());
                 if (!string.IsNullOrWhiteSpace(savedCode))
                 {
                     csharpCode = savedCode;
@@ -563,7 +563,7 @@
             {
                 var model = await editor.GetModel();
                 csharpCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.CSharpCode.ToString(), csharpCode);
+                PlugDataZone.SetVariableValue(PlugDefinitionId, InitVariableNames.Script.ToString(), csharpCode);
                 _isDirty = false;
                 codeResult = "代码已保存";
                 await InvokeAsync(StateHasChanged);

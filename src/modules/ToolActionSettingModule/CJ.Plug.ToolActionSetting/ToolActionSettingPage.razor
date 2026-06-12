@@ -410,13 +410,12 @@
             {
                 continue;
             }
-            var AlreadyExistPlug = AllPlugs.FirstOrDefault(t => t.Type == EachPlugSetting.PlugType);
+            var AlreadyExistPlug = AllPlugs.FirstOrDefault(t => t.PlugTypeKey == EachPlugSetting.PlugTypeKey);
             //Console.WriteLine(EachPlugSetting.PlugDisplayName + ":" + JsonSerializer.Serialize(EachPlugSetting));
             //Log.Information(EachPlugSetting.PlugDisplayName + ":" + JsonSerializer.Serialize(EachPlugSetting));
             var PlugFromSetting = new Plug
             {
                 Name = EachPlugSetting.PlugDisplayName,
-                Type = EachPlugSetting.PlugType,
                 PlugTypeKey = EachPlugSetting.PlugTypeKey,
                 Category = EachPlugSetting.GetSetting(PlugSettingKey.Category.ToString()),
                 GroupName = EachPlugSetting.GetSetting(PlugSettingKey.Group.ToString()),
@@ -473,8 +472,7 @@
                         Type = v.Type,
                         IsBrowsable = v.IsBrowsable,
                         IsArray = v.IsArray,
-                        DefaultValue = v.DefaultValue,
-                        Value = v.DefaultValue,  //将插头中定义的默认值作为值，因为前端参数表格渲染时，使用的是值字段
+                        Value = v.Value,  // 从InitVariables传递预设值
                         IsInitVariable = true
                     });
                 }
@@ -485,7 +483,7 @@
 
             if (AlreadyExistPlug != null)
             {
-                Console.WriteLine("----------->>>>>update plug:" + PlugFromSetting.Type);
+                Console.WriteLine("----------->>>>>update plug:" + PlugFromSetting.PlugTypeKey);
                 //更新插头信息但不更新插入状态、ID等信息
                 PlugFromSetting.DefinitionId = AlreadyExistPlug.DefinitionId;
                 PlugFromSetting.ShowInPlugLibrary = AlreadyExistPlug.ShowInPlugLibrary;
@@ -621,7 +619,7 @@
             var searchLower = Search.ToLower();
             query = query.Where(p =>
                 (p.Name?.ToLower().Contains(searchLower) == true) ||
-                (p.Type?.ToLower().Contains(searchLower) == true) ||
+                (p.PlugTypeKey?.ToLower().Contains(searchLower) == true) ||
                 (p.Id?.ToString().ToLower().Contains(searchLower) == true) ||
                 (p.ToolVersion?.ToLower().Contains(searchLower) == true) ||
                 (p.GroupName?.ToLower().Contains(searchLower) == true) ||
@@ -791,7 +789,7 @@
             foreach (var importPlug in importPlugs)
             {
                 // 根据 Type 查找现有插头
-                var existingPlug = allExistingPlugs.FirstOrDefault(p => p.Type == importPlug.Type);
+                var existingPlug = allExistingPlugs.FirstOrDefault(p => p.PlugTypeKey == importPlug.PlugTypeKey);
 
                 if (existingPlug != null)
                 {
@@ -916,7 +914,7 @@
                 Author = SelectedPlug.Creater ?? "System",
                 Category = SelectedPlug.Category,
                 GroupName = SelectedPlug.GroupName,
-                Type = SelectedPlug.Type,
+                Type = SelectedPlug.PlugTypeKey,
                 ToolType = "Plugin",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow

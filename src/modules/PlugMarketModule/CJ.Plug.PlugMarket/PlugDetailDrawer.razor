@@ -117,7 +117,7 @@
                                 </MudItem>
                                 <MudItem xs="6">
                                     <MudText Typo="Typo.caption" Class="text-muted">类型</MudText>
-                                    <MudText Typo="Typo.body2">@(_sourcePlug.Type ?? "-")</MudText>
+                                    <MudText Typo="Typo.body2">@(_sourcePlug.PlugTypeKey ?? "-")</MudText>
                                 </MudItem>
                                 <MudItem xs="6">
                                     <MudText Typo="Typo.caption" Class="text-muted">分类</MudText>
@@ -185,8 +185,8 @@
                                     </MudTd>
                                     <MudTd DataLabel="默认值">
                                         <MudText Typo="Typo.body2" Style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                                                 Title="@context.DefaultValue">
-                                            @(string.IsNullOrEmpty(context.DefaultValue) ? "-" : context.DefaultValue)
+                                                 Title="@context.Value">
+                                            @(string.IsNullOrEmpty(context.Value) ? "-" : context.Value)
                                         </MudText>
                                     </MudTd>
                                     <MudTd DataLabel="输入/输出">
@@ -353,7 +353,7 @@
         {
             PlugDefinitionId = definitionId,
             Name = sourcePlug.Name,
-            PlugType = sourcePlug.Type,
+            PlugTypeKey = sourcePlug.PlugTypeKey,
             PlugPosition = "0 0",
         });
 
@@ -369,8 +369,7 @@
                     DisplayName = v.DisplayName,
                     Description = v.Description,
                     Type = v.Type,
-                    Value = v.DefaultValue,
-                    DefaultValue = v.DefaultValue,
+                    Value = v.Value,
                     IsInput = v.IsInput,
                     IsOutput = v.IsOutput,
                     IsArray = v.IsArray,

@@ -61,7 +61,7 @@
                             <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate></MudProgressCircular>
                         }
                         <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="编号" @bind-Text="@PlugData.PlugDefinitionId" ReadOnly Variant="Variant.Filled"></MudTextField>
-                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型" @bind-Text="@PlugData.PlugType" ReadOnly Variant="Variant.Filled"></MudTextField>                            
+                        <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="类型" @bind-Text="@PlugData.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>                            
                         <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="KEY" @bind-Text="@PlugData.PlugTypeKey" ReadOnly Variant="Variant.Filled"></MudTextField>
                         <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="名称" @bind-Text="@PlugData.Name" Variant="Variant.Outlined"></MudTextField>
                         <MudTextField T="string" FullWidth Margin="Margin.Dense" Label="描述" @bind-Text="@PlugData.Description" Variant="Variant.Outlined" Lines="3"></MudTextField>
@@ -189,7 +189,7 @@
                     PlugDefinitionId = Activity.GetId(),
                     Name = Activity.GetName(),
                     PlugDataZoneId = PlugDataZone.Id,
-                    PlugType = Activity?.GetTypeName(),
+                    PlugTypeKey = Activity?.GetTypeName(),
                 };
                 PlugDataZone.PlugDatas.Add(PlugData);
                 isNewPlugData = true;
@@ -201,6 +201,23 @@
             // 如果是新建的 PlugData，同时根据根插头创建相应的插头参数到 PDZ
             if (isNewPlugData)
             {
+                // 确保 PlugData 的 Category 和 PlugTypeKey 与根插头保持一致
+                if (rootPlug != null)
+                {
+                    PlugData.PlugTypeKey = rootPlug.PlugTypeKey;
+                    PlugData.Category = rootPlug.Category;
+                }
+                else
+                {
+                    // PlugTypeKey 为空时 GetRootPlugByTypeNameAsync 可能失败，用 DefinitionId 兜底
+                    var plugByDefId = await MainApiClient.GetPlugByDefinitionIdAsync(Activity.GetId());
+                    if (plugByDefId != null)
+                    {
+                        PlugData.PlugTypeKey = plugByDefId.PlugTypeKey;
+                        PlugData.Category = plugByDefId.Category;
+                    }
+                }
+
                 if (rootPlug?.PlugVariables?.Count > 0)
                 {
                     foreach (var v in rootPlug.PlugVariables)
@@ -212,7 +229,6 @@
                             Name = v.Name,
                             Type = v.Type,
                             Value = null,
-                            DefaultValue = null,
                             IsInitVariable = v.IsInitVariable,
                             IsBrowsable = v.IsBrowsable,
                             IsArray = v.IsArray,
@@ -233,7 +249,7 @@
             {
                 foreach (var pcsc in PlugCommonSettingContent)
                 {
-                    var context = new GetSettingContext(PlugData.PlugType, PlugData.PlugDefinitionId,PlugDataZone.PDZId, rootPlug);
+                    var context = new GetSettingContext(PlugData.PlugTypeKey, PlugData.PlugDefinitionId,PlugDataZone.PDZId, rootPlug);
                     var tmpContent = await pcsc.GetPlugCommonSettingContent(context);
                     if (tmpContent != null)
                     {
@@ -243,13 +259,13 @@
                 }
                 if (PlugCommonExecuteSettingContent == null)
                 {
-                    CLog.Warning($"No common setting content found for PlugType {PlugData.PlugType}, trying to match by type keyword.");
+                    CLog.Warning($"No common setting content found for PlugTypeKey {PlugData.PlugTypeKey}, trying to match by type keyword.");
                     foreach (var pcsc in PlugCommonSettingContent)
                     {
                         //如果没有程序预设的插头设置内容，则按照类型自动匹配一个相应的设置内容
-                        if (PlugData.PlugType.Contains("桌面类"))
+                        if (PlugData.PlugTypeKey?.Contains("桌面类") ?? false)
                         {
-                            CLog.Information($"PlugType {PlugData.PlugType} contains '桌面类', trying to get common setting content for CMDPlug");
+                            CLog.Information($"PlugTypeKey {PlugData.PlugTypeKey} contains '桌面类', trying to get common setting content for CMDPlug");
                             var context2 = new GetSettingContext("CMDPlug", PlugData.PlugDefinitionId, PlugDataZone.PDZId, rootPlug);
                             PlugCommonExecuteSettingContent = await pcsc.GetPlugCommonSettingContent(context2);
                             if (PlugCommonExecuteSettingContent != null)
@@ -262,7 +278,7 @@
                 // 如果仍然没有找到内置配置界面，则回退到使用插头自定义的AMIS执行界面
                 if (PlugCommonExecuteSettingContent == null && !string.IsNullOrWhiteSpace(rootPlug?.GuiJsonData))
                 {
-                    CLog.Information($"No built-in setting content found for PlugType {PlugData.PlugType}, falling back to AMIS custom execution interface.");
+                    CLog.Information($"No built-in setting content found for PlugTypeKey {PlugData.PlugTypeKey}, falling back to AMIS custom execution interface.");
                     var guiJsonData = rootPlug.GuiJsonData;
                     PlugCommonExecuteSettingContent = builder =>
                     {

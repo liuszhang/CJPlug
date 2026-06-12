@@ -1,4 +1,4 @@
-﻿@using CJ.Plug.Models.PlugProcess
+@using CJ.Plug.Models.PlugProcess
 @using Microsoft.JSInterop
 @using System.Text.Json
 @using CJ.Plug.SharedPages.Contracts
@@ -152,7 +152,7 @@
                 return true;
             if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
                 return true;
-            if ($"{element.Description} {element.Type} {element.CreatedAt}".Contains(searchString))
+            if ($"{element.Description} {element.PlugTypeKey} {element.CreatedAt}".Contains(searchString))
                 return true;
             return false;
         }).ToArray();

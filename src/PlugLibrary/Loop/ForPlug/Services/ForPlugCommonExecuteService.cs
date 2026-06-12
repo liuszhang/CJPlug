@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 
 using CJ.Plug.Models.Plug;
@@ -26,7 +26,7 @@ namespace ForPlug.Services
                 string? PlugDefinitionId = context.plugExecutionRequest?.ExecuteResultData?.Ids?.PlugDefinitionId;
                 PlugExecutionRequest? plugExecutionRequest = context.plugExecutionRequest;
 
-                Log.Information($"execute for plug: {plug?.Name}");
+                CLog.Information($"execute for plug: {plug?.Name}");
                 var erd = plugExecutionRequest?.ExecuteResultData ?? new ExecuteResultData();
 
                 if (!await DataPrepare(plugExecutionRequest, Enum.GetNames(typeof(InitVariableNames)))) { return await ReportErrorResult(erd); }

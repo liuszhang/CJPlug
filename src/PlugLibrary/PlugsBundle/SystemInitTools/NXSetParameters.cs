@@ -18,7 +18,7 @@ namespace PlugsBundle.SystemInitTools
         public Task<PlugSettings?> GetPlugBaseSetting()
         {
             var settings = new PlugSettings();
-            settings.PlugType = "NXSetParameters";
+            settings.PlugTypeKey = "NXSetParameters";
             settings.PlugDisplayName = "设置NX模型参数";
             settings.PlugTypeKey = "";
             settings.SetSetting(PlugSettingKey.Category.ToString(),PlugCategorys.桌面类.ToString());

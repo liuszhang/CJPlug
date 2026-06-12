@@ -2,6 +2,7 @@
 @using CJ.Plug.ElsaIntegration.Contracts
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugAction
+@using CJ.Plug.Models.Shared
 @using System.Text.Json
 @using CJ.Plug.SharedPages.PlugSettingPages
 @using CJ.Plug.ToolActionSetting.Dialogs
@@ -22,7 +23,19 @@
 <MudPaper>
     <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
 
-        <MudStack Spacing="1" AlignItems="AlignItems.Center" Justify="Justify.Center">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="2">
+            @if (!string.IsNullOrEmpty(Plug.Icon))
+            {
+                @if (Plug.Icon.Contains("/"))
+                {
+                    <img src="/webFiles/@Plug.Icon" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Plug.Icon" Size="Size.Medium" />
+                }
+            }
+            <MudStack Spacing="1" AlignItems="AlignItems.Center" Justify="Justify.Center">
 
             @if (Plug.CreateType==PlugCreateTypeEnum.SystemInitPlug.ToString())
             {
@@ -42,6 +55,7 @@
                     }
                 </MudSelect>
             }
+        </MudStack>
         </MudStack>
         <MudStack Row>
             <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" />

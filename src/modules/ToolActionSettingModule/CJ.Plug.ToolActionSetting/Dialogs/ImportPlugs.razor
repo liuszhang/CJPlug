@@ -146,7 +146,7 @@
 
             foreach (var plug in plugs)
             {
-                if (string.IsNullOrEmpty(plug.Name) || string.IsNullOrEmpty(plug.Type))
+                if (string.IsNullOrEmpty(plug.Name) || string.IsNullOrEmpty(plug.PlugTypeKey))
                 {
                     invalidCount++;
                     continue;

@@ -214,7 +214,6 @@
                     Id=MainProcess.Id,
                     PlugDefinitionId = ProcessDefinitionId,
                     Name = MainProcess?.Name,
-                    PlugType = MainProcess?.Type,
                     PlugTypeKey = MainProcess?.PlugTypeKey,
                     PlugDataZoneId = PlugDataZone.Id,
                 });
@@ -247,7 +246,6 @@
                                     Category = v.Category,
                                     // 只取参数定义，不带运行时值；实际值从PDZ获取
                                     Value = null,
-                                    DefaultValue = v.DefaultValue,
                                     IsInput = v.IsInput,
                                     IsOutput = v.IsOutput,
                                     IsRequired = v.IsRequired,

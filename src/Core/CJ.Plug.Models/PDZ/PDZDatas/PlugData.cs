@@ -15,8 +15,8 @@ using System.Threading.Tasks;
 
 
         public string? PlugDefinitionId { get; set; }  //插头ID
-        public string? PlugType { get; set; } //插头唯一类型标识
-        public string? PlugTypeKey { get; set; } //用于匹配自定义配置界面和执行方法的类型唯一Key，默认为Type,由插头开发者手动配置
+        /// <summary>插头唯一标识符，用于匹配自定义配置界面和执行方法。内置插头如"CMDPlug"/"PythonPlug"，手动创建可为空。</summary>
+        public string? PlugTypeKey { get; set; }
         public bool OnlyExecuteAction { get; set; } = false; //执行时是否只执行动作而忽略插头本身执行
 
         public string? ParentPlugDefinitionId { get; set; } //父插头ID,用于插头嵌套

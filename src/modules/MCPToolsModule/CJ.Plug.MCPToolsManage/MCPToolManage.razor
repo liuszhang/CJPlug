@@ -36,7 +36,13 @@
         @* <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenDeployGuide" Class="ms-2">发布为Skill</MudButton> *@
     </ToolBarContent>
     <Columns>
-        <PropertyColumn Property="x=>x.Name" Title="工具名称" />
+        <TemplateColumn Title="工具名称">
+            <CellTemplate>
+                <MudLink Href="javascript:void(0)" OnClick="() => OpenDetailDialog(context.Item)" Typo="Typo.body2">
+                    @context.Item.Name
+                </MudLink>
+            </CellTemplate>
+        </TemplateColumn>
         <PropertyColumn Property="x => x.Description" Title="工具描述" />
         @* <PropertyColumn Property="x => x.SourcePlugId" Title="源插头ID" /> *@
         <TemplateColumn Title="源插头ID">
@@ -59,7 +65,6 @@
         </TemplateColumn>
         <TemplateColumn Title="操作">
             <CellTemplate>
-                <MudButton OnClick="()=>DownloadTool(context.Item)" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">下载</MudButton>
                 <MudButton OnClick="()=>DeleteTool(context.Item.Id)" Variant="Variant.Outlined" Color="Color.Error">删除</MudButton>
             </CellTemplate>
         </TemplateColumn>
@@ -129,10 +134,11 @@
         //return Task.CompletedTask;
     }
 
-    private async Task DownloadTool(MCPTool tool)
+    private async Task OpenDetailDialog(MCPTool tool)
     {
-        var url = $"/api/file/downloadTool?name={Uri.EscapeDataString(tool.Name!)}&version={Uri.EscapeDataString(tool.Version ?? "latest")}&path={Uri.EscapeDataString(tool.ToolSettingsJson ?? "")}";
-        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        var parameters = new DialogParameters { { "Tool", tool } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<MCPToolDetailDialog>($"MCPTool 详情 — {tool.Name}", parameters, options);
     }
 
     // private class MCPToolDto

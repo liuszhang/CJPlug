@@ -26,15 +26,64 @@
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- 地址栏（服务管理页不显示） -->
+            <!-- 面包屑导航（流程管理相关页面显示） -->
             <Border Grid.Row="0"
+                    Padding="8,6"
+                    Background="#F5F5F5"
+                    BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                    Visibility="{Binding ShowBreadcrumb, Converter={StaticResource BoolToVis}}">
+                <ItemsControl ItemsSource="{Binding BreadcrumbItems}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="Separator"
+                                           Text=" > "
+                                           VerticalAlignment="Center"
+                                           Foreground="#999999"
+                                           FontSize="13"
+                                           Margin="2,0"/>
+                                <Button x:Name="LinkButton"
+                                        Content="{Binding Text}"
+                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                        Padding="4,3" FontSize="13"
+                                        Foreground="#1976D2"
+                                        Cursor="Hand"
+                                        Command="{Binding DataContext.NavigateBreadcrumbCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding NavigateUrl}"
+                                        Visibility="{Binding IsClickable, Converter={StaticResource BoolToVis}}"/>
+                                <TextBlock x:Name="CurrentText"
+                                           Text="{Binding Text}"
+                                           VerticalAlignment="Center"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#333333"
+                                           Margin="4,0"
+                                           Visibility="{Binding IsClickable, Converter={StaticResource InverseBoolToVis}}"/>
+                            </StackPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                    <Setter TargetName="Separator" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <!-- 地址栏（隐藏） -->
+            <Border Grid.Row="1"
                     Padding="6,5,6,5"
                     Background="#F5F5F5"
                     BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
-                    Visibility="{Binding IsServiceManagement, Converter={StaticResource InverseBoolToVis}}">
+                    Visibility="Collapsed">
                 <Border BorderBrush="#CCCCCC" BorderThickness="1"
                         CornerRadius="4" Background="White" Padding="10,5">
                     <TextBox Text="{Binding AddressBarUrl, Mode=OneWay}"
@@ -50,11 +99,11 @@
             </Border>
 
             <!-- 服务管理视图（合并后的 TabControl 页面） -->
-            <views:ServiceManagementView x:Name="ServiceManagementView" Grid.Row="1"
+            <views:ServiceManagementView x:Name="ServiceManagementView" Grid.Row="2"
                                           Visibility="{Binding IsServiceManagement, Converter={StaticResource BoolToVis}}"/>
 
             <!-- WebView2 页面区域（插头管理 / 流程管理 / MCP Tool管理） -->
-            <Border Grid.Row="1"
+            <Border Grid.Row="2"
                     BorderBrush="#35355F" BorderThickness="1,0,0,0"
                     Visibility="{Binding IsServiceManagement, Converter={StaticResource InverseBoolToVis}}">
                 <wv2:WebView2 x:Name="MainWebView"

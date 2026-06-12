@@ -88,9 +88,9 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
             });
 
             // 检查图站上工具文件是否存在（兼容文件、目录和工具名）
-            api.MapPost("/fileExists", (HttpContext context) =>
+            api.MapPost("/fileExists", async (HttpContext context) =>
             {
-                var body = JsonSerializer.Deserialize<JsonElement>(context.Request.Body);
+                var body = await JsonSerializer.DeserializeAsync<JsonElement>(context.Request.Body);
                 var filePath = body.GetProperty("filePath").GetString();
 
                 // 1. 先检查原始路径（绝对路径场景）
@@ -127,6 +127,7 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
             });
 
             // 从主服务器下载工具文件到图站
+            // 使用 staging 目录 + 原子 rename，确保工具安装完整性
             api.MapPost("/downloadTool", async (HttpContext context) =>
             {
                 var body = await JsonSerializer.DeserializeAsync<JsonElement>(context.Request.Body);
@@ -154,8 +155,6 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                     Log.Warning("图站未配置 ToolsRootPath，使用默认路径: {FallbackPath}", targetPath);
                 }
 
-                Directory.CreateDirectory(targetPath);
-
                 // 优先使用 MainApiServer，因为 API 端点在 ApiServer 上注册（非 DispatchServer）
                 var mainServerUrl = !string.IsNullOrEmpty(GlobalData.MainApiServer)
                     ? GlobalData.MainApiServer
@@ -165,43 +164,78 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                 if (!string.IsNullOrEmpty(toolFilePath))
                     downloadUrl += $"&path={Uri.EscapeDataString(toolFilePath)}";
 
-                try
+                // staging 目录：解压到临时目录，成功后原子 rename 到正式目标路径
+                var stagingDir = targetPath + "_staging_" + Guid.NewGuid().ToString("N")[..8];
+                var tempZipPath = Path.Combine(Path.GetTempPath(), $"tool_{Guid.NewGuid()}.zip");
+
+                // 重试逻辑：带超时与指数退避（后续可升级为 IHttpClientFactory）
+                const int maxRetries = 3;
+                for (int attempt = 1; attempt <= maxRetries; attempt++)
                 {
-                    using var httpClient = new HttpClient();
-                    var response = await httpClient.GetAsync(downloadUrl);
-                    if (!response.IsSuccessStatusCode)
-                        return Results.BadRequest($"下载工具失败，HTTP状态码: {response.StatusCode}");
-
-                    // 下载 zip 到临时文件
-                    var tempZipPath = Path.Combine(Path.GetTempPath(), $"tool_{Guid.NewGuid()}.zip");
-                    await using (var fileStream = new FileStream(tempZipPath, FileMode.Create, FileAccess.Write))
-                    {
-                        await response.Content.CopyToAsync(fileStream);
-                    }
-
-                    // 解压到目标目录
                     try
                     {
-                        ZipFile.ExtractToDirectory(tempZipPath, targetPath!, true);
+                        // 清理上次失败的残留
+                        SafeDeleteDirectory(stagingDir);
+                        SafeDeleteFile(tempZipPath);
+
+                        // 使用带超时的 HttpClient
+                        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+                        var response = await httpClient.GetAsync(downloadUrl);
+                        if (!response.IsSuccessStatusCode)
+                            return Results.BadRequest($"下载工具失败，HTTP状态码: {response.StatusCode}");
+
+                        // 下载 zip 到临时文件
+                        await using (var fileStream = new FileStream(tempZipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            await response.Content.CopyToAsync(fileStream);
+                        }
+
+                        // 解压到 staging 目录
+                        Directory.CreateDirectory(stagingDir);
+                        ZipFile.ExtractToDirectory(tempZipPath, stagingDir, overwriteFiles: true);
+
+                        // 原子替换：删除旧目录，将 staging 重命名为正式路径
+                        if (Directory.Exists(targetPath))
+                        {
+                            SafeDeleteDirectory(targetPath);
+                        }
+                        Directory.Move(stagingDir, targetPath);
+
+                        Log.Information("工具 {ToolName}({ToolVersion}) 下载安装成功 -> {TargetPath}",
+                            toolName, toolVersion, targetPath);
                         return Results.Ok(true);
+                    }
+                    catch (Exception ex) when (attempt < maxRetries)
+                    {
+                        var delaySeconds = (int)Math.Pow(2, attempt);
+                        Log.Warning(ex, "下载工具 {ToolName}({ToolVersion}) 第{Attempt}次失败，{Delay}秒后重试",
+                            toolName, toolVersion, attempt, delaySeconds);
+
+                        // 清理本次失败的残留
+                        SafeDeleteDirectory(stagingDir);
+                        SafeDeleteFile(tempZipPath);
+
+                        await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
                     }
                     catch (Exception ex)
                     {
-                        Log.Error(ex, $"解压工具 {toolName}({toolVersion}) 失败");
-                        return Results.BadRequest($"解压工具失败: {ex.Message}");
+                        Log.Error(ex, "下载工具 {ToolName}({ToolVersion}) 失败（已重试{MaxRetries}次）",
+                            toolName, toolVersion, maxRetries);
+
+                        // 失败清理：确保不残留损坏文件
+                        SafeDeleteDirectory(stagingDir);
+                        SafeDeleteFile(tempZipPath);
+
+                        return Results.BadRequest($"下载工具失败: {ex.Message}");
                     }
                     finally
                     {
-                        // 清理临时 zip 文件
-                        if (File.Exists(tempZipPath))
-                            File.Delete(tempZipPath);
+                        // 保底清理临时 zip（不管成功失败）
+                        SafeDeleteFile(tempZipPath);
                     }
                 }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, $"下载工具 {toolName}({toolVersion}) 到图站失败");
-                    return Results.BadRequest($"下载工具失败: {ex.Message}");
-                }
+
+                return Results.BadRequest("下载工具失败，已达最大重试次数");
             });
 
 
@@ -278,6 +312,42 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
         {
             var task = taskStore.GetById(id);
             return task is not null ? TypedResults.Ok(task) : TypedResults.NotFound();
+        }
+
+        /// <summary>
+        /// 安全删除目录：忽略文件锁、权限不足等异常，仅记录日志。
+        /// </summary>
+        private static void SafeDeleteDirectory(string? path)
+        {
+            if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+                return;
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                Log.Information("已清理残留目录: {Path}", path);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "清理残留目录失败（已忽略）: {Path}", path);
+            }
+        }
+
+        /// <summary>
+        /// 安全删除文件：忽略文件锁、权限不足等异常，仅记录日志。
+        /// </summary>
+        private static void SafeDeleteFile(string? path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return;
+            try
+            {
+                File.Delete(path);
+                Log.Information("已清理残留文件: {Path}", path);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "清理残留文件失败（已忽略）: {Path}", path);
+            }
         }
     }
 }
