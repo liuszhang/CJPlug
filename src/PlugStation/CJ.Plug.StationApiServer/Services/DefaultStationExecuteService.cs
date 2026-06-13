@@ -234,10 +234,45 @@ namespace CJ.Plug_Aspire.StationApiService.Services
                 if (exe != null) return exe;
             }
 
-            // 2. 使用图站配置的 ToolsRootPath
-            if (!string.IsNullOrEmpty(StaticData.ToolsRootPath) && !string.IsNullOrEmpty(toolName))
+            // 当 toolName 为空时，尝试从 toolPath 中提取工具目录名作为备选
+            // 例如 "Tools/admin/net8.0-windows/PriorityMatrixWPF.exe" → "net8.0-windows"
+            var resolvedToolName = toolName;
+            if (string.IsNullOrEmpty(resolvedToolName) && !string.IsNullOrEmpty(toolPath))
             {
-                var toolsRootDir = Path.Combine(StaticData.ToolsRootPath, toolName);
+                var dirPart = Path.GetDirectoryName(toolPath);
+                if (!string.IsNullOrEmpty(dirPart))
+                {
+                    resolvedToolName = Path.GetFileName(dirPart);
+                    Log.Information("ResolveToolExePath: 从 toolPath 提取工具目录名: {ExtractedName} (toolPath: {ToolPath})",
+                        resolvedToolName, toolPath);
+                }
+            }
+            // 当 toolName 仅为简单名称（不含路径分隔符）但 toolPath 包含层级路径时，
+            // 从 toolPath 提取完整工具目录路径（含用户层级，如 "admin/net8.0-windows"），
+            // 避免仅用简单名称导致 Step 2/3 在 {ToolsRootPath}/net8.0-windows 查找而找不到
+            if (!string.IsNullOrEmpty(resolvedToolName)
+                && string.IsNullOrEmpty(Path.GetDirectoryName(resolvedToolName))
+                && !string.IsNullOrEmpty(toolPath))
+            {
+                var normalizedPath = toolPath.Replace('\\', '/');
+                var prefix = "Tools/";
+                if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var afterPrefix = normalizedPath[prefix.Length..]; // "admin/net8.0-windows/xxx.exe"
+                    var dirOfEntry = Path.GetDirectoryName(afterPrefix)?.Replace('\\', '/'); // "admin/net8.0-windows"
+                    if (!string.IsNullOrEmpty(dirOfEntry))
+                    {
+                        Log.Information("ResolveToolExePath: toolName='{OriginalName}' 为简单名，从 toolPath 提取工具目录 '{ExtractedDir}'",
+                            toolName, dirOfEntry);
+                        resolvedToolName = dirOfEntry;
+                    }
+                }
+            }
+
+            // 2. 使用图站配置的 ToolsRootPath
+            if (!string.IsNullOrEmpty(StaticData.ToolsRootPath) && !string.IsNullOrEmpty(resolvedToolName))
+            {
+                var toolsRootDir = Path.Combine(StaticData.ToolsRootPath, resolvedToolName);
                 if (Directory.Exists(toolsRootDir))
                 {
                     var exe = FindExeInDirectory(toolsRootDir);
@@ -246,15 +281,24 @@ namespace CJ.Plug_Aspire.StationApiService.Services
             }
 
             // 3. 使用默认路径 ToolAgentServer/Tools/ToolName
-            if (!string.IsNullOrEmpty(toolName))
+            if (!string.IsNullOrEmpty(resolvedToolName))
             {
-                var localDir = Path.Combine(StaticData.ToolAgentServer ?? GlobalData.StationFileRootPath, "Tools", toolName);
+                var fallbackBase = StaticData.ToolAgentServer ?? GlobalData.StationFileRootPath;
+                var localDir = Path.Combine(fallbackBase, "Tools", resolvedToolName);
                 if (Directory.Exists(localDir))
                 {
                     var exe = FindExeInDirectory(localDir);
                     if (exe != null) return exe;
                 }
             }
+
+            // 增强日志：解析失败时记录关键配置值，便于排查路径配置问题
+            Log.Warning(
+                "ResolveToolExePath 未找到工具可执行文件。ToolName: {ToolName}, ToolPath: {ToolPath}, " +
+                "ToolsRootPath: {ToolsRootPath}, FallbackBase: {FallbackBase}",
+                resolvedToolName ?? "(null)", toolPath,
+                StaticData.ToolsRootPath ?? "(null)",
+                StaticData.ToolAgentServer ?? GlobalData.StationFileRootPath);
 
             return null;
         }
