@@ -62,6 +62,9 @@ public static class McpSchemaGenerator
             ["description"] = BuildDescription(v)
         };
 
+        // File 类型增强描述：告知 AI Agent 文件参数格式
+        EnrichFileTypeDescription(prop, varType);
+
         // 数组类型需要声明 items
         if (isArray)
         {
@@ -149,6 +152,9 @@ public static class McpSchemaGenerator
             ["description"] = description ?? displayName ?? name
         };
 
+        // File 类型增强描述：告知 AI Agent 文件参数格式
+        EnrichFileTypeDescription(prop, varType);
+
         if (isArray)
         {
             var itemType = McpTypeMapper.ToJsonSchemaItemType(varType);
@@ -166,6 +172,29 @@ public static class McpSchemaGenerator
         }
 
         return prop;
+    }
+
+    /// <summary>
+    /// 当变量类型为 File 时，增强 JSON Schema，告知 AI Agent 正确的文件引用格式。
+    /// 叠加 contentMediaType / contentEncoding 注解（JSON Schema 2020-12 标准），
+    /// 部分 AI 客户端可能据此渲染文件上传控件或优化交互。
+    /// </summary>
+    private static void EnrichFileTypeDescription(JsonObject prop, VariableTypeEnum varType)
+    {
+        if (varType != VariableTypeEnum.File)
+            return;
+
+        // JSON Schema 2020-12 内容注解：暗示二进制文件内容
+        // contentMediaType: MIME type for the string content
+        // contentEncoding: encoding of the string content (base64)
+        prop["contentMediaType"] = "application/octet-stream";
+        prop["contentEncoding"] = "base64";
+
+        var existingDesc = prop["description"]?.ToString() ?? "";
+        prop["description"] = existingDesc + "\n\n[FILE PARAMETER] " +
+            "Expected value format: \"fileName:fileId\" (e.g., \"report.pdf:a1b2c3d4\"). " +
+            "To upload a new file: call UploadFileForMcpTool with base64-encoded file content to obtain this reference. " +
+            "To reuse an already-uploaded file: call ListAvailableFiles to find its fileId and construct the reference.";
     }
 
     /// <summary>

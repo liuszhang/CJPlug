@@ -74,6 +74,61 @@ namespace CJ.Plug.PlugBaseCore.Services
                     StationToUse.StationIp = "http://" + StationToUse.StationIp;
             }
             //1.1 获取图站后，将参数中的文件参数下载至图站，并获取实际的文件路径作为后续工具执行的实际参数值
+            // P2-P4: 先规范化多格式文件输入（base64 / URL → fileName:fileId），再统一下载
+            StationApiClient stationApiClientForNorm = new StationApiClient(new HttpClient() { BaseAddress = new Uri(StationToUse.StationIp) });
+            foreach (var variable in plugExecutionRequest.InputVariables)
+            {
+                if (variable.Type != VariableTypeEnum.File.ToString() || variable.IsInput != true)
+                    continue;
+
+                var val = variable.Value ?? "";
+
+                // 已经是 "fileName:fileId" 格式（含冒号且非 URL/非 base64 前缀）→ 跳过规范化
+                if (val.Contains(':') &&
+                    !val.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !val.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                    !val.StartsWith("base64:", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // 格式: "base64:<content>" → 上传到文件服务器获取 fileId
+                if (val.StartsWith("base64:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var base64Content = val["base64:".Length..];
+                    var fileName = variable.Name ?? "uploaded_file";
+                    var fileRef = await MainApiClient.UploadFileFromBase64(base64Content, fileName);
+                    if (string.IsNullOrEmpty(fileRef))
+                    {
+                        CLog.Error($"处理 base64 文件参数失败: {variable.Name}");
+                        ERD.ExecuteStatus = JobStatus.完成;
+                        ERD.ExecuteSubStatus = JobSubStatus.出错;
+                        ERD.ResultString = $"处理 base64 文件参数 {variable.Name} 失败";
+                        return ERD;
+                    }
+                    variable.Value = fileRef;
+                    Log.Information($"base64 文件已转换为: {fileRef}");
+                    continue;
+                }
+
+                // 格式: "http://..." 或 "https://..." → 下载到文件服务器获取 fileId
+                if (val.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    val.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    var fileRef = await MainApiClient.UploadFileFromUrl(val, null);
+                    if (string.IsNullOrEmpty(fileRef))
+                    {
+                        CLog.Error($"从 URL 下载文件参数失败: {variable.Name}");
+                        ERD.ExecuteStatus = JobStatus.完成;
+                        ERD.ExecuteSubStatus = JobSubStatus.出错;
+                        ERD.ResultString = $"从 URL 下载文件参数 {variable.Name} 失败: {val}";
+                        return ERD;
+                    }
+                    variable.Value = fileRef;
+                    Log.Information($"URL 文件已转换为: {fileRef}");
+                    continue;
+                }
+            }
+
+            // 统一将 fileName:fileId 格式的文件下载到图站，替换为本地路径
             foreach (var variable in plugExecutionRequest.InputVariables)
             {
                 //Log.Information($"处理变量：{variable.Name}，类型：{variable.Type}，值：{variable.Value}");
@@ -82,7 +137,7 @@ namespace CJ.Plug.PlugBaseCore.Services
                     //Log.Information($"开始处理文件变量{variable.Name}：{variable.Value}，准备下载文件到图站");
                     //下载文件至图站
                     StationApiClient stationApiClient = new StationApiClient(new HttpClient() { BaseAddress = new Uri(StationToUse.StationIp) });
-                    var FileRealPath = await stationApiClient.DownloadFileByFileIdAsync(variable);                    
+                    var FileRealPath = await stationApiClient.DownloadFileByFileIdAsync(variable);
                     if (string.IsNullOrEmpty(FileRealPath))
                     {
                         CLog.Error($"下载文件{variable.Value}至图站{StationToUse.StationIp}失败");

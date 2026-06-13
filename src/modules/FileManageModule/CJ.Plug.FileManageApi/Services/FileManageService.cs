@@ -874,5 +874,166 @@ namespace CJ.Plug.FileManageApi.Services
                 // 忽略读取元数据失败
             }
         }
+
+        /// <summary>
+        /// 从 base64 编码内容上传文件并创建 FileInformation 记录，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        public async Task<string?> UploadFileFromBase64(string fileContent, string fileName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(fileContent))
+                {
+                    CLog.Error("UploadFileFromBase64: fileContent 为空");
+                    return null;
+                }
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    CLog.Error("UploadFileFromBase64: fileName 为空");
+                    return null;
+                }
+
+                var fileId = RandomLongIdentityGenerator.GenerateId();
+                var directoryPath = Path.Combine(GlobalData.MainFileServerPathRoot, fileId);
+                var filePath = Path.Combine(directoryPath, fileName);
+
+                // 确保目录存在
+                if (!Directory.Exists(directoryPath))
+                    Directory.CreateDirectory(directoryPath);
+
+                // 解码并写入文件
+                var bytes = Convert.FromBase64String(fileContent);
+                await File.WriteAllBytesAsync(filePath, bytes);
+
+                // 创建 FileInformation 记录
+                var fileInfo = new FileInformation
+                {
+                    FileId = fileId,
+                    FileName = fileName,
+                    FilePath = filePath,
+                    FileUploader = "MCP_Agent",
+                    FileUploadType = "MCP_Tool",
+                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd"),
+                    FileUploadTime = DateTime.Now.ToString("HH:mm:ss"),
+                };
+                await CreateFileInformation(fileInfo);
+
+                Log.Information("UploadFileFromBase64: 文件已保存 {FilePath}, fileId={FileId}", filePath, fileId);
+                return $"{fileName}:{fileId}";
+            }
+            catch (FormatException ex)
+            {
+                CLog.Error($"UploadFileFromBase64: base64 解码失败 - {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"UploadFileFromBase64: 上传失败 - {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 从远程 URL 下载文件并创建 FileInformation 记录，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        public async Task<string?> UploadFileFromUrl(string url, string? fileName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(url))
+                {
+                    CLog.Error("UploadFileFromUrl: url 为空");
+                    return null;
+                }
+
+                // 仅允许 http/https 协议
+                if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    CLog.Error($"UploadFileFromUrl: 不支持的协议 - {url}");
+                    return null;
+                }
+
+                // 从 URL 提取文件名
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    try
+                    {
+                        var uri = new Uri(url);
+                        fileName = Path.GetFileName(uri.AbsolutePath);
+                        if (!string.IsNullOrEmpty(fileName))
+                            fileName = Uri.UnescapeDataString(fileName);
+                    }
+                    catch { }
+                }
+                if (string.IsNullOrEmpty(fileName))
+                    fileName = "downloaded_file";
+
+                var fileId = RandomLongIdentityGenerator.GenerateId();
+                var directoryPath = Path.Combine(GlobalData.MainFileServerPathRoot, fileId);
+                var filePath = Path.Combine(directoryPath, fileName);
+
+                // 确保目录存在
+                if (!Directory.Exists(directoryPath))
+                    Directory.CreateDirectory(directoryPath);
+
+                // 下载文件
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+                var response = await httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync();
+                await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+                await contentStream.CopyToAsync(fileStream);
+
+                // 创建 FileInformation 记录
+                var fileInfo = new FileInformation
+                {
+                    FileId = fileId,
+                    FileName = fileName,
+                    FilePath = filePath,
+                    FileUploader = "MCP_Agent",
+                    FileUploadType = "MCP_URL",
+                    FileUploadDate = DateTime.Now.ToString("yyyy-MM-dd"),
+                    FileUploadTime = DateTime.Now.ToString("HH:mm:ss"),
+                };
+                await CreateFileInformation(fileInfo);
+
+                Log.Information("UploadFileFromUrl: 文件已从 {Url} 下载到 {FilePath}, fileId={FileId}", url, filePath, fileId);
+                return $"{fileName}:{fileId}";
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"UploadFileFromUrl: 从 URL 下载失败 - {url}, {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 按文件名搜索已有文件，最多返回 100 条
+        /// </summary>
+        public async Task<List<FileInformation>?> SearchFiles(string? keyword)
+        {
+            try
+            {
+                var query = _dbContext.Set<FileInformation>().AsQueryable();
+                if (!string.IsNullOrWhiteSpace(keyword))
+                {
+                    query = query.Where(f =>
+                        f.FileName != null && f.FileName.Contains(keyword));
+                }
+                var results = await query
+                    .OrderByDescending(f => f.FileUploadDate)
+                    .ThenByDescending(f => f.FileUploadTime)
+                    .Take(100)
+                    .ToListAsync();
+                return results;
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"SearchFiles: 搜索失败 - {ex.Message}");
+                return null;
+            }
+        }
     }
 }

@@ -31,5 +31,20 @@ namespace CJ.Plug.FileManageApi.Contracts
         Task<bool> MoveDirectory(string sourcePath, string destPath);
 
         Task<(Stream? fileStream, string? fileName, string? errorMessage)> DownloadToolAsync(string toolName, string toolVersion, string toolPath);
+
+        /// <summary>
+        /// 从 base64 编码内容上传文件并创建 FileInformation 记录，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        Task<string?> UploadFileFromBase64(string fileContent, string fileName);
+
+        /// <summary>
+        /// 从远程 URL 下载文件并创建 FileInformation 记录，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        Task<string?> UploadFileFromUrl(string url, string? fileName);
+
+        /// <summary>
+        /// 按文件名搜索已有文件，最多返回 100 条
+        /// </summary>
+        Task<List<FileInformation>?> SearchFiles(string? keyword);
     }
 }

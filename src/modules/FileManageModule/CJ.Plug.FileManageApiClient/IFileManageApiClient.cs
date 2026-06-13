@@ -23,5 +23,20 @@ namespace CJ.Plug.FileManageApiClient
         Task<FileInformation?> DeleteFileWithRequest(FileDeleteRequest fileDeleteRequest);
 
         Task<bool> MoveDirectory(string sourcePath, string destPath);
+
+        /// <summary>
+        /// 从 base64 编码内容上传文件，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        Task<string?> UploadFileFromBase64(string fileContent, string fileName);
+
+        /// <summary>
+        /// 从远程 URL 下载文件，返回 "fileName:fileId" 格式引用字符串
+        /// </summary>
+        Task<string?> UploadFileFromUrl(string url, string? fileName);
+
+        /// <summary>
+        /// 按文件名搜索已有文件
+        /// </summary>
+        Task<List<FileInformation>?> SearchFiles(string? keyword);
     }
 }
