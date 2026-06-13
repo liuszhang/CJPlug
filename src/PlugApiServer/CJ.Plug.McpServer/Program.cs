@@ -104,5 +104,8 @@ await registry.StartAsync();
 // ★ 配置 WorkflowTools 的 ApiServer 地址（供静态方法调用 MCP Tools API）
 WorkflowTools.Configure(apiUrl);
 
+// ★ 配置 FileTools 的 ApiServer 地址（MCP 文件上传/查询工具）
+FileTools.Configure(apiUrl);
+
 app.MapMcp();
 app.Run("http://localhost:3001");

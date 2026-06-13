@@ -1,98 +1,239 @@
 # 寸金插座平台（CJPlug）
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
+[![MCP](https://img.shields.io/badge/MCP-Enabled-8B5CF6.svg)](#将工具或流程发布为MCP-Tool)
+
 ![CJPlug](./03.Website/Picture/HomePage.png)
 
 ## 介绍
-寸金插座平台可以将任意软件工具以“插头”的方式插入平台，并提供可视化拖拽设计器，设计和执行复杂的工具链调用流程。并支持一键发布为MCP Tool。应用范围包括多学科设计仿真、自动化工具链调用等。平台完全基于.net core。相关核心依赖项目:
 
-- [Elsa](https://github.com/elsa-workflows/elsa-core)：一款基于.NET的强大工作流引擎。
-- [Blazor.Diagrams](https://github.com/Blazor-Diagrams/Blazor.Diagrams)：一款基于Blazor实现的工作流编辑器。
-- [MudBlazor](https://github.com/MudBlazor/MudBlazor)：一款优秀的Blazor前端组件库。
-- [Radzen Blazor](https://github.com/radzenhq/radzen-blazor)：另一款优秀的Blazor前端组件库。
+寸金插座平台（CJPlug）可以将**任意软件工具**（exe、Python 脚本、NX CAD、REST API、Word/Excel 等）以”插头”的方式插入平台，通过**可视化拖拽设计器**编排复杂的自动化工具链流程，并**一键发布为 MCP Tool** 供 AI 客户端（Claude、Cursor、Trae 等）直接调用。
+
+平台完全基于 .NET，核心依赖：
+
+- [Elsa](https://github.com/elsa-workflows/elsa-core)：.NET 工作流引擎，驱动流程执行
+- [Blazor.Diagrams](https://github.com/Blazor-Diagrams/Blazor.Diagrams)：Blazor 可视化流程编辑器
+- [MudBlazor](https://github.com/MudBlazor/MudBlazor)：Blazor 前端组件库
+- [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol.AspNetCore)：MCP 协议实现，将工具流暴露为 AI Tool
 
 ![CJPlug提供可视化搭建环境](./03.Website/Picture/EditProcess.png)
 
 ## 目录
 
-- [操作文档](#操作文档)
-- [进展说明](#进展说明)
+- [快速启动](#快速启动)
+- [架构概览](#架构概览)
+- [将工具或流程发布为 MCP Tool](#将工具或流程发布为MCP-Tool)
+- [AI 能力](#AI-能力)
 - [主要功能](#主要功能)
 - [应用场景](#应用场景)
 - [新增插头](#新增插头)
-- [作业监控](#作业监控)
+- [进展说明](#进展说明)
 - [Contributing](#contributing)
 - [合作支持](#合作支持)
-  - [社区支持](#社区支持)
-  - [企业支持](#企业支持)
 
-## 操作文档
+## 快速启动
 
-[文档完善中]().
+### 方式一：桌面启动器（推荐）
 
-快速启动：
-- 下载后解压打开02.Publish文件夹
-- 双击启动CJ.Plug.Desktop/Debug/net10.0-windows/CJ.Plug.Desktop.exe
-- 如果是linux环境，使用命令 dotnet CJ.Plug.Desktop.dll 运行
-- 密码admin/123456
+下载 `02.Publish` 文件夹后，直接运行桌面启动器：
+
+- **Windows**: 双击 `CJ.Plug.Desktop/Debug/net10.0-windows/CJ.Plug.Desktop.exe`
+- **Linux**: 命令行运行 `dotnet CJ.Plug.Desktop.dll`
+- 默认账号密码：`admin` / `123456`
+
+桌面启动器内置 WebView2 浏览器，开箱即用，无需额外配置。
+
+### 方式二：Aspire 一键启动全部服务
+
+在开发环境中，通过 .NET Aspire AppHost 一键启动所有 8 个服务：
+
+```bash
+cd src/Framework/CJ.Plug.AspireHost.AppHost
+dotnet run
+```
+
+这会启动完整的服务体系（详见[架构概览](#架构概览)），并自动打开 Aspire Dashboard。
+
+### 方式三：分布式部署
+
+将 `02.Publish` 中各服务目录分别部署到不同机器，修改对应的 `appsettings.json` 配置即可。
 
 ![登录页](./03.Website/Picture/登录页.png)
 ![插头管理](./03.Website/Picture/插头管理.png)
 
-## 将工具或流程发布为MCP Tool
-- 创建插头后，点击发布为MCP TOOL按钮
-- 在流程管理界面，选中流程，点击发布为MCP TOOL按钮
+## 架构概览
+
+CJPlug 由 **8 个微服务** 组成，通过 **SignalR Hub** 实时通信：
+
+```
+                    ┌─────────────────────┐
+                    │  Aspire AppHost      │
+                    │  (一键编排)           │
+                    └────────┬────────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+         ▼                   ▼                   ▼
+   ┌──────────┐       ┌──────────┐       ┌──────────────┐
+   │ApiServer │◄─────►│Dispatch  │◄─────►│McpServer     │
+   │ :8687    │       │Server    │       │:3001 (MCP)   │
+   │主业务API │       │:8686 Hub │       │AI可发现/调用  │
+   └────┬─────┘       └────┬─────┘       └──────────────┘
+        │                  │
+        ▼                  │ (SignalR 广播)
+   ┌──────────┐            │                   ┌──────────────┐
+   │ElsaEngn  │            │                   │HostWebServer │
+   │:5001     │            │                   │:5066 (前端)  │
+   │工作流引擎│            │                   │Blazor UI     │
+   └──────────┘            │                   └──────────────┘
+                           │
+   ┌──────────┐            │                   ┌──────────────┐
+   │Station   │◄───────────┘                   │ElsaStudio    │
+   │ApiServer │  SignalR 心跳                   │:5010 设计器  │
+   │:7660     │  + 执行指令 + 日志回报           └──────────────┘
+   └────┬─────┘
+        │
+        ▼
+   ┌──────────┐
+   │Station   │  cmd.exe 启动工具进程
+   │Agent     │  捕获 stdout → 上报结果
+   └──────────┘
+```
+
+**核心数据流**: 用户编排流程 → Elsa 引擎驱动 → 调度服务选择图站 → StationAgent 执行工具 → 结果回报 → 触发下游节点
+
+## 将工具或流程发布为 MCP Tool
+
+> 这是 CJPlug 最核心的能力：**把任意工具或工具流程一键变为 AI 可调用的 MCP Tool**。
+
+### 三条路径，由快到深
+
+| 路径 | 适用场景 | 改动量 |
+|------|---------|--------|
+| **A. 一键发布** | 已有工作流或插头，立即暴露给 AI | 零代码 |
+| **B. 注册插件能力** | 新开发插件，希望 AI 理解参数语义 | ~40行 C# |
+| **C. 静态 Tool** | 纯代码系统操作（列表/状态查询等） | 1 个方法 |
+
+### 路径 A：一键发布（零代码）
+
+1. 创建插头，或设计一个工作流
+2. 点击 **”发布为 MCP TOOL”** 按钮
+3. 平台自动生成 JSON Schema，McpServer 实时刷新
+4. AI 客户端立即可见该 Tool
+
 ![流程管理](./03.Website/Picture/流程管理.png)
 
-## 接入AI客户端使用
-- 进入MCP TOOL管理，点击配置指南，复制配置字符串
-- 进入支持配置MCP的AI客户端（如Trae等），将配置字符串贴入即可
+### 路径 B：注册插件能力（`IPluginCapability`）
+
+新增一行代码，让 AI Workflow Builder 理解你的工具并能自动编排：
+
+```csharp
+// 1. 声明工具能力
+public class MyPluginCapability : IPluginCapability
+{
+    public string PluginTypeKey => “MyPlug”;
+    public string Name => “我的工具”;
+    public string Description => “此工具将输入文件转换为指定格式，支持设置质量等级”;
+    public string[] Tags => new[] { “文件”, “转换” };
+
+    public List<CapabilityParameter> Inputs => new()
+    {
+        new() { Name = “inputFile”, Type = “File”, Description = “输入文件路径”, IsRequired = true },
+        new() { Name = “quality”, Type = “Int”, Description = “质量等级(1-100)”, IsRequired = false, Value = “80” },
+    };
+    public List<CapabilityParameter> Outputs => new()
+    {
+        new() { Name = “outputFile”, Type = “File”, Description = “输出文件路径” },
+    };
+}
+
+// 2. 在 Program.cs 中注册
+capRegistry.Register(new MyPluginCapability());
+```
+
+注册后，用户在 AI 对话框中输入”把所有文件转换为高质量输出”，AI 会自动编排包含你工具的完整流程。
+
+### 路径 C：静态 MCP Tool
+
+```csharp
+[McpServerToolType]
+public static class MySystemTools
+{
+    [McpServerTool]
+    public static string QueryStatus([Description(“任务ID”)] string taskId)
+    {
+        return JsonSerializer.Serialize(new { status = “running”, progress = 75 });
+    }
+}
+```
+
+### 接入 AI 客户端
+
+进入 **MCP Tool 管理** → 点击 **配置指南** → 复制配置，粘贴到 AI 客户端：
+
 ```json
 {
-  "mcpServers": {
-    "cj-mcpserver": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3001"
+  “mcpServers”: {
+    “cj-mcpserver”: {
+      “type”: “streamableHttp”,
+      “url”: “http://localhost:3001”
     }
   }
 }
 ```
 ![配置指南](./03.Website/Picture/配置指南.png)
 
+启动 McpServer（端口 3001）后，Claude、Cursor、Trae 等支持 MCP 的 AI 客户端即可发现并调用你的工具。
 
-## 进展说明
+## AI 能力
 
-寸金插座平台任在不断完善中，以下是一些正在完善中的能力和目前的状态：
+CJPlug 内置了从**自然语言到工作流自动生成**的完整 AI 能力：
 
-- 操作文档还在完善中.
-- 自定义插头界面设计还未完成.
-- 可视化数据流还未完成.
-- 第三方流程执行相关接口还在完善中.
+### AI Workflow Builder（自然语言 → 工作流）
+
+```
+用户说: “读取NX模型的壁厚，如果小于2mm就修改为2mm，然后导出STL”
+                │
+                ▼
+    ① CapabilityRegistry 将所有已注册工具的能力注入 LLM System Prompt
+    ② DeepSeekService 调用 LLM (本地 Ollama / 云端 OpenRouter)
+    ③ LLM 根据工具能力生成工作流 JSON
+    ④ WorkflowTranslator 翻译为可执行的 Elsa 流程
+    ⑤ 自动保存到流程库，可在设计器中可视化编辑
+```
+
+### AI Agent 插件
+
+在工作流中插入 AI 调用节点：
+- 支持本地 Ollama 模型（qwen3、deepseek-r1、llama3.2）和云端 OpenRouter API
+- 动态输入参数 `[paramName]` 模板语法
+- 输出绑定到下游插件变量，形成 AI + 工具的混合流程
+
+### 本地 RAG 知识库
+
+`AIChat` 模块提供基于 SQLite 向量数据库的本地知识库检索增强生成（RAG），支持 PDF、Word 等文档的语义搜索。
 
 ## 主要功能
 
-寸金插座平台提供了一系列支撑工具链执行和管理的功能，包括:
-
-- 可视化集成和管理任意工具，并提供工具的个性化配置，如针对不同图站配置不同安装路径.
-- 支持图站的任意接入和工具的分布式执行.
-- 一键将插头或插头串接的工具流发布为MCP Tools.
-- 持久化保存流程执行数据，随时可以进行结果查看、文件下载等.
-- 提供可视化拖拽方式设计工具链调用流程，实现逻辑执行和数据传递.
-- 支持流程的嵌套调用、流程的发布共享.
-- 支持单个组件执行.
-- 内置多个插头组件，包括CMD插头、REST插头、文本解析插头、循环插头等.
-- 工具链流程支持以Json方式进行导入导出.
-- 支持第三方通过API接口进行流程执行及获取流程执行结果数据.
-- 支持二次开发插头的热插拔.
-
+- **可视化工具集成** — 管理和配置任意工具，支持不同图站的不同安装路径
+- **分布式执行** — 图站（工作站）任意接入，工具分布式执行
+- **一键发布 MCP Tool** — 插头或工具流程一键发布为 MCP Tool，AI 客户端即时可用
+- **AI 自动编排** — 自然语言描述需求，AI 自动编排工具链，生成可执行流程
+- **可视化流程设计** — 拖拽式流程编辑器，支持逻辑控制和数据传递
+- **嵌套流程** — 流程可被其他流程作为子流程调用，支持发布共享
+- **持久化执行数据** — 所有执行结果持久保存，作业监控界面查看状态、下载结果文件
+- **丰富的内置插头** — CMD、REST、Python、文本解析、循环控制、AI Agent 等 20+ 种
+- **JSON 导入导出** — 工具链流程以 JSON 格式导入导出
+- **第三方 API 集成** — 通过 REST API 远程执行流程并获取结果
+- **热插拔二次开发** — 自定义插头通过 DI 自动注入，或通过 XML 配置动态加载
 
 ## 应用场景
 
-寸金插座平台可以应用在多种场景下，包括:
-
-- 多学科设计仿真及优化应用.
-- 第三方系统进行工具集成，如PLM系统通过执行流程获取和更新指定模型的参数值.
-- 任意自动化工具链执行.
-- 以MCP Server的方式将流程提供给LLM调用.
+- **多学科设计仿真及优化** — 串联 CAD/CAE 工具链，参数自动传递与迭代
+- **PLM/PDM 系统集成** — 第三方系统通过 API 执行流程，获取和更新模型参数
+- **任意自动化工具链** — 数据分析、文档处理、脚本编排等场景
+- **MCP Server 暴露给 LLM** — 工具流程作为 AI Agent 的”工具箱”，LLM 自动选择和执行
 
 ## 新增插头
 
@@ -100,111 +241,114 @@
 
 ```csharp
 public class WordPlugCommonSettingContent : IPlugCommonSettingContent
+{
+    public Task<RenderFragment?> GetPlugCommonSettingContent(GetSettingContext context)
     {
-        public Task<RenderFragment?> GetPlugCommonSettingContent(Plug Plug)
+        var plug = context.Plug;
+        // 根据不同的插件类型返回不同的渲染片段
+        if (plug.PlugTypeKey == PlugKeySetting.CommonSettingPageKey)
         {
-
-            // 根据不同的插件类型返回不同的渲染片段
-            if (Plug.PlugTypeKey == PlugKeySetting.CommonSettingPageKey)
+            var sequence = 0;
+            return Task.FromResult<RenderFragment?>(builder =>
             {
-                var sequence = 0;
-                return Task.FromResult<RenderFragment?>(builder =>
-                {
-                    builder.OpenComponent<WordPlugCommonSettingPage>(sequence++);
-                    builder.SetKey(Plug.PlugTypeKey);
-                    builder.AddAttribute(sequence++, nameof(WordPlugCommonSettingPage.Plug), Plug);
-                    builder.CloseComponent();
-
-                });
-            }
-
-            // 如果没有匹配的插件类型，则返回null或默认的RenderFragment
-            return Task.FromResult<RenderFragment?>(null);
-        }
-
-        public Task<PlugSettings?> GetPlugBaseSetting()
-        {
-            var settings = new PlugSettings(null);
-            settings.PlugDisplayName = "Word组件";
-            settings.PlugType = PlugKeySetting.CommonSettingPageKey;
-            settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
-
-            settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
-
-            var InitVariables = new List<BaseVariable>();
-            InitVariables.Add(new BaseVariable()
-            {
-                Name = InitVariableNames.WordFile.ToString(),
-                Type = VariableTypeEnum.File.ToString(),
-                IsBrowsable = true
+                builder.OpenComponent<WordPlugCommonSettingPage>(sequence++);
+                builder.SetKey(plug.PlugTypeKey);
+                builder.AddAttribute(sequence++, nameof(WordPlugCommonSettingPage.Plug), plug);
+                builder.CloseComponent();
             });
-            InitVariables.Add(new BaseVariable()
-            {
-                Name = InitVariableNames.WordTextMapping.ToString(),
-                Type = VariableTypeEnum.WordTextMapping.ToString(),
-                IsBrowsable = true,
-                IsArray = true
-            });
-
-            settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
-                JsonSerializer.Serialize(InitVariables));
-
-            return Task.FromResult<PlugSettings?>(settings);
         }
+        return Task.FromResult<RenderFragment?>(null);
     }
+
+    public Task<PlugSettings?> GetPlugBaseSetting()
+    {
+        var settings = new PlugSettings();
+        settings.PlugDisplayName = “Word组件”;
+        settings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
+
+        settings.SetSetting(PlugSettingKey.Group.ToString(), PlugGroupEnum.工具集成.ToString());
+
+        var InitVariables = new List<BaseVariable>();
+        InitVariables.Add(new BaseVariable()
+        {
+            Name = InitVariableNames.WordFile.ToString(),
+            Type = VariableTypeEnum.File.ToString(),
+            IsBrowsable = true
+        });
+        InitVariables.Add(new BaseVariable()
+        {
+            Name = InitVariableNames.WordTextMapping.ToString(),
+            Type = VariableTypeEnum.WordTextMapping.ToString(),
+            IsBrowsable = true,
+            IsArray = true
+        });
+
+        settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
+            JsonSerializer.Serialize(InitVariables));
+
+        return Task.FromResult<PlugSettings?>(settings);
+    }
+}
 ```
 或者通过界面手动将工具包装为插头：
 ![将工具包装为插头](./03.Website/Picture/CreatePlug.png)
 
+## 进展说明
+
+以下是一些正在完善中的能力：
+
+- 操作文档持续完善中
+- 可视化数据流设计器开发中
+- MCP Tool 管理功能持续增强
+- 更多插头能力注册到 AI Workflow Builder
+
 ## 作业执行监控
 
-寸金插头平台支持持久化保存和管理流程的执行数据，提供作业监控界面进行作业状态监控和结果数据查看下载:
+寸金插座平台支持持久化保存和管理流程的执行数据，提供作业监控界面进行作业状态监控和结果数据查看下载:
 
 ![CJPlug作业监控](./03.Website/Picture/JobMonitor.png)
 
 ## Contributing
 
-We welcome contributions from the community and are pleased that you are interested in helping to improve the CJPlug project! Here are the steps to contribute to our project:
+欢迎社区贡献！请按以下步骤参与：
 
-### 1. Fork and Clone the Repo
-To get started, you'll need to fork the repository to your own GitHub account. You can do this by navigating to the [CJPlug GitHub repository](https://github.com/liuszhang/CJPlug) and clicking the "Fork" button in the top-right corner of the page. Once you have forked the repo, you can clone it to your local machine using the following command:
+### 1. Fork 并 Clone 仓库
+
+点击 [CJPlug GitHub 仓库](https://github.com/liuszhang/CJPlug) 右上角的 "Fork" 按钮，然后：
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/CJPlug.git
 ```
-Replace `YOUR_USERNAME` with your GitHub username. For more information on forking a repo, check out the GitHub documentation [here](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo).
 
-Incorporating the details about the "apps" folder and its projects into the second point about opening the `CJ.Plug-Aspire.sln` using your favorite IDE, we can expand the instructions to guide developers on where to start and what projects they might want to explore first. Here's an updated version of that section with the additional information:
+### 2. 打开解决方案
 
-### 2. Open `CJ.Plug-Aspire.sln` Using Your Favorite IDE
-After cloning the repository, navigate to the cloned directory and open the `CJ.Plug-Aspire.sln` solution file with your preferred IDE that supports .NET development, such as Visual Studio, JetBrains Rider, or Visual Studio Code with the appropriate extensions.
+使用 Visual Studio、JetBrains Rider 或 VS Code 打开 `CJ.Plug-Aspire.sln`。
 
-Within the solution, you will find a "CJ.Plug-Aspire.AppHost" Project designed to help you get started and explore the capabilities of CJPlug:
+解决方案中的主要入门项目：
 
-- **CJ.Plug.ApiServer**: This project is a reference ASP.NET Core application that acts as a api server. 
+- **CJ.Plug.AspireHost.AppHost** — .NET Aspire 编排器，一键启动全部服务（推荐从这里开始探索）
+- **CJ.Plug.ApiServer** — 主 API 服务器（:8687）
+- **CJ.Plug.HostWebServer** — Blazor 前端入口（:5066）
+- **CJ.Plug.ElsaApiServer** — Elsa 工作流引擎（:5001）
+- **CJ.Plug.McpServer** — MCP 协议服务器（:3001）
+- **CJ.Plug.Desktop** — 桌面端启动器（WPF + WebView2）
 
-- **CJ.Plug.HostWebServer**: This project serves a web page server.
+### 3. 先开 Issue，再提交 PR
 
-- **CJ.Plug.ElsaApiServer**: This project serves an elsa workflow engine server to run workflow.
+在动手修改之前，请先 [创建一个 Issue](https://github.com/liuszhang/CJPlug/issues) 讨论你的想法，确保与项目方向一致且没有重复工作。
 
-### 3. Submit a PR with Your Changes
-Once you have made your changes, commit them and push them back to your fork. Then, navigate to the original Elsa Workflow repository and create a new Pull Request. Ensure your PR description clearly describes the changes and any relevant information that will help the reviewers understand your contributions. For a detailed guide on creating a pull request, visit [Creating a pull request from a fork](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork).
+提交 PR 时，请清晰描述改动内容和原因。
 
-### 4. Open an Issue First
-Before you start working on your changes or submit a pull request, please open an issue to discuss what you would like to do. This step is crucial as it ensures you don't spend time working on something that might not align with the project's goals or might already be under development by someone else. You can open an issue [here](https://github.com/liuszhang/CJPlug/issues).
-
-This approach helps us streamline contributions and ensures that your efforts are aligned with the project's needs and priorities. We look forward to your contributions and are here to support you throughout the process. Thank you for contributing to the CJPlug project!
+我们期待你的贡献！
 
 ## 合作支持
 
-我们提供多种方式来支持和合作，帮助您更好地使用和扩展CJPlug平台。
-
 ### 社区支持
 
-您可以通过以下任意方式和我们联系:
-- [GitHub Issues](https://github.com/liuszhang/CJPlug/issues) for bug reports and feature requests.
-- [GitHub Discussions](https://github.com/liuszhang/CJPlug/discussions) for open-ended conversations, questions, and community-driven support.
-- 或者加入我们的QQ交流群:  -。
+- [GitHub Issues](https://github.com/liuszhang/CJPlug/issues) — Bug 报告和功能请求
+- [GitHub Discussions](https://github.com/liuszhang/CJPlug/discussions) — 讨论、问答和社区交流
+- QQ 交流群 — 请在 GitHub 主页查看最新群号
 
 ### 企业支持
-针对企业用户的特殊需求，请联系[liusz@liusz.com](mailto:liusz@liusz.com).
+
+针对企业用户的特殊需求，请联系 [liusz@liusz.com](mailto:liusz@liusz.com)。

@@ -5,6 +5,7 @@ using CJ.Plug.Models.Station;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Text.Json;
 
 namespace CJ.Plug.FileManageApi.Apis
 {
@@ -89,6 +90,49 @@ namespace CJ.Plug.FileManageApi.Apis
                 if (request == null) return Results.BadRequest("请求为空");
                 var ok = await service.MoveDirectory(request.SourcePath, request.DestPath);
                 return ok ? Results.Ok() : Results.BadRequest("目录移动失败");
+            });
+
+            // MCP Tool 文件上传（base64 编码）
+            api.MapPost("/uploadBase64", async (IFileManageService service, [FromBody] JsonElement body) =>
+            {
+                try
+                {
+                    var fileContent = body.GetProperty("fileContent").GetString();
+                    var fileName = body.GetProperty("fileName").GetString();
+                    if (string.IsNullOrEmpty(fileContent) || string.IsNullOrEmpty(fileName))
+                        return Results.BadRequest("fileContent 和 fileName 不能为空");
+                    var result = await service.UploadFileFromBase64(fileContent, fileName);
+                    return result != null ? Results.Ok(result) : Results.BadRequest("上传失败");
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest($"参数解析失败: {ex.Message}");
+                }
+            });
+
+            // MCP Tool 文件上传（从 URL 下载）
+            api.MapPost("/uploadFromUrl", async (IFileManageService service, [FromBody] JsonElement body) =>
+            {
+                try
+                {
+                    var url = body.GetProperty("url").GetString();
+                    var fileName = body.TryGetProperty("fileName", out var fn) ? fn.GetString() : null;
+                    if (string.IsNullOrEmpty(url))
+                        return Results.BadRequest("url 不能为空");
+                    var result = await service.UploadFileFromUrl(url, fileName);
+                    return result != null ? Results.Ok(result) : Results.BadRequest("从 URL 下载失败");
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest($"参数解析失败: {ex.Message}");
+                }
+            });
+
+            // 搜索文件（按文件名）
+            api.MapGet("/searchFiles", async (IFileManageService service, string? keyword) =>
+            {
+                var results = await service.SearchFiles(keyword);
+                return results != null ? Results.Ok(results) : Results.StatusCode(500);
             });
 
             // 以 zip 方式打包下载工具

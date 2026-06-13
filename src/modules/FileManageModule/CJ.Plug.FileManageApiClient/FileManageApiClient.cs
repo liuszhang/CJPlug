@@ -657,5 +657,74 @@ namespace CJ.Plug.FileManageApiClient
                 return false;
             }
         }
+
+        public async Task<string?> UploadFileFromBase64(string fileContent, string fileName)
+        {
+            try
+            {
+                var payload = new { fileContent, fileName };
+                var response = await httpClient.PostAsJsonAsync("api/file/uploadBase64", payload);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadAsStringAsync();
+                }
+                else
+                {
+                    CLog.Warning($"UploadFileFromBase64 失败: {response.StatusCode}");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"UploadFileFromBase64 异常: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string?> UploadFileFromUrl(string url, string? fileName)
+        {
+            try
+            {
+                var payload = new { url, fileName };
+                var response = await httpClient.PostAsJsonAsync("api/file/uploadFromUrl", payload);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadAsStringAsync();
+                }
+                else
+                {
+                    CLog.Warning($"UploadFileFromUrl 失败: {response.StatusCode}");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"UploadFileFromUrl 异常: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<FileInformation>?> SearchFiles(string? keyword)
+        {
+            try
+            {
+                var query = string.IsNullOrWhiteSpace(keyword) ? "" : $"?keyword={Uri.EscapeDataString(keyword)}";
+                var response = await httpClient.GetAsync($"api/file/searchFiles{query}");
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<List<FileInformation>>();
+                }
+                else
+                {
+                    CLog.Warning($"SearchFiles 失败: {response.StatusCode}");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                CLog.Error($"SearchFiles 异常: {ex.Message}");
+                return null;
+            }
+        }
     }
 }

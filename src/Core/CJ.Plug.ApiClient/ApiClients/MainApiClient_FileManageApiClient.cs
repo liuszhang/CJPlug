@@ -182,4 +182,25 @@ public partial class MainApiClient : IFileManageApiClient
             await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"移动目录: {sourcePath} → {destPath}");
         return result;
     }
+
+    public async Task<string?> UploadFileFromBase64(string fileContent, string fileName)
+    {
+        var result = await FileManageApiClient.Value.UploadFileFromBase64(fileContent, fileName);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, $"MCP Base64上传文件: {fileName}");
+        return result;
+    }
+
+    public async Task<string?> UploadFileFromUrl(string url, string? fileName)
+    {
+        var result = await FileManageApiClient.Value.UploadFileFromUrl(url, fileName);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, $"MCP URL上传文件: {fileName ?? url}");
+        return result;
+    }
+
+    public async Task<List<FileInformation>?> SearchFiles(string? keyword)
+    {
+        var result = await FileManageApiClient.Value.SearchFiles(keyword);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"搜索文件: {keyword ?? "(全部)"}");
+        return result;
+    }
 }
