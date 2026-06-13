@@ -42,6 +42,11 @@
         // 清除本地存储的登录状态
         await DomInteropService.ClearCurrentUser();
         AuthenticationState = null;
-        NavigationManager.NavigateTo("/login", forceLoad: true);
+        var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        if (!returnUrl.StartsWith("/"))
+            returnUrl = "/" + returnUrl;
+        if (string.IsNullOrEmpty(returnUrl) || returnUrl == "/" || returnUrl.StartsWith("/login"))
+            returnUrl = "/";
+        NavigationManager.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
     }
 }

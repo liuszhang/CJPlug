@@ -62,6 +62,9 @@
 
 
 @code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
     internal class LoginModel
     {
         public string Username { get; set; } = default!;
@@ -90,7 +93,8 @@
         //await _localStorageService.SetItemAsync<int>("userid", result.Id);
         //await _localStorageService.SetItemAsStringAsync("username", result.UserName);
         ((AccessTokenAuthenticationStateProvider)AuthenticationStateProvider).NotifyAuthenticationStateChanged();
-        NavigationManager.NavigateTo("", true);
+        var targetUrl = string.IsNullOrEmpty(ReturnUrl) ? "" : ReturnUrl;
+        NavigationManager.NavigateTo(targetUrl, true);
     }
 
     private async Task TryLoginToElsa()
@@ -103,7 +107,8 @@
         }
 
         ((AccessTokenAuthenticationStateProvider)AuthenticationStateProvider).NotifyAuthenticationStateChanged();
-        NavigationManager.NavigateTo("", true);
+        var targetUrl = string.IsNullOrEmpty(ReturnUrl) ? "" : ReturnUrl;
+        NavigationManager.NavigateTo(targetUrl, true);
     }
 
     private async Task<bool> ValidateCredentials(string username, string password)

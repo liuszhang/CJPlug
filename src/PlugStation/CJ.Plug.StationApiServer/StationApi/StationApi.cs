@@ -94,8 +94,16 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                 var filePath = body.GetProperty("filePath").GetString();
 
                 // 1. 先检查原始路径（绝对路径场景）
-                if (File.Exists(filePath) || Directory.Exists(filePath))
+                //    对目录额外验证包含可执行文件，避免空目录（如下载残留）产生误报
+                if (File.Exists(filePath))
                     return Results.Ok(true);
+                if (Directory.Exists(filePath))
+                {
+                    var exeExtensions = new[] { ".exe", ".bat", ".cmd" };
+                    var hasExe = exeExtensions.Any(ext =>
+                        Directory.GetFiles(filePath, $"*{ext}", SearchOption.AllDirectories).Length > 0);
+                    if (hasExe) return Results.Ok(true);
+                }
 
                 // 2. 尝试使用图站配置的 ToolsRootPath 解析
                 if (!string.IsNullOrEmpty(StaticData.ToolsRootPath) && !string.IsNullOrEmpty(filePath))
@@ -114,13 +122,20 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                         return Results.Ok(true);
                 }
 
-                // 3. 使用默认路径
+                // 3. 使用默认路径（与 Step 2 一致：目录需验证包含可执行文件）
                 if (!string.IsNullOrEmpty(filePath))
                 {
                     var fallbackBase = StaticData.ToolAgentServer ?? GlobalData.StationFileRootPath;
                     var fallbackPath = Path.Combine(fallbackBase, "Tools", filePath);
-                    if (Directory.Exists(fallbackPath) || File.Exists(fallbackPath))
+                    if (File.Exists(fallbackPath))
                         return Results.Ok(true);
+                    if (Directory.Exists(fallbackPath))
+                    {
+                        var exeExtensions = new[] { ".exe", ".bat", ".cmd" };
+                        var hasExe = exeExtensions.Any(ext =>
+                            Directory.GetFiles(fallbackPath, $"*{ext}", SearchOption.AllDirectories).Length > 0);
+                        if (hasExe) return Results.Ok(true);
+                    }
                 }
 
                 return Results.Ok(false);
@@ -140,9 +155,12 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                     return Results.BadRequest("targetPath 不能为空");
 
                 // 优先使用图站配置的工具安装路径（StationSettingUI 中设置的 ToolsRootPath）
+                // —— targetPath 可能已包含用户层级（如 "liusz/MyTool"），直接使用而非仅依赖 toolName
+                var relativeTarget = targetPath ?? toolName ?? "unknown";
+                relativeTarget = relativeTarget.Replace('/', Path.DirectorySeparatorChar);
                 if (!string.IsNullOrEmpty(StaticData.ToolsRootPath))
                 {
-                    var stationTargetPath = Path.Combine(StaticData.ToolsRootPath, toolName ?? "unknown");
+                    var stationTargetPath = Path.Combine(StaticData.ToolsRootPath, relativeTarget);
                     Log.Information("使用图站配置的工具安装路径: {StationPath}（原始请求: {OriginalPath}）",
                         stationTargetPath, targetPath);
                     targetPath = stationTargetPath;
@@ -151,7 +169,7 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                 {
                     // ToolsRootPath 未配置时，使用 ToolAgentServer 默认路径
                     var fallbackBase = StaticData.ToolAgentServer ?? GlobalData.StationFileRootPath;
-                    targetPath = Path.Combine(fallbackBase, "Tools", toolName ?? "unknown");
+                    targetPath = Path.Combine(fallbackBase, "Tools", relativeTarget);
                     Log.Warning("图站未配置 ToolsRootPath，使用默认路径: {FallbackPath}", targetPath);
                 }
 

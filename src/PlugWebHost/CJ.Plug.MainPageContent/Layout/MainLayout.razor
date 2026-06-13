@@ -163,7 +163,12 @@
             var currentUserId = await DomInteropService.GetCurrentUserId();
             if (currentUserId == null)
             {
-                NavigationManager.NavigateTo("/login", forceLoad: true);
+                var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+                if (!returnUrl.StartsWith("/"))
+                    returnUrl = "/" + returnUrl;
+                if (string.IsNullOrEmpty(returnUrl) || returnUrl == "/" || returnUrl.StartsWith("/login"))
+                    returnUrl = "/";
+                NavigationManager.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
                 return;
             }
         }

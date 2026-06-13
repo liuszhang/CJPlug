@@ -123,9 +123,9 @@ namespace CJ.Plug.PlugBaseCore.Services
                 Tool.ToolPath = toolPathByConfig;
             }
             //将获取到的工具路径根据不同图站基础地址，拼接成完整的工具执行路径（仅用于服务端检查）
-            var ToolPath = ParameterGenerator.GenerateToolPath(Tool.ToolPath);
-            Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的服务端路径为：{ToolPath}");
-            if (string.IsNullOrEmpty(ToolPath))
+            var resolvedToolPathForLog = ParameterGenerator.GenerateToolPath(Tool.ToolPath);
+            Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的服务端路径为：{resolvedToolPathForLog}");
+            if (string.IsNullOrEmpty(resolvedToolPathForLog))
             {
                 CLog.Error($"未找到工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的执行路径");
                 ERD.ExecuteStatus = JobStatus.完成;
@@ -137,8 +137,8 @@ namespace CJ.Plug.PlugBaseCore.Services
             plugExecutionRequest.ToolFullPath = Tool.ToolPath;
 
             // 解析工具包根目录的绝对路径
-            var ToolBasePath = ParameterGenerator.GenerateToolPath(Tool.ToolBasePath);
-            Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})的工具包根目录为：{ToolBasePath}");
+            var resolvedToolBasePathForLog = ParameterGenerator.GenerateToolPath(Tool.ToolBasePath);
+            Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})的工具包根目录为：{resolvedToolBasePathForLog}");
 
             // === 检查并下载工具到图站 ===
             if (!Tool.SkipDownloadToStation)
@@ -152,6 +152,19 @@ namespace CJ.Plug.PlugBaseCore.Services
 
                 // 仅传递工具名，由图站根据自身配置的 ToolsRootPath 解析安装目录
                 var stationToolDir = Tool.ToolName!;
+                // 对于上传工具，ToolBasePath 格式为 Tools/{user}/{folder}，
+                // 需提取用户层级以免不同用户同名工具冲突
+                if (!string.IsNullOrEmpty(Tool.ToolBasePath))
+                {
+                    var normalizedBase = Tool.ToolBasePath.Replace('\\', '/').TrimStart('/');
+                    var segments = normalizedBase.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                    if (segments.Length >= 3
+                        && string.Equals(segments[0], "Tools", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(segments[1], "System", StringComparison.OrdinalIgnoreCase))
+                    {
+                        stationToolDir = string.Join("/", segments[1..]); // "liusz/MyTool"
+                    }
+                }
                 var stationIp = StationToUse.StationIp;
                 var toolName = Tool.ToolName!;
                 var toolVersion = Tool.ToolVersion!;
@@ -169,10 +182,10 @@ namespace CJ.Plug.PlugBaseCore.Services
                             BaseAddress = new Uri(stationIp)
                         });
                         bool exists = await stationClient.CheckFileExistsAsync(stationToolDir);
-                        if (!exists && !string.IsNullOrEmpty(ToolBasePath))
-                            exists = await stationClient.CheckFileExistsAsync(ToolBasePath);
+                        if (!exists && !string.IsNullOrEmpty(Tool.ToolBasePath))
+                            exists = await stationClient.CheckFileExistsAsync(Tool.ToolBasePath);
                         if (!exists)
-                            exists = await stationClient.CheckFileExistsAsync(ToolPath);
+                            exists = await stationClient.CheckFileExistsAsync(Tool.ToolPath);
                         needDownload = !exists;
                         Log.Information(exists
                             ? $"工具{toolName}在图站{stationIp}上已存在"
@@ -199,6 +212,21 @@ namespace CJ.Plug.PlugBaseCore.Services
                             return ERD;
                         }
                         Log.Information($"工具{toolName}已成功下载到图站: {stationToolDir}");
+                        // 下载后验证：确认工具入口在图站上确实存在
+                        var verifyClient = new StationApiClient(new HttpClient
+                        {
+                            BaseAddress = new Uri(stationIp)
+                        });
+                        var toolVerified = await verifyClient.CheckFileExistsAsync(stationToolDir);
+                        if (!toolVerified)
+                        {
+                            Log.Error($"工具{toolName}下载完成但验证失败：图站上未找到 {stationToolDir}");
+                            ERD.ExecuteStatus = JobStatus.完成;
+                            ERD.ExecuteSubStatus = JobSubStatus.出错;
+                            ERD.ResultString = $"下载工具{toolName}到图站完成但文件验证失败，请检查图站配置";
+                            return ERD;
+                        }
+                        Log.Information($"工具{toolName}下载后验证通过: {stationToolDir}");
                     }
                 }
             }
@@ -214,7 +242,7 @@ namespace CJ.Plug.PlugBaseCore.Services
                 {
                     Log.Warning($"工具{Tool.ToolName}({Tool.ToolVersion})已设置跳过下载，但图站上未找到该工具，执行可能失败");
                 }
-                Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})已设置为跳过下载至图站，直接使用现有工具路径: {ToolPath}");
+                Log.Information($"工具{Tool.ToolName}({Tool.ToolVersion})已设置为跳过下载至图站，直接使用现有工具路径: {resolvedToolPathForLog}");
             }
             // === 检查并下载工具到图站 结束 ===
             //2.2 将命令行中的变量替换为参数的实际值
