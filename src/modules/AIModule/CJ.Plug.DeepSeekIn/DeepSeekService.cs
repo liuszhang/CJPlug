@@ -602,5 +602,158 @@ namespace CJ.Plug.DeekSeekIn
 
             return string.Empty;
         }
+
+        // ---- 通用 OpenAI 兼容 API 调用（自定义 ApiBaseUrl） ----
+
+        /// <summary>
+        /// 通用 OpenAI 兼容流式问答 — 使用 SSE 实时流式传输，每收到一个 token 立即 yield return。
+        /// 向 <c>{apiBaseUrl}/chat/completions</c> 发送 stream=true 请求，逐行解析 SSE 事件。
+        /// </summary>
+        public async IAsyncEnumerable<string> StreamChatCompletionAsync(
+            string content,
+            string apiBaseUrl,
+            string apiKey,
+            string model)
+        {
+            Console.WriteLine($"[DeepSeek] StreamChatCompletionAsync: url={apiBaseUrl}, model={model}, apiKey={(string.IsNullOrEmpty(apiKey) ? "(empty)" : apiKey[..Math.Min(8, apiKey.Length)] + "...")}");
+
+            if (string.IsNullOrWhiteSpace(content))
+                yield break;
+
+            var endpoint = apiBaseUrl.TrimEnd('/') + "/chat/completions";
+
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+            if (!string.IsNullOrEmpty(apiKey))
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            var payload = new
+            {
+                model = model,
+                messages = new[]
+                {
+                    new { role = "system", content = "" },
+                    new { role = "user", content = content }
+                },
+                stream = true
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+            HttpResponseMessage response;
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = httpContent };
+                response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                Console.WriteLine($"[DeepSeek] SSE stream started, status={(int)response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DeepSeek] SSE request FAILED: {ex.GetType().Name} - {ex.Message}");
+                yield break;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[DeepSeek] SSE error {(int)response.StatusCode}: {errorBody[..Math.Min(200, errorBody.Length)]}");
+                yield break;
+            }
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            // 委托给不含 try-catch 的内层方法，满足 CS1626 约束
+            await foreach (var token in ReadSseTokensAsync(reader))
+                yield return token;
+        }
+
+        /// <summary>从 SSE 流中逐行读取并 yield return 每个 content token。不含 try-catch（CS1626 要求）。</summary>
+        private static async IAsyncEnumerable<string> ReadSseTokensAsync(StreamReader reader)
+        {
+            while (true)
+            {
+                var line = await reader.ReadLineAsync();
+                if (line == null) break;
+
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!line.StartsWith("data: ")) continue;
+
+                var data = line.Substring(6);
+                if (data == "[DONE]") break;
+
+                var token = TryParseSseContentToken(data);
+                if (token != null)
+                    yield return token;
+            }
+        }
+
+        /// <summary>安全解析 SSE data 行中的 choices[0].delta.content，失败返回 null。</summary>
+        private static string? TryParseSseContentToken(string data)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(data);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var choice in choices.EnumerateArray())
+                    {
+                        if (choice.TryGetProperty("delta", out var delta) &&
+                            delta.TryGetProperty("content", out var contentEl) &&
+                            contentEl.ValueKind == JsonValueKind.String)
+                        {
+                            var token = contentEl.GetString();
+                            if (!string.IsNullOrEmpty(token))
+                                return token;
+                        }
+                    }
+                }
+            }
+            catch (JsonException) { }
+            return null;
+        }
+
+        /// <summary>
+        /// 向给定端点发送 OpenAI 兼容的 chat/completions 请求，返回原始 JSON。
+        /// </summary>
+        private async Task<string> CallChatCompletionApiAsync(
+            string userContent,
+            string apiBaseUrl,
+            string apiKey,
+            string model)
+        {
+            var endpoint = apiBaseUrl.TrimEnd('/') + "/chat/completions";
+            Console.WriteLine($"[DeepSeek] POST {endpoint} | model={model} | hasAuth={!string.IsNullOrEmpty(apiKey)}");
+
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+            if (!string.IsNullOrEmpty(apiKey))
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            var payload = new
+            {
+                model = model,
+                messages = new[]
+                {
+                    new { role = "system", content = "" },
+                    new { role = "user", content = userContent }
+                },
+                stream = false
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync(endpoint, httpContent);
+            var responseText = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Chat API returned {(int)response.StatusCode}: {responseText[..Math.Min(200, responseText.Length)]}");
+
+            return responseText;
+        }
     }
 }

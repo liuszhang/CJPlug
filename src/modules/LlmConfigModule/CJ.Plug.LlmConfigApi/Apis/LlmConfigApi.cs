@@ -120,11 +120,18 @@ public static class LlmConfigApi
         // ---- 获取默认模型信息 ----
         api.MapGet("/getDefaultModelInfo", async (
             ILlmConfigService service,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("LlmConfigApi");
             var (provider, model) = await service.GetDefaultModelInfoAsync(ct);
             if (provider == null || model == null)
+            {
+                logger.LogWarning("GetDefaultModelInfo: no default model found");
                 return Results.Ok(null);
+            }
+            logger.LogInformation("GetDefaultModelInfo: ProviderName={Name}, ApiBaseUrl={Url}, ModelName={Model}, ApiKeyLen={KeyLen}",
+                provider.Name, provider.ApiBaseUrl, model.ModelName, provider.ApiKey?.Length ?? 0);
             return Results.Ok(new DefaultModelInfoResponse(
                 provider.Id, provider.Name, provider.DisplayName,
                 provider.ApiBaseUrl, provider.ApiKey, provider.IsEnabled,

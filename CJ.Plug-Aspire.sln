@@ -28,25 +28,12 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WordPlug", "src\PlugLibrary\WordPlug\WordPlug.csproj", "{8018553C-4D3C-4BA1-86A5-F318809FCAC3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "00.Docs", "00.Docs", "{03BFBFF7-A9FE-44FA-B3DE-30559B731326}"
-	ProjectSection(SolutionItems) = preProject
-		00.Docs\APP开发与应用体系-场景梳理.vsdx = 00.Docs\APP开发与应用体系-场景梳理.vsdx
-		00.Docs\APP开发与应用体系-规范-思路梳理.vsdx = 00.Docs\APP开发与应用体系-规范-思路梳理.vsdx
-		00.Docs\APP开发与应用体系-规范V0.1.docx = 00.Docs\APP开发与应用体系-规范V0.1.docx
-		00.Docs\APP插座平台-功能地图.vsdx = 00.Docs\APP插座平台-功能地图.vsdx
-		00.Docs\APP插座平台-功能框架及功能介绍-V1.pptx = 00.Docs\APP插座平台-功能框架及功能介绍-V1.pptx
-		00.Docs\APP插座平台-功能框架及功能介绍-V2.pptx = 00.Docs\APP插座平台-功能框架及功能介绍-V2.pptx
-		00.Docs\APP插座平台-功能框架及功能介绍.pptx = 00.Docs\APP插座平台-功能框架及功能介绍.pptx
-		docs\草稿.md = docs\草稿.md
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PlugToolIntegrations", "PlugToolIntegrations", "{AD8B504C-3CDC-4276-B7BC-5A191F7632B3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NXGetParameters", "src\PlugToolIntegrations\NXGetParameters\NXGetParameters.csproj", "{5EBEF875-79B0-492D-B3EB-EECABD7EA86E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "01.Script", "01.Script", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
-	ProjectSection(SolutionItems) = preProject
-		01.Scripts\stopService.sh = 01.Scripts\stopService.sh
-	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAgentPlug", "src\PlugLibrary\AIAgentPlug\AIAgentPlug.csproj", "{C5FBF7C8-9066-4FE7-AC07-0CD574D1B2D1}"
 EndProject

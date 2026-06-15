@@ -33,6 +33,17 @@ public class LlmConfigService : ILlmConfigService
         ModelConfigs = p.ModelConfigs?.Select(MapModelConfigToDto).ToList() ?? new()
     };
 
+    /// <summary>映射 Provider 用于内部调用（不脱敏 ApiKey），供 GetDefaultModelInfoAsync 等内部链路使用。</summary>
+    private static LlmProvider MapProviderWithRawApiKey(LlmProvider p) => new()
+    {
+        Id = p.Id, Name = p.Name, DisplayName = p.DisplayName,
+        ApiBaseUrl = p.ApiBaseUrl,
+        ApiKey = p.ApiKey,
+        Description = p.Description, IsEnabled = p.IsEnabled,
+        SortOrder = p.SortOrder, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
+        ModelConfigs = p.ModelConfigs?.Select(MapModelConfigToDto).ToList() ?? new()
+    };
+
     public static LlmModelConfig MapModelConfigToDto(LlmModelConfig m) => new()
     {
         Id = m.Id, LlmProviderId = m.LlmProviderId, ModelName = m.ModelName,
@@ -193,7 +204,10 @@ public class LlmConfigService : ILlmConfigService
 
         if (provider == null || !provider.IsEnabled) return (null, null);
 
-        return (MapToDto(provider), MapModelConfigToDto(defaultModel));
+        // 不脱敏 ApiKey — AskAI 等内部调用链路需要完整凭据来发起 LLM 请求
+        var dto = MapProviderWithRawApiKey(provider);
+        Console.WriteLine($"[LlmConfigService] GetDefaultModelInfo: Provider={dto.Name}, ApiKeyLen={dto.ApiKey?.Length ?? 0}, ApiBaseUrl={dto.ApiBaseUrl}, Model={defaultModel.ModelName}");
+        return (dto, MapModelConfigToDto(defaultModel));
     }
 
     public async Task<bool> SetDefaultModelAsync(int modelConfigId, CancellationToken ct = default)

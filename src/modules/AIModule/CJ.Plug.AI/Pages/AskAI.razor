@@ -159,11 +159,24 @@
             return;
         }
         visible = true;
+        await RefreshDefaultModelInfo();
         messages.AddRange(new[]
         {
             new ChatMessage { Content = Question, UserId = "user1", Timestamp = DateTime.Now.AddMinutes(-29) }
         });
         await TestDeepSeek(Question);
+    }
+
+    private async Task RefreshDefaultModelInfo()
+    {
+        try
+        {
+            _defaultModelInfo = await LlmConfigApiClient.GetDefaultModelInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AskAI] 加载默认模型配置失败: {ex.Message}");
+        }
     }
 
     private async Task TestDeepSeek(string? Question)
@@ -173,9 +186,31 @@
         StateHasChanged();
         Answer += "AI:";
 
-        if (_defaultModelInfo != null && _defaultModelInfo.ProviderName.Contains("ollama", StringComparison.OrdinalIgnoreCase))
+        // 诊断日志：记录当前模型配置
+        if (_defaultModelInfo != null)
+        {
+            Console.WriteLine($"[AskAI] ProviderName={_defaultModelInfo.ProviderName}, ApiBaseUrl={_defaultModelInfo.ApiBaseUrl}, ModelName={_defaultModelInfo.ModelName}, ApiKey={(string.IsNullOrEmpty(_defaultModelInfo.ApiKey) ? "(empty)" : (_defaultModelInfo.ApiKey.Length > 8 ? _defaultModelInfo.ApiKey[..8] + "..." : _defaultModelInfo.ApiKey))}");
+        }
+        else
+        {
+            Console.WriteLine("[AskAI] _defaultModelInfo is null, will fallback to default Ollama");
+        }
+
+        if (_defaultModelInfo == null)
+        {
+            // 无可用模型配置，回退到默认 Ollama
+            Console.WriteLine("[AskAI] Branch: NULL → fallback Ollama");
+            await foreach (var response in DeepSeekService.AskWithTool(Question))
+            {
+                Answer += response;
+                TmpMessage.Content += response;
+                StateHasChanged();
+            }
+        }
+        else if (_defaultModelInfo.ProviderName.Contains("ollama", StringComparison.OrdinalIgnoreCase))
         {
             // Ollama 类型供应商 - 使用配置的端点和模型
+            Console.WriteLine($"[AskAI] Branch: OLLAMA → endpoint={_defaultModelInfo.ApiBaseUrl}, model={_defaultModelInfo.ModelName}");
             var endpoint = new Uri(_defaultModelInfo.ApiBaseUrl);
             await foreach (var response in DeepSeekService.AskWithTool(Question, endpoint, _defaultModelInfo.ModelName))
             {
@@ -184,20 +219,16 @@
                 StateHasChanged();
             }
         }
-        else if (_defaultModelInfo != null && !string.IsNullOrEmpty(_defaultModelInfo.ApiKey))
-        {
-            // OpenRouter 等需要 API Key 的供应商
-            await foreach (var response in DeepSeekService.StreamReasoningFromContentAsync(Question, _defaultModelInfo.ApiKey, _defaultModelInfo.ModelName))
-            {
-                Answer += response;
-                TmpMessage.Content += response;
-                StateHasChanged();
-            }
-        }
         else
         {
-            // 回退到默认 Ollama
-            await foreach (var response in DeepSeekService.AskWithTool(Question))
+            // 通用 OpenAI 兼容供应商（OpenRouter / LM Studio / vLLM / 自定义端点等）
+            // 使用配置的 ApiBaseUrl + ApiKey + ModelName 发起请求
+            Console.WriteLine($"[AskAI] Branch: GENERIC → url={_defaultModelInfo.ApiBaseUrl}, model={_defaultModelInfo.ModelName}");
+            await foreach (var response in DeepSeekService.StreamChatCompletionAsync(
+                Question,
+                _defaultModelInfo.ApiBaseUrl,
+                _defaultModelInfo.ApiKey ?? string.Empty,
+                _defaultModelInfo.ModelName))
             {
                 Answer += response;
                 TmpMessage.Content += response;
