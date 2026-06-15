@@ -73,6 +73,7 @@
     private List<ChatMessage> messages = new();
     ChatMessage TmpMessage = new ChatMessage();
     private DefaultModelInfoResponse? _defaultModelInfo;
+    private string? _mcpConnectionString;
 
     protected override async Task OnInitializedAsync()
     {
@@ -96,6 +97,32 @@
         catch (Exception ex)
         {
             Console.WriteLine($"[AskAI] 加载默认模型配置失败: {ex.Message}");
+        }
+
+        // 加载 MCP Server 配置
+        await LoadMcpConfigAsync();
+    }
+
+    private async Task LoadMcpConfigAsync()
+    {
+        try
+        {
+            var mcpConfig = await LlmConfigApiClient.GetMcpServerConfigAsync();
+            if (mcpConfig != null && mcpConfig.IsEnabled && !string.IsNullOrEmpty(mcpConfig.ConnectionString))
+            {
+                _mcpConnectionString = mcpConfig.ConnectionString;
+                Console.WriteLine($"[AskAI] MCP Server 已启用: {_mcpConnectionString}");
+            }
+            else
+            {
+                _mcpConnectionString = null;
+                Console.WriteLine($"[AskAI] MCP Server 未启用或未配置");
+            }
+        }
+        catch (Exception ex)
+        {
+            _mcpConnectionString = null;
+            Console.WriteLine($"[AskAI] 加载 MCP 配置失败: {ex.Message}");
         }
     }
 
@@ -177,6 +204,8 @@
         {
             Console.WriteLine($"[AskAI] 加载默认模型配置失败: {ex.Message}");
         }
+
+        await LoadMcpConfigAsync();
     }
 
     private async Task TestDeepSeek(string? Question)
@@ -200,7 +229,7 @@
         {
             // 无可用模型配置，回退到默认 Ollama
             Console.WriteLine("[AskAI] Branch: NULL → fallback Ollama");
-            await foreach (var response in DeepSeekService.AskWithTool(Question))
+            await foreach (var response in DeepSeekService.AskWithTool(Question, _mcpConnectionString))
             {
                 Answer += response;
                 TmpMessage.Content += response;
@@ -212,7 +241,7 @@
             // Ollama 类型供应商 - 使用配置的端点和模型
             Console.WriteLine($"[AskAI] Branch: OLLAMA → endpoint={_defaultModelInfo.ApiBaseUrl}, model={_defaultModelInfo.ModelName}");
             var endpoint = new Uri(_defaultModelInfo.ApiBaseUrl);
-            await foreach (var response in DeepSeekService.AskWithTool(Question, endpoint, _defaultModelInfo.ModelName))
+            await foreach (var response in DeepSeekService.AskWithTool(Question, endpoint, _defaultModelInfo.ModelName, _mcpConnectionString))
             {
                 Answer += response;
                 TmpMessage.Content += response;
@@ -228,7 +257,8 @@
                 Question,
                 _defaultModelInfo.ApiBaseUrl,
                 _defaultModelInfo.ApiKey ?? string.Empty,
-                _defaultModelInfo.ModelName))
+                _defaultModelInfo.ModelName,
+                _mcpConnectionString))
             {
                 Answer += response;
                 TmpMessage.Content += response;
