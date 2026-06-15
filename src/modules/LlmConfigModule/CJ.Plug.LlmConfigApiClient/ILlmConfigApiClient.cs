@@ -8,6 +8,9 @@ public record DefaultModelInfoResponse(
     int ModelId, string ModelName, string ModelDisplayName,
     string ModelType, int? MaxTokens, double? Temperature, bool ModelIsEnabled);
 
+/// <summary>通用 API 响应包装，与服务端 ApiResult&lt;T&gt; 结构一致。</summary>
+public record ApiResult<T>(int Code, T? Data, string? Message = null);
+
 public interface ILlmConfigApiClient
 {
     // 供应商 CRUD
@@ -33,4 +36,8 @@ public interface ILlmConfigApiClient
 
     // 测试连接
     Task<(bool Success, string Message)> TestConnectionAsync(int modelConfigId, CancellationToken ct = default);
+
+    // MCP Server 配置
+    Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default);
+    Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default);
 }

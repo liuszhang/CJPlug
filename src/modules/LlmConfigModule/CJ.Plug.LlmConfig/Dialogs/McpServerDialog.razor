@@ -1,0 +1,46 @@
+@using CJ.Plug.LlmConfigModel.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch @bind-Value="Config.IsEnabled" Label="启用 MCP Server 连接"
+                               Color="Color.Primary" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        开启后系统将连接 MCP Server 获取工具能力
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Config.ConnectionString" Label="连接字符串" Required="true"
+                                  Placeholder="如 http://localhost:8080/sse"
+                                  Variant="Variant.Outlined"
+                                  HelperText="MCP Server 的 SSE 端点地址" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Config.Description" Label="描述"
+                                  Placeholder="MCP Server 描述/备注" Variant="Variant.Outlined" Lines="2" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="!_isValid">保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public McpServerConfig Config { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(Config));
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -615,12 +615,11 @@ namespace CJ.Plug.DeekSeekIn
             string apiKey,
             string model)
         {
-            Console.WriteLine($"[DeepSeek] StreamChatCompletionAsync: url={apiBaseUrl}, model={model}, apiKey={(string.IsNullOrEmpty(apiKey) ? "(empty)" : apiKey[..Math.Min(8, apiKey.Length)] + "...")}");
-
             if (string.IsNullOrWhiteSpace(content))
                 yield break;
 
             var endpoint = apiBaseUrl.TrimEnd('/') + "/chat/completions";
+            Console.WriteLine($"[DeepSeek] StreamChatCompletionAsync: apiBaseUrl={apiBaseUrl}, finalUrl={endpoint}, model={model}, apiKey={(string.IsNullOrEmpty(apiKey) ? "(empty)" : apiKey[..Math.Min(8, apiKey.Length)] + "...")}");
 
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromMinutes(5);
