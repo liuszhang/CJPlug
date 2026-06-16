@@ -13,7 +13,7 @@ public class StationConfigService:IStationConfigService
     public StationConfigService(MainDbContext dbContext)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreatedAsync();
+        _dbContext.Database.EnsureCreated();
     }
 
     public async Task<IEnumerable<StationConfigTable>?> GetAllStationConfigsAsync(CancellationToken cancellationToken = default)

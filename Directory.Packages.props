@@ -113,6 +113,8 @@
     <PackageVersion Include="Elsa.CSharp" Version="3.5.3" />
     <PackageVersion Include="Elsa.Email" Version="3.2.0" />
     <PackageVersion Include="Elsa.EntityFrameworkCore" Version="3.5.3" />
+    <PackageVersion Include="Elsa.EntityFrameworkCore.PostgreSql" Version="3.5.3" />
+    <PackageVersion Include="Elsa.EntityFrameworkCore.SqlServer" Version="3.5.3" />
     <PackageVersion Include="Elsa.EntityFrameworkCore.Sqlite" Version="3.5.3" />
     <PackageVersion Include="Elsa.Hosting.Management" Version="3.2.0" />
     <PackageVersion Include="Elsa.MassTransit" Version="3.2.0" />
@@ -137,6 +139,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Core" Version="9.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.9" />

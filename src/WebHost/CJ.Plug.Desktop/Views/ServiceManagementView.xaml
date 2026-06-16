@@ -59,5 +59,10 @@
         <TabItem Header="控制面板">
             <views:ServiceControlView x:Name="ControlPanelView"/>
         </TabItem>
+
+        <!-- Tab 3: 数据库配置 -->
+        <TabItem Header="数据库配置">
+            <views:DatabaseConfigView x:Name="DatabaseConfigView"/>
+        </TabItem>
     </TabControl>
 </UserControl>

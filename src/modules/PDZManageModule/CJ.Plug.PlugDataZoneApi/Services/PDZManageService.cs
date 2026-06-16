@@ -10,7 +10,7 @@ public class PDZManageService : IPDZManageService
     public PDZManageService(MainDbContext dbContext)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreatedAsync();
+        _dbContext.Database.EnsureCreated();
     }
 
     public async Task<PlugDataZone?> CreatePDZ(PlugDataZone PDZ, CancellationToken cancellationToken = default)

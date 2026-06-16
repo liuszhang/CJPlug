@@ -16,7 +16,7 @@ public class ToolManageService : IToolManageService
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
-        _dbContext.Database.EnsureCreatedAsync();
+        _dbContext.Database.EnsureCreated();
     }
 
     public async Task<IEnumerable<Tool>?> GetAllToolsAsync(CancellationToken cancellationToken = default)

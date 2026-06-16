@@ -12,7 +12,7 @@ public partial class PlugManageService : IPlugManageService
     public PlugManageService(MainDbContext dbContext)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreatedAsync();
+        _dbContext.Database.EnsureCreated();
     }
 
     public async Task<Plug> CreatePlugAsync(Plug request, CancellationToken cancellationToken = default)

@@ -11,7 +11,7 @@ public class StationManageService:IStationManageService
     public StationManageService(MainDbContext dbContext, HubConnectionManagerService hubConnectionManagerService)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreatedAsync();
+        _dbContext.Database.EnsureCreated();
         HubConnectionManagerService = hubConnectionManagerService;
         HubConnectionManagerService._hubConnection.Remove("StatusInfo");
         HubConnectionManagerService._hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>

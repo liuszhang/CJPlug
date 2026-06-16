@@ -32,6 +32,7 @@ public partial class App : System.Windows.Application
             {
                 services.AddSingleton<ViewModels.MainViewModel>();
                 services.AddSingleton<ViewModels.ServiceControlViewModel>();
+                services.AddSingleton<ViewModels.DatabaseConfigViewModel>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<Services.AppHostLauncher>();
             })

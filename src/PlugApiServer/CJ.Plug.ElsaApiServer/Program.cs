@@ -28,6 +28,9 @@ using Serilog;
 using System.Text;
 using System.Text.Json;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+AppContext.SetSwitch("Npgsql.EnableMultiplexing", false);
+
 // 设置 .NET Console 编码为 UTF-8
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;

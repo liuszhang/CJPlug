@@ -10,7 +10,7 @@ namespace CJ.Plug.PlugMarketApi.Services
         public PlugMarketService(MainDbContext dbContext)
         {
             _dbContext = dbContext;
-            _dbContext.Database.EnsureCreatedAsync();
+            _dbContext.Database.EnsureCreated();
         }
         public async Task<MarketPlug> CreateMarketPlugAsync(MarketPlug request, CancellationToken cancellationToken = default)
         {
