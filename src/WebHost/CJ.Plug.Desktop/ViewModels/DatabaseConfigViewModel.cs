@@ -137,6 +137,26 @@ public partial class DatabaseConfigViewModel : ObservableObject
         return Path.Combine(projectRoot, "src", "PlugApiServer", "CJ.Plug.ElsaApiServer", "appsettings.json");
     }
 
+    /// <summary>
+    /// 获取 ApiServer 源码目录的 appsettings.json 路径（固定返回 src 下路径）。
+    /// 用于与 02.Publish 双写时确定源码目标路径。
+    /// </summary>
+    private static string GetApiServerSourceConfigPath()
+    {
+        var projectRoot = FindProjectRoot();
+        return Path.Combine(projectRoot, "src", "PlugApiServer", "CJ.Plug.ApiServer", "appsettings.json");
+    }
+
+    /// <summary>
+    /// 获取 ElsaApiServer 源码目录的 appsettings.json 路径（固定返回 src 下路径）。
+    /// 用于与 02.Publish 双写时确定源码目标路径。
+    /// </summary>
+    private static string GetElsaApiServerSourceConfigPath()
+    {
+        var projectRoot = FindProjectRoot();
+        return Path.Combine(projectRoot, "src", "PlugApiServer", "CJ.Plug.ElsaApiServer", "appsettings.json");
+    }
+
     private void LoadConfig()
     {
         try
@@ -292,6 +312,16 @@ public partial class DatabaseConfigViewModel : ObservableObject
             }
 
             File.WriteAllText(path, updatedJson);
+            // 同时写入源码目录，确保 VS 调试时 builder.Configuration 能读到
+            var apiSrcPath = GetApiServerSourceConfigPath();
+            try
+            {
+                var srcDir = System.IO.Path.GetDirectoryName(apiSrcPath);
+                if (!string.IsNullOrEmpty(srcDir) && !Directory.Exists(srcDir))
+                    Directory.CreateDirectory(srcDir);
+                File.WriteAllText(apiSrcPath, updatedJson);
+            }
+            catch { /* 源码目录写入失败不影响发布目录 */ }
             ApiSaveMessage = "配置已保存，重启服务后生效";
         }
         catch (Exception ex)
@@ -402,6 +432,16 @@ public partial class DatabaseConfigViewModel : ObservableObject
             }
 
             File.WriteAllText(path, updatedJson);
+            // 同时写入源码目录，确保 VS 调试时 builder.Configuration 能读到
+            var elsaSrcPath = GetElsaApiServerSourceConfigPath();
+            try
+            {
+                var srcDir = System.IO.Path.GetDirectoryName(elsaSrcPath);
+                if (!string.IsNullOrEmpty(srcDir) && !Directory.Exists(srcDir))
+                    Directory.CreateDirectory(srcDir);
+                File.WriteAllText(elsaSrcPath, updatedJson);
+            }
+            catch { /* 源码目录写入失败不影响发布目录 */ }
             ElsaSaveMessage = "配置已保存，重启服务后生效";
         }
         catch (Exception ex)
@@ -498,6 +538,10 @@ public partial class DatabaseConfigViewModel : ObservableObject
         {
             ApiConnectionString = BuildConnectionString(ApiDbType, ApiServer, ApiPort, ApiDatabase, ApiUsername, ApiPassword, ApiConnectionString);
         }
+        else
+        {
+            ApiConnectionString = "Data Source=main.db;Cache=Shared;";
+        }
     }
 
     private void RegenerateElsaConnectionString()
@@ -505,6 +549,10 @@ public partial class DatabaseConfigViewModel : ObservableObject
         if (ElsaDbType != "SQLite")
         {
             ElsaConnectionString = BuildConnectionString(ElsaDbType, ElsaServer, ElsaPort, ElsaDatabase, ElsaUsername, ElsaPassword, ElsaConnectionString);
+        }
+        else
+        {
+            ElsaConnectionString = "Data Source=../../main-elsa.db;Cache=Shared;";
         }
     }
 

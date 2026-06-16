@@ -45,15 +45,18 @@ namespace CJ.Plug.Models.DbContexts
                 if (Directory.Exists(Path.Combine(dir, "src")) &&
                     Directory.Exists(Path.Combine(dir, "02.Publish")))
                 {
-                    // 优先 02.Publish 构建输出目录（Debug/Release 自动适配）
+                    // 优先 src 源码目录（VS 调试时 builder.Configuration 从此读取）
+                    var srcPath = Path.Combine(dir, "src", "PlugApiServer", "CJ.Plug.ApiServer", "appsettings.json");
+                    if (File.Exists(srcPath)) return srcPath;
+
+                    // 回退到 02.Publish 构建输出目录（Debug/Release 自动适配）
                     var debugPath = Path.Combine(dir, "02.Publish", "CJ.Plug.ApiServer", "Debug", "net10.0", "appsettings.json");
                     if (File.Exists(debugPath)) return debugPath;
 
                     var releasePath = Path.Combine(dir, "02.Publish", "CJ.Plug.ApiServer", "Release", "net10.0", "appsettings.json");
                     if (File.Exists(releasePath)) return releasePath;
 
-                    // 回退到源码目录
-                    return Path.Combine(dir, "src", "PlugApiServer", "CJ.Plug.ApiServer", "appsettings.json");
+                    return null;
                 }
                 var parent = Path.GetDirectoryName(dir);
                 if (parent == dir) break;

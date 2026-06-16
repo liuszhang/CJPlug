@@ -15,6 +15,8 @@
     <PackageVersion Include="Elsa.JavaScript" Version="3.5.3" />
     <PackageVersion Include="Elsa.Liquid" Version="3.5.3" />
     <PackageVersion Include="Elsa.Persistence.EFCore" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Persistence.EFCore.PostgreSql" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Persistence.EFCore.SqlServer" Version="3.7.0" />
     <PackageVersion Include="Elsa.Persistence.EFCore.Sqlite" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.Agents" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.DomInterop" Version="3.7.0" />
