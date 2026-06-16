@@ -196,6 +196,7 @@ else
     }
 }
 
+<MudCheckBox Value="@SupportRemoteView" ValueChanged="@OnSupportRemoteViewChanged" T="bool" Label="支持远程视图" Color="Color.Primary" Dense></MudCheckBox>
 
 @code {
     /// <summary>服务器 API 基地址</summary>
@@ -234,15 +235,27 @@ else
     private bool _loaded;
     private bool _restored;
     private int _activeTabIndex;
+    private bool SupportRemoteView { get; set; }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private async Task OnSupportRemoteViewChanged(bool value)
     {
-        if (firstRender && !_loaded)
+        SupportRemoteView = value;
+        // 立即写入 Plug 对象，防止组件因切换插头类型等操作被重建后状态丢失
+        if (ExistingPlug != null)
+        {
+            ExistingPlug.SetPlugSetting(PlugSettingKey.SupportRemoteView.ToString(),
+                                        value.ToString().ToLower());
+        }
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!_loaded)
         {
             _loaded = true;
             Tools = await StationAndToolApiClient.GetAllToolsAsync();
             await TryRestoreFromExistingPlug();
-            StateHasChanged();
         }
     }
 
@@ -250,6 +263,8 @@ else
     {
         if (ExistingPlug == null || _restored) return;
         _restored = true;
+
+        SupportRemoteView = ExistingPlug.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString()) == "true";
 
         // 从工具库选择模式：根据 ToolId 恢复
         if (ExistingPlug.ToolId.HasValue)
@@ -425,6 +440,8 @@ else
         // plug.AddVariable("ShowConsole", VariableTypeEnum.String.ToString());
         // plug.AddVariable("RedirectOutput", VariableTypeEnum.String.ToString());
         // plug.AddVariable("RedirectWorkPath", VariableTypeEnum.String.ToString());
+
+        plug.SetPlugSetting(PlugSettingKey.SupportRemoteView.ToString(), SupportRemoteView.ToString().ToLower());
     }
 
     /// <summary>将选中工具的变量附加到 Plug</summary>

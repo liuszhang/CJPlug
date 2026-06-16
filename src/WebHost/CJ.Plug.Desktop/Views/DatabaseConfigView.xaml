@@ -294,22 +294,18 @@
                                Margin="0,0,0,20"/>
 
                     <!-- 数据库类型 -->
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="数据库类型:" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Column="1"
-                                  Style="{StaticResource MdComboBox}"
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                        <TextBlock Text="数据库类型:" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Style="{StaticResource MdComboBox}"
+                                  Width="200"
+                                  VerticalAlignment="Center"
                                   SelectedValue="{Binding ApiDbType, Mode=TwoWay}"
                                   SelectedValuePath="Content">
                             <ComboBoxItem Content="SQLite"/>
                             <ComboBoxItem Content="PostgreSQL"/>
                             <ComboBoxItem Content="SqlServer"/>
                         </ComboBox>
-                    </Grid>
+                    </StackPanel>
 
                     <!-- 连接字符串 (仅 SQLite) -->
                     <Grid Margin="0,0,0,14"
@@ -328,67 +324,66 @@
                                  MinHeight="50"/>
                     </Grid>
 
-                    <!-- 服务器地址 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsApiNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="服务器地址:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ApiServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Grid.Column="2" Text="端口:" Style="{StaticResource FieldLabel}" MinWidth="40"/>
-                        <TextBox Grid.Column="3"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ApiPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                    <!-- 非 SQLite 配置区域 (PostgreSQL / SqlServer) -->
+                    <StackPanel Visibility="{Binding IsApiNotSqlite, Converter={StaticResource BoolToVis}}">
+                        <!-- 服务器地址 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="服务器地址:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ApiServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Grid.Column="2" Text="端口:" Style="{StaticResource FieldLabel}" MinWidth="40"/>
+                            <TextBox Grid.Column="3"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ApiPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 数据库名 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsApiNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="数据库名:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ApiDatabase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                        <!-- 数据库名 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="数据库名:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ApiDatabase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 用户名 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsApiNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="用户名:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ApiUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                        <!-- 用户名 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="用户名:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ApiUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 密码 (非 SQLite) -->
-                    <Grid Margin="0,0,0,20"
-                          Visibility="{Binding IsApiNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="密码:" Style="{StaticResource FieldLabel}"/>
-                        <PasswordBox Grid.Column="1"
-                                     Style="{StaticResource MdPasswordBox}"
-                                     PasswordChanged="OnApiPasswordChanged"/>
-                    </Grid>
+                        <!-- 密码 -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="密码:" Style="{StaticResource FieldLabel}"/>
+                            <PasswordBox Grid.Column="1"
+                                         Style="{StaticResource MdPasswordBox}"
+                                         PasswordChanged="OnApiPasswordChanged"/>
+                        </Grid>
+                    </StackPanel>
 
                     <!-- 按钮行 -->
                     <Grid Margin="0,0,0,8">
@@ -428,22 +423,18 @@
                                Margin="0,0,0,20"/>
 
                     <!-- 数据库类型 -->
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="数据库类型:" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Column="1"
-                                  Style="{StaticResource MdComboBox}"
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                        <TextBlock Text="数据库类型:" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Style="{StaticResource MdComboBox}"
+                                  Width="200"
+                                  VerticalAlignment="Center"
                                   SelectedValue="{Binding ElsaDbType, Mode=TwoWay}"
                                   SelectedValuePath="Content">
                             <ComboBoxItem Content="SQLite"/>
                             <ComboBoxItem Content="PostgreSQL"/>
                             <ComboBoxItem Content="SqlServer"/>
                         </ComboBox>
-                    </Grid>
+                    </StackPanel>
 
                     <!-- 连接字符串 (仅 SQLite) -->
                     <Grid Margin="0,0,0,14"
@@ -462,67 +453,66 @@
                                  MinHeight="50"/>
                     </Grid>
 
-                    <!-- 服务器地址 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsElsaNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="服务器地址:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ElsaServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Grid.Column="2" Text="端口:" Style="{StaticResource FieldLabel}" MinWidth="40"/>
-                        <TextBox Grid.Column="3"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ElsaPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                    <!-- 非 SQLite 配置区域 (PostgreSQL / SqlServer) -->
+                    <StackPanel Visibility="{Binding IsElsaNotSqlite, Converter={StaticResource BoolToVis}}">
+                        <!-- 服务器地址 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="服务器地址:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ElsaServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Grid.Column="2" Text="端口:" Style="{StaticResource FieldLabel}" MinWidth="40"/>
+                            <TextBox Grid.Column="3"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ElsaPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 数据库名 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsElsaNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="数据库名:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ElsaDatabase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                        <!-- 数据库名 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="数据库名:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ElsaDatabase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 用户名 (非 SQLite) -->
-                    <Grid Margin="0,0,0,14"
-                          Visibility="{Binding IsElsaNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="用户名:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1"
-                                 Style="{StaticResource MdTextBox}"
-                                 Text="{Binding ElsaUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
+                        <!-- 用户名 -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="用户名:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource MdTextBox}"
+                                     Text="{Binding ElsaUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
 
-                    <!-- 密码 (非 SQLite) -->
-                    <Grid Margin="0,0,0,20"
-                          Visibility="{Binding IsElsaNotSqlite, Converter={StaticResource BoolToVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="密码:" Style="{StaticResource FieldLabel}"/>
-                        <PasswordBox Grid.Column="1"
-                                     Style="{StaticResource MdPasswordBox}"
-                                     PasswordChanged="OnElsaPasswordChanged"/>
-                    </Grid>
+                        <!-- 密码 -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="密码:" Style="{StaticResource FieldLabel}"/>
+                            <PasswordBox Grid.Column="1"
+                                         Style="{StaticResource MdPasswordBox}"
+                                         PasswordChanged="OnElsaPasswordChanged"/>
+                        </Grid>
+                    </StackPanel>
 
                     <!-- 按钮行 -->
                     <Grid Margin="0,0,0,8">

@@ -59,6 +59,28 @@ namespace CJ.Plug.PlugBaseCore.Services
                     }
                 }
 
+                // 手动输入路径的桌面类插头：构造合成 Tool 绕过 API 查找
+                // 此类插头没有 ToolId，路径由用户手动指定（存储在 plug.Value 中）
+                if (!plug.ToolId.HasValue
+                    && !string.IsNullOrEmpty(plug.Value)
+                    && !(plug.ToolVersionPath?.StartsWith("uploaded://") ?? false)
+                    && plugExecutionRequest.ResolvedTool == null)
+                {
+                    var syntheticTool = new Tool
+                    {
+                        ToolName = plug.ToolName ?? "自定义工具",
+                        ToolVersion = "1.0",
+                        ToolPath = plug.Value,
+                        CommandParameter = plug.ToolCommandLineShema,
+                        SkipDownloadToStation = true,
+                        IsBrowsable = false,
+                    };
+                    plugExecutionRequest.ResolvedTool = syntheticTool;
+                    plugExecutionRequest.ToolName = syntheticTool.ToolName;
+                    plugExecutionRequest.ToolVersion = syntheticTool.ToolVersion;
+                    CLog.Information($"[MANUAL-PATH] 桌面插头手动路径模式，合成 Tool: Name={syntheticTool.ToolName}, Path={plug.Value}");
+                }
+
                 if(plugExecutionRequest.InputVariables.Count==0&&!string.IsNullOrEmpty(plugExecutionRequest.ExecuteResultData.Ids.PDZId))
                 {
                     //这里应该使用PDZ的参数

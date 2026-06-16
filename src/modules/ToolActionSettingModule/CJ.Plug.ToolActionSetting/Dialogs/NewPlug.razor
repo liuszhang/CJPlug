@@ -80,6 +80,7 @@
                                    PlugFolder="@(Plug.DefinitionId?.ToString())"
                                    Username="@_currentUserName"
                                    IsSystemPlug="@IsSystemPlug"
+                                   ExistingPlug="Plug"
                                    CommandDisplayChanged="OnCommandDisplayChanged" />
             }
             else if (SelectedCategory == PlugCategorys.接口类.ToString())
