@@ -48,6 +48,7 @@ namespace CMDPlug.Services
             var PlugSettings = new PlugSettings(null);
             PlugSettings.PlugDisplayName = "CMD命令执行";
             PlugSettings.PlugTypeKey = PlugKeySetting.CommonSettingPageKey;
+            PlugSettings.PlugCategory= PlugCategorys.桌面类.ToString();
             //PlugSettings.SetSetting(PlugSettingKey.Outcomes.ToString(), "成功|失败");
 
             var InitVariables = new List<BaseVariable>();

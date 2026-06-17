@@ -90,6 +90,16 @@ public partial class MainViewModel : ObservableObject
             Name = "工具资源",
             Url = "http://localhost:5066/ToolResource?hideMenu=true"
         });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "AI对话",
+            Url = "http://localhost:5066/AskAI?hideMenu=true"
+        });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "LLM配置",
+            Url = "http://localhost:5066/LlmConfig?hideMenu=true"
+        });
 
         SelectedMenuItem = MenuItems[3];
     }
