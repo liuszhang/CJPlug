@@ -7,7 +7,7 @@ using CJ.Plug.Models.VariableType;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
 using CJ.Plug.PlugDataZoneApiClient;
-using CJ.Plug.StationAndToolApiClient;
+using CJ.Plug.StationManageApiClient;
 using CommonToolExecute;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -16,13 +16,13 @@ using System.Text.Json;
 public class CommonToolExecutePlugCommonExecuteService: BasePlugExecuteService
 {
     private readonly IToolExecuteService ToolExecuteService;
-    private IStationAndToolApiClient? StationAndToolApiClient;
+    private MainApiClient? StationManageApiClient;
 
     public CommonToolExecutePlugCommonExecuteService(IServiceProvider serviceProvider, IToolExecuteService toolExecuteService) : base(serviceProvider)
     {
         ToolExecuteService = toolExecuteService;
         PDZApiClient = PDZApiClient ?? _serviceProvider.GetRequiredService<IPDZApiClient>();
-        StationAndToolApiClient= StationAndToolApiClient??_serviceProvider.GetRequiredService<IStationAndToolApiClient>();
+        StationManageApiClient= StationManageApiClient??_serviceProvider.GetRequiredService<MainApiClient>();
     }
 
     public override bool IsThisPlugTypeKey(string? PlugTypeKey) => (PlugTypeKey == PlugKeySetting.CommonExecuteKey);
@@ -129,7 +129,7 @@ public class CommonToolExecutePlugCommonExecuteService: BasePlugExecuteService
             var ToolVariable = PlugVariablesInPDZ.Where(v => v.Name == InitVariableNames.Tool.ToString()).FirstOrDefault();
             var tmpToolValue = JsonSerializer.Deserialize<ToolVariable>(ToolVariable?.Value);
             //Log.Information(tmpTool?.ToolId?.ToString());
-            var Tool = await StationAndToolApiClient.GetToolByIdAsync(tmpToolValue.ToolId);
+            var Tool = await StationManageApiClient.GetToolByIdAsync(tmpToolValue.ToolId);
             if (Tool == null)
             {
                 Log.Information("请先选择一个工具");

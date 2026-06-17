@@ -3,7 +3,6 @@
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.AspNetCore.Components.Forms
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.Models.VariableType
 @using CJ.Plug.ToolActionSetting.Components.Plugs
 @using Microsoft.JSInterop
@@ -11,7 +10,6 @@
 
 @inject MainApiClient MainApiClient
 @inject ISnackbar Snackbar
-@inject IStationAndToolApiClient StationAndToolApiClient
 @inject IJSRuntime JsRuntime
 @inject IDomInteropService DomInteropService
 
@@ -50,6 +48,7 @@
                     <MudSelectItem Value="@PlugCategorys.桌面类.ToString()">桌面类</MudSelectItem>
                     <MudSelectItem Value="@PlugCategorys.接口类.ToString()">接口类</MudSelectItem>
                     <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
+                    <MudSelectItem Value="@PlugCategorys.设备类.ToString()">设备类</MudSelectItem>
                 </MudSelect>
                 <MudTextField @bind-Value="@Plug.PlugTypeKey" Margin="Margin.Dense" Label="插头标识" ReadOnly="true" Variant="Variant.Filled" Class="flex-grow-1"></MudTextField>
                 <MudTextField @bind-Value="@Plug.GroupName" Margin="Margin.Dense" Label="插头分组" Variant="Variant.Outlined" Class="flex-grow-1"></MudTextField>
@@ -92,6 +91,10 @@
                                   Plug="@Plug"
                                   OnError="msg => Snackbar.Add(msg, Severity.Error)"
                                   OnInfo="msg => Snackbar.Add(msg, Severity.Info)" />
+            }
+            else if (Plug.Category?.Contains("设备") == true)
+            {
+                <DevicePlugConfig @ref="_deviceConfig" Plug="@Plug" />
             }
         </MudStack>
     </DialogContent>
@@ -204,6 +207,7 @@
     private DesktopPlugConfig? _desktopConfig;
     private InterfacePlugConfig? _interfaceConfig;
     private ScriptPlugConfig? _scriptConfig;
+    private DevicePlugConfig? _deviceConfig;
 
     protected override void OnInitialized()
     {
@@ -297,6 +301,10 @@
             else if (Plug.Category?.Contains("脚本") == true && _scriptConfig != null)
             {
                 _scriptConfig.ApplyToPlug(Plug);
+            }
+            else if (Plug.Category?.Contains("设备") == true && _deviceConfig != null)
+            {
+                _deviceConfig.ApplyToPlug(Plug);
             }
 
             await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);

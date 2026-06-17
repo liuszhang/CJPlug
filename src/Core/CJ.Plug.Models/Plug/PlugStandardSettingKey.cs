@@ -42,7 +42,20 @@ namespace CJ.Plug.Models.Plug
 
         //script plug
         TextMapping,
-        ScriptType               //用来保存是何种脚本，如java/python/c#等，插头执行时根据该配置匹配相应的脚本
+        ScriptType,              //用来保存是何种脚本，如java/python/c#等，插头执行时根据该配置匹配相应的脚本
+
+        //device plug
+        DeviceIP,                //设备 IP 地址
+        DevicePort,              //设备端口
+        DeviceProtocol,          //通信协议 (HTTP/TCP/UDP/Modbus TCP/Modbus RTU/Serial)
+        DeviceBrand,             //设备品牌
+        DeviceModel,             //设备型号
+        DeviceTimeout,           //连接超时 (ms)
+        DeviceAuthType,          //认证方式 (None/BasicAuth/ApiKey/BearerToken)
+        DeviceUsername,          //认证用户名
+        DevicePassword,          //认证密码
+        DeviceApiKey,            //API Key / Token
+        DeviceActions            //设备动作列表 (JSON)
 
 
 

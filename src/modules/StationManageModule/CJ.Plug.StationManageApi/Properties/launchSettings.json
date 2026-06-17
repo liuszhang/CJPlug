@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "CJ.Plug.StationManageApi": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:48379;http://localhost:48380"
+    }
+  }
+}

@@ -3,7 +3,6 @@
 @using CJ.Plug.Models.Shared
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.AspNetCore.Components.Forms
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.TASApiClient
 @using CJ.Plug.Models.VariableType
 @using CJ.Plug.ToolActionSetting.Components.Plugs
@@ -12,7 +11,6 @@
 
 @inject MainApiClient MainApiClient
 @inject ITASApiClient TASApiClient
-@inject IStationAndToolApiClient StationAndToolApiClient
 @inject IJSRuntime JsRuntime
 @inject IElsaDomToolService ElsaDomToolService
 @inject IDomInteropService DomInteropService
@@ -52,6 +50,7 @@
                 <MudSelectItem Value="@PlugCategorys.桌面类.ToString()">桌面类</MudSelectItem>
                 <MudSelectItem Value="@PlugCategorys.接口类.ToString()">接口类</MudSelectItem>
                 <MudSelectItem Value="@PlugCategorys.脚本类.ToString()">脚本类</MudSelectItem>
+                <MudSelectItem Value="@PlugCategorys.设备类.ToString()">设备类</MudSelectItem>
             </MudSelect>
 
             <MudStack Row>
@@ -92,6 +91,10 @@
                 <ScriptPlugConfig @ref="_scriptConfig"
                                   OnError="msg => Snackbar.Add(msg, Severity.Error)"
                                   OnInfo="msg => Snackbar.Add(msg, Severity.Info)" />
+            }
+            else if (SelectedCategory == PlugCategorys.设备类.ToString())
+            {
+                <DevicePlugConfig @ref="_deviceConfig" />
             }
         </MudStack>
     </DialogContent>
@@ -203,6 +206,7 @@
     private DesktopPlugConfig? _desktopConfig;
     private InterfacePlugConfig? _interfaceConfig;
     private ScriptPlugConfig? _scriptConfig;
+    private DevicePlugConfig? _deviceConfig;
 
     protected override void OnInitialized()
     {
@@ -274,6 +278,10 @@
             else if (SelectedCategory == PlugCategorys.脚本类.ToString() && _scriptConfig != null)
             {
                 _scriptConfig.ApplyToPlug(Plug);
+            }
+            else if (SelectedCategory == PlugCategorys.设备类.ToString() && _deviceConfig != null)
+            {
+                _deviceConfig.ApplyToPlug(Plug);
             }
 
             Plug.Creater = _currentUserName;

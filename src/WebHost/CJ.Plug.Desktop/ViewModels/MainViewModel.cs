@@ -82,8 +82,13 @@ public partial class MainViewModel : ObservableObject
         });
         MenuItems.Add(new MenuItemViewModel
         {
-            Name = "图站与工具",
-            Url = "http://localhost:5066/StationAndTool?hideMenu=true"
+            Name = "图站管理",
+            Url = "http://localhost:5066/StationManage?hideMenu=true"
+        });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "工具资源",
+            Url = "http://localhost:5066/ToolResource?hideMenu=true"
         });
 
         SelectedMenuItem = MenuItems[3];

@@ -1,0 +1,141 @@
+using System.IO;
+using CJ.Plug.AuditModels;
+using CJ.Plug.Models.Station;
+using CJ.Plug.StationManageApiClient;
+
+public partial class MainApiClient : IStationManageApiClient
+{
+    public async Task<Station?> CheckOrCreateStation(string stationIp, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.CheckOrCreateStation(stationIp, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"检查或创建工作站: {stationIp}");
+        return result;
+    }
+
+    public async Task CreateOrSetToolConfig(StationConfigTable stationToolConfig)
+    {
+        await StationManageApiClient.Value.CreateOrSetToolConfig(stationToolConfig);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, "创建或设置工具配置");
+    }
+
+    public async Task<Station?> CreateStationAsync(Station newStation, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.CreateStationAsync(newStation, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, $"创建工作站ID: {newStation.Id}");
+        return result;
+    }
+
+    public async Task<StationConfigTable?> CreateStationToolConfigAsync(StationConfigTable newStationToolConfig, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.CreateStationToolConfigAsync(newStationToolConfig, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Create, "创建工作站工具配置");
+        return result;
+    }
+
+    public async Task<bool> DeleteStationAsync(int StationId, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.DeleteStationAsync(StationId, ct);
+        if (result)
+            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Delete, $"删除工作站ID: {StationId}");
+        return result;
+    }
+
+    public async Task<bool> DeleteStationToolConfigAsync(int stationToolConfigId, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.DeleteStationToolConfigAsync(stationToolConfigId, ct);
+        if (result)
+            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Delete, $"删除工作站工具配置ID: {stationToolConfigId}");
+        return result;
+    }
+
+    public async Task<List<StationConfigTable>?> GetAllStationConfigsAsync(CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetAllStationConfigsAsync(ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "查询所有工作站配置");
+        return result;
+    }
+
+    public async Task<List<Station>?> GetAllStationsAsync(CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetAllStationsAsync(ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "查询所有工作站");
+        return result;
+    }
+
+    public async Task<StationConfigTable?> GetByIdAsync(int id, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetByIdAsync(id, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"查询工作站配置ID: {id}");
+        return result;
+    }
+
+    public async Task<StationConfigTable?> GetByStationIpAsync(string stationIp, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetByStationIpAsync(stationIp, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"查询工作站配置IP: {stationIp}");
+        return result;
+    }
+
+    public async Task<Station?> GetStationByIdAsync(int id, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetStationByIdAsync(id, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"查询工作站ID: {id}");
+        return result;
+    }
+
+    public async Task<Station?> GetStationByIpAsync(string stationIp, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetStationByIpAsync($"{stationIp}", ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"查询工作站IP: {stationIp}");
+        return result;
+    }
+
+    public async Task<string?> GetStationToUse(CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetStationToUse(ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取可用工作站");
+        return result;
+    }
+
+    public async Task<Station?> GetStationToUseByTool(string toolName, string? version = null, string? specifiedStationIp = null, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetStationToUseByTool(toolName, version, specifiedStationIp, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"按工具获取工作站: {toolName}");
+        return result;
+    }
+
+    public async Task<string?> GetToolPathByFilter(ToolConfigFilter ToolConfigFilter)
+    {
+        var result = await StationManageApiClient.Value.GetToolPathByFilter(ToolConfigFilter);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "按筛选获取工具路径");
+        return result;
+    }
+
+    public async Task<ToolDeploySettingModel?> GetToolDeploySettingAsync(ToolConfigFilter filter)
+    {
+        var result = await StationManageApiClient.Value.GetToolDeploySettingAsync(filter);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取工具部署设置");
+        return result;
+    }
+
+    public async Task<string?> GetToolPathOnIp(string ip, string toolName, string? version = null)
+    {
+        var result = await StationManageApiClient.Value.GetToolPathOnIp(ip, toolName, version);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, $"获取IP工具路径: {ip}.{toolName}");
+        return result;
+    }
+
+    public async Task<Station?> UpdateStationAsync(Station updatedStation, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.UpdateStationAsync(updatedStation, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, $"更新工作站ID: {updatedStation.Id}");
+        return result;
+    }
+
+    public async Task<StationConfigTable?> UpdateStationToolConfigAsync(StationConfigTable updatedStationToolConfig, CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.UpdateStationToolConfigAsync(updatedStationToolConfig, ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, "更新工作站工具配置");
+        return result;
+    }
+}

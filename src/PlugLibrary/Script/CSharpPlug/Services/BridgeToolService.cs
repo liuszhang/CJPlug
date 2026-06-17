@@ -1,6 +1,6 @@
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Plug;
-using CJ.Plug.StationAndToolApiClient;
+using CJ.Plug.StationManageApiClient;
 using Serilog;
 using System.Text;
 
@@ -18,15 +18,13 @@ namespace CSharpPlug.Services
     public class BridgeToolService
     {
         private readonly MainApiClient _mainApiClient;
-        private readonly IStationAndToolApiClient _stationAndToolApiClient;
 
         private const string BridgeToolName = ".NET Framework 桥接程序";
         private const string BridgeToolVersion = "1.0";
 
-        public BridgeToolService(MainApiClient mainApiClient, IStationAndToolApiClient stationAndToolApiClient)
+        public BridgeToolService(MainApiClient mainApiClient)
         {
             _mainApiClient = mainApiClient;
-            _stationAndToolApiClient = stationAndToolApiClient;
         }
 
         /// <summary>
@@ -44,7 +42,7 @@ namespace CSharpPlug.Services
             try
             {
                 // 1. 查找桥接程序工具（验证工具已在种子数据中注册）
-                var tool = await _stationAndToolApiClient.GetToolByDisplayNameAsync(
+                var tool = await _mainApiClient.GetToolByDisplayNameAsync(
                     $"{BridgeToolName}({BridgeToolVersion})");
                 if (tool == null)
                 {
@@ -53,7 +51,7 @@ namespace CSharpPlug.Services
                 }
 
                 // 2. 获取可用的图站
-                var stationIp = await _stationAndToolApiClient.GetStationToUse();
+                var stationIp = await _mainApiClient.GetStationToUse();
                 if (string.IsNullOrEmpty(stationIp))
                 {
                     Log.Warning("无可用的图站来执行桥接程序");
@@ -65,7 +63,7 @@ namespace CSharpPlug.Services
                 // 3. 解决工具路径：优先用工具配置表获取图站上的工具路径
                 //    如果配置表没有，则使用工具本身的 ToolPath 作为兜底
                 var toolPath = tool.ToolPath;
-                var toolConfigPath = await _stationAndToolApiClient.GetToolPathByFilter(
+                var toolConfigPath = await _mainApiClient.GetToolPathByFilter(
                     new CJ.Plug.Models.Station.ToolConfigFilter
                     {
                         StationIP = stationIp,

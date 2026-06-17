@@ -10,7 +10,7 @@
     <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
     <ProjectReference Include="..\..\JobManageModule\CJ.Plug.JobManageApiClient\CJ.Plug.JobManageApiClient.csproj" />
     <ProjectReference Include="..\..\PDZManageModule\CJ.Plug.PlugDataZoneApiClient\CJ.Plug.PlugDataZoneApiClient.csproj" />
-    <ProjectReference Include="..\..\StationAndToolModule\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
+    <ProjectReference Include="..\..\StationManageModule\CJ.Plug.StationManageApiClient\CJ.Plug.StationManageApiClient.csproj" />
     <ProjectReference Include="..\..\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
   </ItemGroup>
 

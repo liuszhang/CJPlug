@@ -66,7 +66,22 @@ internal partial class PlugExecutionEngine
             plug.SetVariableValue(v.Name, v.Value);
         }
 
-        CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}");
+        // 将插头定义中的默认变量值注入到 InputVariables（如果调用方未提供）。
+        // 直接运行 / Standalone 模式中 InputVariables 可能为空，此时应使用插头配置的默认参数值。
+        foreach (var pv in plug.PlugVariables)
+        {
+            if (request.InputVariables.Any(iv => iv.Name == pv.Name)) continue;
+            if (string.IsNullOrEmpty(pv.Value)) continue;
+            CLog.Information($"[TRACE-MCP] 使用插头默认变量: {pv.Name}={pv.Value}");
+            request.InputVariables.Add(new PlugVariableData
+            {
+                Name = pv.Name,
+                Value = pv.Value,
+                Type = pv.Type
+            });
+        }
+
+        CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}, InputVariables 数: {request.InputVariables?.Count ?? 0}");
 
         // 将插头类型信息注入到 request，确保下游 handler 能正确使用
         request.PlugTypeKey = plug.PlugTypeKey;

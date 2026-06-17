@@ -1,4 +1,5 @@
 @page "/TAS"
+@implements IDisposable
 
 @using System.Text.Json
 @using System.Text.Json.Nodes
@@ -17,12 +18,12 @@
 @using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Dialogs
 @using CJ.Plug.SharedPages.Layout
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.TASApiClient
 @using CJ.Plug.ToolActionSetting.Components
 @using CJ.Plug.ToolActionSetting.Dialogs
 @using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
 @using Elsa.Studio.Workflows.Domain.Contracts
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 @using Orientation = Radzen.Orientation
@@ -32,16 +33,18 @@
 @using Variant=MudBlazor.Variant
 @using DialogOptions=MudBlazor.DialogOptions
 @using CJ.Plug.SharedPages.Contracts
+@using Microsoft.JSInterop
 
 
 @inject NavigationManager NavigationManager
-@inject IStationAndToolApiClient StationAndToolApiClient
 @inject IDialogService DialogService
 @inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 @inject IElsaStudioService ElsaEngineService
 @inject ISnackbar Snackbar
 @inject MainApiClient MainApiClient
 @inject IDomInteropService DomInteropService
+@inject IJSRuntime JSRuntime
+@inject HubConnectionManagerService HubConnectionManagerService
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -84,7 +87,7 @@
 
     <MudDivider />
 
-    <MudDropContainer T="Plug" Items="AllPlugsToShow" @key="AllPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
+    <MudDropContainer T="Plug" Items="AllPlugsToShow" @key="AllPlugsToShow" @ref="_container" ItemsSelector="@IsItemInZone" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
 
 
         <ChildContent>
@@ -96,10 +99,11 @@
                         <VerticalWell ExtraPadding="100">
 
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                                <MudSelect T="int" Dense Margin="Margin.Dense" Variant="Variant.Outlined" @bind-Value="_plugListTabIndex" Style="width:120px">
+                                @* TODO: 下拉框暂时隐藏，后续根据需求恢复 *@
+                                @* <MudSelect T="int" Dense Margin="Margin.Dense" Variant="Variant.Outlined" @bind-Value="_plugListTabIndex" Style="width:120px">
                                     <MudSelectItem Value="0">插头</MudSelectItem>
                                     <MudSelectItem Value="1">动作</MudSelectItem>
-                                </MudSelect>
+                                </MudSelect> *@
                                 @if (_plugListTabIndex == 0)
                                 {
                                     <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键插入</MudButton>
@@ -115,11 +119,26 @@
                                 }
                                 else if (_plugListTabIndex == 0)
                                 {
-                                    <MudList T="Plug" SelectedValue="SelectedPlug" SelectedValueChanged="OnPlugSelected" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
-                                        <MudDropZone T="Plug" Identifier="@("Plug")" AllowReorder="true">
-
-                                        </MudDropZone>
-                                    </MudList>
+                                    <MudExpansionPanels>
+                                        @foreach (var group in _groupedPlugItems)
+                                        {
+                                            var groupKey = group.Key;
+                                            var isCollapsed = _collapsedGroups.Contains(groupKey);
+                                            <MudExpansionPanel Text="@($"{groupKey} ({group.Value.Count})")"
+                                                               IsExpanded="@(!isCollapsed)"
+                                                               IsExpandedChanged="@((bool expanded) => OnGroupToggled(groupKey, expanded))">
+                                                <ChildContent>
+                                                    <MudList T="Plug" SelectedValue="SelectedPlug"
+                                                             SelectedValueChanged="OnPlugSelected"
+                                                             Color="Color.Primary"
+                                                             SelectionMode="SelectionMode.SingleSelection">
+                                                        <MudDropZone T="Plug" Identifier='@("Plug_" + groupKey)' AllowReorder="true">
+                                                        </MudDropZone>
+                                                    </MudList>
+                                                </ChildContent>
+                                            </MudExpansionPanel>
+                                        }
+                                    </MudExpansionPanels>
                                 }
                                 else
                                 {
@@ -262,6 +281,8 @@
     private List<Plug>? PlugItemsToShow { get; set; } = new();
     private List<Plug>? ActionItemsToShow { get; set; } = new();
     private List<Plug>? AllPlugsToShow { get; set; } = new();
+    private Dictionary<string, List<Plug>> _groupedPlugItems = new();
+    private HashSet<string> _collapsedGroups = new();
     private int _plugListTabIndex = 0;
     private List<Plug>? ShadowPlugActions { get; set; } = new();
     private Plug? SelectedPlug { get; set; }
@@ -270,7 +291,7 @@
 
     private bool PlugListPanelCollapsed { get; set; } = false;
     private bool PlugVariablePanelCollapsed { get; set; } = false;
-    private bool PlugActionPanelCollapsed { get; set; } = false;
+    private bool PlugActionPanelCollapsed { get; set; } = true; @* 默认折叠，后续如需恢复改为 false *@
     public double SplitterPanelPercent { get; set; } = 35;
 
     public SetMaxGuiDesignerNotify? SetMaxGuiDesignerNotify { get; set; }
@@ -318,6 +339,21 @@
         StateHasChanged();
     }
 
+    private void OnGroupToggled(string groupKey, bool expanded)
+    {
+        if (expanded)
+            _collapsedGroups.Remove(groupKey);
+        else
+            _collapsedGroups.Add(groupKey);
+    }
+
+    private bool IsItemInZone(Plug item, string dropzone)
+    {
+        if (item.Tag == "Plug" && dropzone.StartsWith("Plug_"))
+            return $"Plug_{PlugCategoryGroupHelper.GetDisplayGroup(item.Category)}" == dropzone;
+        return item.Tag == dropzone;
+    }
+
     private async Task OnPlugSelected(Plug? plug)
     {
         SelectedPlug = plug;
@@ -359,7 +395,34 @@
             await LoadMcpTools();
             _actionPanelPlug = SelectedPlug;
             StateHasChanged();
+
+            // 监听图站执行事件：直接运行插头时触发 VNC 远程桌面弹窗
+            HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
+            HubConnectionManagerService._hubConnection.On(
+                LogTypeEnum.StationExecuting.ToString(),
+                new[] { typeof(string), typeof(string), typeof(string) },
+                (args, _) =>
+                {
+                    var pdzId = (string?)args[0];
+                    var plugDefinitionId = (string?)args[1];
+                    var stationIp = (string?)args[2];
+                    if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
+                    InvokeAsync(async () =>
+                    {
+                        var host = stationIp;
+                        try { host = new Uri(stationIp).Host; } catch { }
+                        Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面...", Severity.Info);
+                        await JSRuntime.InvokeVoidAsync("open", $"/remote/vnc/{host}", "_blank");
+                    });
+                    return Task.CompletedTask;
+                },
+                null);
         }
+    }
+
+    public void Dispose()
+    {
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
     }
 
     private void OnMaxGuiDesigner(bool isMax)
@@ -435,7 +498,7 @@
             if (PlugFromSetting.ToolName != null || PlugFromSetting.ToolDisplayName != null)
             {
                 //Log.Information("获取工具信息：" + PlugFromSetting.ToolName + " " + PlugFromSetting.ToolDisplayName);
-                var tool = await StationAndToolApiClient.GetToolByDisplayNameAsync(PlugFromSetting.ToolDisplayName ?? $"{PlugFromSetting.ToolName}({PlugFromSetting.ToolVersion})");
+                var tool = await MainApiClient.GetToolByDisplayNameAsync(PlugFromSetting.ToolDisplayName ?? $"{PlugFromSetting.ToolName}({PlugFromSetting.ToolVersion})");
                 PlugFromSetting.ToolCommandLineShema = tool?.CommandParameter ?? EachPlugSetting.GetSetting(PlugSettingKey.CommandLineShema.ToString());
                 PlugFromSetting.Category = tool?.ToolType ?? EachPlugSetting.GetSetting(PlugSettingKey.Category.ToString());
                 PlugFromSetting.ToolDisplayName = $"{tool?.ToolName}({tool?.ToolVersion})";
@@ -633,6 +696,19 @@
             p.CreateType == PlugCreateTypeEnum.RootAdminPlug.ToString() ||
             p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()
         ).ToList();
+
+        // 按显示分组排序，组内按名称排序
+        var groupOrder = PlugCategoryGroupHelper.GroupOrder;
+        PlugItemsToShow = PlugItemsToShow
+            .OrderBy(p => Array.IndexOf(groupOrder, PlugCategoryGroupHelper.GetDisplayGroup(p.Category)))
+            .ThenBy(p => p.Name)
+            .ToList();
+
+        // 构建分组字典
+        _groupedPlugItems = PlugItemsToShow
+            .GroupBy(p => PlugCategoryGroupHelper.GetDisplayGroup(p.Category))
+            .OrderBy(g => Array.IndexOf(groupOrder, g.Key))
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         ActionItemsToShow = query.Where(p =>
             p.CreateType == PlugCreateTypeEnum.ActionRootPlug.ToString() ||

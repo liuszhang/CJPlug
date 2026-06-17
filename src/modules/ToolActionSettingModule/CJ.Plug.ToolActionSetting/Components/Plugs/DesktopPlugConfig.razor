@@ -6,14 +6,13 @@
 @using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Contracts
 @using CJ.Plug.SharedPages.Variable
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.VariableUIHandler.Components
 @using CJ.Plug.VariableUIHandler.Models
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Text.RegularExpressions
 
-@inject IStationAndToolApiClient StationAndToolApiClient
+@inject MainApiClient MainApiClient
 @inject IDialogService DialogService
 
 <MudDivider Class="my-2"></MudDivider>
@@ -254,7 +253,7 @@ else
         if (!_loaded)
         {
             _loaded = true;
-            Tools = await StationAndToolApiClient.GetAllToolsAsync();
+            Tools = await MainApiClient.GetAllToolsAsync();
             await TryRestoreFromExistingPlug();
         }
     }

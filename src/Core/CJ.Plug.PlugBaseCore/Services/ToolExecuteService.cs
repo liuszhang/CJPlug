@@ -319,40 +319,29 @@ namespace CJ.Plug.PlugBaseCore.Services
             }
             //Log.Information($"工具{plugExecutionRequest.ToolName}({plugExecutionRequest.ToolVersion})的执行命令为：{plugExecutionRequest.RequestCommand}");
 
-            //3 执行工具，获取执行结果
-            var result = await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp, plugExecutionRequest);
-
-
+            //3.1 提前通知前端打开 VNC 远程桌面（必须在 SubmitNewToolExecute 之前发送，
+            //    因为 Standalone 模式下该方法是同步等待进程结束的，事后发送就晚了）
             CLog.Information($"准备启动远程桌面");
-            // 通知前端：图站开始执行，可用于触发 VNC 远程桌面
-            //StatusReporter.ReportStationExecuting(
-            //        result?.Ids?.PlugDefinitionId,
-            //        StationToUse.StationIp,
-            //        result?.Ids?.PDZId);
-            var pdz = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
-            var plugData = pdz?.GetPlugData(result?.Ids?.PlugDefinitionId);
-            if (plugData != null)
+            var vncPlugDefId = plugExecutionRequest.ExecuteResultData?.Ids?.PlugDefinitionId;
+            var pdzForVnc = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
+            var plugDataForVnc = pdzForVnc?.GetPlugData(vncPlugDefId);
+            var plugForVnc = plugDataForVnc != null
+                ? await MainApiClient.GetRootPlugByTypeNameAsync(plugDataForVnc.PlugTypeKey)
+                : !string.IsNullOrEmpty(vncPlugDefId)
+                    ? await MainApiClient.GetPlugByDefinitionIdAsync(vncPlugDefId)
+                    : null;
+            if (plugForVnc != null)
             {
-                var plugTypeKey = plugData.PlugTypeKey;
-                CLog.Information($"插头result?.Ids?.PlugDefinitionId：{result?.Ids?.PlugDefinitionId}");
-                CLog.Information($"插头plugExecutionRequest?.PlugTypeKey：{plugTypeKey}");
-                var plug = await MainApiClient.GetRootPlugByTypeNameAsync(plugTypeKey);
-                //var plug = await MainApiClient.GetPlugByDefinitionIdAsync(result?.Ids?.PlugDefinitionId);
-                var plugSetting = plug?.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
-                CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
+                var plugSetting = plugForVnc.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
                 if (plugSetting == "true")
                 {
-                    //CLog.Information($"插头{plug?.Name}的远程支持设置SupportRemoteView={plugSetting}");
-                    StatusReporter.ReportStationExecuting(
-                        result?.Ids?.PlugDefinitionId,
-                        StationToUse.StationIp,
-                        result?.Ids?.PDZId);
+                    CLog.Information($"插头{plugForVnc.Name}已启用 SupportRemoteView，发送 StationExecuting 通知");
+                    StatusReporter.ReportStationExecuting(vncPlugDefId, StationToUse.StationIp, plugExecutionRequest.PDZId);
                 }
             }
-            else
-            {
-                CLog.Warning($"未找到 PlugData，PlugDefinitionId={result?.Ids?.PlugDefinitionId}，跳过远程桌面通知");
-            }
+
+            //3.2 执行工具，获取执行结果
+            var result = await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp, plugExecutionRequest);
 
             return result;
 

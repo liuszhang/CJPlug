@@ -28,7 +28,8 @@
     <ProjectReference Include="..\..\modules\PlugMarketModule\CJ.Plug.PlugMarketApiClient\CJ.Plug.PlugMarketApiClient.csproj" />
     <ProjectReference Include="..\..\modules\ProcessManageModule\CJ.Plug.ProcessManageApiClient\CJ.Plug.ProcessManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\RelationManageModule\CJ.Plug.RelationApiClient\CJ.Plug.RelationApiClient.csproj" />
-    <ProjectReference Include="..\..\modules\StationAndToolModule\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\StationManageModule\CJ.Plug.StationManageApiClient\CJ.Plug.StationManageApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\ToolResourceModule\CJ.Plug.ToolResourceApiClient\CJ.Plug.ToolResourceApiClient.csproj" />
     <ProjectReference Include="..\..\modules\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
     <ProjectReference Include="..\..\modules\UserManageModule\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj" />

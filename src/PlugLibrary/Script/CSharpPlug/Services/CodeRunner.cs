@@ -1,5 +1,5 @@
 using CJ.Plug.PlugBaseCore.Contracts;
-using CJ.Plug.StationAndToolApiClient;
+using CJ.Plug.StationManageApiClient;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
