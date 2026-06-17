@@ -41,6 +41,10 @@ namespace CJ.Plug.Models.Station
         public bool IsEnabled { get; set; }= true;
         public bool IsSystemInitTool { get; set; }=false;
         public bool? IsBrowsable { get; set; }= true;
+        /// <summary>
+        /// 是否支持远程可视化。为 true 时启动工具会弹出 VNC 远程连接窗口。
+        /// </summary>
+        public bool SupportsRemoteVisualization { get; set; } = false;
 
         public List<BaseVariable> GetVariablesFromToolCommand()
         {

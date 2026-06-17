@@ -219,9 +219,20 @@
                         </MudCardContent>
 
                         <MudCardActions Class="card-actions d-flex justify-space-between">
-                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                            <MudStack Row Spacing="1">
+                                <MudTooltip Text="查看图站详情">
+                                    <MudButton OnClick="@(() => OpenStationDetail(station))"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
+                                               Color="Color.Info"
+                                               StartIcon="@Icons.Material.Filled.Info">
+                                        详情
+                                    </MudButton>
+                                </MudTooltip>
                                 <MudTooltip Text="配置此图站的工具">
                                     <MudButton OnClick="@(() => ConfigTools(station))"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
                                                Color="Color.Primary"
                                                StartIcon="@Icons.Material.Filled.Settings">
                                         配置
@@ -229,12 +240,14 @@
                                 </MudTooltip>
                                 <MudTooltip Text="选择此图站执行任务">
                                     <MudButton OnClick="@(() => SetToolAgentToUse(station.StationIp))"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
                                                Color="@(ToolAgentToUse == station.StationIp ? Color.Success : Color.Default)"
                                                StartIcon="@Icons.Material.Filled.CheckCircle">
                                         @(ToolAgentToUse == station.StationIp ? "已选中" : "使用")
                                     </MudButton>
                                 </MudTooltip>
-                            </MudButtonGroup>
+                            </MudStack>
                             <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                                 <ActivatorContent>
                                     <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" />
@@ -331,6 +344,14 @@
     {
         var parameters = new DialogParameters<ToolConfigDialog> { { x => x.Station, station } };
         await DialogService.ShowAsync<ToolConfigDialog>(null, parameters);
+    }
+
+    private async Task OpenStationDetail(Station? station)
+    {
+        if (station == null) return;
+        var parameters = new DialogParameters<StationDetailDialog> { { x => x.Station, station } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<StationDetailDialog>($"图站详情 - {station.StationName}", parameters, options);
     }
 
     private async Task DeleteStation(Station station)

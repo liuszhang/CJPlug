@@ -14,6 +14,7 @@ namespace CJ.Plug.Models.Station
         public string? StationStatus { get; set; }
         public string? UpdateTime { get; set; }
         public bool IsStarted { get; set; } = false;
+        public bool IsOnline { get; set; } = false;
         /// <summary>
         /// 图站分类，可能是Windows、Linux等
         /// </summary>

@@ -123,6 +123,11 @@ public class ToolManageService : IToolManageService
         existingTool.ToolCompany= updatedTool.ToolCompany;
         existingTool.CommandParameter = updatedTool.CommandParameter;
         existingTool.ToolDescription = updatedTool.ToolDescription;
+        existingTool.SkipDownloadToStation = updatedTool.SkipDownloadToStation;
+        existingTool.IsEnabled = updatedTool.IsEnabled;
+        existingTool.IsSystemInitTool = updatedTool.IsSystemInitTool;
+        existingTool.IsBrowsable = updatedTool.IsBrowsable;
+        existingTool.SupportsRemoteVisualization = updatedTool.SupportsRemoteVisualization;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingTool;
@@ -249,6 +254,7 @@ public class ToolManageService : IToolManageService
                     existingTool.IsEnabled = defaultTool.IsEnabled;
                     existingTool.IsSystemInitTool = defaultTool.IsSystemInitTool;
                     existingTool.IsBrowsable = defaultTool.IsBrowsable;
+                    existingTool.SupportsRemoteVisualization = defaultTool.SupportsRemoteVisualization;
 
                     _dbContext.Set<Tool>().Update(existingTool);
                     updated++;
@@ -270,7 +276,8 @@ public class ToolManageService : IToolManageService
                         SkipDownloadToStation = defaultTool.SkipDownloadToStation,
                         IsEnabled = defaultTool.IsEnabled,
                         IsSystemInitTool = defaultTool.IsSystemInitTool,
-                        IsBrowsable = defaultTool.IsBrowsable
+                        IsBrowsable = defaultTool.IsBrowsable,
+                        SupportsRemoteVisualization = defaultTool.SupportsRemoteVisualization
                     };
 
                     // 自动生成路径（如果为空）

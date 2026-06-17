@@ -89,6 +89,7 @@
 
 
             <MudCheckBox @bind-Value="@Tool.SkipDownloadToStation" T="bool" Label="无需工具下载（勾选后工具无需下载至图站，适用于纯接口调用或工具已在服务器本地的场景）" Color="Color.Secondary"></MudCheckBox>
+            <MudSwitch @bind-Value="@Tool.SupportsRemoteVisualization" Label="支持远程可视化（启动时弹出VNC远程连接窗口）" Color="Color.Info"></MudSwitch>
             @if (Tool.ToolType.Contains("桌面类"))
             {       
                 <MudTextField @bind-Value="@Tool.CommandParameter" Margin="Margin.Dense" Label="命令行配置" Variant="Variant.Outlined"></MudTextField>
@@ -225,6 +226,7 @@
                 IsEnabled = ExistingTool.IsEnabled,
                 IsSystemInitTool = ExistingTool.IsSystemInitTool,
                 IsBrowsable = ExistingTool.IsBrowsable,
+                SupportsRemoteVisualization = ExistingTool.SupportsRemoteVisualization,
                 ToolDescription = ExistingTool.ToolDescription,
             };
         }
