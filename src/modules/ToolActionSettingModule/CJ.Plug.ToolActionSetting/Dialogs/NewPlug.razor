@@ -270,6 +270,7 @@
                 {
                     Plug.ToolCommandLineShema = _commandDisplay;
                 }
+                await _desktopConfig.EnsureToolAsync(Plug);
             }
             else if (SelectedCategory == PlugCategorys.接口类.ToString() && _interfaceConfig != null)
             {

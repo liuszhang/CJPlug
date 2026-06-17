@@ -57,12 +57,7 @@
     </div>
     <MudStack Row AlignItems="AlignItems.Center">
         <MudButton OnClick="CreateToolItem" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建插头</MudButton>
-        <MudButton OnClick="RefreshContainer" StartIcon="@Icons.Material.Filled.AppRegistration" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
-
-        @* <MudButton StartIcon="@Icons.Material.Filled.NewReleases" Variant="Variant.Filled" Color="Color.Primary">创建接口类插头</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.Javascript" Variant="Variant.Filled" Color="Color.Primary">创建脚本类插头</MudButton> *@
-        <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" Color="Color.Primary">导入</MudButton>
-        <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" Color="Color.Primary">导出</MudButton>
+       
         @if (IsSelectedPlugPublished())
         {
             <MudButton OnClick="UnpublishSelectedPlug" StartIcon="@Icons.Material.Filled.CancelPresentation" Variant="Variant.Outlined" Color="Color.Warning">取消发布MCP</MudButton>
@@ -72,7 +67,11 @@
             <MudButton OnClick="PublishSelectedPlug" Disabled="@(SelectedPlug == null)" StartIcon="@Icons.Material.Filled.Publish" Variant="Variant.Outlined" Color="Color.Tertiary">发布为MCP Tool</MudButton>
         }
         <MudButton OnClick="GetSysInitRootPlugs" StartIcon="@Icons.Material.Filled.DevicesFold" Variant="Variant.Outlined" Color="Color.Primary">重置默认插头</MudButton>
-        <MudSpacer></MudSpacer>
+        <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" >导入</MudButton>
+        <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" >导出</MudButton>
+        <MudButton OnClick="RefreshContainer" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" >刷新</MudButton>
+
+        @* <MudSpacer></MudSpacer> *@
         <MudTextField T="string"
         Margin="Margin.Dense"
         Placeholder="可搜索： 名称, ID, 版本, 流程"

@@ -86,13 +86,22 @@ namespace CJ.Plug.Models.Plug
         //public int? MarketPlugId { get; set; }
 
 
-        public int? ToolId { get; set; } //工具ID
-        public string? ToolName { get; set; } //工具名称
-        public string? ToolDisplayName { get; set; } //工具显示名称，用于识别的唯一值，如“获取NX模型参数(1.0)”
-        public string? ToolCommandLineShema { get; set; } //工具执行脚本，实际执行时将参数替换为实际值;默认为空，如果有值，则以此为准，覆盖工具本身的执行命令
+        public int? ToolId { get; set; } //工具ID（唯一权威来源，通过此 ID 查找 Tool 实体获取所有工具信息）
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolName { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolDisplayName { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolCommandLineShema { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
         public string? ToolVersion { get; set; }
 
-        public string? ToolVersionPath { get; set; } //工具版本路径，暂时不用
+        [Obsolete("Use ToolId to manage tool paths instead")]
+        public string? ToolVersionPath { get; set; }
         public List<string>? ToolVersions { get; set; } = new(); //工具版本列表，暂时不用
 
         //public List<PlugAction.PlugAction>? PlugActions { get; set; }= new List<PlugAction.PlugAction>();
@@ -163,10 +172,10 @@ namespace CJ.Plug.Models.Plug
             {
                 return new PlugSettings();
             }
-            var settings = JsonSerializer.Deserialize<PlugSettings>(PlugSettingsJson);            
+            var settings = JsonSerializer.Deserialize<PlugSettings>(PlugSettingsJson);
             return settings;
         }
-        
+
         /// <summary>
         /// 设置插头配置的方便类
         /// </summary>
@@ -178,7 +187,7 @@ namespace CJ.Plug.Models.Plug
             PlugSettings.SetSetting(key,value);
             PlugSettingsJson = PlugSettings.GetSettingsJson();
         }
-        
+
         /// <summary>
         /// 获取插头配置的方便类
         /// </summary>
@@ -249,6 +258,6 @@ namespace CJ.Plug.Models.Plug
         }
 
 
-        
+
     }
 }

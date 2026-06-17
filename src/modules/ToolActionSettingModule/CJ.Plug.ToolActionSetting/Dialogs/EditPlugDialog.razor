@@ -264,6 +264,7 @@
                 {
                     Plug.ToolCommandLineShema = _commandDisplay;
                 }
+                await _desktopConfig.EnsureToolAsync(Plug);
                 _desktopConfig.ApplyToolVariables(Plug);
 
                 // 从执行命令中解析 [XXX] 变量并自动生成插头变量，跳过 [ToolPath]

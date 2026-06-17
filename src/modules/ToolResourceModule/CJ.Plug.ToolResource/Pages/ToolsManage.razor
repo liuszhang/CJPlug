@@ -13,8 +13,7 @@
 <MudStack Row AlignItems="AlignItems.Center" Class="mb-4">
     <MudButton OnClick="@AddItem" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">添加工具</MudButton>
     <MudButton OnClick="ImportTools" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download">导入默认</MudButton>
-    <MudSpacer />
-    <MudTextField @bind-Value="@_searchTerm" Placeholder="搜索工具..." Variant="Variant.Outlined"
+    <MudTextField @bind-Value="@_searchTerm" Placeholder="搜索工具..." Variant="Variant.Outlined" Margin="Margin.Dense"
                   Immediate="true" Style="width:280px;" AdornmentIcon="@Icons.Material.Filled.Search"
                   Adornment="Adornment.Start" />
 </MudStack>
@@ -34,10 +33,10 @@
 }
 else
 {
-    <MudGrid Spacing="3">
+    <MudGrid Spacing="2">
         @foreach (var tool in _filteredTools)
         {
-            <MudItem xs="12" sm="6" md="4" lg="4">
+            <MudItem xs="12" sm="6" md="4" lg="3" xl="3">
                 <MudCard Elevation="2" Class="tool-card">
                     @* 卡片头部 *@
                     <MudCardHeader>
@@ -47,7 +46,7 @@ else
                         </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.h6" Style="font-weight:600;">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
                                     @(tool.ToolName ?? "未命名")
                                 </MudText>
                                 <MudStack Row Spacing="1">
@@ -65,9 +64,9 @@ else
                                     }
                                     @if (tool.IsSystemInitTool)
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
-                                            系统
-                                        </MudChip>
+                                        <MudTooltip Text="系统工具">
+                                            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Color="Color.Primary" />
+                                        </MudTooltip>
                                     }
                                 </MudStack>
                             </MudStack>
@@ -75,10 +74,10 @@ else
                     </MudCardHeader>
 
                     @* 卡片内容 *@
-                    <MudCardContent Class="pa-3">
-                        <MudStack Spacing="2">
+                    <MudCardContent Class="pa-2">
+                        <MudStack Spacing="1">
                             @* 版本 + 厂商 *@
-                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
                                 <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text">
                                     v@(tool.ToolVersion)
                                 </MudChip>
@@ -118,16 +117,13 @@ else
                     @* 卡片操作区 *@
                     <MudCardActions Class="card-actions">
                         <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
-                            @if (tool.SupportsRemoteVisualization)
-                            {
-                                <MudTooltip Text="启动工具并打开远程可视化窗口">
-                                    <MudButton OnClick="@(() => LaunchToolWithVisualization(tool))"
-                                               Variant="Variant.Filled" Size="Size.Small" Color="Color.Info"
-                                               StartIcon="@Icons.Material.Filled.PlayArrow">
-                                        启动
-                                    </MudButton>
-                                </MudTooltip>
-                            }
+                            <MudTooltip Text="启动工具并打开远程可视化窗口">
+                                <MudButton OnClick="@(() => LaunchToolWithVisualization(tool))"
+                                           Variant="Variant.Filled" Size="Size.Small" Color="Color.Info"
+                                           StartIcon="@Icons.Material.Filled.PlayArrow">
+                                    启动
+                                </MudButton>
+                            </MudTooltip>
                             <MudTooltip Text="编辑工具配置">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                                OnClick="@(() => EditToolItem(tool))" />
@@ -136,10 +132,13 @@ else
                                 <MudIconButton Icon="@Icons.Material.Filled.Dns" Size="Size.Small"
                                                OnClick="@(() => ToolDeploySetting(tool))" Color="Color.Primary" />
                             </MudTooltip>
-                            <MudTooltip Text="下载工具包">
-                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
-                                               OnClick="@(() => DownloadToolItem(tool))" />
-                            </MudTooltip>
+                            @if (!tool.SkipDownloadToStation)
+                            {
+                                <MudTooltip Text="下载工具包">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
+                                                   OnClick="@(() => DownloadToolItem(tool))" />
+                                </MudTooltip>
+                            }
                             @if (!tool.IsSystemInitTool)
                             {
                                 <MudTooltip Text="删除工具">
@@ -167,7 +166,7 @@ else
     }
     .card-actions {
         background: var(--mud-palette-background-grey);
-        padding: 8px 12px;
+        padding: 4px 8px;
         border-top: 1px solid var(--mud-palette-divider);
     }
     .text-muted {
