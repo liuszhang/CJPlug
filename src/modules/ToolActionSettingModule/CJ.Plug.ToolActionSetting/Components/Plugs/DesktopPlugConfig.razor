@@ -505,6 +505,7 @@ else
                     ToolName = toolName,
                     ToolVersion = toolVersion,
                     ToolPath = ManualToolPath, // 不等于 ToolName，CreateToolAsync 不会重写
+                    ToolBasePath = Path.Combine("Tools", IsSystemPlug ? "0System" : Username, toolName),
                     CommandParameter = plug.ToolCommandLineShema ?? $"[ToolPath]",
                     SkipDownloadToStation = true,
                     IsBrowsable = false,
@@ -531,6 +532,9 @@ else
             toolName = folderName ?? FolderToolName ?? "unknown";
             if (toolName == "unknown") return; // 无法确定文件夹名，跳过
 
+            // 预计算工具路径，使用前端传入的登录用户名而非依赖后端 GetCurrentUserName()
+            var prebuiltToolPath = Path.Combine("Tools", userOrSystem, toolName);
+
             var displayName = $"{toolName}({toolVersion})";
             try { tool = await MainApiClient.GetToolByDisplayNameAsync(displayName); } catch { }
 
@@ -540,7 +544,8 @@ else
                 {
                     ToolName = toolName,
                     ToolVersion = toolVersion,
-                    // ToolPath/ToolBasePath 留空，CreateToolAsync 自动生成 Tools/{user|0System}/{folderName}
+                    ToolPath = prebuiltToolPath,
+                    ToolBasePath = prebuiltToolPath,
                     CommandParameter = plug.ToolCommandLineShema ?? "[ToolPath]",
                     SkipDownloadToStation = false,
                     IsBrowsable = false,

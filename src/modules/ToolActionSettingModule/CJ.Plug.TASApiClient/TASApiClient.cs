@@ -172,6 +172,13 @@ public partial class TASApiClient:BaseApiClient,ITASApiClient
 
 
 
+    public async Task BatchUpdateSortOrdersAsync(List<PlugSortOrderDto> sortOrders, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/api/plug/batchUpdateSortOrders", sortOrders, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+
     [Obsolete]
     public async Task<string?> GetPlugVariableValueAsync(int plugId, string variableName)
     {

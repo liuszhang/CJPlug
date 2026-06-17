@@ -15,6 +15,19 @@ public class PDZManageService : IPDZManageService
 
     public async Task<PlugDataZone?> CreatePDZ(PlugDataZone PDZ, CancellationToken cancellationToken = default)
     {
+        // 防御：PDZId 为 null 时从已有字段生成默认值，避免 Path.Combine 抛出 ArgumentNullException
+        if (string.IsNullOrEmpty(PDZ.PDZId))
+        {
+            PDZ.PDZId = (PDZ.UserName ?? "")
+                      + (PDZ.PlugDefinitionId ?? "")
+                      + (PDZ.Type ?? "")
+                      + (PDZ.JobDefinitionId ?? "");
+            if (string.IsNullOrEmpty(PDZ.PDZId))
+            {
+                PDZ.PDZId = Guid.NewGuid().ToString("N");
+            }
+        }
+
         if (string.IsNullOrEmpty(PDZ.PDZWorkPath))
         {
             if (string.IsNullOrEmpty(PDZ.JobDefinitionId))

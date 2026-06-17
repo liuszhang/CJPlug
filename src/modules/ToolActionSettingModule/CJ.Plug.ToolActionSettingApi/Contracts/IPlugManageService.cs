@@ -29,6 +29,7 @@ public interface IPlugManageService
 
     Task<List<PlugVariable>?> GetVariablesByDefinitionId(string definiitonId);
 
+    Task BatchUpdateSortOrdersAsync(List<PlugSortOrderDto> sortOrders, CancellationToken cancellationToken = default);
 
     Task<IEnumerable<PlugToPlugAction>> GetAllRealationssAsync(CancellationToken cancellationToken = default);
     Task<PlugToPlugAction> CreateRealationAsync(PlugToPlugAction request, CancellationToken cancellationToken = default);

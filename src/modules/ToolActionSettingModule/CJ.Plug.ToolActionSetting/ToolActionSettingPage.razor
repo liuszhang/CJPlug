@@ -307,6 +307,7 @@
         Console.WriteLine(dropItem.DropzoneIdentifier);
         var prevPlugId = _actionPanelPlug?.Id;
 
+        // 情况1：插头拖入 Action 区域 → 创建新动作插头
         if (dropItem.DropzoneIdentifier.Contains("Action") && dropItem.Item.Tag == "Plug")
         {
             var newPlug = dropItem.Item;
@@ -321,6 +322,49 @@
             Console.WriteLine(JsonSerializer.Serialize(result));
 
             await GetAllRootPlugs();
+        }
+        // 情况2：同组内拖拽重排 → 持久化排序
+        else if (dropItem.DropzoneIdentifier.StartsWith("Plug_") && dropItem.Item.Tag == "Plug")
+        {
+            var groupKey = dropItem.DropzoneIdentifier.Substring("Plug_".Length);
+            // MudBlazor 拖拽重排后 AllPlugsToShow 已反映新顺序，从中提取该组插头
+            var itemsInGroup = AllPlugsToShow
+                .Where(p => p.Tag == "Plug" && PlugCategoryGroupHelper.GetDisplayGroup(p.Category) == groupKey)
+                .ToList();
+
+            if (itemsInGroup.Count > 1)
+            {
+                var sortOrders = itemsInGroup
+                    .Select((plug, index) => new PlugSortOrderDto
+                    {
+                        Id = plug.Id ?? 0,
+                        SortOrder = index
+                    })
+                    .Where(dto => dto.Id > 0)
+                    .ToList();
+
+                if (sortOrders.Count > 0)
+                {
+                    try
+                    {
+                        await MainApiClient.BatchUpdateSortOrdersAsync(sortOrders);
+                        // 同步更新内存中的 SortOrder，确保连续拖拽不丢状态
+                        foreach (var dto in sortOrders)
+                        {
+                            var memPlug = RootPlugs.FirstOrDefault(p => p.Id == dto.Id);
+                            if (memPlug != null)
+                                memPlug.SortOrder = dto.SortOrder;
+                        }
+                        Console.WriteLine($"[SortOrder] 已保存 {groupKey} 组排序，共 {sortOrders.Count} 项");
+                        Snackbar.Add($"{groupKey} 组排序已保存", Severity.Success, config => { config.VisibleStateDuration = 1500; });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SortOrder] 排序保存失败: {ex.Message}");
+                        Snackbar.Add($"排序保存失败: {ex.Message}", Severity.Error);
+                    }
+                }
+            }
         }
 
         // 用 Id 从刷新后的列表中找回新对象引用，保证 MudList 能匹配高亮
@@ -610,6 +654,7 @@
         RootPlugs.Clear();
 
         var AllPlugs = await MainApiClient.GetPlugs();
+        Console.WriteLine($"[GetAllRootPlugs] API 返回 {AllPlugs.Count} 个插头，前5条 SortOrder: {string.Join(", ", AllPlugs.Take(5).Select(p => $"Id={p.Id},SortOrder={p.SortOrder}"))}");
         //获取用户或管理员创建的源插头及源插头动作
         var _RootPlugs = AllPlugs.Where(t => 
             t.CreateType == PlugCreateTypeEnum.RootPlug.ToString() ||
@@ -696,10 +741,11 @@
             p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()
         ).ToList();
 
-        // 按显示分组排序，组内按名称排序
+        // 按显示分组排序，组内按 SortOrder 再按名称排序
         var groupOrder = PlugCategoryGroupHelper.GroupOrder;
         PlugItemsToShow = PlugItemsToShow
             .OrderBy(p => Array.IndexOf(groupOrder, PlugCategoryGroupHelper.GetDisplayGroup(p.Category)))
+            .ThenBy(p => p.SortOrder ?? int.MaxValue)
             .ThenBy(p => p.Name)
             .ToList();
 

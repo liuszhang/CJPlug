@@ -4,6 +4,7 @@ using CJ.Plug.Models.Relation;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Data.Common;
 
 public partial class PlugManageService : IPlugManageService
 {
@@ -13,6 +14,7 @@ public partial class PlugManageService : IPlugManageService
     {
         _dbContext = dbContext;
         _dbContext.Database.EnsureCreated();
+        //MigratePlugSchema();
     }
 
     public async Task<Plug> CreatePlugAsync(Plug request, CancellationToken cancellationToken = default)
@@ -95,9 +97,13 @@ public partial class PlugManageService : IPlugManageService
 
     public async Task<IEnumerable<Plug>> GetAllPlugsAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<Plug>()
+        var plugs = await _dbContext.Set<Plug>()
             .Include(p=>p.PlugVariables)
             .ToListAsync();
+        Log.Information("[GetAllPlugsAsync] 返回 {Count} 个插头，前5条: {Plugs}",
+            plugs.Count,
+            plugs.Take(5).Select(p => new { p.Id, p.SortOrder, p.Name }));
+        return plugs;
     }
 
     public async Task<IEnumerable<Plug>?> GetChildPlugsAsync(string DefinitionId, CancellationToken cancellationToken = default)
@@ -252,6 +258,94 @@ public partial class PlugManageService : IPlugManageService
 
     }
 
+
+    private void MigratePlugSchema()
+    {
+        try
+        {
+            var conn = _dbContext.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+                conn.Open();
+
+            // 检查 SortOrder 列是否存在
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "PRAGMA table_info(Plugs)";
+            using var reader = cmd.ExecuteReader();
+            bool hasSortOrder = false;
+            while (reader.Read())
+            {
+                var colName = reader.GetString(1); // PRAGMA table_info 第2列为列名
+                if (colName == "SortOrder")
+                {
+                    hasSortOrder = true;
+                    break;
+                }
+            }
+            reader.Close();
+
+            if (!hasSortOrder)
+            {
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE Plugs ADD COLUMN SortOrder INTEGER";
+                alterCmd.ExecuteNonQuery();
+                Log.Information("[MigratePlugSchema] 已为 Plugs 表添加 SortOrder 列，数据库路径: {Path}", conn.DataSource);
+            }
+            else
+            {
+                Log.Information("[MigratePlugSchema] SortOrder 列已存在，跳过迁移。数据库路径: {Path}", conn.DataSource);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[MigratePlugSchema] Schema 迁移失败");
+        }
+    }
+
+    public async Task BatchUpdateSortOrdersAsync(List<PlugSortOrderDto> sortOrders, CancellationToken cancellationToken = default)
+    {
+        if (sortOrders == null || sortOrders.Count == 0)
+        {
+            Log.Warning("[BatchUpdateSortOrders] 收到空的排序列表，跳过");
+            return;
+        }
+
+        Log.Information("[BatchUpdateSortOrders] 收到 {Count} 个排序项: {@Orders}",
+            sortOrders.Count, sortOrders.Select(s => new { s.Id, s.SortOrder }));
+
+        var ids = sortOrders.Select(s => s.Id).ToList();
+        var plugs = await _dbContext.Set<Plug>()
+            .Where(p => p.Id != null && ids.Contains(p.Id.Value))
+            .ToListAsync(cancellationToken);
+
+        Log.Information("[BatchUpdateSortOrders] 查询到 {Found}/{Requested} 个插头",
+            plugs.Count, ids.Count);
+
+        int updated = 0;
+        foreach (var plug in plugs)
+        {
+            var dto = sortOrders.FirstOrDefault(s => s.Id == plug.Id);
+            if (dto != null)
+            {
+                plug.SortOrder = dto.SortOrder;
+                updated++;
+            }
+        }
+
+        try
+        {
+            var entryCount = _dbContext.ChangeTracker.Entries<Plug>()
+                .Count(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Modified);
+            Log.Information("[BatchUpdateSortOrders] 变更追踪: {Modified} 个实体 Modified，即将 SaveChanges", entryCount);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            Log.Information("[BatchUpdateSortOrders] SaveChanges 成功，更新了 {Updated} 个插头的 SortOrder", updated);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[BatchUpdateSortOrders] SaveChanges 失败: {Message}", ex.Message);
+            throw;
+        }
+    }
 
     public async Task<List<PlugVariable>?> GetVariablesByDefinitionId(string definiitonId)
     {

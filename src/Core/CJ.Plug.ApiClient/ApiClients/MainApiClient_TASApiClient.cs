@@ -173,4 +173,10 @@ public partial class MainApiClient : ITASApiClient
         await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Update, $"更新插件: {item.Name}");
         return result;
     }
+
+    public async Task BatchUpdateSortOrdersAsync(List<PlugSortOrderDto> sortOrders, CancellationToken cancellationToken = default)
+    {
+        await TASApiClient.Value.BatchUpdateSortOrdersAsync(sortOrders, cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Update, $"批量更新插头排序: {sortOrders.Count} 项");
+    }
 }

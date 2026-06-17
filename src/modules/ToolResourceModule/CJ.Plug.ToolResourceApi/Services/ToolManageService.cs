@@ -330,11 +330,17 @@ public class ToolManageService : IToolManageService
             if (!string.IsNullOrWhiteSpace(identityName))
                 return identityName;
 
-            return Environment.UserName;
+            // 不降级到 Environment.UserName，避免使用 OS 登录名而非应用登录用户
+            // 调用方（DesktopPlugConfig 等）应该在创建 Tool 前预填充 ToolPath/ToolBasePath
+            Log.Warning("GetCurrentUserName: HttpContext.User.Identity.Name 为空，且无降级方案。"
+                + "若 ToolPath/ToolBasePath 未预填充，工具路径将无法正确生成。"
+                + "请确保调用方在创建 Tool 前正确设置了 ToolPath 和 ToolBasePath。");
+            return "unknown_user";
         }
-        catch
+        catch (Exception ex)
         {
-            return "default";
+            Log.Error(ex, "GetCurrentUserName 异常");
+            return "unknown_user";
         }
     }
 }

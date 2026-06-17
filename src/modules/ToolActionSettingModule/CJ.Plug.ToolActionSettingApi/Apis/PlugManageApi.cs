@@ -22,6 +22,7 @@ public static class PlugManageApi
         api.MapPut("/updatePlug/{id}", async (IPlugManageService service, int id, [FromBody] Plug request) => await service.UpdatePlugAsync(id, request)); // 编辑 API
         api.MapPost("/createPlug", async (IPlugManageService service, [FromBody] Plug request) => await service.CreatePlugAsync(request));
         api.MapDelete("/deletePlug/{id}", async (IPlugManageService service, int id) => await service.DeletePlugAsync(id));
+        api.MapPost("/batchUpdateSortOrders", async (IPlugManageService service, [FromBody] List<PlugSortOrderDto> sortOrders) => await service.BatchUpdateSortOrdersAsync(sortOrders));
 
 
         api.MapGet("/getPlugActions", async (IPlugManageService service) => await service.GetAllPlugActionsAsync());

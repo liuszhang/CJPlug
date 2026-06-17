@@ -72,6 +72,9 @@ namespace CJ.Plug.Models.Plug
         //是否将TAS插头展示在组件库
         public bool ShowInPlugLibrary { get; set; } = false;
 
+        //拖拽排序序号，用于持久化插头在同组内的显示顺序
+        public int? SortOrder { get; set; }
+
 
         //流程引擎相关数据
         public string? ActivityNodeId { get; set; }
