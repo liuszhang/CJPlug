@@ -60,6 +60,23 @@ public class LlmConfigSeedDataProvider : ISeedDataProvider
         await dbContext.SaveChangesAsync(cancellationToken);
         Log.Information("[SeedData] LLM 种子数据: OpenRouter 供应商及 1 个模型已创建");
 
+        // ---- DeepSeek ----
+        var deepseek = new LlmProvider
+        {
+            Name = "deepseek", DisplayName = "DeepSeek",
+            ApiBaseUrl = "https://api.deepseek.com",
+            Description = "DeepSeek API",
+            IsEnabled = true, SortOrder = 3, CreatedAt = now, UpdatedAt = now
+        };
+        dbContext.Set<LlmProvider>().Add(deepseek);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.Set<LlmModelConfig>().AddRange(
+            new LlmModelConfig { LlmProviderId = deepseek.Id, ModelName = "deepseek-v4-pro", DisplayName = "DeepSeek V4 Pro", ModelType = "Chat", MaxTokens = 4096, Temperature = 0.7, IsDefault = false, IsEnabled = true }
+        );
+        await dbContext.SaveChangesAsync(cancellationToken);
+        Log.Information("[SeedData] LLM 种子数据: DeepSeek 供应商及 1 个模型已创建");
+
         Console.WriteLine("[SeedData] LLM 配置模块种子数据创建完成");
     }
 }

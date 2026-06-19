@@ -170,6 +170,9 @@ public abstract class StationPlugExecuteService : BasePlugExecuteService
             RequestCommand = source.RequestCommand,
             SpecifiedStationIp = source.SpecifiedStationIp,
             StationApiPort = source.StationApiPort,
+            // 复制预解析的工具和图站引用（由 ExecuteMcpPluginPathAsync 设置），避免下游重复 HTTP 查询
+            ResolvedTool = source.ResolvedTool,
+            ResolvedStation = source.ResolvedStation,
             ExecuteResultData = new ExecuteResultData
             {
                 Ids = source.ExecuteResultData?.Ids,

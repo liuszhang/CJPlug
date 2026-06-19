@@ -1,4 +1,5 @@
 @page "/TAS"
+@implements IDisposable
 
 @using System.Text.Json
 @using System.Text.Json.Nodes
@@ -17,12 +18,12 @@
 @using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Dialogs
 @using CJ.Plug.SharedPages.Layout
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.TASApiClient
 @using CJ.Plug.ToolActionSetting.Components
 @using CJ.Plug.ToolActionSetting.Dialogs
 @using Elsa.Api.Client.Resources.WorkflowDefinitions.Models
 @using Elsa.Studio.Workflows.Domain.Contracts
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 @using Orientation = Radzen.Orientation
@@ -32,16 +33,18 @@
 @using Variant=MudBlazor.Variant
 @using DialogOptions=MudBlazor.DialogOptions
 @using CJ.Plug.SharedPages.Contracts
+@using Microsoft.JSInterop
 
 
 @inject NavigationManager NavigationManager
-@inject IStationAndToolApiClient StationAndToolApiClient
 @inject IDialogService DialogService
 @inject IEnumerable<IPlugCommonSettingContent> PlugCommonSettingContent
 @inject IElsaStudioService ElsaEngineService
 @inject ISnackbar Snackbar
 @inject MainApiClient MainApiClient
 @inject IDomInteropService DomInteropService
+@inject IJSRuntime JSRuntime
+@inject HubConnectionManagerService HubConnectionManagerService
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -54,12 +57,7 @@
     </div>
     <MudStack Row AlignItems="AlignItems.Center">
         <MudButton OnClick="CreateToolItem" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建插头</MudButton>
-        <MudButton OnClick="RefreshContainer" StartIcon="@Icons.Material.Filled.AppRegistration" Variant="Variant.Filled" Color="Color.Primary">刷新</MudButton>
-
-        @* <MudButton StartIcon="@Icons.Material.Filled.NewReleases" Variant="Variant.Filled" Color="Color.Primary">创建接口类插头</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.Javascript" Variant="Variant.Filled" Color="Color.Primary">创建脚本类插头</MudButton> *@
-        <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" Color="Color.Primary">导入</MudButton>
-        <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" Color="Color.Primary">导出</MudButton>
+       
         @if (IsSelectedPlugPublished())
         {
             <MudButton OnClick="UnpublishSelectedPlug" StartIcon="@Icons.Material.Filled.CancelPresentation" Variant="Variant.Outlined" Color="Color.Warning">取消发布MCP</MudButton>
@@ -69,7 +67,11 @@
             <MudButton OnClick="PublishSelectedPlug" Disabled="@(SelectedPlug == null)" StartIcon="@Icons.Material.Filled.Publish" Variant="Variant.Outlined" Color="Color.Tertiary">发布为MCP Tool</MudButton>
         }
         <MudButton OnClick="GetSysInitRootPlugs" StartIcon="@Icons.Material.Filled.DevicesFold" Variant="Variant.Outlined" Color="Color.Primary">重置默认插头</MudButton>
-        <MudSpacer></MudSpacer>
+        <MudButton OnClick="ShowImportDialog" StartIcon="@Icons.Material.Filled.FileUpload" Variant="Variant.Filled" >导入</MudButton>
+        <MudButton OnClick="ShowExportDialog" StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Filled" >导出</MudButton>
+        <MudButton OnClick="RefreshContainer" StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" >刷新</MudButton>
+
+        @* <MudSpacer></MudSpacer> *@
         <MudTextField T="string"
         Margin="Margin.Dense"
         Placeholder="可搜索： 名称, ID, 版本, 流程"
@@ -84,7 +86,7 @@
 
     <MudDivider />
 
-    <MudDropContainer T="Plug" Items="AllPlugsToShow" @key="AllPlugsToShow" @ref="_container" ItemsSelector="@((item, dropzone) => item.Tag == dropzone)" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
+    <MudDropContainer T="Plug" Items="AllPlugsToShow" @ref="_container" ItemsSelector="@IsItemInZone" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
 
 
         <ChildContent>
@@ -96,10 +98,11 @@
                         <VerticalWell ExtraPadding="100">
 
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                                <MudSelect T="int" Dense Margin="Margin.Dense" Variant="Variant.Outlined" @bind-Value="_plugListTabIndex" Style="width:120px">
+                                @* TODO: 下拉框暂时隐藏，后续根据需求恢复 *@
+                                @* <MudSelect T="int" Dense Margin="Margin.Dense" Variant="Variant.Outlined" @bind-Value="_plugListTabIndex" Style="width:120px">
                                     <MudSelectItem Value="0">插头</MudSelectItem>
                                     <MudSelectItem Value="1">动作</MudSelectItem>
-                                </MudSelect>
+                                </MudSelect> *@
                                 @if (_plugListTabIndex == 0)
                                 {
                                     <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键插入</MudButton>
@@ -115,11 +118,28 @@
                                 }
                                 else if (_plugListTabIndex == 0)
                                 {
-                                    <MudList T="Plug" SelectedValue="SelectedPlug" SelectedValueChanged="OnPlugSelected" Color="Color.Primary" SelectionMode="SelectionMode.SingleSelection">
-                                        <MudDropZone T="Plug" Identifier="@("Plug")" AllowReorder="true">
-
-                                        </MudDropZone>
-                                    </MudList>
+                                    <MudExpansionPanels>
+                                        @foreach (var group in _groupedPlugItems)
+                                        {
+                                            var groupKey = group.Key;
+                                            var isCollapsed = _collapsedGroups.Contains(groupKey);
+                                            <MudExpansionPanel Text="@($"{groupKey} ({group.Value.Count})")"
+                                                               IsExpanded="@(!isCollapsed)"
+                                                               IsExpandedChanged="@((bool expanded) => OnGroupToggled(groupKey, expanded))">
+                                                <ChildContent>
+                                                    <MudList T="Plug" SelectedValue="SelectedPlug"
+                                                             SelectedValueChanged="OnPlugSelected"
+                                                             Color="Color.Primary"
+                                                             SelectionMode="SelectionMode.SingleSelection">
+                                                    <div data-sort-group="@groupKey">
+                                                        <MudDropZone T="Plug" Identifier='@("Plug_" + groupKey)' AllowReorder="true">
+                                                        </MudDropZone>
+                                                    </div>
+                                                    </MudList>
+                                                </ChildContent>
+                                            </MudExpansionPanel>
+                                        }
+                                    </MudExpansionPanels>
                                 }
                                 else
                                 {
@@ -210,7 +230,7 @@
             }
             else if (context.Tag == "Plug")
             {
-                <MudListItem T="Plug" Value="@context">
+                <MudListItem T="Plug" Value="@context" data-plug-id="@(context.Id?.ToString())">
                     <TASPlugItem Plug="@context" OnDelete="() => RemoveToolItem(context)" OnChangeVersion="() => ChangeToolVersion(context)"></TASPlugItem>
                 </MudListItem>
             }
@@ -262,6 +282,8 @@
     private List<Plug>? PlugItemsToShow { get; set; } = new();
     private List<Plug>? ActionItemsToShow { get; set; } = new();
     private List<Plug>? AllPlugsToShow { get; set; } = new();
+    private Dictionary<string, List<Plug>> _groupedPlugItems = new();
+    private HashSet<string> _collapsedGroups = new();
     private int _plugListTabIndex = 0;
     private List<Plug>? ShadowPlugActions { get; set; } = new();
     private Plug? SelectedPlug { get; set; }
@@ -270,7 +292,7 @@
 
     private bool PlugListPanelCollapsed { get; set; } = false;
     private bool PlugVariablePanelCollapsed { get; set; } = false;
-    private bool PlugActionPanelCollapsed { get; set; } = false;
+    private bool PlugActionPanelCollapsed { get; set; } = true; @* 默认折叠，后续如需恢复改为 false *@
     public double SplitterPanelPercent { get; set; } = 35;
 
     public SetMaxGuiDesignerNotify? SetMaxGuiDesignerNotify { get; set; }
@@ -287,6 +309,7 @@
         Console.WriteLine(dropItem.DropzoneIdentifier);
         var prevPlugId = _actionPanelPlug?.Id;
 
+        // 情况1：插头拖入 Action 区域 → 创建新动作插头
         if (dropItem.DropzoneIdentifier.Contains("Action") && dropItem.Item.Tag == "Plug")
         {
             var newPlug = dropItem.Item;
@@ -302,6 +325,50 @@
 
             await GetAllRootPlugs();
         }
+        // 情况2：同组内拖拽重排 → 持久化排序
+        // MudBlazor 内部维护自己的一份排序副本；_container.Items 和 @bind-Items
+        // 返回的都是 Blazor 参数值（拖拽前的列表），不反映内部重排后的顺序。
+        // 必须通过 JS 读取 DOM 中 MudListItem 的实际顺序来获取正确的拖拽后排列。
+        else if (dropItem.DropzoneIdentifier.StartsWith("Plug_") && dropItem.Item.Tag == "Plug")
+        {
+            var groupKey = dropItem.DropzoneIdentifier.Substring("Plug_".Length);
+
+            try
+            {
+                // 从 DOM 读取 MudBlazor 内部重排后的实际顺序
+                var orderedIds = await JSRuntime.InvokeAsync<List<int>>("getPlugSortOrder", groupKey);
+                if (orderedIds == null || orderedIds.Count <= 1)
+                    return;
+
+                Console.WriteLine($"[SortOrder] DOM 返回 {groupKey} 组顺序: {string.Join(", ", orderedIds)}");
+
+                var sortOrders = orderedIds
+                    .Select((id, index) => new PlugSortOrderDto { Id = id, SortOrder = index })
+                    .Where(dto => dto.Id > 0)
+                    .ToList();
+
+                if (sortOrders.Count == 0)
+                    return;
+
+                await MainApiClient.BatchUpdateSortOrdersAsync(sortOrders);
+                // 同步更新内存中的 SortOrder
+                foreach (var dto in sortOrders)
+                {
+                    var memPlug = RootPlugs.FirstOrDefault(p => p.Id == dto.Id);
+                    if (memPlug != null)
+                        memPlug.SortOrder = dto.SortOrder;
+                }
+                // 从已更新 SortOrder 的 RootPlugs 重建 AllPlugsToShow
+                UpdateFilteredPlugs();
+                Console.WriteLine($"[SortOrder] 已保存 {groupKey} 组排序，共 {sortOrders.Count} 项");
+                Snackbar.Add($"{groupKey} 组排序已保存", Severity.Success, config => { config.VisibleStateDuration = 1500; });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SortOrder] 排序保存失败: {ex.Message}");
+                Snackbar.Add($"排序保存失败: {ex.Message}", Severity.Error);
+            }
+        }
 
         // 用 Id 从刷新后的列表中找回新对象引用，保证 MudList 能匹配高亮
         if (prevPlugId != null)
@@ -316,6 +383,21 @@
 
         _isDragging = false;
         StateHasChanged();
+    }
+
+    private void OnGroupToggled(string groupKey, bool expanded)
+    {
+        if (expanded)
+            _collapsedGroups.Remove(groupKey);
+        else
+            _collapsedGroups.Add(groupKey);
+    }
+
+    private bool IsItemInZone(Plug item, string dropzone)
+    {
+        if (item.Tag == "Plug" && dropzone.StartsWith("Plug_"))
+            return $"Plug_{PlugCategoryGroupHelper.GetDisplayGroup(item.Category)}" == dropzone;
+        return item.Tag == dropzone;
     }
 
     private async Task OnPlugSelected(Plug? plug)
@@ -355,11 +437,48 @@
     {
         if (firstRender)
         {
+            // 注入 JS 辅助函数：从 DOM 读取 MudBlazor 内部重排后的插头顺序
+            await JSRuntime.InvokeVoidAsync("eval",
+                "window.getPlugSortOrder=function(g){" +
+                "var w=document.querySelector('div[data-sort-group=\"'+g+'\"]');" +
+                "if(!w)return[];" +
+                "var r=[];" +
+                "w.querySelectorAll('[data-plug-id]').forEach(function(e){" +
+                "var i=e.getAttribute('data-plug-id');if(i)r.push(parseInt(i))" +
+                "});" +
+                "return r;}");
             await GetAllRootPlugs();
             await LoadMcpTools();
             _actionPanelPlug = SelectedPlug;
             StateHasChanged();
+
+            // 监听图站执行事件：直接运行插头时触发 VNC 远程桌面弹窗
+            HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
+            HubConnectionManagerService._hubConnection.On(
+                LogTypeEnum.StationExecuting.ToString(),
+                new[] { typeof(string), typeof(string), typeof(string) },
+                (args, _) =>
+                {
+                    var pdzId = (string?)args[0];
+                    var plugDefinitionId = (string?)args[1];
+                    var stationIp = (string?)args[2];
+                    if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
+                    InvokeAsync(async () =>
+                    {
+                        var host = stationIp;
+                        try { host = new Uri(stationIp).Host; } catch { }
+                        Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面...", Severity.Info);
+                        await JSRuntime.InvokeVoidAsync("open", $"/remote/vnc/{host}", "_blank");
+                    });
+                    return Task.CompletedTask;
+                },
+                null);
         }
+    }
+
+    public void Dispose()
+    {
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
     }
 
     private void OnMaxGuiDesigner(bool isMax)
@@ -435,7 +554,7 @@
             if (PlugFromSetting.ToolName != null || PlugFromSetting.ToolDisplayName != null)
             {
                 //Log.Information("获取工具信息：" + PlugFromSetting.ToolName + " " + PlugFromSetting.ToolDisplayName);
-                var tool = await StationAndToolApiClient.GetToolByDisplayNameAsync(PlugFromSetting.ToolDisplayName ?? $"{PlugFromSetting.ToolName}({PlugFromSetting.ToolVersion})");
+                var tool = await MainApiClient.GetToolByDisplayNameAsync(PlugFromSetting.ToolDisplayName ?? $"{PlugFromSetting.ToolName}({PlugFromSetting.ToolVersion})");
                 PlugFromSetting.ToolCommandLineShema = tool?.CommandParameter ?? EachPlugSetting.GetSetting(PlugSettingKey.CommandLineShema.ToString());
                 PlugFromSetting.Category = tool?.ToolType ?? EachPlugSetting.GetSetting(PlugSettingKey.Category.ToString());
                 PlugFromSetting.ToolDisplayName = $"{tool?.ToolName}({tool?.ToolVersion})";
@@ -548,6 +667,7 @@
         RootPlugs.Clear();
 
         var AllPlugs = await MainApiClient.GetPlugs();
+        Console.WriteLine($"[GetAllRootPlugs] API 返回 {AllPlugs.Count} 个插头，前5条 SortOrder: {string.Join(", ", AllPlugs.Take(5).Select(p => $"Id={p.Id},SortOrder={p.SortOrder}"))}");
         //获取用户或管理员创建的源插头及源插头动作
         var _RootPlugs = AllPlugs.Where(t => 
             t.CreateType == PlugCreateTypeEnum.RootPlug.ToString() ||
@@ -633,6 +753,20 @@
             p.CreateType == PlugCreateTypeEnum.RootAdminPlug.ToString() ||
             p.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()
         ).ToList();
+
+        // 按显示分组排序，组内按 SortOrder 再按名称排序
+        var groupOrder = PlugCategoryGroupHelper.GroupOrder;
+        PlugItemsToShow = PlugItemsToShow
+            .OrderBy(p => Array.IndexOf(groupOrder, PlugCategoryGroupHelper.GetDisplayGroup(p.Category)))
+            .ThenBy(p => p.SortOrder ?? int.MaxValue)
+            .ThenBy(p => p.Name)
+            .ToList();
+
+        // 构建分组字典
+        _groupedPlugItems = PlugItemsToShow
+            .GroupBy(p => PlugCategoryGroupHelper.GetDisplayGroup(p.Category))
+            .OrderBy(g => Array.IndexOf(groupOrder, g.Key))
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         ActionItemsToShow = query.Where(p =>
             p.CreateType == PlugCreateTypeEnum.ActionRootPlug.ToString() ||
@@ -804,7 +938,6 @@
                     existingPlug.GroupName = importPlug.GroupName;
                     existingPlug.PlugSettingsJson = importPlug.PlugSettingsJson;
                     existingPlug.PlugVariables = importPlug.PlugVariables;
-                    existingPlug.Value = importPlug.Value;
                     existingPlug.RealValuePath = importPlug.RealValuePath;
                     existingPlug.WorkPath = importPlug.WorkPath;
                     existingPlug.ToolId = importPlug.ToolId;

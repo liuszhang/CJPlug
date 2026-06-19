@@ -1,4 +1,6 @@
 ﻿
+using System.IO;
+using System.Text.Json;
 using CJ.Plug.ElsaIntegration;
 using CJ.Plug.ElsaIntegration.Services;
 using CJ.Plug.ElsaIntegration.Pages;
@@ -33,15 +35,39 @@ public static class ElsaExtensions
 {
 
 
-    private static IServiceCollection ConfigElsaServices(this IServiceCollection services)
+    private static IServiceCollection ConfigElsaServices(this IServiceCollection services, IConfiguration? configuration = null)
     {
+        // 优先从 IConfiguration 读取（与 ApiServer 一致），失败时回退到文件扫描
+        var elsaConnectionString = TryReadFromConfiguration(configuration, "ConnectionStrings:ElsaDb")
+                                   ?? ReadElsaConnectionString();
+        var elsaDbType = TryReadFromConfiguration(configuration, "DatabaseConfig:DbType")
+                         ?? ReadElsaDbType();
+
+        Console.WriteLine($"[ElsaExtensions] DbType={elsaDbType}, ConnStr prefix={elsaConnectionString?.Substring(0, Math.Min(elsaConnectionString?.Length ?? 0, 30))}...");
+
         services.AddElsa(elsa =>
         {
             // Configure Management layer to use EF Core.
-            elsa.UseWorkflowManagement(management => management.UseEntityFrameworkCore(ef => ef.UseSqlite("Data Source=../../main-elsa.db;Cache=Shared;")));
+            elsa.UseWorkflowManagement(management => management.UseEntityFrameworkCore(ef =>
+            {
+                switch (elsaDbType)
+                {
+                    case "PostgreSQL": ef.UsePostgreSql(elsaConnectionString); break;
+                    case "SqlServer": ef.UseSqlServer(elsaConnectionString); break;
+                    default: ef.UseSqlite(elsaConnectionString); break;
+                }
+            }));
 
             // Configure Runtime layer to use EF Core.
-            elsa.UseWorkflowRuntime(runtime => runtime.UseEntityFrameworkCore(ef => ef.UseSqlite("Data Source=../../main-elsa.db;Cache=Shared;")));
+            elsa.UseWorkflowRuntime(runtime => runtime.UseEntityFrameworkCore(ef =>
+            {
+                switch (elsaDbType)
+                {
+                    case "PostgreSQL": ef.UsePostgreSql(elsaConnectionString); break;
+                    case "SqlServer": ef.UseSqlServer(elsaConnectionString); break;
+                    default: ef.UseSqlite(elsaConnectionString); break;
+                }
+            }));
 
             // Default Identity features for authentication/authorization.
             elsa.UseIdentity(identity =>
@@ -97,9 +123,114 @@ public static class ElsaExtensions
         return services;
     }
 
+    private static string? FindElsaApiServerConfigPath()
+    {
+        var dir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir, "src")) &&
+                Directory.Exists(Path.Combine(dir, "02.Publish")))
+            {
+                // 优先 src 源码目录（VS 调试时 builder.Configuration 从此读取）
+                var srcPath = Path.Combine(dir, "src", "PlugApiServer", "CJ.Plug.ElsaApiServer", "appsettings.json");
+                if (File.Exists(srcPath)) return srcPath;
+
+                // 回退到 02.Publish 构建输出目录（Debug/Release 自动适配）
+                var debugPath = Path.Combine(dir, "02.Publish", "CJ.Plug.ElsaApiServer", "Debug", "net10.0", "appsettings.json");
+                if (File.Exists(debugPath)) return debugPath;
+
+                var releasePath = Path.Combine(dir, "02.Publish", "CJ.Plug.ElsaApiServer", "Release", "net10.0", "appsettings.json");
+                if (File.Exists(releasePath)) return releasePath;
+
+                return null;
+            }
+            var parent = Path.GetDirectoryName(dir);
+            if (parent == dir) break;
+            dir = parent;
+        }
+        return null;
+    }
+
+    private static string? TryReadFromConfiguration(IConfiguration? configuration, string key)
+    {
+        if (configuration == null) return null;
+        var value = configuration[key];
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static string ReadElsaConnectionString()
+    {
+        try
+        {
+            var configPath = FindElsaApiServerConfigPath();
+            Console.WriteLine($"[ElsaExtensions] ReadElsaConnectionString: configPath={configPath ?? "(null)"}");
+            if (configPath == null || !File.Exists(configPath))
+            {
+                Console.WriteLine("[ElsaExtensions] Config file not found, using default SQLite connection string");
+                return "Data Source=../../main-elsa.db;Cache=Shared;";
+            }
+
+            var json = File.ReadAllText(configPath);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("ConnectionStrings", out var connStr) &&
+                connStr.TryGetProperty("ElsaDb", out var elsaDb))
+            {
+                var val = elsaDb.GetString();
+                if (!string.IsNullOrWhiteSpace(val))
+                {
+                    Console.WriteLine($"[ElsaExtensions] ReadElsaConnectionString OK, prefix={val.Substring(0, Math.Min(val.Length, 50))}...");
+                    return val;
+                }
+            }
+            Console.WriteLine("[ElsaExtensions] ConnectionStrings:ElsaDb not found or empty in config file");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ElsaExtensions] ReadElsaConnectionString failed: {ex.Message}");
+        }
+
+        return "Data Source=../../main-elsa.db;Cache=Shared;";
+    }
+
+    private static string ReadElsaDbType()
+    {
+        try
+        {
+            var configPath = FindElsaApiServerConfigPath();
+            Console.WriteLine($"[ElsaExtensions] ReadElsaDbType: configPath={configPath ?? "(null)"}");
+            if (configPath == null || !File.Exists(configPath))
+            {
+                Console.WriteLine("[ElsaExtensions] Config file not found, defaulting to SQLite");
+                return "SQLite";
+            }
+
+            var json = File.ReadAllText(configPath);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("DatabaseConfig", out var dbConfig) &&
+                dbConfig.TryGetProperty("DbType", out var dbTypeElem))
+            {
+                var val = dbTypeElem.GetString();
+                if (!string.IsNullOrWhiteSpace(val))
+                {
+                    Console.WriteLine($"[ElsaExtensions] ReadElsaDbType OK, value={val}");
+                    return val;
+                }
+            }
+            Console.WriteLine("[ElsaExtensions] DatabaseConfig:DbType not found or empty in config file");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ElsaExtensions] ReadElsaDbType failed: {ex.Message}");
+        }
+
+        return "SQLite";
+    }
+
     public static WebApplicationBuilder AddElsaServicesForApi(this WebApplicationBuilder builder)
     {
-        builder.Services.ConfigElsaServices();
+        builder.Services.ConfigElsaServices(builder.Configuration);
         
         builder.Services.AddScoped<IElsaEngineService, ElsaEngineService>();
 

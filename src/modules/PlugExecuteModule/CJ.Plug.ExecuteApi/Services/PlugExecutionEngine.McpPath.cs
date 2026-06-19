@@ -66,7 +66,22 @@ internal partial class PlugExecutionEngine
             plug.SetVariableValue(v.Name, v.Value);
         }
 
-        CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}");
+        // 将插头定义中的默认变量值注入到 InputVariables（如果调用方未提供）。
+        // 直接运行 / Standalone 模式中 InputVariables 可能为空，此时应使用插头配置的默认参数值。
+        foreach (var pv in plug.PlugVariables)
+        {
+            if (request.InputVariables.Any(iv => iv.Name == pv.Name)) continue;
+            if (string.IsNullOrEmpty(pv.Value)) continue;
+            CLog.Information($"[TRACE-MCP] 使用插头默认变量: {pv.Name}={pv.Value}");
+            request.InputVariables.Add(new PlugVariableData
+            {
+                Name = pv.Name,
+                Value = pv.Value,
+                Type = pv.Type
+            });
+        }
+
+        CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}, InputVariables 数: {request.InputVariables?.Count ?? 0}");
 
         // 将插头类型信息注入到 request，确保下游 handler 能正确使用
         request.PlugTypeKey = plug.PlugTypeKey;
@@ -128,8 +143,34 @@ internal partial class PlugExecutionEngine
                 }
             }
         }
-        // 上传文件夹工具（DefaultPlugExecuteService）：预构造合成 Tool，避免 downstream 中 ToolVersionPath 解析问题
-        else if (plug.ToolVersionPath?.StartsWith("uploaded://") == true
+        // 通用兜底（DefaultPlugExecuteService 等非 StationPlugExecuteService handler）：
+        // 通过 ToolId 预解析 Tool 和 Station，替代旧版上传文件夹合成 Tool 逻辑
+        else if (plug.ToolId.HasValue && request.ResolvedTool == null && request.ResolvedStation == null)
+        {
+            request.ResolvedTool = await _dbContext.Set<Tool>()
+                .FirstOrDefaultAsync(t => t.Id == plug.ToolId.Value);
+            if (request.ResolvedTool != null)
+            {
+                request.ToolName = request.ResolvedTool.ToolName;
+                request.ToolVersion = request.ResolvedTool.ToolVersion;
+                CLog.Information($"[TRACE-MCP] 通过 ToolId={plug.ToolId} 解析工具: {request.ResolvedTool.ToolName}({request.ResolvedTool.ToolVersion}), ToolPath={request.ResolvedTool.ToolPath}");
+
+                request.ResolvedStation = await _dbContext.Set<Station>()
+                    .FirstOrDefaultAsync(s => s.IsStarted == true);
+                if (request.ResolvedStation != null)
+                {
+                    request.SpecifiedStationIp = request.ResolvedStation.StationIp;
+                    CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
+                }
+            }
+            else
+            {
+                CLog.Error($"[TRACE-MCP] 未在本地 DB 中找到 Tool (Id={plug.ToolId})");
+            }
+        }
+        // 兼容旧数据：无 ToolId 的上传文件夹工具（uploaded:// 格式），保留原始合成逻辑
+        else if (!plug.ToolId.HasValue
+                 && plug.ToolVersionPath?.StartsWith("uploaded://") == true
                  && request.ResolvedTool == null)
         {
             var pathPart = plug.ToolVersionPath["uploaded://".Length..];
@@ -142,7 +183,6 @@ internal partial class PlugExecutionEngine
             }
             else
             {
-                // 旧格式: uploaded://{DefinitionId}，从 Plug 元数据推导
                 uploadedUserOrSystem = string.Equals(plug.CreateType, PlugCreateTypeEnum.SystemInitPlug.ToString(), StringComparison.OrdinalIgnoreCase)
                     ? "0System" : (plug.Creater ?? "unknown");
                 uploadedFolderName = plug.ToolName ?? partSlash[0];
@@ -171,9 +211,8 @@ internal partial class PlugExecutionEngine
             };
             request.ToolName = uploadedFolderName;
             request.ToolVersion = "1.0";
-            CLog.Information($"[TRACE-MCP] 上传工具合成 Tool: {uploadedFolderName}, BasePath={uploadedToolBasePath}");
+            CLog.Information($"[TRACE-MCP-LEGACY] 旧格式上传工具合成 Tool: {uploadedFolderName}, BasePath={uploadedToolBasePath}");
 
-            // 同时解析可用的图站
             request.ResolvedStation = await _dbContext.Set<Station>()
                 .FirstOrDefaultAsync(s => s.IsStarted == true);
             if (request.ResolvedStation != null)

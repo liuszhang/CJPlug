@@ -2,6 +2,8 @@
 @using CJ.Plug.LlmConfigApiClient
 @using CJ.Plug.LlmConfigModel.Models
 @using MudBlazor
+@using MudExtensions
+@using Radzen.Blazor
 
 @inject ILlmConfigApiClient LlmConfigApiClient
 @inject IDialogService DialogService
@@ -9,7 +11,11 @@
 
 <PageTitle>LLM 配置管理</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.False">
+
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
+        <RadzenSplitterPane Size="50%">
+
+        
     <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
         <MudIcon Icon="@Icons.Material.Filled.SmartToy" Color="Color.Primary" Size="Size.Large" />
         <MudText Typo="Typo.h5">LLM 配置管理</MudText>
@@ -31,7 +37,7 @@
     <MudGrid>
         @* ---- 左侧：供应商列表 ---- *@
         <MudItem xs="12" md="4">
-            <MudPaper Elevation="2" Class="pa-4" Style="height: calc(100vh - 220px); overflow-y: auto;">
+            <MudPaper Elevation="2" Class="pa-4" Style="height: 100%; overflow-y: auto;">
                 <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">供应商</MudText>
                     <MudSpacer />
@@ -76,7 +82,7 @@
 
         @* ---- 右侧：模型配置列表 ---- *@
         <MudItem xs="12" md="8">
-            <MudPaper Elevation="2" Class="pa-4" Style="height: calc(100vh - 220px); overflow-y: auto;">
+            <MudPaper Elevation="2" Class="pa-4" Style="height: 100%; overflow-y: auto;">
                 <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">
                         模型配置
@@ -163,7 +169,64 @@
             </MudPaper>
         </MudItem>
     </MudGrid>
-</MudContainer>
+        </RadzenSplitterPane>
+    <RadzenSplitterPane Size="50%">
+
+        
+    @* ---- MCP Server 配置 ---- *@
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">MCP Server 配置</MudText>
+            <MudSpacer />
+            @if (_mcpConfig != null)
+            {
+                <MudChip T="string" Icon="@(_mcpConfig.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                         Color="@(_mcpConfig.IsEnabled ? Color.Success : Color.Default)" Size="Size.Small" Variant="Variant.Outlined">
+                    @(_mcpConfig.IsEnabled ? "已启用" : "已禁用")
+                </MudChip>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
+                           StartIcon="@Icons.Material.Outlined.Edit" OnClick="EditMcpServerConfig">编辑</MudButton>
+            }
+        </MudStack>
+
+        @if (_mcpLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (_mcpConfig == null)
+        {
+            <MudText Color="Color.Secondary">暂未配置 MCP Server</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="CreateMcpServerConfig" Class="mt-2">
+                添加 MCP Server
+            </MudButton>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="2">
+                    <MudText Typo="Typo.subtitle2">连接状态</MudText>
+                    <MudSwitch T="bool" Value="@_mcpConfig.IsEnabled" Disabled="true" Color="Color.Primary" />
+                </MudItem>
+                <MudItem xs="12" sm="5">
+                    <MudText Typo="Typo.subtitle2">描述</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(_mcpConfig.Description ?? "（无）")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="5">
+                    <MudText Typo="Typo.subtitle2">连接字符串</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="word-break:break-all;">
+                        @(string.IsNullOrEmpty(_mcpConfig.ConnectionString) ? "（未设置）" : _mcpConfig.ConnectionString)
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+
+        }
+    </MudPaper>
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+
 
 @code {
     private List<LlmProvider>? _providers;
@@ -172,32 +235,56 @@
     private LlmProvider? _selectedProvider;
     private (string ProviderName, string ModelName)? _activeConfig;
 
+    // MCP Server
+    private McpServerConfig? _mcpConfig;
+    private bool _mcpLoading;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadProviders();
         UpdateActiveConfig();
+        await LoadMcpConfig();
     }
 
     private void UpdateActiveConfig()
     {
         _activeConfig = null;
-        if (_providers == null) return;
-        foreach (var p in _providers.Where(p => p.IsEnabled))
+        Console.WriteLine($"[UpdateActiveConfig] _providers is null? {_providers == null}, count={_providers?.Count ?? 0}");
+
+        if (_providers == null) { InvokeAsync(StateHasChanged); return; }
+
+        foreach (var p in _providers)
+        {
+            Console.WriteLine($"[UpdateActiveConfig] Provider={p.Name}, IsEnabled={p.IsEnabled}, ModelConfigs={p.ModelConfigs?.Count ?? 0}");
+        }
+
+        // 优先查找 IsDefault 模型（不限供应商启用状态 — 即使供应商禁用，IsDefault 模型仍应被识别）
+        foreach (var p in _providers)
         {
             var defaultModel = p.ModelConfigs?.FirstOrDefault(m => m.IsDefault && m.IsEnabled);
             if (defaultModel != null)
             {
                 _activeConfig = (p.DisplayName, defaultModel.DisplayName);
+                Console.WriteLine($"[UpdateActiveConfig] 默认模型: {p.DisplayName}(IsEnabled={p.IsEnabled}) / {defaultModel.DisplayName}");
+                InvokeAsync(StateHasChanged);
                 return;
             }
         }
-        // 没有默认模型，取第一个启用的供应商+模型
+
+        // 没有 IsDefault 模型，取第一个启用的供应商+模型
         var firstProvider = _providers.FirstOrDefault(p => p.IsEnabled && p.ModelConfigs?.Any(m => m.IsEnabled) == true);
         if (firstProvider != null)
         {
             var firstModel = firstProvider.ModelConfigs!.First(m => m.IsEnabled);
             _activeConfig = (firstProvider.DisplayName, firstModel.DisplayName);
+            Console.WriteLine($"[UpdateActiveConfig] 兜底: {firstProvider.DisplayName} / {firstModel.DisplayName}");
         }
+        else
+        {
+            Console.WriteLine("[UpdateActiveConfig] 兜底也失败: 没有启用的供应商或没有启用的模型");
+        }
+
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadProviders()
@@ -232,8 +319,9 @@
         var dialog = await DialogService.ShowAsync<Dialogs.ProviderDialog>("新建供应商",
             new DialogParameters { ["Provider"] = new LlmProvider() });
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
+        if (result != null && !result.Canceled && result.Data is LlmProvider provider)
         {
+            await LlmConfigApiClient.CreateProviderAsync(provider);
             await LoadProviders();
             UpdateActiveConfig();
             Snackbar.Add("供应商创建成功", Severity.Success);
@@ -248,8 +336,9 @@
         var dialog = await DialogService.ShowAsync<Dialogs.ProviderDialog>("编辑供应商",
             new DialogParameters { ["Provider"] = full });
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
+        if (result != null && !result.Canceled && result.Data is LlmProvider updated)
         {
+            await LlmConfigApiClient.UpdateProviderAsync(updated);
             await LoadProviders();
             UpdateActiveConfig();
             if (_selectedProviderId == provider.Id)
@@ -293,8 +382,9 @@
         var dialog = await DialogService.ShowAsync<Dialogs.ModelConfigDialog>("新建模型配置",
             new DialogParameters { ["ModelConfig"] = config });
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
+        if (result != null && !result.Canceled && result.Data is LlmModelConfig created)
         {
+            await LlmConfigApiClient.CreateModelConfigAsync(created);
             await LoadModelConfigs();
             UpdateActiveConfig();
             Snackbar.Add("模型配置创建成功", Severity.Success);
@@ -309,8 +399,9 @@
         var dialog = await DialogService.ShowAsync<Dialogs.ModelConfigDialog>("编辑模型配置",
             new DialogParameters { ["ModelConfig"] = full });
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
+        if (result != null && !result.Canceled && result.Data is LlmModelConfig updated)
         {
+            await LlmConfigApiClient.UpdateModelConfigAsync(updated);
             await LoadModelConfigs();
             UpdateActiveConfig();
             Snackbar.Add("模型配置更新成功", Severity.Success);
@@ -362,5 +453,50 @@
             Snackbar.Add($"✅ {message}", Severity.Success);
         else
             Snackbar.Add($"❌ {message}", Severity.Error, c => c.SnackbarVariant = Variant.Filled);
+    }
+
+    // ---- MCP Server 操作 ----
+
+    private async Task LoadMcpConfig()
+    {
+        _mcpLoading = true;
+        try
+        {
+            _mcpConfig = await LlmConfigApiClient.GetMcpServerConfigAsync();
+        }
+        catch
+        {
+            _mcpConfig = null;
+        }
+        finally
+        {
+            _mcpLoading = false;
+        }
+    }
+
+    private async Task CreateMcpServerConfig()
+    {
+        var config = new McpServerConfig { IsEnabled = true };
+        var dialog = await DialogService.ShowAsync<Dialogs.McpServerDialog>("新建 MCP Server",
+            new DialogParameters { ["Config"] = config });
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && result.Data is McpServerConfig created)
+        {
+            _mcpConfig = await LlmConfigApiClient.SaveMcpServerConfigAsync(created);
+            Snackbar.Add("MCP Server 配置已保存", Severity.Success);
+        }
+    }
+
+    private async Task EditMcpServerConfig()
+    {
+        if (_mcpConfig == null) return;
+        var dialog = await DialogService.ShowAsync<Dialogs.McpServerDialog>("编辑 MCP Server",
+            new DialogParameters { ["Config"] = _mcpConfig });
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && result.Data is McpServerConfig updated)
+        {
+            _mcpConfig = await LlmConfigApiClient.SaveMcpServerConfigAsync(updated);
+            Snackbar.Add("MCP Server 配置已更新", Severity.Success);
+        }
     }
 }

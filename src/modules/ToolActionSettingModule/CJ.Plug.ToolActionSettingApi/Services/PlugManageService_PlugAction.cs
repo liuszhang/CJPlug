@@ -68,7 +68,6 @@ public partial class PlugManageService : IPlugManageService
 
         item.Name = request.Name;
         item.Category = request.Category;
-        item.Value = request.Value;
         item.PlugTypeKey = request.PlugTypeKey;
         item.ShowInPlugLibrary = request.ShowInPlugLibrary;
         item.PlugSettingsJson = request.PlugSettingsJson;

@@ -207,6 +207,37 @@ public class AppHostLauncher : IDisposable
     }
 
     /// <summary>
+    /// 强制停止所有 CJPlug 服务端口上的残留进程。
+    /// 遍历 AppHost 中定义的全部服务端口，逐一反查并终止占用进程。
+    /// </summary>
+    public async Task ForceStopAllPortsAsync()
+    {
+        // AppHost.cs 中定义的所有服务端口
+        int[] allPorts = [15288, 19275, 19276, 8686, 8687, 7660, 5001, 5010, 5066, 3001, 6274];
+
+        foreach (var port in allPorts)
+        {
+            try
+            {
+                await KillProcessByPortAsync(port);
+                OutputReceived?.Invoke($"[INFO] 端口 {port} 残留进程已强制终止。");
+            }
+            catch (InvalidOperationException)
+            {
+                // 该端口无残留进程，跳过
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "强制终止端口 {Port} 进程时发生错误", port);
+                OutputReceived?.Invoke($"[WARN] 端口 {port} 终止失败: {ex.Message}");
+            }
+        }
+
+        _externalInstanceDetected = false;
+        _ownsProcess = false;
+    }
+
+    /// <summary>
     /// 根据端口号反查占用进程并强制终止（Windows: netstat）。
     /// </summary>
     private static async Task KillProcessByPortAsync(int port)

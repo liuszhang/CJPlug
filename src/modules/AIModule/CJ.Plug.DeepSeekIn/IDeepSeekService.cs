@@ -37,5 +37,26 @@ namespace CJ.Plug.DeekSeekIn
         /// 使用指定模型配置进行非流式 Chat Completion
         /// </summary>
         Task<string> ChatCompletionAsync(string systemPrompt, string userPrompt, string apiKey, string model, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 通用 OpenAI 兼容流式问答 — 使用自定义 ApiBaseUrl + ApiKey + Model。
+        /// 适用于非 Ollama 的自定义供应商（LM Studio / vLLM / 自部署兼容端点等）。
+        /// </summary>
+        IAsyncEnumerable<string> StreamChatCompletionAsync(string content, string apiBaseUrl, string apiKey, string model);
+
+        /// <summary>
+        /// 带 MCP Server 连接的 Ollama 工具问答
+        /// </summary>
+        IAsyncEnumerable<string> AskWithTool(string Question, string? mcpConnectionString);
+
+        /// <summary>
+        /// 带 MCP Server 连接的 Ollama 工具问答（指定端点+模型）
+        /// </summary>
+        IAsyncEnumerable<string> AskWithTool(string Question, Uri modelEndpoint, string modelName, string? mcpConnectionString);
+
+        /// <summary>
+        /// 带 MCP Server 配置的通用 OpenAI 兼容流式问答
+        /// </summary>
+        IAsyncEnumerable<string> StreamChatCompletionAsync(string content, string apiBaseUrl, string apiKey, string model, string? mcpConnectionString);
     }
 }

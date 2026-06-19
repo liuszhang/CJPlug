@@ -19,14 +19,17 @@ public partial class MainWindow : Window
     private readonly Services.AppHostLauncher _appHostLauncher;
 
     private readonly ViewModels.ServiceControlViewModel _serviceControlVm;
+    private readonly ViewModels.DatabaseConfigViewModel _databaseConfigVm;
 
     public MainWindow(
         ViewModels.MainViewModel viewModel,
         ViewModels.ServiceControlViewModel serviceControlVm,
+        ViewModels.DatabaseConfigViewModel databaseConfigVm,
         Services.AppHostLauncher appHostLauncher)
     {
         _appHostLauncher = appHostLauncher;
         _serviceControlVm = serviceControlVm;
+        _databaseConfigVm = databaseConfigVm;
         DataContext = viewModel;
         InitializeComponent();
         Loaded += OnLoaded;
@@ -68,8 +71,8 @@ public partial class MainWindow : Window
             });
         };
 
-        // 初始化服务管理视图（仪表盘 WebView2 + 控制面板）
-        await ServiceManagementView.InitializeAsync(_serviceControlVm, "http://localhost:15288");
+        // 初始化服务管理视图（仪表盘 WebView2 + 控制面板 + 数据库配置）
+        await ServiceManagementView.InitializeAsync(_serviceControlVm, _databaseConfigVm, "http://localhost:15288");
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

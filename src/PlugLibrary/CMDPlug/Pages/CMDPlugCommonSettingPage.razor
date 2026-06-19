@@ -219,8 +219,7 @@
         redirectOutput = bool.TryParse(Plug.GetVariableValue(InitVariableNames.RedirectOutput.ToString()), out var ro) ? ro : true;
         redirectWorkPath = bool.TryParse(Plug.GetVariableValue(InitVariableNames.RedirectWorkPath.ToString()), out var rwp) ? rwp : true;
 
-        Plug.Value = Plug.GetVariableValue(InitVariableNames.CMDCommand.ToString());
-        CMDCommand = Plug.Value ?? "notepad";
+        CMDCommand = Plug.GetVariableValue(InitVariableNames.CMDCommand.ToString()) ?? "notepad";
 
         DefinitionId = SettingContext.PlugDefinitionId;
         //Log.Information(PlugSettings.GetSettingsJson());

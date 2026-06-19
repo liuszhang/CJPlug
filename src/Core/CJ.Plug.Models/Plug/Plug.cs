@@ -26,7 +26,6 @@ namespace CJ.Plug.Models.Plug
         public string? PlugTypeKey { get; set; }
         public string? Category { get; set; } = ToolTypeEnum.桌面类_自研.ToString(); //记录插头的种类，如桌面类，接口类，脚本类等
         public string? GroupName { get; set; }   //记录插头在插头库中的分组名称，对应引擎中的Category
-        public string? Value { get; set; } //用于保存插头重要的值，以简化从PlugSetting中取值的操作
         public string? RealValuePath { get; set; } //如果有文件操作，保存文件在文件服务器的真实路径，便于后续数据处理，也是为了简化从PlugSetting中取值的操作
         public string? WorkPath { get; set; }  //插头的工作目录（相对路径）
         public string? Status { get; set; }
@@ -72,6 +71,9 @@ namespace CJ.Plug.Models.Plug
         //是否将TAS插头展示在组件库
         public bool ShowInPlugLibrary { get; set; } = false;
 
+        //拖拽排序序号，用于持久化插头在同组内的显示顺序
+        public int? SortOrder { get; set; }
+
 
         //流程引擎相关数据
         public string? ActivityNodeId { get; set; }
@@ -86,13 +88,22 @@ namespace CJ.Plug.Models.Plug
         //public int? MarketPlugId { get; set; }
 
 
-        public int? ToolId { get; set; } //工具ID
-        public string? ToolName { get; set; } //工具名称
-        public string? ToolDisplayName { get; set; } //工具显示名称，用于识别的唯一值，如“获取NX模型参数(1.0)”
-        public string? ToolCommandLineShema { get; set; } //工具执行脚本，实际执行时将参数替换为实际值;默认为空，如果有值，则以此为准，覆盖工具本身的执行命令
+        public int? ToolId { get; set; } //工具ID（唯一权威来源，通过此 ID 查找 Tool 实体获取所有工具信息）
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolName { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolDisplayName { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
+        public string? ToolCommandLineShema { get; set; }
+
+        [Obsolete("Use ToolId to look up Tool entity instead")]
         public string? ToolVersion { get; set; }
 
-        public string? ToolVersionPath { get; set; } //工具版本路径，暂时不用
+        [Obsolete("Use ToolId to manage tool paths instead")]
+        public string? ToolVersionPath { get; set; }
         public List<string>? ToolVersions { get; set; } = new(); //工具版本列表，暂时不用
 
         //public List<PlugAction.PlugAction>? PlugActions { get; set; }= new List<PlugAction.PlugAction>();
@@ -163,10 +174,10 @@ namespace CJ.Plug.Models.Plug
             {
                 return new PlugSettings();
             }
-            var settings = JsonSerializer.Deserialize<PlugSettings>(PlugSettingsJson);            
+            var settings = JsonSerializer.Deserialize<PlugSettings>(PlugSettingsJson);
             return settings;
         }
-        
+
         /// <summary>
         /// 设置插头配置的方便类
         /// </summary>
@@ -178,7 +189,7 @@ namespace CJ.Plug.Models.Plug
             PlugSettings.SetSetting(key,value);
             PlugSettingsJson = PlugSettings.GetSettingsJson();
         }
-        
+
         /// <summary>
         /// 获取插头配置的方便类
         /// </summary>
@@ -249,6 +260,6 @@ namespace CJ.Plug.Models.Plug
         }
 
 
-        
+
     }
 }

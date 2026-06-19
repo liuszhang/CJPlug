@@ -3,12 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:converters="clr-namespace:CJ.Plug.Desktop.Converters"
              mc:Ignorable="d"
              d:DesignHeight="800" d:DesignWidth="220">
+    <UserControl.Resources>
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+    </UserControl.Resources>
     <Grid Background="#2D2D3F">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- 应用标题 -->
@@ -17,7 +22,8 @@
             <TextBlock Text="一寸光阴一寸金"
                        FontSize="22" FontWeight="SemiBold"
                        Foreground="#E0E0F0"
-                       FontFamily="Segoe UI" />
+                       FontFamily="Segoe UI"
+                       Visibility="{Binding DataContext.IsMenuCollapsed, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVis}}"/>
         </Border>
 
         <!-- 菜单列表 -->
@@ -43,7 +49,8 @@
                                         BorderBrush="Transparent"
                                         BorderThickness="3,0,0,0"
                                         Padding="{TemplateBinding Padding}">
-                                    <ContentPresenter VerticalAlignment="Center"/>
+                                    <ContentPresenter VerticalAlignment="Center"
+                                                      HorizontalAlignment="Left"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsSelected" Value="True">
@@ -59,13 +66,60 @@
                             </ControlTemplate>
                         </Setter.Value>
                     </Setter>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.IsMenuCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </DataTrigger>
+                    </Style.Triggers>
                 </Style>
             </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal"
+                                DataContext="{Binding}">
+                        <!-- 折叠模式：仅图标；展开模式：图标 + 文字 -->
+                        <TextBlock Text="{Binding Icon}"
+                                   FontSize="16"
+                                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
+                                   VerticalAlignment="Center"
+                                   Width="22"
+                                   TextAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding Name}"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding DataContext.IsMenuCollapsed, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVis}}"/>
+                    </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+
+        <!-- 底部折叠/展开按钮 -->
+        <Border Grid.Row="2"
+                Padding="0,8"
+                BorderBrush="#3D3D5F" BorderThickness="0,1,0,0">
+            <Button Width="32" Height="32"
+                    Background="#3D3D5F"
+                    BorderThickness="1"
+                    BorderBrush="#5C5C8F"
+                    Cursor="Hand"
+                    ToolTip="收起/展开菜单"
+                    HorizontalAlignment="Center"
+                    Command="{Binding DataContext.ToggleMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                <Button.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="4"/>
+                    </Style>
+                </Button.Resources>
+                <Button.Content>
+                    <TextBlock Text="&#x2630;"
+                               FontSize="18"
+                               FontFamily="Segoe UI"
+                               Foreground="#E0E0F0"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Button.Content>
+            </Button>
+        </Border>
     </Grid>
 </UserControl>

@@ -36,27 +36,47 @@ namespace CJ.Plug.PlugBaseCore.Services
                 plugExecutionRequest.ToolVersion = string.IsNullOrEmpty(plugExecutionRequest.ToolVersion) ? plug.ToolVersion : plugExecutionRequest.ToolVersion;
                 plugExecutionRequest.RequestCommand = string.IsNullOrEmpty(plugExecutionRequest.RequestCommand) ? plug.ToolCommandLineShema : plugExecutionRequest.RequestCommand;
 
-                // 上传文件夹工具（uploaded://）：构造合成 Tool，复用 ToolExecuteService 管线
-                if (plug.ToolVersionPath?.StartsWith("uploaded://") == true
-                    && plugExecutionRequest.ResolvedTool == null)
+                // 通过 ToolId 预解析 Tool（优先），替代旧版运行时合成 Tool 的逻辑
+                // 注意：新数据在保存时已通过 EnsureToolAsync 同步 plug.ToolName/ToolVersion，
+                // ToolExecuteService 可通过 display name 查找到真实的 Tool 记录，无需在此合成
+                if (plug.ToolId.HasValue && plugExecutionRequest.ResolvedTool == null)
+                {
+                    // plug.ToolName/ToolVersion 已由 EnsureToolAsync 在保存时从 Tool 实体同步，
+                    // lines 35-37 的 fallback 会将它们复制到 request 中。
+                    // ToolExecuteService.ExecuteToolAsync 通过 display name 查找 Tool 即可成功。
+                    CLog.Information($"[TOOL-BY-ID] 插头已关联 ToolId={plug.ToolId}, ToolName={plug.ToolName}({plug.ToolVersion})，由 ToolExecuteService 按 display name 查找");
+                }
+                // 兼容旧数据：无 ToolId 但有 ToolVersionPath（uploaded://），回退到旧版运行时合成逻辑
+                else if (!plug.ToolId.HasValue && !string.IsNullOrEmpty(plug.ToolVersionPath)
+                         && plug.ToolVersionPath.StartsWith("uploaded://")
+                         && plugExecutionRequest.ResolvedTool == null)
                 {
                     var syntheticTool = BuildUploadedTool(plug);
                     if (syntheticTool != null)
                     {
                         plugExecutionRequest.ResolvedTool = syntheticTool;
-                        // 使用文件夹名作为 ToolName，确保图站能按名查找本地目录
                         plugExecutionRequest.ToolName = syntheticTool.ToolName;
                         plugExecutionRequest.ToolVersion = syntheticTool.ToolVersion ?? "1.0";
-                        CLog.Information($"[UPLOADED-TOOL] 合成 Tool: {syntheticTool.ToolName}, BasePath={syntheticTool.ToolBasePath}");
+                        CLog.Information($"[UPLOADED-TOOL-LEGACY] 旧格式合成 Tool: {syntheticTool.ToolName}");
                     }
-                    else
+                }
+                else if (!plug.ToolId.HasValue && !string.IsNullOrEmpty(plug.GetVariableValue("Url"))
+                         && !(plug.ToolVersionPath?.StartsWith("uploaded://") ?? false)
+                         && plugExecutionRequest.ResolvedTool == null)
+                {
+                    var syntheticTool = new Tool
                     {
-                        CLog.Error($"[UPLOADED-TOOL] 无法构造合成 Tool，ToolVersionPath={plug.ToolVersionPath}");
-                        resultData.ExecuteStatus = JobStatus.完成;
-                        resultData.ExecuteSubStatus = JobSubStatus.出错;
-                        resultData.ResultString = "上传文件夹的工具路径为旧格式，请在插头管理中重新编辑并保存此插头以更新路径信息。";
-                        return resultData;
-                    }
+                        ToolName = plug.ToolName ?? "自定义工具",
+                        ToolVersion = "1.0",
+                        ToolPath = plug.GetVariableValue("Url"),
+                        CommandParameter = plug.ToolCommandLineShema,
+                        SkipDownloadToStation = true,
+                        IsBrowsable = false,
+                    };
+                    plugExecutionRequest.ResolvedTool = syntheticTool;
+                    plugExecutionRequest.ToolName = syntheticTool.ToolName;
+                    plugExecutionRequest.ToolVersion = syntheticTool.ToolVersion;
+                    CLog.Information($"[MANUAL-PATH-LEGACY] 旧格式手动路径合成 Tool: Name={syntheticTool.ToolName}");
                 }
 
                 if(plugExecutionRequest.InputVariables.Count==0&&!string.IsNullOrEmpty(plugExecutionRequest.ExecuteResultData.Ids.PDZId))

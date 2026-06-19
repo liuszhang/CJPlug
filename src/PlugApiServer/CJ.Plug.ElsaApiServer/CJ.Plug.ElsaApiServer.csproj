@@ -6,9 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CJ.Plug_Aspire.ElsaApi</RootNamespace>
     <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
-	  <!-- 添加此属性以控制是否跳过构建 -->
-	  <!--<SkipBuild Condition="'$(SkipBuild)' == 'true'">true</SkipBuild>-->
-	  <SkipBuild>true</SkipBuild>
+    <SkipBuild>true</SkipBuild>
   </PropertyGroup>
 
   <ItemGroup>

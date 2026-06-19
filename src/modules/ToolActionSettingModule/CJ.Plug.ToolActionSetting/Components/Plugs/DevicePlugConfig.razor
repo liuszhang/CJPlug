@@ -1,0 +1,265 @@
+@using CJ.Plug.Models.Plug
+@using System.Text.Json
+
+<MudDivider Class="my-2"></MudDivider>
+<MudText Typo="Typo.subtitle2" Color="Color.Primary">设备连接配置</MudText>
+
+<MudStack Spacing="2">
+
+    @* 协议类型 *@
+    <MudSelect T="string" @bind-Value="@_protocol" Label="协议类型" Style="width:200px;"
+               Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        <MudSelectItem Value="@("HTTP")">HTTP</MudSelectItem>
+        <MudSelectItem Value="@("HTTPS")">HTTPS</MudSelectItem>
+        <MudSelectItem Value="@("TCP")">TCP</MudSelectItem>
+        <MudSelectItem Value="@("UDP")">UDP</MudSelectItem>
+        <MudSelectItem Value="@("Modbus TCP")">Modbus TCP</MudSelectItem>
+        <MudSelectItem Value="@("Modbus RTU")">Modbus RTU</MudSelectItem>
+        <MudSelectItem Value="@("Serial")">Serial (串口)</MudSelectItem>
+    </MudSelect>
+
+    @* IP + 端口 + 超时 *@
+    <MudStack Row>
+        <MudTextField T="string" @bind-Value="@_ip" Label="IP 地址" Margin="Margin.Dense"
+                      Placeholder="例如：192.168.1.100" Variant="Variant.Outlined"
+                      Style="flex:2" />
+        <MudTextField T="string" @bind-Value="@_port" Label="端口" Margin="Margin.Dense"
+                      Placeholder="例如：8080" Variant="Variant.Outlined"
+                      Style="flex:1" />
+        <MudTextField T="string" @bind-Value="@_timeout" Label="超时(ms)" Margin="Margin.Dense"
+                      Placeholder="5000" Variant="Variant.Outlined"
+                      Style="flex:1" />
+    </MudStack>
+
+    @* 认证方式 *@
+    <MudSelect T="string" @bind-Value="@_authType" Label="认证方式" Style="width:200px;"
+               Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+        <MudSelectItem Value="@("None")">无认证</MudSelectItem>
+        <MudSelectItem Value="@("BasicAuth")">Basic Auth</MudSelectItem>
+        <MudSelectItem Value="@("ApiKey")">API Key</MudSelectItem>
+        <MudSelectItem Value="@("BearerToken")">Bearer Token</MudSelectItem>
+    </MudSelect>
+
+    @if (_authType == "BasicAuth")
+    {
+        <MudStack Row>
+            <MudTextField T="string" @bind-Value="@_username" Label="用户名" Margin="Margin.Dense"
+                          Variant="Variant.Outlined" Style="flex:1" />
+            <MudTextField T="string" @bind-Value="@_password" Label="密码" Margin="Margin.Dense"
+                          Variant="Variant.Outlined" Style="flex:1"
+                          InputType="InputType.Password" />
+        </MudStack>
+    }
+    else if (_authType == "ApiKey")
+    {
+        <MudTextField T="string" @bind-Value="@_apiKey" Label="API Key" Margin="Margin.Dense"
+                      Variant="Variant.Outlined"
+                      Placeholder="例如：sk-xxxxxxxxxxxx" />
+    }
+    else if (_authType == "BearerToken")
+    {
+        <MudTextField T="string" @bind-Value="@_apiKey" Label="Bearer Token" Margin="Margin.Dense"
+                      Variant="Variant.Outlined"
+                      Placeholder="例如：eyJhbGciOi..." />
+    }
+</MudStack>
+
+<MudDivider Class="my-2"></MudDivider>
+<MudText Typo="Typo.subtitle2" Color="Color.Primary">设备信息</MudText>
+
+<MudStack Row>
+    <MudTextField T="string" @bind-Value="@_brand" Label="品牌" Margin="Margin.Dense"
+                  Placeholder="例如：Philips Hue" Variant="Variant.Outlined"
+                  Style="flex:1" />
+    <MudTextField T="string" @bind-Value="@_model" Label="型号" Margin="Margin.Dense"
+                  Placeholder="例如：Hue Bridge v2" Variant="Variant.Outlined"
+                  Style="flex:1" />
+</MudStack>
+
+<MudDivider Class="my-2"></MudDivider>
+
+@* 设备动作列表 *@
+<MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+    <MudText Typo="Typo.subtitle2" Color="Color.Primary">设备动作</MudText>
+    <MudSpacer />
+    <MudButton StartIcon="@Icons.Material.Outlined.Add"
+               Variant="Variant.Filled" Size="Size.Small"
+               OnClick="AddDeviceAction"
+               Color="Color.Primary">添加动作</MudButton>
+</MudStack>
+
+@if (_deviceActions.Count == 0)
+{
+    <MudText Typo="Typo.caption" Color="Color.Default" Class="pa-2">
+        暂无动作，点击"添加动作"按钮为设备添加可执行的操作
+    </MudText>
+}
+else
+{
+    <MudStack Spacing="2">
+        @for (int i = 0; i < _deviceActions.Count; i++)
+        {
+            var idx = i;
+            var action = _deviceActions[idx];
+            <MudPaper Class="pa-2" Elevation="1">
+                <MudStack Spacing="1">
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.body2" Style="font-weight:600">动作 @(idx + 1)</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveDeviceAction(idx))" />
+                    </MudStack>
+                    <MudStack Row>
+                        <MudTextField T="string" @bind-Value="@action.Name" Label="动作名称"
+                                      Margin="Margin.Dense" Variant="Variant.Outlined"
+                                      Placeholder="例如：开灯" Style="flex:1" />
+                        @if (_protocol == "HTTP" || _protocol == "HTTPS")
+                        {
+                            <MudSelect T="string" @bind-Value="@action.HttpMethod" Label="HTTP方法"
+                                       Style="width:110px;" Margin="Margin.Dense" Dense Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("GET")">GET</MudSelectItem>
+                                <MudSelectItem Value="@("POST")">POST</MudSelectItem>
+                                <MudSelectItem Value="@("PUT")">PUT</MudSelectItem>
+                                <MudSelectItem Value="@("DELETE")">DELETE</MudSelectItem>
+                                <MudSelectItem Value="@("PATCH")">PATCH</MudSelectItem>
+                            </MudSelect>
+                        }
+                    </MudStack>
+                    <MudTextField T="string" @bind-Value="@action.Endpoint" Label="端点/命令"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined"
+                                  Placeholder="@(_protocol is "HTTP" or "HTTPS" ? "例如：/api/lights/1/state" : "例如：01050000FF00")" />
+                    <MudTextField T="string" @bind-Value="@action.Body" Label="请求体/数据内容"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined" Lines="2"
+                                  Placeholder="@(_protocol is "HTTP" or "HTTPS" ? "例如：{\"on\": true, \"bri\": 254}" : "例如：发送的原始数据或 Modbus 寄存器设置")" />
+                    <MudTextField T="string" @bind-Value="@action.Description" Label="描述说明"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined"
+                                  Placeholder="可选：描述此动作的功能" />
+                </MudStack>
+            </MudPaper>
+        }
+    </MudStack>
+}
+
+@code {
+    [Parameter] public Plug? Plug { get; set; }
+
+    private string _protocol = "HTTP";
+    private string _ip = "";
+    private string _port = "80";
+    private string _timeout = "5000";
+    private string _authType = "None";
+    private string _username = "";
+    private string _password = "";
+    private string _apiKey = "";
+    private string _brand = "";
+    private string _model = "";
+    private List<DeviceActionModel> _deviceActions = new();
+    private bool _loaded;
+
+    /// <summary>
+    /// 设备动作数据模型
+    /// </summary>
+    public class DeviceActionModel
+    {
+        public string Name { get; set; } = "";
+        public string Endpoint { get; set; } = "";
+        public string HttpMethod { get; set; } = "GET";
+        public string Body { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Plug != null && !_loaded)
+        {
+            LoadFromPlug();
+            _loaded = true;
+        }
+    }
+
+    private void AddDeviceAction()
+    {
+        _deviceActions.Add(new DeviceActionModel
+        {
+            Name = $"动作{_deviceActions.Count + 1}",
+            HttpMethod = "GET"
+        });
+    }
+
+    private void RemoveDeviceAction(int index)
+    {
+        if (index >= 0 && index < _deviceActions.Count)
+            _deviceActions.RemoveAt(index);
+    }
+
+    private void LoadFromPlug()
+    {
+        if (Plug == null) return;
+
+        var settings = Plug.GetPlugSettings();
+        if (settings == null) return;
+
+        _ip = settings.GetSetting(PlugSettingKey.DeviceIP.ToString()) ?? "";
+        _port = settings.GetSetting(PlugSettingKey.DevicePort.ToString()) ?? "80";
+        _protocol = settings.GetSetting(PlugSettingKey.DeviceProtocol.ToString()) ?? "HTTP";
+        _brand = settings.GetSetting(PlugSettingKey.DeviceBrand.ToString()) ?? "";
+        _model = settings.GetSetting(PlugSettingKey.DeviceModel.ToString()) ?? "";
+        _timeout = settings.GetSetting(PlugSettingKey.DeviceTimeout.ToString()) ?? "5000";
+        _authType = settings.GetSetting(PlugSettingKey.DeviceAuthType.ToString()) ?? "None";
+        _username = settings.GetSetting(PlugSettingKey.DeviceUsername.ToString()) ?? "";
+        _password = settings.GetSetting(PlugSettingKey.DevicePassword.ToString()) ?? "";
+        _apiKey = settings.GetSetting(PlugSettingKey.DeviceApiKey.ToString()) ?? "";
+
+        var actionsJson = settings.GetSetting(PlugSettingKey.DeviceActions.ToString());
+        if (!string.IsNullOrEmpty(actionsJson))
+        {
+            try
+            {
+                _deviceActions = JsonSerializer.Deserialize<List<DeviceActionModel>>(actionsJson) ?? new();
+            }
+            catch
+            {
+                _deviceActions = new();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 将设备类配置写入 Plug 对象。
+    /// </summary>
+    public void ApplyToPlug(Plug plug)
+    {
+        // 连接配置
+        plug.SetPlugSetting(PlugSettingKey.DeviceProtocol.ToString(), _protocol);
+        plug.SetPlugSetting(PlugSettingKey.DeviceIP.ToString(), _ip);
+        plug.SetPlugSetting(PlugSettingKey.DevicePort.ToString(), _port);
+        plug.SetPlugSetting(PlugSettingKey.DeviceTimeout.ToString(), _timeout);
+        plug.SetPlugSetting(PlugSettingKey.DeviceAuthType.ToString(), _authType);
+
+        // 认证信息（仅当选择了对应认证方式时保存）
+        if (_authType == "BasicAuth")
+        {
+            plug.SetPlugSetting(PlugSettingKey.DeviceUsername.ToString(), _username);
+            plug.SetPlugSetting(PlugSettingKey.DevicePassword.ToString(), _password);
+        }
+        else if (_authType == "ApiKey" || _authType == "BearerToken")
+        {
+            plug.SetPlugSetting(PlugSettingKey.DeviceApiKey.ToString(), _apiKey);
+        }
+
+        // 设备信息
+        plug.SetPlugSetting(PlugSettingKey.DeviceBrand.ToString(), _brand);
+        plug.SetPlugSetting(PlugSettingKey.DeviceModel.ToString(), _model);
+
+        // 设备动作列表序列化为 JSON 存储
+        if (_deviceActions.Count > 0)
+        {
+            var json = JsonSerializer.Serialize(_deviceActions);
+            plug.SetPlugSetting(PlugSettingKey.DeviceActions.ToString(), json);
+        }
+
+        // 设置插头类别
+        plug.Category = PlugCategorys.设备类.ToString();
+    }
+}

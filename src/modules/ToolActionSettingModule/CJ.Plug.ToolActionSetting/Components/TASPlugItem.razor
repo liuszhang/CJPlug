@@ -11,6 +11,7 @@
 @using Elsa.Api.Client.Shared.Models
 @using Elsa.Studio.Workflows.Domain.Contracts
 @using Size=MudBlazor.Size
+@using CJ.Plug.Models.Job
 
 @inject MainApiClient MainApiClient
 @inject IWorkflowDefinitionService WorkflowDefinitionService
@@ -19,53 +20,65 @@
 @inject IElsaStudioService ElsaEngineService
 @inject IDialogService DialogService
 
-@* <MudBadge Dot="true" Color="Color.Info" Visible="@toolItem.ShowInPlugLibrary"> *@
-<MudPaper>
-    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+<MudPaper Class="pa-1" Elevation="0">
+    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="1">
 
-        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="2">
+        @* 左侧：图标 + 名称(#ID) *@
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Style="flex:1;min-width:0;overflow:hidden">
             @if (!string.IsNullOrEmpty(Plug.Icon))
             {
                 @if (Plug.Icon.Contains("/"))
                 {
-                    <img src="/webFiles/@Plug.Icon" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" />
+                    <img src="/webFiles/@Plug.Icon" style="width:28px;height:28px;object-fit:cover;border-radius:4px;" />
                 }
                 else
                 {
-                    <MudIcon Icon="@Plug.Icon" Size="Size.Medium" />
+                    <MudIcon Icon="@Plug.Icon" Size="Size.Small" />
                 }
-            }
-            <MudStack Spacing="1" AlignItems="AlignItems.Center" Justify="Justify.Center">
-
-            @if (Plug.CreateType==PlugCreateTypeEnum.SystemInitPlug.ToString())
-            {
-                <MudAlert Severity="Severity.Info" Dense>@Plug.Name (@Plug.Id)</MudAlert>
             }
             else
             {
-                <MudAlert Severity="Severity.Normal" Dense>@Plug.Name (@Plug.Id)</MudAlert>
+                <MudIcon Icon="@GetDefaultIcon()" Size="Size.Small" />
             }
+            <MudText Typo="Typo.body2" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                @* <span class="mud-text-secondary" style="font-size:0.65rem">[SO:@Plug.SortOrder] </span> *@
+                @Plug.Name
+                <span class="mud-text-secondary" style="font-size:0.75rem">#@Plug.Id</span>
+            </MudText>
+        </MudStack>
 
-            @if (Plug.ToolVersions?.Count>0)
+        @* 右侧：版本 + 状态 + 操作按钮 *@
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="0">
+
+            @if (Plug.ToolVersions?.Count > 0)
             {
-                <MudSelect T="string" Variant="Variant.Outlined" Value="Plug.ToolVersion" ValueChanged="ChangeVersion" Dense Margin="Margin.Dense" FullWidth="false">
+                <MudSelect T="string" Value="Plug.ToolVersion" ValueChanged="ChangeVersion"
+                    Dense Margin="Margin.Dense" Style="width:70px;font-size:0.75rem">
                     @foreach(var v in Plug.ToolVersions)
                     {
                         <MudSelectItem Value="@v">@v</MudSelectItem>
                     }
                 </MudSelect>
             }
-        </MudStack>
-        </MudStack>
-        <MudStack Row>
-            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" />
-            @if (!(Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()))
-            {
-                <MudIconButton Disabled="@_processing" OnClick="DeleteToolItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" />
-            }
+
             @if (Plug.ShowInPlugLibrary)
             {
-                <MudIcon Icon="@Icons.Material.Filled.Check"  Title="已插入" Color="Color.Success" ></MudIcon>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" Size="Size.Small" Color="Color.Success" Title="已插入" />
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked" Size="Size.Small" Color="Color.Default" Title="未插入" />
+            }
+
+            <MudIconButton OnClick="RunPlug" Size="Size.Small"
+                Icon="@(_isRunning ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.PlayArrow)"
+                Color="Color.Success" Disabled="@_isRunning" Title="执行测试" />
+
+            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" Title="配置" />
+
+            @if (!(Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()))
+            {
+                <MudIconButton Disabled="@_processing" OnClick="DeleteToolItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Title="删除" />
             }
         </MudStack>
     </MudStack>
@@ -81,6 +94,20 @@
     [Parameter]
     public Plug? Plug { get; set; } = new();
     private bool IsDesktopCategory => Plug?.Category?.Contains("桌面") == true;
+
+    private string GetDefaultIcon()
+    {
+        var cat = Plug?.Category;
+        if (string.IsNullOrEmpty(cat)) return Icons.Material.Filled.Extension;
+        if (cat.Contains("桌面")) return Icons.Material.Filled.Window;
+        if (cat.Contains("接口")) return Icons.Material.Filled.Http;
+        if (cat.Contains("脚本")) return Icons.Material.Filled.Code;
+        if (cat.Contains("设备")) return Icons.Material.Filled.DevicesOther;
+        if (cat.Contains("数据库")) return Icons.Material.Filled.Storage;
+        if (cat.Contains("流程")) return Icons.Material.Filled.AccountTree;
+        return Icons.Material.Filled.Extension;
+    }
+
     public PlugSettings? PlugSettings { get; set; }
     [CascadingParameter]
     public Plug? SelectedToolItem { get; set; } = new();
@@ -88,17 +115,18 @@
     public EventCallback<string> OnDelete { get; set; }
     [Parameter]
     public EventCallback<string> OnChangeVersion { get; set; }
-    public string? toolPath { get; set; } = @"""C:\Program Files\Siemens\NX 12.0\NXBIN\uggraf.exe""";
+    public string? toolPath { get; set; } = @"""C:\Program Files\Siemens\NX 12.0\NXBIN\ugraf.exe""";
 
     private readonly List<string> toolVersions = ["11.0", "12.0"];
     private int _numberOfColors = Enum.GetValues(typeof(Color)).Length;
 
     bool _processing = false;
+    private bool _isRunning;
 
 
 
     protected override async Task OnParametersSetAsync()
-    {      
+    {
         PlugSettings = Plug.GetPlugSettings();
     }
 
@@ -113,6 +141,42 @@
             StateHasChanged();
         }
     }
+
+    private async Task RunPlug()
+    {
+        if (_isRunning || Plug?.DefinitionId == null) return;
+        _isRunning = true;
+        StateHasChanged();
+        try
+        {
+            var result = await MainApiClient.ExecutePlugByDefifnitionId(Plug.DefinitionId);
+            if (result is null)
+            {
+                Snackbar.Add($"执行 [{Plug.Name}]：服务未返回结果", Severity.Warning);
+            }
+            else if (result.ExecuteStatus == JobStatus.完成)
+            {
+                Snackbar.Add($"执行 [{Plug.Name}]：{result.ExecuteResultMessage ?? "成功"}", Severity.Success,
+                    options => options.VisibleStateDuration = 5000);
+            }
+            else
+            {
+                Snackbar.Add($"执行 [{Plug.Name}]：{result.ExecuteStatus} - {result.ExecuteResultMessage ?? ""}", Severity.Warning,
+                    options => options.VisibleStateDuration = 8000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"执行 [{Plug.Name}] 异常：{ex.Message}", Severity.Error,
+                options => options.VisibleStateDuration = 8000);
+        }
+        finally
+        {
+            _isRunning = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task DeleteToolItem()
     {
         _processing = true;
@@ -140,10 +204,10 @@
 
     private async Task CreateAndPublishWorkflow(Plug item,bool publish)
     {
-        
+
         WorkflowDefinition workflowDefinition =await WorkflowDefinitionService.FindByDefinitionIdAsync(item.DefinitionId,VersionOptions.Latest) ?? new();
         Console.WriteLine($"target workflow id:{workflowDefinition.DefinitionId}");
-        workflowDefinition.Name = item.Name;        
+        workflowDefinition.Name = item.Name;
         workflowDefinition.Options.UsableAsActivity = true;
         workflowDefinition.Options.AutoUpdateConsumingWorkflows = true;
         //workflowDefinition.IsPublished = false;

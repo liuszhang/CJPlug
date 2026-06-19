@@ -24,6 +24,7 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
     <PackageReference Include="NSwag.AspNetCore" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 

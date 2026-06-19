@@ -85,6 +85,11 @@
 
                 await MainApiClient.UpdatePlugVariableData(PlugVariableData);
                 //await MainApiClient.CreateOrUpdatePDZ(EditorContext.PlugDataZone);
+
+                if (EditorContext.OnValueChanged != null)
+                {
+                    await EditorContext.OnValueChanged();
+                }
             }
             catch (Exception ex)
             {
@@ -111,6 +116,11 @@
         PlugVariableData.Value = "";
         PlugVariableData.DisplayValue = "";
         await MainApiClient.UpdatePlugVariableData(PlugVariableData);
+
+        if (EditorContext.OnValueChanged != null)
+        {
+            await EditorContext.OnValueChanged();
+        }
     }
 
 }

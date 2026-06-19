@@ -120,16 +120,24 @@ public static class LlmConfigApi
         // ---- 获取默认模型信息 ----
         api.MapGet("/getDefaultModelInfo", async (
             ILlmConfigService service,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("LlmConfigApi");
             var (provider, model) = await service.GetDefaultModelInfoAsync(ct);
             if (provider == null || model == null)
-                return Results.Ok(null);
-            return Results.Ok(new DefaultModelInfoResponse(
+            {
+                logger.LogWarning("GetDefaultModelInfo: no default model found");
+                // 返回结构化空结果，避免客户端 JSON 反序列化崩溃
+                return Results.Ok(new ApiResult<DefaultModelInfoResponse?>(0, null, "no default model found"));
+            }
+            logger.LogInformation("GetDefaultModelInfo: ProviderName={Name}, ApiBaseUrl={Url}, ModelName={Model}, ApiKeyLen={KeyLen}",
+                provider.Name, provider.ApiBaseUrl, model.ModelName, provider.ApiKey?.Length ?? 0);
+            return Results.Ok(new ApiResult<DefaultModelInfoResponse?>(0, new DefaultModelInfoResponse(
                 provider.Id, provider.Name, provider.DisplayName,
                 provider.ApiBaseUrl, provider.ApiKey, provider.IsEnabled,
                 model.Id, model.ModelName, model.DisplayName,
-                model.ModelType, model.MaxTokens, model.Temperature, model.IsEnabled));
+                model.ModelType, model.MaxTokens, model.Temperature, model.IsEnabled)));
         })
         .WithName("GetDefaultModelInfo")
         .WithDescription("获取当前默认模型及供应商信息");
@@ -141,7 +149,9 @@ public static class LlmConfigApi
             CancellationToken ct) =>
         {
             var success = await service.SetDefaultModelAsync(modelConfigId, ct);
-            return success ? Results.Ok(true) : Results.NotFound();
+            return success
+                ? Results.Ok(new ApiResult<bool>(0, true))
+                : Results.Ok(new ApiResult<bool>(1, false, "model config not found"));
         })
         .WithName("SetDefaultModel")
         .WithDescription("设置指定模型为默认模型");
@@ -158,6 +168,25 @@ public static class LlmConfigApi
         .WithName("TestLlmConnection")
         .WithDescription("测试 LLM 连接");
 
+        // ---- MCP Server 配置 ----
+        api.MapGet("/getMcpServerConfig", async (
+            ILlmConfigService service,
+            CancellationToken ct) =>
+        {
+            var config = await service.GetMcpServerConfigAsync(ct);
+            return config == null ? Results.Ok(null) : Results.Ok(config);
+        })
+        .WithName("GetMcpServerConfig")
+        .WithDescription("获取 MCP Server 配置");
+
+        api.MapPost("/saveMcpServerConfig", async (
+            [FromBody] McpServerConfig config,
+            ILlmConfigService service,
+            CancellationToken ct) =>
+            await service.SaveMcpServerConfigAsync(config, ct))
+        .WithName("SaveMcpServerConfig")
+        .WithDescription("保存 MCP Server 配置");
+
         return app;
     }
 }
@@ -167,3 +196,6 @@ public record DefaultModelInfoResponse(
     string ApiBaseUrl, string? ApiKey, bool ProviderIsEnabled,
     int ModelId, string ModelName, string ModelDisplayName,
     string ModelType, int? MaxTokens, double? Temperature, bool ModelIsEnabled);
+
+/// <summary>通用 API 响应包装，确保空结果也返回合法 JSON。</summary>
+public record ApiResult<T>(int Code, T? Data, string? Message = null);

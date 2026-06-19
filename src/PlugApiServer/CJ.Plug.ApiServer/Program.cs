@@ -18,6 +18,8 @@ using PlugsBundle;
 using Serilog;
 using System.Text;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+AppContext.SetSwitch("Npgsql.EnableMultiplexing", false);
 
 // 设置 .NET Console 编码为 UTF-8
 Console.OutputEncoding = Encoding.UTF8;
@@ -74,16 +76,27 @@ builder.Services.AddSingleton<HubConnectionManagerService>(new HubConnectionMana
 // ★方案② 备选：基准目录 = 自定义输出目录（和运行时一致）
 var apiRootDir = AppContext.BaseDirectory;
 
-// ========== 读取连接字符串 + 拼接绝对路径 ==========
-//var connStr = builder.Configuration.GetConnectionString("Sqlite");
+// ========== 读取连接字符串 + 数据库类型，按类型动态注册 ==========
 var connStr = DbConnectionString.ConnectionString;
-// 将「相对路径的连接字符串」转换为「绝对路径」
+var dbType = DbConnectionString.DbType;
+// 仅 SQLite 需要将相对路径 Data Source= 拼接为绝对路径
 var absoluteConnStr = connStr.Replace("Data Source=", $"Data Source={Path.Combine(apiRootDir, "")}");
 
-
-builder.Services.AddDbContext<MainDbContext>(options =>
-                //options.UseSqlite(DbConnectionString.ConnectionString));
-                options.UseSqlite(absoluteConnStr));
+builder.Services.AddDbContextPool<MainDbContext>(options =>
+{
+    switch (dbType)
+    {
+        case "PostgreSQL":
+            options.UseNpgsql(connStr);
+            break;
+        case "SqlServer":
+            options.UseSqlServer(connStr);
+            break;
+        default:
+            options.UseSqlite(absoluteConnStr);
+            break;
+    }
+}, poolSize: 128);
 
 //自定义插头的执行注册
 builder.Services.AddPlugsExecutebundle();

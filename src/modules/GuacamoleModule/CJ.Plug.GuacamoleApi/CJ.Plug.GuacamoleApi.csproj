@@ -14,7 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CJ.Plug.GuacamoleModels\CJ.Plug.GuacamoleModels.csproj" />
     <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
-    <ProjectReference Include="..\..\StationAndToolModule\CJ.Plug.StationAndToolApi\CJ.Plug.StationAndToolApi.csproj" />
+    <ProjectReference Include="..\..\StationManageModule\CJ.Plug.StationManageApi\CJ.Plug.StationManageApi.csproj" />
   </ItemGroup>
 
 </Project>

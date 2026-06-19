@@ -380,3 +380,6 @@ FodyWeavers.xsd
 /02.Publish/CJ.Plug.ElsaApiServer/main-elsa.db
 /02.Publish/CJ.Plug.ElsaApiServer/main-elsa.db
 /02.Publish/CJ.Plug.ApiServer/main.db
+
+# 开发类文档
+.workbuddy/

@@ -20,6 +20,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBreadcrumb;
 
+    /// <summary>
+    /// 左侧菜单是否折叠（收起为仅图标模式）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isMenuCollapsed;
+
     public ObservableCollection<BreadcrumbItem> BreadcrumbItems { get; } = [];
 
     /// <summary>
@@ -63,30 +69,59 @@ public partial class MainViewModel : ObservableObject
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "插头管理",
-            Url = "http://localhost:5066/TAS?hideMenu=true"
+            Url = "http://localhost:5066/TAS?hideMenu=true",
+            Icon = "\u2699"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "流程管理",
-            Url = "http://localhost:5066/ProcessManageList?hideMenu=true"
+            Url = "http://localhost:5066/ProcessManageList?hideMenu=true",
+            Icon = "\u2395"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "MCP Tool管理",
-            Url = "http://localhost:5066/MCPToolManage?hideMenu=true"
+            Url = "http://localhost:5066/MCPToolManage?hideMenu=true",
+            Icon = "\u2328"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "服务管理",
-            Url = "http://localhost:15288"
+            Url = "http://localhost:15288",
+            Icon = "\u2691"
         });
         MenuItems.Add(new MenuItemViewModel
         {
-            Name = "图站与工具",
-            Url = "http://localhost:5066/StationAndTool?hideMenu=true"
+            Name = "图站管理",
+            Url = "http://localhost:5066/StationManage?hideMenu=true",
+            Icon = "\u2606"
+        });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "工具资源",
+            Url = "http://localhost:5066/ToolResource?hideMenu=true",
+            Icon = "\u2692"
+        });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "AI对话",
+            Url = "http://localhost:5066/AskAI?hideMenu=true",
+            Icon = "\u2601"
+        });
+        MenuItems.Add(new MenuItemViewModel
+        {
+            Name = "LLM配置",
+            Url = "http://localhost:5066/LlmConfig?hideMenu=true",
+            Icon = "\u2693"
         });
 
         SelectedMenuItem = MenuItems[3];
+    }
+
+    [RelayCommand]
+    private void ToggleMenu()
+    {
+        IsMenuCollapsed = !IsMenuCollapsed;
     }
 
     [RelayCommand]

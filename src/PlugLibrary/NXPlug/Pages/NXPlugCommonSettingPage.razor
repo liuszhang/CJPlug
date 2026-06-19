@@ -550,7 +550,7 @@
         {
             //Log.Information("Begin DownloadFileByFileId On Web");
             //调用Elsa框架成熟的文件下载服务
-            //await Files.DownloadFileFromStreamAsync(plug.Value, stream);
+            //await Files.DownloadFileFromStreamAsync(plug.GetVariableValue("Url"), stream);
             //await ElsaDomToolService.DownloadFileFromStreamAsync(fileName, stream);
             await Files.DownloadFileFromStreamAsync(FileName, stream);
             //await IDomInteropService.DownloadFileFromStreamAsync(fileName, stream);

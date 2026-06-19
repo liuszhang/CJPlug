@@ -10,6 +10,7 @@ public class LlmConfigDbConfig : IModuleDbConfig
     {
         modelBuilder.Entity<LlmProvider>(entity => entity.ToTable("LlmProviders"));
         modelBuilder.Entity<LlmModelConfig>(entity => entity.ToTable("LlmModelConfigs"));
+        modelBuilder.Entity<McpServerConfig>(entity => entity.ToTable("McpServerConfigs"));
 
         Console.WriteLine("------>Success Add LlmConfig Module DbSet Config");
     }

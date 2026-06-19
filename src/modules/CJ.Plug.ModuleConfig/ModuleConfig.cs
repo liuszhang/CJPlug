@@ -41,7 +41,8 @@ namespace CJ.Plug.ModuleConfig
             services.AddProcessManagePageModuleServices();
             services.AddJobManagePageModuleServices();
             services.AddTASPageModuleServices();
-            services.AddStationAndToolModuleServices();
+            services.AddStationManageModuleServices();
+            services.AddToolResourceModuleServices();
             services.AddPlugMarketPageModuleServices();
             services.AddPlugExecutePageModuleServices();
             services.AddProcessEditPageModuleServices();
@@ -90,7 +91,8 @@ namespace CJ.Plug.ModuleConfig
             //services.AddLoginModuleApiServices();
             services.AddProcessManageModuleApiServices();
             services.AddJobManageModuleApiServices();
-            services.AddStationAndToolApiServices();
+            services.AddStationManageApiServices();
+            services.AddToolResourceApiServices();
             services.AddTASModuleApiServices();
             services.AddPDZManageModuleApiServices();
             services.AddPlugExecuteModuleApiServices();
@@ -127,7 +129,8 @@ namespace CJ.Plug.ModuleConfig
             app.AddLoginModuleApi();
             app.AddProcessManageModuleApi();
             app.AddJobManageModuleApi();
-            app.AddStationAndToolApi();
+            app.AddStationManageApi();
+            app.AddToolResourceApi();
             app.AddTASModuleApi();
             app.AddPDZManageModuleApi();
             app.AddPlugExecuteModuleApi();

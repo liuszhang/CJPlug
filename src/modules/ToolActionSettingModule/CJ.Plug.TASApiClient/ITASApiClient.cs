@@ -1,4 +1,5 @@
-﻿using CJ.Plug.Models.PlugAction;
+﻿using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.PlugAction;
 using CJ.Plug.Models.Relation;
 using System;
 using System.Collections.Generic;
@@ -34,5 +35,6 @@ namespace CJ.Plug.TASApiClient
         Task SetExecutePlugActionsToPlug(Models.Plug.Plug plug, List<PlugAction>? plugActions);
         Task<PlugAction?> UpdatePlugActionAsync(PlugAction newItem, CancellationToken cancellationToken = default);
         Task<Models.Plug.Plug?> UpdatePlugAsync(int? itemId, Models.Plug.Plug item, CancellationToken cancellationToken = default);
+        Task BatchUpdateSortOrdersAsync(List<PlugSortOrderDto> sortOrders, CancellationToken cancellationToken = default);
     }
 }

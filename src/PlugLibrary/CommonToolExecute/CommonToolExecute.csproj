@@ -17,7 +17,7 @@
 
   <ItemGroup>
 	  <ProjectReference Include="..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
-	  <ProjectReference Include="..\..\modules\StationAndToolModule\CJ.Plug.StationAndToolApiClient\CJ.Plug.StationAndToolApiClient.csproj" />
+	  <ProjectReference Include="..\..\modules\StationManageModule\CJ.Plug.StationManageApiClient\CJ.Plug.StationManageApiClient.csproj" />
   </ItemGroup>
 
 </Project>

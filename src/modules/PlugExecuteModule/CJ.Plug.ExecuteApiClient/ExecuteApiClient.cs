@@ -3,7 +3,7 @@ using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Station;
 using CJ.Plug.PlugDataZoneApiClient;
-using CJ.Plug.StationAndToolApiClient;
+using CJ.Plug.StationManageApiClient;
 using CJ.Plug.TASApiClient;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -14,7 +14,7 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
 {
     private readonly IServiceProvider _serviceProvider;
     private ITASApiClient? TasApiClient;
-    private IStationAndToolApiClient? StationAndToolApiClient;
+    private IStationManageApiClient? StationManageApiClient;
     private IPDZApiClient? PDZApiClient;
     private IJobManageApiClient? JobManageApiClient;
 
@@ -96,8 +96,8 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
         //Console.WriteLine("the execution string is:" + JsonSerializer.Serialize(stationExectionRequest.RequestCommand));
 
         //此处应动态获取图站IP
-        StationAndToolApiClient= StationAndToolApiClient??_serviceProvider.GetService<IStationAndToolApiClient>();
-        var stationIp = await StationAndToolApiClient.GetStationToUse();
+        StationManageApiClient= StationManageApiClient??_serviceProvider.GetService<IStationManageApiClient>();
+        var stationIp = await StationManageApiClient.GetStationToUse();
         if (string.IsNullOrEmpty(stationIp))
         {
             CLog.Error("可使用的图站为空，请检查配置。");
@@ -125,7 +125,7 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
                 ToolName = stationExectionRequest.ToolName,
                 ToolVersion = stationExectionRequest.ToolVersion
             };
-            var toolPathByConfig = await StationAndToolApiClient.GetToolPathByFilter(filter);
+            var toolPathByConfig = await StationManageApiClient.GetToolPathByFilter(filter);
             if (!string.IsNullOrEmpty(toolPathByConfig))
             {
                 CLog.Information("根据配置表更新工具路径：" + toolPathByConfig);

@@ -38,9 +38,19 @@ namespace CJ.Plug.Models.Station
         /// 下载完成后用于完整性校验，null 则跳过校验。
         /// </summary>
         public string? Sha256 { get; set; }
+        /// <summary>
+        /// 图站端部署状态（由 StationApiServer 的 /api/station/tools 端点填充）。
+        /// 取值：未安装 / 已安装 / 未找到 / 已就绪 / null（未检查）
+        /// </summary>
+        public string? DeploymentStatus { get; set; }
+
         public bool IsEnabled { get; set; }= true;
         public bool IsSystemInitTool { get; set; }=false;
         public bool? IsBrowsable { get; set; }= true;
+        /// <summary>
+        /// 是否支持远程可视化。为 true 时启动工具会弹出 VNC 远程连接窗口。
+        /// </summary>
+        public bool SupportsRemoteVisualization { get; set; } = false;
 
         public List<BaseVariable> GetVariablesFromToolCommand()
         {

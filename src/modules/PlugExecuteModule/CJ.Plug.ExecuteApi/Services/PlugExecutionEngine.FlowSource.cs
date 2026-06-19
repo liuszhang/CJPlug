@@ -70,11 +70,21 @@ internal partial class PlugExecutionEngine
             return await ExecuteMcpPluginPathAsync(ctx, definitionId);
         }
 
-        // 非 MCP 路径：plugData 为 null 时无法继续执行，直接返回错误
-        // 注：MCP Plugin 路径在上方已处理并 return，不会到达此处
+        // 非 MCP 路径：plugData 为 null 时尝试从 Plug 定义构建临时 PlugData 并走 Plugin 路径执行
+        // 直接启动插头（如从插头管理中点击运行按钮）没有预存的 PlugData 记录，
+        // 此处仿照 MCP Plugin 路径做自动 fallback，避免"未找到 PlugData"错误。
         if (ctx.PlugData == null)
         {
-            CLog.Error($"StartExecutePlug: 未找到 PlugData，PlugDefinitionId={request.ExecuteResultData.Ids.PlugDefinitionId}");
+            CLog.Information($"[TRACE] PlugData 不存在 (non-MCP)，尝试从 Plug 定义构建临时 PlugData: {definitionId}");
+            var plug = await _plugManageService.GetPlugByDefinitionId(definitionId);
+            if (plug != null)
+            {
+                CLog.Information($"[TRACE] 找到 Plug 定义 ({plug.Category}/{plug.PlugTypeKey ?? "-"})，重定向到 Plugin 路径: {definitionId}");
+                request.McpToolType = "Plugin";
+                request.ExecuteMode = ExecuteMode.Standalone;
+                return await ExecuteMcpPluginPathAsync(ctx, definitionId);
+            }
+            CLog.Error($"StartExecutePlug: 未找到 PlugData 且未找到 Plug 定义，PlugDefinitionId={definitionId}");
             return new ExecuteResultData
             {
                 ExecuteStatus = JobStatus.完成,

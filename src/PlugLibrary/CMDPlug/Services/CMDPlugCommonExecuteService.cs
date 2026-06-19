@@ -54,42 +54,45 @@ public class CMDPlugCommonExecuteService : StationPlugExecuteService
             CLog.Information($"[TRACE-CMD]   {v.Name}={v.Value}");
         var inputs = new List<PlugVariableData>();
         var inputVars = executionRequest.InputVariables;
-        if (inputVars != null && inputVars.Count > 0)
+
+        // 使用 VariableResolver 统一解析入口：InputVariables → PlugVariables.Value。
+        // 总是尝试解析，即使 InputVariables 为空 — 变量可能已由上游（如 ExecuteMcpPluginPathAsync）注入默认值。
+        // 兼容 MCP 标准变量名 ("command") 和 CMD 插头变量名 ("CMDCommand")。
+        var cmd = VariableResolver.ResolveStandalone("command", inputVars, plugVariables: null)
+               ?? VariableResolver.ResolveStandalone(InitVariableNames.CMDCommand.ToString(), inputVars, plugVariables: null);
+        var args = VariableResolver.ResolveStandalone("arguments", inputVars, plugVariables: null);
+        var workingDir = VariableResolver.ResolveStandalone("workingDirectory", inputVars, plugVariables: null)
+                      ?? VariableResolver.ResolveStandalone(InitVariableNames.RedirectWorkPath.ToString(), inputVars, plugVariables: null);
+        var timeout = VariableResolver.ResolveStandalone("timeout", inputVars, plugVariables: null)
+                   ?? VariableResolver.ResolveStandalone(InitVariableNames.ExecutionTimeout.ToString(), inputVars, plugVariables: null);
+
+        var cmdCommand = cmd;
+        if (!string.IsNullOrEmpty(args))
+            cmdCommand += " " + args;
+
+        if (!string.IsNullOrEmpty(cmdCommand))
         {
-            // 使用 VariableResolver 统一解析入口：InputVariables → PlugVariables.Value
-            var cmd = VariableResolver.ResolveStandalone("command", inputVars, plugVariables: null);
-            var args = VariableResolver.ResolveStandalone("arguments", inputVars, plugVariables: null);
-            var workingDir = VariableResolver.ResolveStandalone("workingDirectory", inputVars, plugVariables: null);
-            var timeout = VariableResolver.ResolveStandalone("timeout", inputVars, plugVariables: null);
-
-            var cmdCommand = cmd;
-            if (!string.IsNullOrEmpty(args))
-                cmdCommand += " " + args;
-
-            if (!string.IsNullOrEmpty(cmdCommand))
+            inputs.Add(new PlugVariableData
             {
-                inputs.Add(new PlugVariableData
-                {
-                    Name = InitVariableNames.CMDCommand.ToString(),
-                    Value = cmdCommand
-                });
-            }
-            if (!string.IsNullOrEmpty(workingDir))
+                Name = InitVariableNames.CMDCommand.ToString(),
+                Value = cmdCommand
+            });
+        }
+        if (!string.IsNullOrEmpty(workingDir))
+        {
+            inputs.Add(new PlugVariableData
             {
-                inputs.Add(new PlugVariableData
-                {
-                    Name = InitVariableNames.RedirectWorkPath.ToString(),
-                    Value = workingDir
-                });
-            }
-            if (!string.IsNullOrEmpty(timeout))
+                Name = InitVariableNames.RedirectWorkPath.ToString(),
+                Value = workingDir
+            });
+        }
+        if (!string.IsNullOrEmpty(timeout))
+        {
+            inputs.Add(new PlugVariableData
             {
-                inputs.Add(new PlugVariableData
-                {
-                    Name = InitVariableNames.ExecutionTimeout.ToString(),
-                    Value = timeout
-                });
-            }
+                Name = InitVariableNames.ExecutionTimeout.ToString(),
+                Value = timeout
+            });
         }
 
         executionRequest.InputVariables.Clear();

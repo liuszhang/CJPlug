@@ -93,6 +93,24 @@ public partial class ServiceControlViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ForceStop()
+    {
+        StatusText = "强制停止中...";
+        StatusColor = "Yellow";
+        try
+        {
+            await _launcher.ForceStopAllPortsAsync();
+            UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            StatusText = "强制停止失败";
+            StatusColor = "Red";
+            ConsoleOutput += $"[ERROR] {ex.Message}{Environment.NewLine}";
+        }
+    }
+
+    [RelayCommand]
     private void ClearOutput()
     {
         ConsoleOutput = string.Empty;

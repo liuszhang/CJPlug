@@ -80,7 +80,8 @@ public class LlmConfigApiClient : BaseApiClient, ILlmConfigApiClient
     // 获取默认模型信息
     public async Task<DefaultModelInfoResponse?> GetDefaultModelInfoAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<DefaultModelInfoResponse>("/api/llm/getDefaultModelInfo", ct);
+        var wrapper = await httpClient.GetFromJsonAsync<ApiResult<DefaultModelInfoResponse?>>("/api/llm/getDefaultModelInfo", ct);
+        return wrapper?.Data;
     }
 
     // 设置默认模型
@@ -88,7 +89,8 @@ public class LlmConfigApiClient : BaseApiClient, ILlmConfigApiClient
     {
         var response = await httpClient.PostAsync($"/api/llm/setDefaultModel/{modelConfigId}", null, ct);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        var result = await response.Content.ReadFromJsonAsync<ApiResult<bool>>(cancellationToken: ct);
+        return result?.Data ?? false;
     }
 
     // 测试连接
@@ -101,4 +103,18 @@ public class LlmConfigApiClient : BaseApiClient, ILlmConfigApiClient
     }
 
     private record TestConnectionResult(bool Success, string Message);
+
+    // ---- MCP Server 配置 ----
+
+    public async Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default)
+    {
+        return await httpClient.GetFromJsonAsync<McpServerConfig>("/api/llm/getMcpServerConfig", ct);
+    }
+
+    public async Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/api/llm/saveMcpServerConfig", config, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<McpServerConfig>(cancellationToken: ct);
+    }
 }

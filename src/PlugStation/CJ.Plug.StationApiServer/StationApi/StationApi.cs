@@ -5,6 +5,7 @@ using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Shared;
 
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Station;
 using CJ.Plug.StationApiServer.Contracts;
 using CJ.Plug.StationApiService.Contracts;
 using CJ.Plug_Aspire.StationApiService.Models;
@@ -15,6 +16,8 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Runtime.InteropServices;
 
 namespace CJ.Plug_Aspire.StationApiService.StationApi
 {
@@ -61,7 +64,7 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
 
             api.MapGet("/test", () => TypedResults.Ok("pong!"));
 
-            // 从主服务器获取所有支持的工具列表
+            // 从主服务器获取所有支持的工具列表，并注入图站端的部署状态
             // 优先使用 MainApiServer，因为 API 端点在 ApiServer 上注册（非 DispatchServer）
             api.MapGet("/tools", async () =>
             {
@@ -78,7 +81,25 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                         return Results.BadRequest($"获取工具列表失败，HTTP状态码: {response.StatusCode}");
 
                     var content = await response.Content.ReadAsStringAsync();
-                    return Results.Content(content, "application/json", Encoding.UTF8);
+                    var tools = JsonSerializer.Deserialize<List<Tool>>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (tools != null)
+                    {
+                        var toolsRootPath = StaticData.ToolsRootPath;
+                        foreach (var tool in tools)
+                        {
+                            tool.DeploymentStatus = GetDeploymentStatus(tool, toolsRootPath);
+                        }
+                    }
+
+                    return Results.Json(tools, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -257,6 +278,32 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
             });
 
 
+            // 图站负载状态：CPU、内存、磁盘
+            api.MapGet("/load-status", () =>
+            {
+                try
+                {
+                    var cpuUsage = GetCpuUsage();
+                    var memoryInfo = GetMemoryInfo();
+                    var diskInfos = GetDiskInfos();
+
+                    return TypedResults.Ok(new
+                    {
+                        CpuUsagePercent = cpuUsage,
+                        MemoryTotalMB = memoryInfo.totalMB,
+                        MemoryUsedMB = memoryInfo.usedMB,
+                        MemoryUsagePercent = memoryInfo.percent,
+                        Disks = diskInfos,
+                        Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "获取图站负载状态失败");
+                    return Results.Problem("获取负载状态失败: " + ex.Message);
+                }
+            });
+
             return app;
         }
 
@@ -333,6 +380,59 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
         }
 
         /// <summary>
+        /// 判断工具在图站端的部署状态，对齐 StationSettingUI 中 ToolRegistrationModel.StatusText 的逻辑。
+        /// </summary>
+        private static string? GetDeploymentStatus(Tool tool, string toolsRootPath)
+        {
+            if (tool.SkipDownloadToStation)
+            {
+                // 无需下载至图站的工具：通过 ToolPath 判断文件是否存在
+                if (string.IsNullOrWhiteSpace(tool.ToolPath))
+                    return "未找到";
+
+                // 1. 直接检查绝对路径
+                if (File.Exists(tool.ToolPath))
+                    return "已就绪";
+                if (Directory.Exists(tool.ToolPath))
+                {
+                    var hasExe = new[] { ".exe", ".bat", ".cmd" }.Any(ext =>
+                        Directory.GetFiles(tool.ToolPath, $"*{ext}", SearchOption.AllDirectories).Length > 0);
+                    if (hasExe) return "已就绪";
+                }
+
+                // 2. 相对路径：尝试从 ToolsRootPath 解析
+                if (!string.IsNullOrEmpty(toolsRootPath) && !Path.IsPathRooted(tool.ToolPath))
+                {
+                    var resolvedPath = Path.Combine(toolsRootPath, tool.ToolPath);
+                    if (File.Exists(resolvedPath)) return "已就绪";
+                    if (Directory.Exists(resolvedPath))
+                    {
+                        var hasExe = new[] { ".exe", ".bat", ".cmd" }.Any(ext =>
+                            Directory.GetFiles(resolvedPath, $"*{ext}", SearchOption.AllDirectories).Length > 0);
+                        if (hasExe) return "已就绪";
+                    }
+                }
+
+                return "未找到";
+            }
+            else
+            {
+                // 需要下载的工具：检查本地安装目录 = toolsRootPath/ToolName
+                var localPath = string.IsNullOrEmpty(toolsRootPath) || string.IsNullOrEmpty(tool.ToolName)
+                    ? null
+                    : Path.Combine(toolsRootPath, tool.ToolName);
+
+                if (localPath != null && Directory.Exists(localPath))
+                {
+                    var hasFiles = Directory.GetFiles(localPath, "*", SearchOption.AllDirectories).Length > 0;
+                    return hasFiles ? "已安装" : "未安装";
+                }
+
+                return "未安装";
+            }
+        }
+
+        /// <summary>
         /// 安全删除目录：忽略文件锁、权限不足等异常，仅记录日志。
         /// </summary>
         private static void SafeDeleteDirectory(string? path)
@@ -367,5 +467,137 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                 Log.Warning(ex, "清理残留文件失败（已忽略）: {Path}", path);
             }
         }
+
+        private static double GetCpuUsage()
+        {
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    using var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                    cpuCounter.NextValue();
+                    Thread.Sleep(200);
+                    return Math.Round(cpuCounter.NextValue(), 1);
+                }
+                else
+                {
+                    // Linux: 读取 /proc/stat
+                    var stat1 = File.ReadAllText("/proc/stat");
+                    Thread.Sleep(200);
+                    var stat2 = File.ReadAllText("/proc/stat");
+                    var cpuLine1 = stat1.Split('\n').First(l => l.StartsWith("cpu "));
+                    var cpuLine2 = stat2.Split('\n').First(l => l.StartsWith("cpu "));
+
+                    var vals1 = cpuLine1.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(long.Parse).ToArray();
+                    var vals2 = cpuLine2.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(long.Parse).ToArray();
+
+                    var idle1 = vals1[3];
+                    var total1 = vals1.Sum();
+                    var idle2 = vals2[3];
+                    var total2 = vals2.Sum();
+
+                    var idleDelta = idle2 - idle1;
+                    var totalDelta = total2 - total1;
+
+                    return totalDelta > 0 ? Math.Round((1.0 - (double)idleDelta / totalDelta) * 100, 1) : 0;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static (long totalMB, long usedMB, double percent) GetMemoryInfo()
+        {
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    using var memCounter = new PerformanceCounter("Memory", "Available MBytes");
+                    var availableMB = (long)memCounter.NextValue();
+                    var totalMB = (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024));
+                    if (totalMB <= 0)
+                    {
+                        // fallback: 使用系统总物理内存
+                        var memStatus = new MEMORYSTATUSEX();
+                        memStatus.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+                        if (GlobalMemoryStatusEx(ref memStatus))
+                        {
+                            totalMB = (long)(memStatus.ullTotalPhys / (1024 * 1024));
+                        }
+                    }
+                    var usedMB = totalMB > 0 ? totalMB - availableMB : 0;
+                    var percent = totalMB > 0 ? Math.Round((double)usedMB / totalMB * 100, 1) : 0;
+                    return (totalMB, usedMB, percent);
+                }
+                else
+                {
+                    var memInfo = File.ReadAllText("/proc/meminfo");
+                    var lines = memInfo.Split('\n');
+                    long totalKB = 0, availableKB = 0;
+
+                    foreach (var line in lines)
+                    {
+                        if (line.StartsWith("MemTotal:"))
+                            totalKB = long.Parse(line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]);
+                        if (line.StartsWith("MemAvailable:"))
+                            availableKB = long.Parse(line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]);
+                    }
+
+                    var totalMB = totalKB / 1024;
+                    var usedMB = (totalKB - availableKB) / 1024;
+                    var percent = totalMB > 0 ? Math.Round((double)usedMB / totalMB * 100, 1) : 0;
+                    return (totalMB, usedMB, percent);
+                }
+            }
+            catch
+            {
+                return (0, 0, 0);
+            }
+        }
+
+        private static List<object> GetDiskInfos()
+        {
+            var disks = new List<object>();
+            try
+            {
+                foreach (var drive in DriveInfo.GetDrives())
+                {
+                    if (!drive.IsReady) continue;
+                    disks.Add(new
+                    {
+                        Name = drive.Name,
+                        Label = string.IsNullOrEmpty(drive.VolumeLabel) ? drive.Name : drive.VolumeLabel,
+                        TotalGB = Math.Round((double)drive.TotalSize / (1024 * 1024 * 1024), 1),
+                        UsedGB = Math.Round((double)(drive.TotalSize - drive.TotalFreeSpace) / (1024 * 1024 * 1024), 1),
+                        FreeGB = Math.Round((double)drive.TotalFreeSpace / (1024 * 1024 * 1024), 1),
+                        UsagePercent = Math.Round((double)(drive.TotalSize - drive.TotalFreeSpace) / drive.TotalSize * 100, 1),
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "获取磁盘信息失败");
+            }
+            return disks;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
     }
 }

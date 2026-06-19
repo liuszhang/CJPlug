@@ -33,6 +33,17 @@ public class LlmConfigService : ILlmConfigService
         ModelConfigs = p.ModelConfigs?.Select(MapModelConfigToDto).ToList() ?? new()
     };
 
+    /// <summary>映射 Provider 用于内部调用（不脱敏 ApiKey），供 GetDefaultModelInfoAsync 等内部链路使用。</summary>
+    private static LlmProvider MapProviderWithRawApiKey(LlmProvider p) => new()
+    {
+        Id = p.Id, Name = p.Name, DisplayName = p.DisplayName,
+        ApiBaseUrl = p.ApiBaseUrl,
+        ApiKey = p.ApiKey,
+        Description = p.Description, IsEnabled = p.IsEnabled,
+        SortOrder = p.SortOrder, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
+        ModelConfigs = p.ModelConfigs?.Select(MapModelConfigToDto).ToList() ?? new()
+    };
+
     public static LlmModelConfig MapModelConfigToDto(LlmModelConfig m) => new()
     {
         Id = m.Id, LlmProviderId = m.LlmProviderId, ModelName = m.ModelName,
@@ -58,6 +69,15 @@ public class LlmConfigService : ILlmConfigService
             .Include(p => p.ModelConfigs)
             .OrderBy(p => p.SortOrder)
             .ToListAsync(ct);
+
+        foreach (var p in providers)
+        {
+            var defaultModel = p.ModelConfigs?.FirstOrDefault(m => m.IsDefault && m.IsEnabled);
+            _logger.LogInformation("[GetAllProviders] Provider={Name} (Id={Id}), IsEnabled={Enabled}, ModelConfigs 数={Count}, 默认模型={DefaultModel}",
+                p.Name, p.Id, p.IsEnabled, p.ModelConfigs?.Count ?? 0,
+                defaultModel != null ? $"{defaultModel.ModelName}(IsDefault={defaultModel.IsDefault})" : "无");
+        }
+
         return providers.Select(MapToDto);
     }
 
@@ -175,37 +195,82 @@ public class LlmConfigService : ILlmConfigService
 
     public async Task<(LlmProvider? Provider, LlmModelConfig? Model)> GetDefaultModelInfoAsync(CancellationToken ct = default)
     {
+        // 获取所有启用的模型总数用于诊断
+        var totalEnabled = await _dbContext.Set<LlmModelConfig>()
+            .CountAsync(m => m.IsEnabled, ct);
+        _logger.LogInformation("GetDefaultModelInfo: total enabled models in DB = {Count}", totalEnabled);
+
         // 优先找 IsDefault 的模型
         var defaultModel = await _dbContext.Set<LlmModelConfig>()
             .Where(m => m.IsDefault && m.IsEnabled)
             .FirstOrDefaultAsync(ct);
+        _logger.LogInformation("GetDefaultModelInfo: IsDefault+IsEnabled query → {Found}", defaultModel != null);
 
         // 没有默认模型则取第一个启用的
-        defaultModel ??= await _dbContext.Set<LlmModelConfig>()
-            .Where(m => m.IsEnabled)
-            .OrderBy(m => m.Id)
-            .FirstOrDefaultAsync(ct);
+        if (defaultModel == null)
+        {
+            defaultModel = await _dbContext.Set<LlmModelConfig>()
+                .Where(m => m.IsEnabled)
+                .OrderBy(m => m.Id)
+                .FirstOrDefaultAsync(ct);
+            _logger.LogInformation("GetDefaultModelInfo: fallback first-IsEnabled query → {Found}", defaultModel != null);
+        }
 
-        if (defaultModel == null) return (null, null);
+        if (defaultModel == null)
+        {
+            _logger.LogWarning("GetDefaultModelInfo: no enabled model found at all");
+            return (null, null);
+        }
 
         var provider = await _dbContext.Set<LlmProvider>()
             .FirstOrDefaultAsync(p => p.Id == defaultModel.LlmProviderId, ct);
 
-        if (provider == null || !provider.IsEnabled) return (null, null);
+        if (provider == null)
+        {
+            _logger.LogWarning("GetDefaultModelInfo: provider not found for ProviderId={ProviderId}", defaultModel.LlmProviderId);
+            return (null, null);
+        }
 
-        return (MapToDto(provider), MapModelConfigToDto(defaultModel));
+        if (!provider.IsEnabled)
+        {
+            _logger.LogWarning("GetDefaultModelInfo: provider {ProviderName} (Id={ProviderId}) is disabled", provider.Name, provider.Id);
+            return (null, null);
+        }
+
+        // 不脱敏 ApiKey — AskAI 等内部调用链路需要完整凭据来发起 LLM 请求
+        var dto = MapProviderWithRawApiKey(provider);
+        _logger.LogInformation("GetDefaultModelInfo: Provider={Name}, ApiKeyLen={KeyLen}, ApiBaseUrl={Url}, Model={Model}",
+            dto.Name, dto.ApiKey?.Length ?? 0, dto.ApiBaseUrl, defaultModel.ModelName);
+        return (dto, MapModelConfigToDto(defaultModel));
     }
 
     public async Task<bool> SetDefaultModelAsync(int modelConfigId, CancellationToken ct = default)
     {
         var config = await _dbContext.Set<LlmModelConfig>().FirstOrDefaultAsync(m => m.Id == modelConfigId, ct);
-        if (config == null) return false;
+        if (config == null)
+        {
+            _logger.LogWarning("[SetDefaultModel] modelConfigId={Id} 未找到", modelConfigId);
+            return false;
+        }
+
+        _logger.LogInformation("[SetDefaultModel] 找到模型 Id={Id}, ModelName={Name}, ModelType={Type}, LlmProviderId={ProvId}, 当前 IsDefault={Def}",
+            config.Id, config.ModelName, config.ModelType, config.LlmProviderId, config.IsDefault);
+
+        // 自动启用供应商：如果模型所属供应商被禁用，则自动启用
+        var provider = await _dbContext.Set<LlmProvider>().FirstOrDefaultAsync(p => p.Id == config.LlmProviderId, ct);
+        if (provider != null && !provider.IsEnabled)
+        {
+            _logger.LogWarning("[SetDefaultModel] 供应商 {ProvName} (Id={ProvId}) 当前被禁用，自动启用", provider.Name, provider.Id);
+            provider.IsEnabled = true;
+            provider.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+        }
 
         await ClearDefaultForTypeAsync(config.ModelType, ct);
 
         config.IsDefault = true;
         config.UpdatedAt = DateTime.UtcNow.ToLocalTime();
-        await _dbContext.SaveChangesAsync(ct);
+        var rows = await _dbContext.SaveChangesAsync(ct);
+        _logger.LogInformation("[SetDefaultModel] SaveChanges 完成, 影响行数={Rows}, config.IsDefault={Def}", rows, config.IsDefault);
         return true;
     }
 
@@ -253,6 +318,50 @@ public class LlmConfigService : ILlmConfigService
             return (false, $"连接失败: {ex.Message}");
         }
     }
+
+    // ---- MCP Server 配置 ----
+
+
+    public async Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default)
+    {
+        var config = await _dbContext.Set<McpServerConfig>()
+            .OrderBy(c => c.Id)
+            .FirstOrDefaultAsync(ct);
+        return config == null ? null : MapMcpServerConfigToDto(config);
+    }
+
+    public async Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    {
+        var existing = await _dbContext.Set<McpServerConfig>()
+            .OrderBy(c => c.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing != null)
+        {
+            existing.IsEnabled = config.IsEnabled;
+            existing.ConnectionString = config.ConnectionString;
+            existing.Description = config.Description;
+            existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+            await _dbContext.SaveChangesAsync(ct);
+            return MapMcpServerConfigToDto(existing);
+        }
+        else
+        {
+            config.CreatedAt = DateTime.UtcNow.ToLocalTime();
+            config.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+            _dbContext.Set<McpServerConfig>().Add(config);
+            await _dbContext.SaveChangesAsync(ct);
+            return MapMcpServerConfigToDto(config);
+        }
+    }
+
+    public static McpServerConfig MapMcpServerConfigToDto(McpServerConfig c) => new()
+    {
+        Id = c.Id, IsEnabled = c.IsEnabled,
+        ConnectionString = c.ConnectionString,
+        Description = c.Description,
+        CreatedAt = c.CreatedAt, UpdatedAt = c.UpdatedAt
+    };
 
     private async Task ClearDefaultForTypeAsync(string modelType, CancellationToken ct)
     {

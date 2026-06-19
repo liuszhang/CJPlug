@@ -6,14 +6,13 @@
 @using CJ.Plug.SharedPages
 @using CJ.Plug.SharedPages.Contracts
 @using CJ.Plug.SharedPages.Variable
-@using CJ.Plug.StationAndToolApiClient
 @using CJ.Plug.VariableUIHandler.Components
 @using CJ.Plug.VariableUIHandler.Models
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Text.RegularExpressions
 
-@inject IStationAndToolApiClient StationAndToolApiClient
+@inject MainApiClient MainApiClient
 @inject IDialogService DialogService
 
 <MudDivider Class="my-2"></MudDivider>
@@ -22,7 +21,7 @@
 @{
     bool showTabs = ExistingPlug == null
         || (!ExistingPlug.ToolId.HasValue
-            && string.IsNullOrEmpty(ExistingPlug.Value)
+            && string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url"))
             && !(ExistingPlug.ToolVersionPath?.StartsWith("uploaded://") ?? false));
 }
 
@@ -162,7 +161,7 @@ else
             }
         }
     }
-    else if (!string.IsNullOrEmpty(ExistingPlug!.Value))
+    else if (!string.IsNullOrEmpty(ExistingPlug!.GetVariableValue("Url")))
     {
         <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：手动输入路径</MudText>
         <MudTextField Value="@ManualToolPath" ValueChanged="@(async (string v) => await OnManualToolPathChanged(v))" Margin="Margin.Dense" Label="工具完整路径"
@@ -196,6 +195,7 @@ else
     }
 }
 
+<MudCheckBox Value="@SupportRemoteView" ValueChanged="@OnSupportRemoteViewChanged" T="bool" Label="支持远程视图" Color="Color.Primary" Dense></MudCheckBox>
 
 @code {
     /// <summary>服务器 API 基地址</summary>
@@ -234,15 +234,27 @@ else
     private bool _loaded;
     private bool _restored;
     private int _activeTabIndex;
+    private bool SupportRemoteView { get; set; }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private async Task OnSupportRemoteViewChanged(bool value)
     {
-        if (firstRender && !_loaded)
+        SupportRemoteView = value;
+        // 立即写入 Plug 对象，防止组件因切换插头类型等操作被重建后状态丢失
+        if (ExistingPlug != null)
+        {
+            ExistingPlug.SetPlugSetting(PlugSettingKey.SupportRemoteView.ToString(),
+                                        value.ToString().ToLower());
+        }
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!_loaded)
         {
             _loaded = true;
-            Tools = await StationAndToolApiClient.GetAllToolsAsync();
+            Tools = await MainApiClient.GetAllToolsAsync();
             await TryRestoreFromExistingPlug();
-            StateHasChanged();
         }
     }
 
@@ -250,6 +262,8 @@ else
     {
         if (ExistingPlug == null || _restored) return;
         _restored = true;
+
+        SupportRemoteView = ExistingPlug.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString()) == "true";
 
         // 从工具库选择模式：根据 ToolId 恢复
         if (ExistingPlug.ToolId.HasValue)
@@ -262,10 +276,10 @@ else
             }
         }
         // 手动输入路径模式：根据 Value 恢复
-        else if (!string.IsNullOrEmpty(ExistingPlug.Value))
+        else if (!string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url")))
         {
             _activeTabIndex = 1;
-            ManualToolPath = ExistingPlug.Value;
+            ManualToolPath = ExistingPlug.GetVariableValue("Url");
             ManualToolName = ExistingPlug.ToolName;
             await NotifyCommandDisplayChanged();
         }
@@ -382,12 +396,14 @@ else
         }
         else if (!string.IsNullOrEmpty(ManualToolPath))
         {
+            plug.ToolId = null; // 切换为手动路径模式，清除旧的ToolId
             plug.ToolName = ManualToolName ?? "自定义工具";
-            plug.Value = ManualToolPath;
+            plug.SetVariableValue("Url", ManualToolPath);
             plug.ToolCommandLineShema = $"[{ManualToolPath}] ";
         }
         else if (_folderUploader?.HasSelection == true || !string.IsNullOrEmpty(FolderEntryFile))
         {
+            plug.ToolId = null; // 切换为上传文件夹模式，清除旧的ToolId
             plug.ToolName = FolderToolName ?? "上传的工具";
             // uploaded:// 路径存储实际文件夹路径：uploaded://{userOrSystem}/{folderName}
             var userOrSystem = IsSystemPlug ? "0System" : Username;
@@ -425,6 +441,8 @@ else
         // plug.AddVariable("ShowConsole", VariableTypeEnum.String.ToString());
         // plug.AddVariable("RedirectOutput", VariableTypeEnum.String.ToString());
         // plug.AddVariable("RedirectWorkPath", VariableTypeEnum.String.ToString());
+
+        plug.SetPlugSetting(PlugSettingKey.SupportRemoteView.ToString(), SupportRemoteView.ToString().ToLower());
     }
 
     /// <summary>将选中工具的变量附加到 Plug</summary>
@@ -456,5 +474,100 @@ else
     public async Task<int> UploadFolderAsync()
     {
         return _folderUploader != null ? await _folderUploader.UploadAsync() : 0;
+    }
+
+    /// <summary>
+    /// 确保桌面类插头有关联的 Tool 记录。
+    /// 手动路径和上传文件夹模式会自动创建 Tool，避免运行时动态合成。
+    /// </summary>
+    public async Task EnsureToolAsync(Plug plug)
+    {
+        // 已经有 ToolId（工具库选择模式），无需处理
+        if (plug.ToolId.HasValue) return;
+
+        Tool? tool = null;
+        string toolName;
+        string toolVersion = "1.0";
+
+        // 手动输入路径模式
+        if (!string.IsNullOrEmpty(ManualToolPath))
+        {
+            toolName = ManualToolName ?? "自定义工具";
+            var displayName = $"{toolName}({toolVersion})";
+
+            // 查重：避免重复创建同名 Tool
+            try { tool = await MainApiClient.GetToolByDisplayNameAsync(displayName); } catch { }
+
+            if (tool == null)
+            {
+                tool = new Tool
+                {
+                    ToolName = toolName,
+                    ToolVersion = toolVersion,
+                    ToolPath = ManualToolPath, // 不等于 ToolName，CreateToolAsync 不会重写
+                    ToolBasePath = Path.Combine("Tools", IsSystemPlug ? "0System" : Username, toolName),
+                    CommandParameter = plug.ToolCommandLineShema ?? $"[ToolPath]",
+                    SkipDownloadToStation = true,
+                    IsBrowsable = false,
+                    ToolType = ToolTypeEnum.桌面类_自研.ToString(),
+                    ToolDescription = $"由插头「{plug.Name}」自动创建",
+                };
+                tool = await MainApiClient.CreateToolAsync(tool);
+            }
+        }
+        // 上传文件夹模式
+        else if (_folderUploader?.HasSelection == true || !string.IsNullOrEmpty(FolderEntryFile))
+        {
+            var userOrSystem = IsSystemPlug ? "0System" : Username;
+            // 确定文件夹名（与 ApplyToPlug 逻辑一致）
+            var folderName = _selectedUploadFolderName
+                ?? _folderUploader?.SelectedFolderName;
+            if (string.IsNullOrEmpty(folderName) && plug.ToolVersionPath?.StartsWith("uploaded://") == true)
+            {
+                var existingPart = plug.ToolVersionPath["uploaded://".Length..];
+                var existingParts = existingPart.Split('/');
+                if (existingParts.Length >= 2)
+                    folderName = existingParts[1];
+            }
+            toolName = folderName ?? FolderToolName ?? "unknown";
+            if (toolName == "unknown") return; // 无法确定文件夹名，跳过
+
+            // 预计算工具路径，使用前端传入的登录用户名而非依赖后端 GetCurrentUserName()
+            var prebuiltToolPath = Path.Combine("Tools", userOrSystem, toolName);
+
+            var displayName = $"{toolName}({toolVersion})";
+            try { tool = await MainApiClient.GetToolByDisplayNameAsync(displayName); } catch { }
+
+            if (tool == null)
+            {
+                tool = new Tool
+                {
+                    ToolName = toolName,
+                    ToolVersion = toolVersion,
+                    ToolPath = prebuiltToolPath,
+                    ToolBasePath = prebuiltToolPath,
+                    CommandParameter = plug.ToolCommandLineShema ?? "[ToolPath]",
+                    SkipDownloadToStation = false,
+                    IsBrowsable = false,
+                    IsSystemInitTool = IsSystemPlug,
+                    ToolType = ToolTypeEnum.桌面类_自研.ToString(),
+                    ToolDescription = $"由插头「{plug.Name}」自动创建",
+                };
+                tool = await MainApiClient.CreateToolAsync(tool);
+            }
+        }
+        else
+        {
+            return; // 无工具配置模式（不应出现在桌面类插头中）
+        }
+
+        if (tool != null)
+        {
+            plug.ToolId = tool.Id;
+            plug.ToolDisplayName = $"{tool.ToolName}({tool.ToolVersion})";
+            // 同步 Plug 上的冗余属性以保持向后兼容
+            plug.ToolName = tool.ToolName;
+            plug.ToolVersion = tool.ToolVersion;
+        }
     }
 }

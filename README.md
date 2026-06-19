@@ -4,11 +4,76 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
 [![MCP](https://img.shields.io/badge/MCP-Enabled-8B5CF6.svg)](#将工具或流程发布为MCP-Tool)
 
+
+
+---
+
+<!--  ╔═══════════════════ 三大核心能力 ═══════════════════╗  -->
+
+<table width="100%">
+<tr>
+<td width="33%" align="center" valign="top">
+
+### 🖥️ 纯浏览器远程执行
+
+**多图站分布式可视化调用**
+
+![CJPlug](./03.Website/Picture/VNC可视化.png)
+无需安装客户端，打开浏览器即可跨图站（工作站）远程触发任意工具执行，实时回传日志与结果文件。支持多图站并行调度，工具运行在哪台机器上对用户完全透明。
+
+</td>
+<td width="1%" align="center">
+
+```
+│
+│
+│
+```
+
+</td>
+<td width="33%" align="center" valign="top">
+
+### 🔗 逻辑流 + 数据流串接
+
+**可视化工具流程编排**
+
+
+![CJPlug](./03.Website/Picture/EditProcess.png)
+拖拽即可将任意插头连成复杂工具链——逻辑分支、循环控制、子流程嵌套，变量在节点间自动传递。支持 AI 自然语言生成流程，也支持 JSON 导入导出复用。
+
+</td>
+<td width="1%" align="center">
+
+```
+│
+│
+│
+```
+
+</td>
+<td width="33%" align="center" valign="top">
+
+### 🤖 一键发布 MCP Tool
+
+**工具 / 流程 → AI 可调用**
+
+
+![CJPlug](./03.Website/Picture/插头管理.png)
+任意插头或完整工具流程，点一个按钮即发布为标准 MCP Tool。Claude、Cursor、Trae 等 AI 客户端立即可发现并调用，零代码接入，Schema 自动生成。
+
+</td>
+</tr>
+</table>
+
+---
+
 ![CJPlug](./03.Website/Picture/HomePage.png)
+
+---
 
 ## 介绍
 
-寸金插座平台（CJPlug）可以将**任意软件工具**（exe、Python 脚本、NX CAD、REST API、Word/Excel 等）以”插头”的方式插入平台，通过**可视化拖拽设计器**编排复杂的自动化工具链流程，并**一键发布为 MCP Tool** 供 AI 客户端（Claude、Cursor、Trae 等）直接调用。
+寸金插座平台（CJPlug）可以将**任意软件工具**（exe、Python 脚本、NX CAD、REST API、Word/Excel 等）以"插头"的方式插入平台，通过**可视化拖拽设计器**编排复杂的自动化工具链流程，并**一键发布为 MCP Tool** 供 AI 客户端（Claude、Cursor、Trae 等）直接调用。
 
 平台完全基于 .NET，核心依赖：
 

@@ -18,17 +18,24 @@
     async Task ValueChanged(BaseVariable PDZVariable,string value)
     {
         //Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
-        //PDZVariable.Value = value;
-        //await MainApiClient.CreateOrUpdatePDZ(EditorContext.PlugDataZone);
+        PDZVariable.Value = value;
+        PDZVariable.DisplayValue = value;
 
-        var plugVariableData = EditorContext.PlugDataZone.PlugVariableDatas?.FirstOrDefault(p => p.Id == PDZVariable.Id);
-        if (plugVariableData != null)
+        if (EditorContext.PlugDataZone != null)
         {
-            plugVariableData.Value = value;
-            plugVariableData.DisplayValue = value;
+            var plugVariableData = EditorContext.PlugDataZone.PlugVariableDatas?.FirstOrDefault(p => p.Id == PDZVariable.Id);
+            if (plugVariableData != null)
+            {
+                plugVariableData.Value = value;
+                plugVariableData.DisplayValue = value;
+                await MainApiClient.UpdatePlugVariableData(plugVariableData);
+            }
         }
-        await MainApiClient.UpdatePlugVariableData(plugVariableData);
 
+        if (EditorContext.OnValueChanged != null)
+        {
+            await EditorContext.OnValueChanged();
+        }
 
         Snackbar.Add($"更新插头{EditorContext?.Variable?.Name}参数值成功");
     }
