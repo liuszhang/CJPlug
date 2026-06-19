@@ -122,10 +122,18 @@
         // plug.PlugTypeKey = "RESTPlug";
         plug.Value = InterfaceUrl;
 
-        // 添加接口类默认参数（与REST插头一致）
-        plug.PlugVariables.Add(new PlugVariable{ Name = "Url",Type = VariableTypeEnum.String.ToString(),IsInitVariable = true,IsBrowsable = false,});
-        plug.PlugVariables.Add(new PlugVariable { Name = "Method", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true, IsBrowsable = false, });
-        plug.PlugVariables.Add(new PlugVariable { Name = "RequestHeaders", Type = VariableTypeEnum.String.ToString(), IsInitVariable = true, IsBrowsable = false, });
+        // 添加接口类默认参数（与REST插头一致），使用 AddVariable 避免重复添加
+        plug.AddVariable("Url", VariableTypeEnum.String.ToString(), IsInitVariable: true);
+        plug.AddVariable("Method", VariableTypeEnum.String.ToString(), IsInitVariable: true);
+        plug.AddVariable("RequestHeaders", VariableTypeEnum.String.ToString(), IsInitVariable: true);
+
+        // 设置 IsBrowsable 为 false（AddVariable 不管理此属性，需单独设置）
+        var urlVar = plug.PlugVariables.FirstOrDefault(v => v.Name == "Url");
+        if (urlVar != null) urlVar.IsBrowsable = false;
+        var methodVar = plug.PlugVariables.FirstOrDefault(v => v.Name == "Method");
+        if (methodVar != null) methodVar.IsBrowsable = false;
+        var headersVar = plug.PlugVariables.FirstOrDefault(v => v.Name == "RequestHeaders");
+        if (headersVar != null) headersVar.IsBrowsable = false;
 
         // 设置URL默认值
         if (!string.IsNullOrEmpty(InterfaceUrl))

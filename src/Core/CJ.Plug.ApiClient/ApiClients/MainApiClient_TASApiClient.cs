@@ -170,7 +170,8 @@ public partial class MainApiClient : ITASApiClient
     public async Task<Plug?> UpdatePlugAsync(int? itemId, Plug item, CancellationToken cancellationToken = default)
     {
         var result = await TASApiClient.Value.UpdatePlugAsync(itemId, item, cancellationToken);
-        await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Update, $"更新插件: {item.Name}");
+        if (result != null)
+            await AuditLog.LogSuccessAsync(AuditModule.PlugManage, AuditOperationType.Update, $"更新插件: {item.Name}");
         return result;
     }
 

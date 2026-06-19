@@ -108,7 +108,7 @@ public partial class TASApiClient:BaseApiClient,ITASApiClient
 
     public async Task<Plug?> UpdatePlugAsync(int? itemId, Plug item, CancellationToken cancellationToken = default)
     {
-        //Console.WriteLine(">>>>>>>>>>>>>>from web variables is:"+JsonSerializer.Serialize(workflow.ProcessVariables));
+        Console.WriteLine("[TASApiClient] UpdatePlugAsync about to PUT, itemId={0}, item.Value={1}", itemId, item.Value);
         var result = await httpClient.PutAsJsonAsync($"/api/plug/updatePlug/{itemId}", item, cancellationToken);
         //return true;
         // 检查响应状态码
@@ -120,10 +120,9 @@ public partial class TASApiClient:BaseApiClient,ITASApiClient
         else
         {
             // 处理错误情况
-            //var errorMessage = await result.Content.ReadAsStringAsync();
             var errorMessage = await result.Content.ReadAsStringAsync();
             Console.WriteLine($"Error updating tool: {errorMessage}");
-            return null;
+            throw new InvalidOperationException($"更新插头失败 (HTTP {(int)result.StatusCode}): {errorMessage}");
         }
     }
 

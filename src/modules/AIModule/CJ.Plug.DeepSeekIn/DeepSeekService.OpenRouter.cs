@@ -3,10 +3,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.IO;
+using OllamaSharp;
 namespace CJ.Plug.DeekSeekIn
 {
     public partial class DeepSeekService : IDeepSeekService
@@ -148,7 +150,7 @@ namespace CJ.Plug.DeekSeekIn
             {
                 jsonResponse = await CallOpenRouterChatAsync(messages, apiKey, model);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //yield return $"[Error] {ex.Message}";
                 yield break;
@@ -520,12 +522,52 @@ namespace CJ.Plug.DeekSeekIn
             var endpoint = apiBaseUrl.TrimEnd('/') + "/chat/completions";
             Console.WriteLine($"[DeepSeek] StreamChatCompletionAsync: apiBaseUrl={apiBaseUrl}, finalUrl={endpoint}, model={model}, mcp={(string.IsNullOrEmpty(mcpConnectionString) ? "(none)" : mcpConnectionString)}");
 
+            // 客户端侧加载 MCP 工具定义，转换为 OpenAI tools 标准格式
+            List<OllamaSharp.Models.Chat.Tool>? toolList = null;
+            if (!string.IsNullOrEmpty(mcpConnectionString))
+            {
+                try
+                {
+                    var loaded = await LoadMcpToolsAsync(mcpConnectionString);
+                    if (loaded != null && loaded.Count > 0)
+                        toolList = loaded.ToList();
+                    else
+                        Console.WriteLine($"[DeepSeek] MCP server returned 0 tools, proceeding without tools");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DeepSeek] MCP tool loading failed, continuing without tools: {ex.Message}");
+                }
+            }
+
+            // 将 OllamaSharp Tool 转换为 OpenAI function tool 格式
+            object? openaiTools = null;
+            if (toolList is { Count: > 0 })
+            {
+                openaiTools = toolList.Select(t =>
+                {
+                    var func = t.Function;
+                    return (object)new
+                    {
+                        type = "function",
+                        function = new
+                        {
+                            name = func?.Name ?? "unknown",
+                            description = func?.Description ?? "",
+                            parameters = (object?)func?.Parameters ?? new { type = "object", properties = new { } }
+                        }
+                    };
+                }).ToArray();
+
+                Console.WriteLine($"[DeepSeek] Loaded {toolList.Count} MCP tools for OpenAI request: {string.Join(", ", toolList.Select(t => t.Function?.Name ?? "?"))}");
+            }
+
+            // 构建带 tools 的请求
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromMinutes(5);
             if (!string.IsNullOrEmpty(apiKey))
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-            // 使用 Dictionary 构建请求体，支持条件附加 mcp_servers
             var messages = new[]
             {
                 new { role = "system", content = "" },
@@ -539,16 +581,13 @@ namespace CJ.Plug.DeekSeekIn
                 ["stream"] = true
             };
 
-            if (!string.IsNullOrEmpty(mcpConnectionString))
-            {
-                payloadDict["mcp_servers"] = new[]
-                {
-                    new { url = mcpConnectionString }
-                };
-                Console.WriteLine($"[DeepSeek] Attaching mcp_servers: [{mcpConnectionString}]");
-            }
+            if (openaiTools != null)
+                payloadDict["tools"] = openaiTools;
 
             var json = JsonSerializer.Serialize(payloadDict);
+            Console.WriteLine($"[DeepSeek] Request payload size: {json.Length} chars, hasTools={openaiTools != null}, toolCount={(openaiTools != null ? toolList?.Count ?? 0 : 0)}");
+            // 打印前 500 字符方便排查 tools 字段是否存在
+            Console.WriteLine($"[DeepSeek] Request payload (first 500 chars): {json[..Math.Min(500, json.Length)]}");
             using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
             HttpResponseMessage response;

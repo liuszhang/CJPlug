@@ -2,6 +2,8 @@
 @using CJ.Plug.LlmConfigApiClient
 @using CJ.Plug.LlmConfigModel.Models
 @using MudBlazor
+@using MudExtensions
+@using Radzen.Blazor
 
 @inject ILlmConfigApiClient LlmConfigApiClient
 @inject IDialogService DialogService
@@ -9,7 +11,11 @@
 
 <PageTitle>LLM 配置管理</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.False">
+
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
+        <RadzenSplitterPane Size="50%">
+
+        
     <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
         <MudIcon Icon="@Icons.Material.Filled.SmartToy" Color="Color.Primary" Size="Size.Large" />
         <MudText Typo="Typo.h5">LLM 配置管理</MudText>
@@ -31,7 +37,7 @@
     <MudGrid>
         @* ---- 左侧：供应商列表 ---- *@
         <MudItem xs="12" md="4">
-            <MudPaper Elevation="2" Class="pa-4" Style="height: calc(100vh - 220px); overflow-y: auto;">
+            <MudPaper Elevation="2" Class="pa-4" Style="height: 100%; overflow-y: auto;">
                 <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">供应商</MudText>
                     <MudSpacer />
@@ -76,7 +82,7 @@
 
         @* ---- 右侧：模型配置列表 ---- *@
         <MudItem xs="12" md="8">
-            <MudPaper Elevation="2" Class="pa-4" Style="height: calc(100vh - 220px); overflow-y: auto;">
+            <MudPaper Elevation="2" Class="pa-4" Style="height: 100%; overflow-y: auto;">
                 <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">
                         模型配置
@@ -163,7 +169,10 @@
             </MudPaper>
         </MudItem>
     </MudGrid>
+        </RadzenSplitterPane>
+    <RadzenSplitterPane Size="50%">
 
+        
     @* ---- MCP Server 配置 ---- *@
     <MudPaper Elevation="2" Class="pa-4 mt-4">
         <MudStack Row AlignItems="AlignItems.Center" Class="mb-3">
@@ -218,7 +227,10 @@
             </MudStack>
         }
     </MudPaper>
-</MudContainer>
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+
 
 @code {
     private List<LlmProvider>? _providers;

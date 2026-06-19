@@ -157,9 +157,21 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
     async Task<DataGridEditFormAction> CommittedItemChanges(PlugVariable? item)
     {
         Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
-        Snackbar.Add($"更新插头{Plug.Name}参数成功");
+
+        // 当 Url 变量被编辑时，同步到 Plug.Value（InterfacePlugConfig 优先读取 Plug.Value）
+        if (item?.Name == "Url" && Plug != null)
+        {
+            Plug.Value = item.Value;
+        }
+
+        // 诊断：输出即将发送到后端的 Plug 完整数据
+        var plugJson = System.Text.Json.JsonSerializer.Serialize(Plug, new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
+        Console.WriteLine($"[DIAG] Plug before UpdatePlugAsync: {plugJson}");
+        Snackbar.Add($"[DIAG] Plug.Value={Plug?.Value}, PlugVariables.Url.Value={Plug?.PlugVariables?.FirstOrDefault(v=>v.Name=="Url")?.Value}", Severity.Warning);
+
         await SavePlugAndActivity();
 
+        Snackbar.Add($"更新插头{Plug.Name}参数成功");
         return DataGridEditFormAction.Close;
     }
 

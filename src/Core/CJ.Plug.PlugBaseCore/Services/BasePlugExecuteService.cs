@@ -107,6 +107,16 @@ public abstract class BasePlugExecuteService : IPlugCommonExecute
                     {
                         PlugDataZone.SetVariableValue(plugDefinitionId, v, variableValue);
                     }
+                    // Standalone 模式回退：PDZ 由外部预设（空 PDZ）时，从 InputVariables / Plug 定义层回退解析
+                    else if (pdzWasPreSet)
+                    {
+                        variableValue = VariableResolver.ResolveStandalone(v, plugExecutionRequest?.InputVariables, plugVariables);
+                        if (variableValue != null)
+                        {
+                            PlugDataZone.SetVariableValue(plugDefinitionId, v, variableValue);
+                            CLog.Information($"变量 {v} 从 Standalone 数据源（InputVariables/Plug定义）回退解析: {variableValue}");
+                        }
+                    }
                 }
                 // PDZ 已由外部预设时跳过 HTTP 更新，避免调用可能不存在的远端端点
                 if (!pdzWasPreSet)

@@ -188,6 +188,7 @@ public partial class PlugManageService : IPlugManageService
 
     public async Task<Plug?> UpdatePlugAsync(int id, Plug request)
     {
+        Console.WriteLine("[PlugManageService] UpdatePlugAsync entered, id={0}, request.Value={1}, request.PlugVariables count={2}", id, request.Value, request.PlugVariables?.Count ?? 0);
         var item = await _dbContext.Set<Plug>()
             .Include(p => p.PlugVariables)
             //.Include(a => a.PlugActions)
@@ -239,8 +240,9 @@ public partial class PlugManageService : IPlugManageService
         // 阶段一：删除现有子项
         _dbContext.Set<PlugVariable>().RemoveRange(item.PlugVariables);
         // 立即提交删除操作（缩小事务范围）
-        //item.PlugVariables.Clear();
+        Console.WriteLine("[PlugManageService] Before first SaveChanges, item.Value={0}", item.Value);
         await _dbContext.SaveChangesAsync();
+        item.PlugVariables.Clear();
         Console.WriteLine("---------------------delete all variables success--------------------");
 
         // 添加新的 PlugVariables

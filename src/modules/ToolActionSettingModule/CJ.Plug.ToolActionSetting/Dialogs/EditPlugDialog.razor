@@ -225,6 +225,8 @@
 
     private async Task Submit()
     {
+        Console.WriteLine("[EditPlugDialog] Submit entered, Category={0}, Plug.Id={1}, Plug.Value={2}", Plug.Category, Plug.Id, Plug.Value);
+
         if (string.IsNullOrWhiteSpace(Plug.Name))
         {
             Snackbar.Add("请输入插头名称", Severity.Warning);
@@ -297,7 +299,9 @@
             }
             else if (Plug.Category?.Contains("接口") == true && _interfaceConfig != null)
             {
+                Console.WriteLine("[EditPlugDialog] 接口分支, _interfaceConfig not null, Plug.Value before Apply={0}, PlugVariables count={1}", Plug.Value, Plug.PlugVariables?.Count);
                 _interfaceConfig.ApplyToPlug(Plug);
+                Console.WriteLine("[EditPlugDialog] 接口分支 after Apply, Plug.Value={0}, PlugVariables count={1}", Plug.Value, Plug.PlugVariables?.Count);
             }
             else if (Plug.Category?.Contains("脚本") == true && _scriptConfig != null)
             {
@@ -308,8 +312,17 @@
                 _deviceConfig.ApplyToPlug(Plug);
             }
 
-            await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
-            MudDialog.Close(DialogResult.Ok(Plug));
+            Console.WriteLine("[EditPlugDialog] About to call UpdatePlugAsync, Plug.Id={0}, Plug.Value={1}", Plug.Id, Plug.Value);
+            var result = await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+            Console.WriteLine("[EditPlugDialog] UpdatePlugAsync returned, result={0}", result != null ? $"not null (Value={result.Value})" : "NULL");
+            if (result == null)
+            {
+                Snackbar.Add("更新插头失败：服务端返回异常，请检查网络或服务端日志", Severity.Error);
+            }
+            else
+            {
+                MudDialog.Close(DialogResult.Ok(Plug));
+            }
         }
         catch (Exception ex)
         {

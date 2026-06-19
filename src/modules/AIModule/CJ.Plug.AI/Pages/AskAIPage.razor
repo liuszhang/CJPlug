@@ -34,7 +34,7 @@
         </CJ.Plug.SharedPages.Layout.VerticalWell>
 
         <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mt-2 mb-4">
-            <MudTextField @bind-Value="@Question" Immediate
+            @* <MudTextField @bind-Value="@Question" Immediate
                           Placeholder="输入问题或命令，按 Enter 发送"
                           Margin="Margin.Dense" Variant="Variant.Outlined"
                           Style="width: 800px;"
@@ -43,7 +43,7 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        OnClick="@(() => SendMessage(Question))">
                 发送
-            </MudButton>
+            </MudButton> *@
             @if (_defaultModelInfo != null)
             {
                 <MudChip T="string" Icon="@Icons.Material.Filled.SmartToy" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">
@@ -190,6 +190,7 @@
         StateHasChanged();
         Answer += "AI:";
 
+        Console.WriteLine($"[AskAIPage] MCP status: _mcpConnectionString='{(_mcpConnectionString == null ? "(null)" : (_mcpConnectionString.Length == 0 ? "(empty)" : _mcpConnectionString[..Math.Min(60, _mcpConnectionString.Length)]))}'");
         if (_defaultModelInfo != null)
         {
             Console.WriteLine($"[AskAIPage] ProviderName={_defaultModelInfo.ProviderName}, ApiBaseUrl={_defaultModelInfo.ApiBaseUrl}, ModelName={_defaultModelInfo.ModelName}, ApiKey={(string.IsNullOrEmpty(_defaultModelInfo.ApiKey) ? "(empty)" : (_defaultModelInfo.ApiKey.Length > 8 ? _defaultModelInfo.ApiKey[..8] + "..." : _defaultModelInfo.ApiKey))}");
