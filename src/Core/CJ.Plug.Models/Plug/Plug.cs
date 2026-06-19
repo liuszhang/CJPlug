@@ -26,7 +26,6 @@ namespace CJ.Plug.Models.Plug
         public string? PlugTypeKey { get; set; }
         public string? Category { get; set; } = ToolTypeEnum.桌面类_自研.ToString(); //记录插头的种类，如桌面类，接口类，脚本类等
         public string? GroupName { get; set; }   //记录插头在插头库中的分组名称，对应引擎中的Category
-        public string? Value { get; set; } //用于保存插头重要的值，以简化从PlugSetting中取值的操作
         public string? RealValuePath { get; set; } //如果有文件操作，保存文件在文件服务器的真实路径，便于后续数据处理，也是为了简化从PlugSetting中取值的操作
         public string? WorkPath { get; set; }  //插头的工作目录（相对路径）
         public string? Status { get; set; }

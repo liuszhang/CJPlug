@@ -124,7 +124,7 @@
         if (MudDialog != null)
             await MudDialog.SetOptionsAsync(diaOption);
 
-        //Log.Information(Plug.Value);
+        //Log.Information(Plug.GetVariableValue("CommandText"));
         if(Plug.GetPlugSettings()?.Settings.Count==0)
         {
             PlugSettings = new PlugSettings();
@@ -163,13 +163,13 @@
     }
     private async Task EditorOnDidInit()
     {
-        if (Plug.Value == null)
+        if (Plug.GetVariableValue("CommandText") == null)
         {
             iniValue = @"生成一个边长为100的正方体";
         }
         else
         {
-            iniValue = Plug.Value;
+            iniValue = Plug.GetVariableValue("CommandText");
         }
         if (iniValue != null)
         {
@@ -215,8 +215,8 @@
         {
             var model = await _editor.GetModel();
             editorCode = await model.GetValue(EndOfLinePreference.CRLF, default);
-            Plug.Value = editorCode;
-            //Log.Information(Plug.Value);
+            Plug.SetVariableValue("CommandText", editorCode);
+            //Log.Information(Plug.GetVariableValue("CommandText"));
             await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
             _isDirty = false;
             StateHasChanged();

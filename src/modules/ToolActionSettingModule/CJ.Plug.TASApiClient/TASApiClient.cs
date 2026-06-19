@@ -108,7 +108,7 @@ public partial class TASApiClient:BaseApiClient,ITASApiClient
 
     public async Task<Plug?> UpdatePlugAsync(int? itemId, Plug item, CancellationToken cancellationToken = default)
     {
-        Console.WriteLine("[TASApiClient] UpdatePlugAsync about to PUT, itemId={0}, item.Value={1}", itemId, item.Value);
+        Console.WriteLine("[TASApiClient] UpdatePlugAsync about to PUT, itemId={0}", itemId);
         var result = await httpClient.PutAsJsonAsync($"/api/plug/updatePlug/{itemId}", item, cancellationToken);
         //return true;
         // 检查响应状态码

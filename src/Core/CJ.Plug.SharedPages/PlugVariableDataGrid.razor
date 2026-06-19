@@ -1,6 +1,6 @@
 @using System.Text.Json
 @using System.Text.Json.Nodes
-
+@using CJ.Plug.Models.LogModels
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.Services
 @using CJ.Plug.Models.Shared
@@ -77,7 +77,7 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
         </PropertyColumn>
         <PropertyColumn Property="x => x.Value" Title="设置参数默认值" Required="false">
             <EditTemplate>
-                <VariableValueUI PlugDefinitionId="@Plug?.DefinitionId" BaseVariable="@(context.Item)"></VariableValueUI>
+                    <VariableValueUI PlugDefinitionId="@Plug?.DefinitionId" BaseVariable="@(context.Item)" OnValueChanged="async () => await SavePlugAndActivity()"></VariableValueUI>
             </EditTemplate>
         </PropertyColumn>
         @* <PropertyColumn Property="x => x.DefaultValue" Title="默认值" Required="false" >
@@ -156,39 +156,45 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
 
     async Task<DataGridEditFormAction> CommittedItemChanges(PlugVariable? item)
     {
+        CLog.Information($"[PlugVariableDataGrid] CommittedItemChanges 入口, PlugId={Plug?.Id}, PlugName={Plug?.Name}, Item={item?.Name}");
         Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(item)}");
-
-        // 当 Url 变量被编辑时，同步到 Plug.Value（InterfacePlugConfig 优先读取 Plug.Value）
-        if (item?.Name == "Url" && Plug != null)
-        {
-            Plug.Value = item.Value;
-        }
 
         // 诊断：输出即将发送到后端的 Plug 完整数据
         var plugJson = System.Text.Json.JsonSerializer.Serialize(Plug, new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
+        CLog.Information($"[PlugVariableDataGrid] Plug before UpdatePlugAsync: {plugJson}");
         Console.WriteLine($"[DIAG] Plug before UpdatePlugAsync: {plugJson}");
-        Snackbar.Add($"[DIAG] Plug.Value={Plug?.Value}, PlugVariables.Url.Value={Plug?.PlugVariables?.FirstOrDefault(v=>v.Name=="Url")?.Value}", Severity.Warning);
+        Snackbar.Add($"[DIAG] PlugVariables.Url.Value={Plug?.PlugVariables?.FirstOrDefault(v=>v.Name=="Url")?.Value}", Severity.Warning);
 
-        await SavePlugAndActivity();
+        var success = await SavePlugAndActivity();
+        if (success)
+        {
+            Snackbar.Add($"更新插头{Plug?.Name}参数成功");
+        }
 
-        Snackbar.Add($"更新插头{Plug.Name}参数成功");
         return DataGridEditFormAction.Close;
     }
 
     async Task NameChanged(string value)
     {
+        CLog.Information($"[PlugVariableDataGrid] NameChanged 入口, PlugId={Plug?.Id}, NewName={value}");
         Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
-        Snackbar.Add($"更新插头{Plug.Name}参数名成功");
-        await SavePlugAndActivity();
+        var success = await SavePlugAndActivity();
+        if (success)
+        {
+            Snackbar.Add($"更新插头{Plug?.Name}参数名成功");
+        }
     }
     async Task TypeChanged(PlugVariable item, string value)
     {
+        CLog.Information($"[PlugVariableDataGrid] TypeChanged 入口, PlugId={Plug?.Id}, Item={item?.Name}, NewType={value}");
         Console.WriteLine($"Event = CommittedItemChanges, Data = {System.Text.Json.JsonSerializer.Serialize(value)}");
         item.Type = value;
 
-        await SavePlugAndActivity();
-        Snackbar.Add($"更新插头{Plug.Name}参数类型成功");
-
+        var success = await SavePlugAndActivity();
+        if (success)
+        {
+            Snackbar.Add($"更新插头{Plug?.Name}参数类型成功");
+        }
     }
 
     async Task Refresh()
@@ -196,10 +202,28 @@ Bordered="true" Dense="true" ColumnResizeMode="ResizeMode.Column" LoadingProgres
         StateHasChanged();
     }
 
-    async Task SavePlugAndActivity(PlugDataZone? pdz=null)
+    async Task<bool> SavePlugAndActivity(PlugDataZone? pdz=null)
     {
-        //Plug = Plug2 ?? Plug;
-        await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
-        //Console.WriteLine(">>>>>>>>>>>end update plug:" + JsonSerializer.Serialize(Plug));
+        CLog.Information($"[PlugVariableDataGrid] SavePlugAndActivity 入口, PlugId={Plug?.Id}, PlugName={Plug?.Name}, VariablesCount={Plug?.PlugVariables?.Count}");
+        try
+        {
+            CLog.Information($"[PlugVariableDataGrid] 调用 UpdatePlugAsync, PlugId={Plug.Id}");
+            var result = await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
+            CLog.Information($"[PlugVariableDataGrid] UpdatePlugAsync 返回, result={result != null}, resultId={result?.Id}");
+            if (result == null)
+            {
+                CLog.Error($"[PlugVariableDataGrid] UpdatePlugAsync 返回 null, PlugId={Plug.Id}");
+                Snackbar.Add($"更新插头{Plug?.Name}参数失败：服务端返回异常", Severity.Error);
+                return false;
+            }
+            CLog.Information($"[PlugVariableDataGrid] SavePlugAndActivity 成功, PlugId={Plug.Id}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            CLog.Error($"[PlugVariableDataGrid] SavePlugAndActivity 异常, PlugId={Plug?.Id}, ex={ex}");
+            Snackbar.Add($"更新插头{Plug?.Name}参数失败: {ex.Message}", Severity.Error);
+            return false;
+        }
     }
 }

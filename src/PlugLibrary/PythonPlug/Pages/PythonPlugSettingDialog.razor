@@ -398,7 +398,7 @@ if a == 1:
             byte[] stringBytes = Encoding.UTF8.GetBytes(editorCode);
             using Stream stream = new MemoryStream(stringBytes);
             //string fileName = testPlug.Id +"|"+ testPlug.Name + ".py";
-            Plug.Value = Plug.Name + ".py";
+            Plug.SetVariableValue("FileName", Plug.Name + ".py");
             //Plug.WorkPath = await FileManage.GetCurrentWorkPath(Plug.Id?.ToString(), null);
             //var filePath = await FileManage.UploadFileStreamToServerPath(stream, Plug.WorkPath, Plug.Value);
             //Plug.RealValuePath = filePath;

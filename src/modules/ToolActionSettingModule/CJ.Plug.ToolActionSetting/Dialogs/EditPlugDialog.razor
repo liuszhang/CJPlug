@@ -225,7 +225,7 @@
 
     private async Task Submit()
     {
-        Console.WriteLine("[EditPlugDialog] Submit entered, Category={0}, Plug.Id={1}, Plug.Value={2}", Plug.Category, Plug.Id, Plug.Value);
+        Console.WriteLine("[EditPlugDialog] Submit entered, Category={0}, Plug.Id={1}", Plug.Category, Plug.Id);
 
         if (string.IsNullOrWhiteSpace(Plug.Name))
         {
@@ -299,9 +299,9 @@
             }
             else if (Plug.Category?.Contains("接口") == true && _interfaceConfig != null)
             {
-                Console.WriteLine("[EditPlugDialog] 接口分支, _interfaceConfig not null, Plug.Value before Apply={0}, PlugVariables count={1}", Plug.Value, Plug.PlugVariables?.Count);
+                Console.WriteLine("[EditPlugDialog] 接口分支, _interfaceConfig not null, PlugVariables count={0}", Plug.PlugVariables?.Count);
                 _interfaceConfig.ApplyToPlug(Plug);
-                Console.WriteLine("[EditPlugDialog] 接口分支 after Apply, Plug.Value={0}, PlugVariables count={1}", Plug.Value, Plug.PlugVariables?.Count);
+                Console.WriteLine("[EditPlugDialog] 接口分支 after Apply, PlugVariables count={0}", Plug.PlugVariables?.Count);
             }
             else if (Plug.Category?.Contains("脚本") == true && _scriptConfig != null)
             {
@@ -312,9 +312,9 @@
                 _deviceConfig.ApplyToPlug(Plug);
             }
 
-            Console.WriteLine("[EditPlugDialog] About to call UpdatePlugAsync, Plug.Id={0}, Plug.Value={1}", Plug.Id, Plug.Value);
+            Console.WriteLine("[EditPlugDialog] About to call UpdatePlugAsync, Plug.Id={0}", Plug.Id);
             var result = await MainApiClient.UpdatePlugAsync(Plug.Id, Plug);
-            Console.WriteLine("[EditPlugDialog] UpdatePlugAsync returned, result={0}", result != null ? $"not null (Value={result.Value})" : "NULL");
+            Console.WriteLine("[EditPlugDialog] UpdatePlugAsync returned, result={0}", result != null ? "not null" : "NULL");
             if (result == null)
             {
                 Snackbar.Add("更新插头失败：服务端返回异常，请检查网络或服务端日志", Severity.Error);

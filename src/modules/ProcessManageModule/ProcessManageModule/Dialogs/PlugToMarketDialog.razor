@@ -121,7 +121,7 @@
         element.MarketImageBytes = MarketImageBytes;
         element.Base64ImageUrl = Base64ImageUrl;
         element.PlugTypeKey = Plug.PlugTypeKey + "(M)";
-        element.Value = Plug.Value;
+        element.SetVariableValue("Url", Plug.GetVariableValue("Url"));
         element.RootPlugID = Plug.Id;
         element.Creater = Plug.Creater;
         element.UsersCount = 1;

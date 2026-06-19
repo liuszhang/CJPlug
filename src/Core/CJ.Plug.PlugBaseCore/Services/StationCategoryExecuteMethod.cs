@@ -60,7 +60,7 @@ namespace CJ.Plug.PlugBaseCore.Services
                         CLog.Information($"[UPLOADED-TOOL-LEGACY] 旧格式合成 Tool: {syntheticTool.ToolName}");
                     }
                 }
-                else if (!plug.ToolId.HasValue && !string.IsNullOrEmpty(plug.Value)
+                else if (!plug.ToolId.HasValue && !string.IsNullOrEmpty(plug.GetVariableValue("Url"))
                          && !(plug.ToolVersionPath?.StartsWith("uploaded://") ?? false)
                          && plugExecutionRequest.ResolvedTool == null)
                 {
@@ -68,7 +68,7 @@ namespace CJ.Plug.PlugBaseCore.Services
                     {
                         ToolName = plug.ToolName ?? "自定义工具",
                         ToolVersion = "1.0",
-                        ToolPath = plug.Value,
+                        ToolPath = plug.GetVariableValue("Url"),
                         CommandParameter = plug.ToolCommandLineShema,
                         SkipDownloadToStation = true,
                         IsBrowsable = false,

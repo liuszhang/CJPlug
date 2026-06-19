@@ -32,6 +32,11 @@
             }
         }
 
+        if (EditorContext.OnValueChanged != null)
+        {
+            await EditorContext.OnValueChanged();
+        }
+
         Snackbar.Add($"更新插头{EditorContext?.Variable?.Name}参数值成功");
     }
 }

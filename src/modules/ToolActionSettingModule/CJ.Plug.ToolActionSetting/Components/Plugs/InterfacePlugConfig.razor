@@ -98,7 +98,7 @@
         if (!string.IsNullOrEmpty(method))
             HttpMethod = method;
 
-        InterfaceUrl = Plug.Value ?? Plug.GetVariableValue("Url");
+        InterfaceUrl = Plug.GetVariableValue("Url");
 
         var headersJson = Plug.GetVariableValue("RequestHeaders");
         if (!string.IsNullOrEmpty(headersJson))
@@ -120,7 +120,6 @@
     public void ApplyToPlug(Plug plug)
     {
         // plug.PlugTypeKey = "RESTPlug";
-        plug.Value = InterfaceUrl;
 
         // 添加接口类默认参数（与REST插头一致），使用 AddVariable 避免重复添加
         plug.AddVariable("Url", VariableTypeEnum.String.ToString(), IsInitVariable: true);

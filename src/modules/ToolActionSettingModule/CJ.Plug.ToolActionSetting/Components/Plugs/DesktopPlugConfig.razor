@@ -21,7 +21,7 @@
 @{
     bool showTabs = ExistingPlug == null
         || (!ExistingPlug.ToolId.HasValue
-            && string.IsNullOrEmpty(ExistingPlug.Value)
+            && string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url"))
             && !(ExistingPlug.ToolVersionPath?.StartsWith("uploaded://") ?? false));
 }
 
@@ -161,7 +161,7 @@ else
             }
         }
     }
-    else if (!string.IsNullOrEmpty(ExistingPlug!.Value))
+    else if (!string.IsNullOrEmpty(ExistingPlug!.GetVariableValue("Url")))
     {
         <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：手动输入路径</MudText>
         <MudTextField Value="@ManualToolPath" ValueChanged="@(async (string v) => await OnManualToolPathChanged(v))" Margin="Margin.Dense" Label="工具完整路径"
@@ -276,10 +276,10 @@ else
             }
         }
         // 手动输入路径模式：根据 Value 恢复
-        else if (!string.IsNullOrEmpty(ExistingPlug.Value))
+        else if (!string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url")))
         {
             _activeTabIndex = 1;
-            ManualToolPath = ExistingPlug.Value;
+            ManualToolPath = ExistingPlug.GetVariableValue("Url");
             ManualToolName = ExistingPlug.ToolName;
             await NotifyCommandDisplayChanged();
         }
@@ -398,7 +398,7 @@ else
         {
             plug.ToolId = null; // 切换为手动路径模式，清除旧的ToolId
             plug.ToolName = ManualToolName ?? "自定义工具";
-            plug.Value = ManualToolPath;
+            plug.SetVariableValue("Url", ManualToolPath);
             plug.ToolCommandLineShema = $"[{ManualToolPath}] ";
         }
         else if (_folderUploader?.HasSelection == true || !string.IsNullOrEmpty(FolderEntryFile))
