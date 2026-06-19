@@ -12,4 +12,10 @@ public partial class MenuItemViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isSelected;
+
+    /// <summary>
+    /// 折叠模式下显示的图标字符（如 Unicode 符号或首字）。
+    /// </summary>
+    [ObservableProperty]
+    private string _icon = string.Empty;
 }

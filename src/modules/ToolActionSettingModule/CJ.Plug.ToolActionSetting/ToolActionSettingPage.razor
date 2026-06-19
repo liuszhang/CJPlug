@@ -86,7 +86,7 @@
 
     <MudDivider />
 
-    <MudDropContainer T="Plug" Items="AllPlugsToShow" @key="AllPlugsToShow" @ref="_container" ItemsSelector="@IsItemInZone" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
+    <MudDropContainer T="Plug" Items="AllPlugsToShow" @ref="_container" ItemsSelector="@IsItemInZone" ItemPicked="@((args) => { _isDragging = true; _selectionUpdateCts?.Cancel(); StateHasChanged(); })" ItemDropped="ItemDroped" Style="height: calc(100vh - 120px);">
 
 
         <ChildContent>
@@ -131,8 +131,10 @@
                                                              SelectedValueChanged="OnPlugSelected"
                                                              Color="Color.Primary"
                                                              SelectionMode="SelectionMode.SingleSelection">
+                                                    <div data-sort-group="@groupKey">
                                                         <MudDropZone T="Plug" Identifier='@("Plug_" + groupKey)' AllowReorder="true">
                                                         </MudDropZone>
+                                                    </div>
                                                     </MudList>
                                                 </ChildContent>
                                             </MudExpansionPanel>
@@ -228,7 +230,7 @@
             }
             else if (context.Tag == "Plug")
             {
-                <MudListItem T="Plug" Value="@context">
+                <MudListItem T="Plug" Value="@context" data-plug-id="@(context.Id?.ToString())">
                     <TASPlugItem Plug="@context" OnDelete="() => RemoveToolItem(context)" OnChangeVersion="() => ChangeToolVersion(context)"></TASPlugItem>
                 </MudListItem>
             }
@@ -324,46 +326,47 @@
             await GetAllRootPlugs();
         }
         // 情况2：同组内拖拽重排 → 持久化排序
+        // MudBlazor 内部维护自己的一份排序副本；_container.Items 和 @bind-Items
+        // 返回的都是 Blazor 参数值（拖拽前的列表），不反映内部重排后的顺序。
+        // 必须通过 JS 读取 DOM 中 MudListItem 的实际顺序来获取正确的拖拽后排列。
         else if (dropItem.DropzoneIdentifier.StartsWith("Plug_") && dropItem.Item.Tag == "Plug")
         {
             var groupKey = dropItem.DropzoneIdentifier.Substring("Plug_".Length);
-            // MudBlazor 拖拽重排后 AllPlugsToShow 已反映新顺序，从中提取该组插头
-            var itemsInGroup = AllPlugsToShow
-                .Where(p => p.Tag == "Plug" && PlugCategoryGroupHelper.GetDisplayGroup(p.Category) == groupKey)
-                .ToList();
 
-            if (itemsInGroup.Count > 1)
+            try
             {
-                var sortOrders = itemsInGroup
-                    .Select((plug, index) => new PlugSortOrderDto
-                    {
-                        Id = plug.Id ?? 0,
-                        SortOrder = index
-                    })
+                // 从 DOM 读取 MudBlazor 内部重排后的实际顺序
+                var orderedIds = await JSRuntime.InvokeAsync<List<int>>("getPlugSortOrder", groupKey);
+                if (orderedIds == null || orderedIds.Count <= 1)
+                    return;
+
+                Console.WriteLine($"[SortOrder] DOM 返回 {groupKey} 组顺序: {string.Join(", ", orderedIds)}");
+
+                var sortOrders = orderedIds
+                    .Select((id, index) => new PlugSortOrderDto { Id = id, SortOrder = index })
                     .Where(dto => dto.Id > 0)
                     .ToList();
 
-                if (sortOrders.Count > 0)
+                if (sortOrders.Count == 0)
+                    return;
+
+                await MainApiClient.BatchUpdateSortOrdersAsync(sortOrders);
+                // 同步更新内存中的 SortOrder
+                foreach (var dto in sortOrders)
                 {
-                    try
-                    {
-                        await MainApiClient.BatchUpdateSortOrdersAsync(sortOrders);
-                        // 同步更新内存中的 SortOrder，确保连续拖拽不丢状态
-                        foreach (var dto in sortOrders)
-                        {
-                            var memPlug = RootPlugs.FirstOrDefault(p => p.Id == dto.Id);
-                            if (memPlug != null)
-                                memPlug.SortOrder = dto.SortOrder;
-                        }
-                        Console.WriteLine($"[SortOrder] 已保存 {groupKey} 组排序，共 {sortOrders.Count} 项");
-                        Snackbar.Add($"{groupKey} 组排序已保存", Severity.Success, config => { config.VisibleStateDuration = 1500; });
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[SortOrder] 排序保存失败: {ex.Message}");
-                        Snackbar.Add($"排序保存失败: {ex.Message}", Severity.Error);
-                    }
+                    var memPlug = RootPlugs.FirstOrDefault(p => p.Id == dto.Id);
+                    if (memPlug != null)
+                        memPlug.SortOrder = dto.SortOrder;
                 }
+                // 从已更新 SortOrder 的 RootPlugs 重建 AllPlugsToShow
+                UpdateFilteredPlugs();
+                Console.WriteLine($"[SortOrder] 已保存 {groupKey} 组排序，共 {sortOrders.Count} 项");
+                Snackbar.Add($"{groupKey} 组排序已保存", Severity.Success, config => { config.VisibleStateDuration = 1500; });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SortOrder] 排序保存失败: {ex.Message}");
+                Snackbar.Add($"排序保存失败: {ex.Message}", Severity.Error);
             }
         }
 
@@ -434,6 +437,16 @@
     {
         if (firstRender)
         {
+            // 注入 JS 辅助函数：从 DOM 读取 MudBlazor 内部重排后的插头顺序
+            await JSRuntime.InvokeVoidAsync("eval",
+                "window.getPlugSortOrder=function(g){" +
+                "var w=document.querySelector('div[data-sort-group=\"'+g+'\"]');" +
+                "if(!w)return[];" +
+                "var r=[];" +
+                "w.querySelectorAll('[data-plug-id]').forEach(function(e){" +
+                "var i=e.getAttribute('data-plug-id');if(i)r.push(parseInt(i))" +
+                "});" +
+                "return r;}");
             await GetAllRootPlugs();
             await LoadMcpTools();
             _actionPanelPlug = SelectedPlug;

@@ -14,7 +14,7 @@ public partial class PlugManageService : IPlugManageService
     {
         _dbContext = dbContext;
         _dbContext.Database.EnsureCreated();
-        //MigratePlugSchema();
+        MigratePlugSchema();
     }
 
     public async Task<Plug> CreatePlugAsync(Plug request, CancellationToken cancellationToken = default)
@@ -312,39 +312,22 @@ public partial class PlugManageService : IPlugManageService
         Log.Information("[BatchUpdateSortOrders] 收到 {Count} 个排序项: {@Orders}",
             sortOrders.Count, sortOrders.Select(s => new { s.Id, s.SortOrder }));
 
-        var ids = sortOrders.Select(s => s.Id).ToList();
-        var plugs = await _dbContext.Set<Plug>()
-            .Where(p => p.Id != null && ids.Contains(p.Id.Value))
-            .ToListAsync(cancellationToken);
-
-        Log.Information("[BatchUpdateSortOrders] 查询到 {Found}/{Requested} 个插头",
-            plugs.Count, ids.Count);
-
-        int updated = 0;
-        foreach (var plug in plugs)
+        // 使用 ExecuteUpdate 直接执行 UPDATE SQL，绕过 EF ChangeTracker。
+        // ChangeTracker 在某些场景下无法正确检测 SortOrder 属性变更（如复合模型的 TPH 继承），
+        // 导致 SaveChanges 不生成 UPDATE 语句。
+        int totalAffected = 0;
+        foreach (var dto in sortOrders)
         {
-            var dto = sortOrders.FirstOrDefault(s => s.Id == plug.Id);
-            if (dto != null)
-            {
-                plug.SortOrder = dto.SortOrder;
-                updated++;
-            }
+            var affected = await _dbContext.Set<Plug>()
+                .Where(p => p.Id == dto.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(p => p.SortOrder, dto.SortOrder),
+                    cancellationToken);
+            totalAffected += affected;
         }
 
-        try
-        {
-            var entryCount = _dbContext.ChangeTracker.Entries<Plug>()
-                .Count(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Modified);
-            Log.Information("[BatchUpdateSortOrders] 变更追踪: {Modified} 个实体 Modified，即将 SaveChanges", entryCount);
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            Log.Information("[BatchUpdateSortOrders] SaveChanges 成功，更新了 {Updated} 个插头的 SortOrder", updated);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "[BatchUpdateSortOrders] SaveChanges 失败: {Message}", ex.Message);
-            throw;
-        }
+        Log.Information("[BatchUpdateSortOrders] ExecuteUpdate 完成，{Affected} 行受影响，共 {Count} 项",
+            totalAffected, sortOrders.Count);
     }
 
     public async Task<List<PlugVariable>?> GetVariablesByDefinitionId(string definiitonId)

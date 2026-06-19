@@ -12,10 +12,11 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <converters:BoolToWidthConverter x:Key="BoolToWidth"/>
     </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="{Binding IsMenuCollapsed, Converter={StaticResource BoolToWidth}}"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 

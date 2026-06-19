@@ -64,10 +64,11 @@
         }
         <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
     </MudAppBar>
-    <MudDrawer @bind-Open="@_open" Variant="@DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="1" Width="200px" OpenMiniOnHover="true">
+    <MudDrawer @bind-Open="@_open" Variant="@DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="1" Width="200px">
         <MudDrawerHeader>
             <MudText Typo="Typo.h6">CJ.Plug</MudText>
-            @* <MudIconButton Icon="@Icons.Material.Filled.LogoDev" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleLogger" /> *@
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Edge="Edge.End" OnClick="@ToggleDrawer" />
         </MudDrawerHeader>
 
         <MyNavMenu />
@@ -252,15 +253,7 @@
 
     private void ToggleDrawer()
     {
-        InvokeAsync(() =>
-        {
-            //Log.Information("菜单状态改变");
-            _open = !_open;
-            StateHasChanged(); // 确保在 UI 线程上触发重渲染
-        });
-        //Console.WriteLine("open is :" + _open.ToString());
-        //_open = !_open;
-        //Log.Information("OpenMenu:" + (!_open).ToString());
+        _open = !_open;
     }
 
     private async Task SetMenuStatus(bool isOpen)
