@@ -14,7 +14,7 @@ public partial class PlugManageService : IPlugManageService
     {
         _dbContext = dbContext;
         _dbContext.Database.EnsureCreated();
-        MigratePlugSchema();
+        //MigratePlugSchema();
     }
 
     public async Task<Plug> CreatePlugAsync(Plug request, CancellationToken cancellationToken = default)
