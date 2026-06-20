@@ -99,8 +99,9 @@
     {
         try
         {
-            var mcpConfig = await LlmConfigApiClient.GetMcpServerConfigAsync();
-            if (mcpConfig != null && mcpConfig.IsEnabled && !string.IsNullOrEmpty(mcpConfig.ConnectionString))
+            var mcpConfigs = await LlmConfigApiClient.GetMcpServerConfigsAsync();
+            var mcpConfig = mcpConfigs.FirstOrDefault(c => c.IsEnabled && !string.IsNullOrEmpty(c.ConnectionString));
+            if (mcpConfig != null)
             {
                 _mcpConnectionString = mcpConfig.ConnectionString;
                 Console.WriteLine($"[AskAIPage] MCP Server 已启用: {_mcpConnectionString}");

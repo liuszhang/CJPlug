@@ -21,7 +21,7 @@
 @{
     bool showTabs = ExistingPlug == null
         || (!ExistingPlug.ToolId.HasValue
-            && string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url"))
+            && string.IsNullOrEmpty(ExistingPlug.GetVariableValue("ToolPath"))
             && !(ExistingPlug.ToolVersionPath?.StartsWith("uploaded://") ?? false));
 }
 
@@ -118,7 +118,39 @@
 else
 {
     @* 编辑模式：根据已有配置展示对应内容 *@
-    @if (ExistingPlug!.ToolId.HasValue)
+    @if (!string.IsNullOrEmpty(ExistingPlug!.ToolVersionPath) &&
+         ExistingPlug.ToolVersionPath.StartsWith("uploaded://"))
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：上传文件夹</MudText>
+        <FolderUploader @ref="_folderUploader"
+                        ServerBaseUrl="@ServerBaseUrl"
+                        PlugFolder="@(PlugFolder ?? "")"
+                        Username="@Username"
+                        IsSystemPlug="@IsSystemPlug"
+                        OnFolderSelected="OnFolderPicked" />
+        <MudTextField @bind-Value="@FolderToolName" Margin="Margin.Dense" Label="工具名称"
+                      Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
+        
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
+            <MudTextField Value="@FolderEntryFile" ValueChanged="@(async (string v) => await OnFolderEntryFileChanged(v))" Margin="Margin.Dense" Label="入口程序"
+                          Placeholder="例如：app.exe 或 main.py" Variant="Variant.Outlined"
+                          HelperText="指定文件夹中的入口执行程序"
+                          Adornment="Adornment.End">
+            </MudTextField>
+            <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Small"
+                           OnClick="OpenServerFilePicker" />
+        </MudStack>
+    }
+    else if (!string.IsNullOrEmpty(ExistingPlug!.GetVariableValue("ToolPath")))
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：手动输入路径</MudText>
+        <MudTextField Value="@ManualToolPath" ValueChanged="@(async (string v) => await OnManualToolPathChanged(v))" Margin="Margin.Dense" Label="工具完整路径"
+                      Placeholder="例如：C:\Program Files\Tool\tool.exe" Variant="Variant.Outlined"
+                      HelperText="输入工具在图站上的完整路径"></MudTextField>
+        <MudTextField @bind-Value="@ManualToolName" Margin="Margin.Dense" Label="工具名称"
+                      Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
+    }
+    else if (ExistingPlug!.ToolId.HasValue)
     {
         <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：从工具库选择</MudText>
         @if (SelectedTool != null)
@@ -160,38 +192,6 @@ else
                 </MudStack>
             }
         }
-    }
-    else if (!string.IsNullOrEmpty(ExistingPlug!.GetVariableValue("Url")))
-    {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：手动输入路径</MudText>
-        <MudTextField Value="@ManualToolPath" ValueChanged="@(async (string v) => await OnManualToolPathChanged(v))" Margin="Margin.Dense" Label="工具完整路径"
-                      Placeholder="例如：C:\Program Files\Tool\tool.exe" Variant="Variant.Outlined"
-                      HelperText="输入工具在图站上的完整路径"></MudTextField>
-        <MudTextField @bind-Value="@ManualToolName" Margin="Margin.Dense" Label="工具名称"
-                      Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
-    }
-    else if (!string.IsNullOrEmpty(ExistingPlug!.ToolVersionPath) &&
-             ExistingPlug.ToolVersionPath.StartsWith("uploaded://"))
-    {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">配置方式：上传文件夹</MudText>
-        <FolderUploader @ref="_folderUploader"
-                        ServerBaseUrl="@ServerBaseUrl"
-                        PlugFolder="@(PlugFolder ?? "")"
-                        Username="@Username"
-                        IsSystemPlug="@IsSystemPlug"
-                        OnFolderSelected="OnFolderPicked" />
-        <MudTextField @bind-Value="@FolderToolName" Margin="Margin.Dense" Label="工具名称"
-                      Placeholder="自定义工具名称" Variant="Variant.Outlined"></MudTextField>
-        
-        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center">
-            <MudTextField Value="@FolderEntryFile" ValueChanged="@(async (string v) => await OnFolderEntryFileChanged(v))" Margin="Margin.Dense" Label="入口程序"
-                          Placeholder="例如：app.exe 或 main.py" Variant="Variant.Outlined"
-                          HelperText="指定文件夹中的入口执行程序"
-                          Adornment="Adornment.End">
-            </MudTextField>
-            <MudIconButton Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Small"
-                           OnClick="OpenServerFilePicker" />
-        </MudStack>
     }
 }
 
@@ -265,27 +265,9 @@ else
 
         SupportRemoteView = ExistingPlug.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString()) == "true";
 
-        // 从工具库选择模式：根据 ToolId 恢复
-        if (ExistingPlug.ToolId.HasValue)
-        {
-            _activeTabIndex = 0;
-            var tool = Tools.FirstOrDefault(t => t.Id == ExistingPlug.ToolId);
-            if (tool != null)
-            {
-                await OnSelectedToolChanged(tool);
-            }
-        }
-        // 手动输入路径模式：根据 Value 恢复
-        else if (!string.IsNullOrEmpty(ExistingPlug.GetVariableValue("Url")))
-        {
-            _activeTabIndex = 1;
-            ManualToolPath = ExistingPlug.GetVariableValue("Url");
-            ManualToolName = ExistingPlug.ToolName;
-            await NotifyCommandDisplayChanged();
-        }
-        // 上传文件夹模式：根据 ToolVersionPath 识别
-        else if (!string.IsNullOrEmpty(ExistingPlug.ToolVersionPath) &&
-                 ExistingPlug.ToolVersionPath.StartsWith("uploaded://"))
+        // 上传文件夹模式：根据 ToolVersionPath 识别（优先判断，因 EnsureToolAsync 后三种模式均有 ToolId）
+        if (!string.IsNullOrEmpty(ExistingPlug.ToolVersionPath) &&
+            ExistingPlug.ToolVersionPath.StartsWith("uploaded://"))
         {
             _activeTabIndex = 2;
             FolderToolName = ExistingPlug.ToolName;
@@ -313,6 +295,24 @@ else
                 }
             }
             await NotifyCommandDisplayChanged();
+        }
+        // 手动输入路径模式：根据 ToolPath 变量恢复
+        else if (!string.IsNullOrEmpty(ExistingPlug.GetVariableValue("ToolPath")))
+        {
+            _activeTabIndex = 1;
+            ManualToolPath = ExistingPlug.GetVariableValue("ToolPath");
+            ManualToolName = ExistingPlug.ToolName;
+            await NotifyCommandDisplayChanged();
+        }
+        // 从工具库选择模式：根据 ToolId 恢复
+        else if (ExistingPlug.ToolId.HasValue)
+        {
+            _activeTabIndex = 0;
+            var tool = Tools.FirstOrDefault(t => t.Id == ExistingPlug.ToolId);
+            if (tool != null)
+            {
+                await OnSelectedToolChanged(tool);
+            }
         }
         // 无法匹配任何已有配置方式时，默认选中第一个页签
         else
@@ -361,9 +361,10 @@ else
         if (SelectedTool != null)
             newDisplay = SelectedTool.CommandParameter;
         else if (!string.IsNullOrEmpty(ManualToolPath))
-            newDisplay = "[ToolPath]";
+            // 编辑模式回显已保存的完整命令，新建模式默认 [ToolPath]
+            newDisplay = ExistingPlug?.ToolCommandLineShema ?? "[ToolPath]";
         else if (_folderUploader?.HasSelection == true || !string.IsNullOrEmpty(FolderEntryFile))
-            newDisplay = "[ToolPath]";
+            newDisplay = ExistingPlug?.ToolCommandLineShema ?? "[ToolPath]";
 
         if (_commandDisplay != newDisplay)
         {
@@ -398,7 +399,7 @@ else
         {
             plug.ToolId = null; // 切换为手动路径模式，清除旧的ToolId
             plug.ToolName = ManualToolName ?? "自定义工具";
-            plug.SetVariableValue("Url", ManualToolPath);
+            plug.SetVariableValue("ToolPath", ManualToolPath);
             plug.ToolCommandLineShema = $"[{ManualToolPath}] ";
         }
         else if (_folderUploader?.HasSelection == true || !string.IsNullOrEmpty(FolderEntryFile))
