@@ -22,15 +22,7 @@
 无需安装客户端，打开浏览器即可跨图站（工作站）远程触发任意工具执行，实时回传日志与结果文件。支持多图站并行调度，工具运行在哪台机器上对用户完全透明。
 
 </td>
-<td width="1%" align="center">
 
-```
-│
-│
-│
-```
-
-</td>
 <td width="33%" align="center" valign="top">
 
 ### 🔗 逻辑流 + 数据流串接
@@ -42,15 +34,7 @@
 拖拽即可将任意插头连成复杂工具链——逻辑分支、循环控制、子流程嵌套，变量在节点间自动传递。支持 AI 自然语言生成流程，也支持 JSON 导入导出复用。
 
 </td>
-<td width="1%" align="center">
 
-```
-│
-│
-│
-```
-
-</td>
 <td width="33%" align="center" valign="top">
 
 ### 🤖 一键发布 MCP Tool
@@ -68,6 +52,10 @@
 ---
 
 ![CJPlug](./03.Website/Picture/HomePage.png)
+
+<video width="100%" controls>
+    <source src="./03.Website/Video/CJPlug录屏演示-260617.mp4" type="video/mp4">
+</video>
 
 ---
 
@@ -187,7 +175,9 @@ CJPlug 由 **8 个微服务** 组成，通过 **SignalR Hub** 实时通信：
 3. 平台自动生成 JSON Schema，McpServer 实时刷新
 4. AI 客户端立即可见该 Tool
 
-![流程管理](./03.Website/Picture/流程管理.png)
+<video width="100%" controls>
+    <source src="./03.Website/Video/CJPlug-增加自定义桌面工具为插头.mp4" type="video/mp4">
+</video>
 
 ### 路径 B：注册插件能力（`IPluginCapability`）
 
