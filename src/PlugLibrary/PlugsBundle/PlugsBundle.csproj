@@ -16,6 +16,7 @@
     <ProjectReference Include="..\CommonToolExecute\CommonToolExecute.csproj" />
     <ProjectReference Include="..\ExcelPlug\ExcelPlug.csproj" />
     <ProjectReference Include="..\FileDownloadPlug\FileDownloadPlug.csproj" />
+    <ProjectReference Include="..\LLMPlug\LLMPlug.csproj" />
     <ProjectReference Include="..\Loop\AndPlug\AndPlug.csproj" />
     <ProjectReference Include="..\Loop\ForPlug\ForPlug.csproj" />
     <ProjectReference Include="..\Loop\IfPlug\IfPlug.csproj" />
@@ -38,6 +39,7 @@
     <ProjectReference Include="..\WordPlug\WordPlug.csproj" />
     <ProjectReference Include="..\PPTPlug\PPTPlug.csproj" />
     <ProjectReference Include="..\PatranPlug\PatranPlug.csproj" />
+    <ProjectReference Include="..\WordReadPlug\WordReadPlug.csproj" />
   </ItemGroup>
 
   <ItemGroup>
