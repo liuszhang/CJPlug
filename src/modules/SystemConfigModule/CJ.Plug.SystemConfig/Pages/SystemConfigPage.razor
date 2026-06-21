@@ -1,0 +1,112 @@
+@page "/SystemConfig"
+@using Microsoft.AspNetCore.Components.Forms
+@inject IConfiguration Configuration
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>系统配置</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">系统配置</MudText>
+
+    <MudCard Elevation="2" Class="pa-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-3">独立执行程序</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                配置 CJ.Plug.ExecuteApp.exe 的路径。此路径用于在独立桌面窗口中启动流程执行。
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_exePath"
+                                  Label="ExecuteApp.exe 路径"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="例如: D:\Pro\CJ.Plug.Github\CJPlug\02.Publish\CJ.Plug.ExecuteApp\Debug\net10.0-windows\CJ.Plug.ExecuteApp.exe"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" md="1" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.FolderOpen"
+                               OnClick="BrowseFileAsync"
+                               FullWidth="true">
+                        浏览
+                    </MudButton>
+                </MudItem>
+                <MudItem xs="12" md="3" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="SaveConfigAsync"
+                               FullWidth="true">
+                        保存配置
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <MudAlert Severity="@(_isSuccess ? Severity.Success : Severity.Error)"
+                          Class="mt-3"
+                          Dense="true">
+                    @_statusMessage
+                </MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private string _exePath = string.Empty;
+    private string _statusMessage = string.Empty;
+    private bool _isSuccess;
+
+    protected override void OnInitialized()
+    {
+        _exePath = Configuration.GetValue<string>("StandaloneExecute:AppPath") ?? string.Empty;
+    }
+
+    private async Task BrowseFileAsync()
+    {
+        try
+        {
+            // 通过 WebView2 消息通信打开文件对话框（仅在 Desktop WebView2 环境中生效）
+            var path = await JSRuntime.InvokeAsync<string>("systemConfig.browseFile");
+            if (!string.IsNullOrEmpty(path))
+            {
+                _exePath = path;
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // 非 WebView2 环境（浏览器）降级：不做处理，用户手动输入路径
+        }
+    }
+
+    private async Task SaveConfigAsync()
+    {
+        try
+        {
+            var http = HttpClientFactory.CreateClient("SystemConfig");
+            var response = await http.PostAsJsonAsync("/api/systemConfig", new { AppPath = string.IsNullOrWhiteSpace(_exePath) ? null : _exePath.Trim() });
+            if (response.IsSuccessStatusCode)
+            {
+                _isSuccess = true;
+                _statusMessage = "配置已保存成功。";
+                Snackbar.Add("配置已保存", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _isSuccess = false;
+                _statusMessage = $"保存失败: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _isSuccess = false;
+            _statusMessage = $"保存失败: {ex.Message}";
+        }
+    }
+}

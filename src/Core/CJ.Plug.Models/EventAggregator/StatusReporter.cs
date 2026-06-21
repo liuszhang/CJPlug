@@ -59,9 +59,10 @@ namespace CJ.Plug.Models.EventAggregator
         /// <param name="plugDefinitionId">正在执行的插头 ID</param>
         /// <param name="stationIp">图站 IP</param>
         /// <param name="pdzId">PDZ ID</param>
-        public static void ReportStationExecuting(string? plugDefinitionId, string? stationIp, string? pdzId = "")
+        /// <param name="protocol">远程协议类型: rdp, vnc, ssh</param>
+        public static void ReportStationExecuting(string? plugDefinitionId, string? stationIp, string? pdzId = "", string? protocol = "vnc")
         {
-            var data = System.Text.Json.JsonSerializer.Serialize(new { PlugDefinitionId = plugDefinitionId, StationIp = stationIp });
+            var data = System.Text.Json.JsonSerializer.Serialize(new { PlugDefinitionId = plugDefinitionId, StationIp = stationIp, Protocol = protocol });
             // Receiver 传 null，避免 CLog 对 Job1 类型 PDZ 的重复转发
             CLog.Information(data, null, pdzId, plugDefinitionId, null, LogTypeEnum.StationExecuting);
         }

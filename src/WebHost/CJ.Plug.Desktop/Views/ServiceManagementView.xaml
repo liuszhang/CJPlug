@@ -64,5 +64,12 @@
         <TabItem Header="数据库配置">
             <views:DatabaseConfigView x:Name="DatabaseConfigView"/>
         </TabItem>
+
+        <!-- Tab 4: 系统配置 -->
+        <TabItem Header="系统配置">
+            <Border BorderBrush="#35355F" BorderThickness="1,1,0,0">
+                <wv2:WebView2 x:Name="SystemConfigWebView"/>
+            </Border>
+        </TabItem>
     </TabControl>
 </UserControl>

@@ -335,8 +335,9 @@ namespace CJ.Plug.PlugBaseCore.Services
                 var plugSetting = plugForVnc.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
                 if (plugSetting == "true")
                 {
-                    CLog.Information($"插头{plugForVnc.Name}已启用 SupportRemoteView，发送 StationExecuting 通知");
-                    StatusReporter.ReportStationExecuting(vncPlugDefId, StationToUse.StationIp, plugExecutionRequest.PDZId);
+                    var protocol = StationToUse.GuacamoleProtocol ?? "vnc";
+                    CLog.Information($"插头{plugForVnc.Name}已启用 SupportRemoteView，发送 StationExecuting 通知 (protocol={protocol})");
+                    StatusReporter.ReportStationExecuting(vncPlugDefId, StationToUse.StationIp, plugExecutionRequest.PDZId, protocol);
                 }
             }
 

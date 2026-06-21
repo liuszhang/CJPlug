@@ -347,18 +347,19 @@
 
         // 监听图站执行事件 (用于打开远程桌面)
         HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
-        HubConnectionManagerService._hubConnection.On<string, string, string>(
+        HubConnectionManagerService._hubConnection.On<string, string, string, string>(
             LogTypeEnum.StationExecuting.ToString(),
-            (pdzId, plugDefinitionId, stationIp) =>
+            (pdzId, plugDefinitionId, stationIp, protocol) =>
             {
-                Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp}");
+                Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp} protocol={protocol}");
                 InvokeAsync(async () =>
                 {
                     // 从完整 URL 中提取纯 IP（stationIp 可能是 "http://192.168.161.237:7660"）
                     var pureIp = ExtractHost(stationIp);
-                    // 打开新的浏览器页签显示远程桌面 (默认 SSH)
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}?protocol=ssh", "_blank");
-                    Snackbar.Add($"正在打开远程终端: {pureIp}", Severity.Info);
+                    var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
+                    // 打开新的浏览器页签显示远程桌面
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}?protocol={resolvedProtocol}", "_blank");
+                    Snackbar.Add($"正在打开远程桌面: {pureIp} ({resolvedProtocol})", Severity.Info);
                 });
             });
     }

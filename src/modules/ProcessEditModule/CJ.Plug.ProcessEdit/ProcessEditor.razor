@@ -389,10 +389,10 @@
                });
            });
 
-        // 图站开始执行时，自动打开 VNC 远程桌面页签
-        HubConnectionManagerService._hubConnection.On<string, string, string>(
+        // 图站开始执行时，自动打开远程桌面页签
+        HubConnectionManagerService._hubConnection.On<string, string, string, string>(
             LogTypeEnum.StationExecuting.ToString(),
-            (pdzId, plugDefinitionId, stationIp) =>
+            (pdzId, plugDefinitionId, stationIp, protocol) =>
             {
                 if (string.IsNullOrEmpty(stationIp)) return;
                 InvokeAsync(async () =>
@@ -400,8 +400,9 @@
                     // StationIp 格式为 "http://192.168.1.100:7660"，提取纯 IP/主机名
                     var host = stationIp;
                     try { host = new Uri(stationIp).Host; } catch { }
-                    Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面...", Severity.Info);
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/vnc/{host}", "_blank");
+                    var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
+                    Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({resolvedProtocol})...", Severity.Info);
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{resolvedProtocol}/{host}", "_blank");
                 });
             });
     }

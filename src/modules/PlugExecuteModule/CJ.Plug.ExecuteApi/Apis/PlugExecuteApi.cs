@@ -1,7 +1,10 @@
 ﻿using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Shared;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 public static class PlugExecuteApi
 {
@@ -58,8 +61,12 @@ public static class PlugExecuteApi
                         statusCode: 500);
                 }
 
-                // 获取当前 Blazor Server 的 baseUrl
-                var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
+                // 获取 Web 前端 (HostWebServer) 的 baseUrl
+                // /process/{id}/execute 是 Blazor 页面路由，必须在 HostWebServer 上访问
+                // 不能使用 context.Request.Host（那是 ApiServer 自身端口 8687，没有 Blazor 路由）
+                var baseUrl = configuration.GetValue<string>("StandaloneExecute:WebFrontendUrl")
+                    ?? configuration.GetValue<string>("WebFrontend:Url")
+                    ?? GlobalData.MainWebFileServerUrl;
 
                 var psi = new ProcessStartInfo
                 {
@@ -81,8 +88,69 @@ public static class PlugExecuteApi
             }
         });
 
+        // 系统配置 API
+        var sysConfigApi = app.MapGroup("api/systemConfig").WithTags("系统配置");
+
+        sysConfigApi.MapGet("", (IConfiguration configuration) =>
+        {
+            var appPath = configuration.GetValue<string>("StandaloneExecute:AppPath") ?? "";
+            return Results.Ok(new { appPath });
+        });
+
+        sysConfigApi.MapPost("", (HttpContext context, IConfiguration configuration) =>
+        {
+            try
+            {
+                var body = context.Request.ReadFromJsonAsync<SystemConfigRequest>().Result;
+                var newPath = body?.AppPath ?? "";
+
+                var hostDir = AppContext.BaseDirectory;
+                var publishSettings = Path.GetFullPath(Path.Combine(hostDir, "appsettings.json"));
+                var srcRoot = Path.GetFullPath(Path.Combine(hostDir, "..", "..", "..", "..", "..", "src"));
+
+                WriteAppSetting(publishSettings, "StandaloneExecute:AppPath", newPath);
+
+                var hostName = new DirectoryInfo(Path.GetFullPath(Path.Combine(hostDir, "..", ".."))).Name;
+                var srcSettings = Path.Combine(srcRoot, "PlugWebHost", hostName, "appsettings.json");
+                if (File.Exists(srcSettings))
+                {
+                    WriteAppSetting(srcSettings, "StandaloneExecute:AppPath", newPath);
+                }
+
+                return Results.Ok(new { success = true, path = newPath });
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(detail: $"保存配置失败: {ex.Message}", statusCode: 500);
+            }
+        });
+
         return app;
     }
 
+    private static void WriteAppSetting(string filePath, string keyPath, string value)
+    {
+        if (!File.Exists(filePath)) return;
+
+        var json = File.ReadAllText(filePath);
+        var node = JsonNode.Parse(json);
+        if (node == null) return;
+
+        var keys = keyPath.Split(':');
+        var current = node;
+        for (int i = 0; i < keys.Length - 1; i++)
+        {
+            if (current[keys[i]] == null)
+                current[keys[i]] = new JsonObject();
+            current = current[keys[i]]!;
+        }
+        current[keys[^1]] = string.IsNullOrEmpty(value) ? null : value;
+
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        File.WriteAllText(filePath, node.ToJsonString(options));
+    }
+
 }
+
+internal record SystemConfigRequest(string? AppPath);
 
