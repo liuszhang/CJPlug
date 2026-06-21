@@ -113,4 +113,18 @@ public partial class MainApiClient : IExecuteApiClient
             throw;
         }
     }
+
+    public async Task LaunchStandaloneAppAsync(string definitionId, CancellationToken ct = default)
+    {
+        try
+        {
+            await ExecuteApiClient.Value.LaunchStandaloneAppAsync(definitionId, ct);
+            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Execute, $"启动独立执行程序: {definitionId}");
+        }
+        catch (Exception ex)
+        {
+            await AuditLog.LogFailureAsync(AuditModule.Other, AuditOperationType.Execute, $"启动独立执行程序异常: {definitionId}", ex.Message);
+            throw;
+        }
+    }
 }

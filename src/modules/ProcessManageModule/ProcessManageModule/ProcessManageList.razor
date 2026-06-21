@@ -135,6 +135,12 @@
  *@
                         </MudBadge>
                     </MudTooltip>
+                    <MudTooltip Text="在独立桌面窗口中执行" Delay="100">
+                        <MudIconButton OnClick="()=>LaunchStandaloneExecute(context)"
+                                       Icon="@Icons.Material.Outlined.OpenInNew"
+                                       Color="Color.Info"
+                                       Size="Size.Small" />
+                    </MudTooltip>
                     <MudMenu Icon="@Icons.Material.Filled.MoreVert">
                         <MudMenuItem OnClick="()=>UpdateProcess(context)" Icon="@Icons.Material.Outlined.ZoomIn">编辑</MudMenuItem>
                         <MudMenuItem OnClick="()=>DeleteProcess(context)" Icon="@Icons.Material.Outlined.Delete">删除</MudMenuItem>
@@ -362,6 +368,19 @@
     {
         var CorrelationId = RandomLongIdentityGenerator.GenerateId();
         NavigationManager.NavigateTo($"/process/{process.DefinitionId}/execute/{CorrelationId}");
+    }
+
+    private async Task LaunchStandaloneExecute(Process process)
+    {
+        try
+        {
+            await MainApiClient.LaunchStandaloneAppAsync(process.DefinitionId);
+            Snackbar.Add($"已在独立窗口中启动流程执行: {process.Name}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"启动独立执行窗口失败: {ex.Message}", Severity.Error);
+        }
     }
 
 

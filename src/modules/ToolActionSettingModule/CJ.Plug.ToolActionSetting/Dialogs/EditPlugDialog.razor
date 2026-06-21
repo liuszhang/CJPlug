@@ -277,16 +277,17 @@
                     {
                         var varName = match.Groups[1].Value;
                         if (varName == "ToolPath") continue;
-                        if (!Plug.PlugVariables.Any(v => v.Name == varName))
-                        {
-                            var typeStr = match.Groups[2].Value;
-                            var isFile = !string.IsNullOrWhiteSpace(typeStr) && typeStr.Equals("File", StringComparison.OrdinalIgnoreCase);
-                            var varType = string.IsNullOrWhiteSpace(typeStr) || typeStr.Equals("String", StringComparison.OrdinalIgnoreCase)
-                                ? VariableTypeEnum.String.ToString()
-                                : isFile
-                                    ? VariableTypeEnum.File.ToString()
-                                    : VariableTypeEnum.String.ToString();
+                        var typeStr = match.Groups[2].Value;
+                        var isFile = !string.IsNullOrWhiteSpace(typeStr) && typeStr.Equals("File", StringComparison.OrdinalIgnoreCase);
+                        var varType = string.IsNullOrWhiteSpace(typeStr) || typeStr.Equals("String", StringComparison.OrdinalIgnoreCase)
+                            ? VariableTypeEnum.String.ToString()
+                            : isFile
+                                ? VariableTypeEnum.File.ToString()
+                                : VariableTypeEnum.String.ToString();
 
+                        var existingVar = Plug.PlugVariables.FirstOrDefault(v => v.Name == varName);
+                        if (existingVar == null)
+                        {
                             Plug.PlugVariables.Add(new PlugVariable
                             {
                                 Name = varName,
@@ -295,6 +296,11 @@
                                 Type = varType,
                                 IsInput = isFile, // File 类型默认为输入参数，确保执行时下载到图站并替换实际路径
                             });
+                        }
+                        else if (isFile && !existingVar.IsInput)
+                        {
+                            // 修复旧数据：已有的 File 变量 IsInput 可能为 false，强制设为 true
+                            existingVar.IsInput = true;
                         }
                     }
                 }

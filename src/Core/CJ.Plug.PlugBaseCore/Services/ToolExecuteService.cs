@@ -132,7 +132,7 @@ namespace CJ.Plug.PlugBaseCore.Services
             foreach (var variable in plugExecutionRequest.InputVariables)
             {
                 //Log.Information($"处理变量：{variable.Name}，类型：{variable.Type}，值：{variable.Value}");
-                if (variable.Type == VariableTypeEnum.File.ToString() && variable.IsInput==true)
+                if (variable.Type == VariableTypeEnum.File.ToString())
                 {
                     //Log.Information($"开始处理文件变量{variable.Name}：{variable.Value}，准备下载文件到图站");
                     //下载文件至图站

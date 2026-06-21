@@ -217,4 +217,9 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
 
     }
 
+    public async Task LaunchStandaloneAppAsync(string definitionId, CancellationToken cancellationToken = default)
+    {
+        await httpClient.PostAsync($"/api/plug/launchStandalone/{definitionId}", null, cancellationToken);
+    }
+
 }
