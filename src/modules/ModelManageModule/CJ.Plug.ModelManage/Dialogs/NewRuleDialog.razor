@@ -23,6 +23,8 @@
             <MudTextField T="string" Label="规则名称" @bind-Value="rule.Name" />
             <MudTextField T="string" Label="规则描述" @bind-Value="rule.Description" Lines="3" />
             <MudDateRangePicker T="DateTime?" Label="生效日期范围" @bind-DateRange="dateRange" Clearable="true" />
+            <MudTextField T="string" Label="规则表达式" @bind-Value="rule.RuleExpression" Lines="3" />
+            <MudTextField T="string" Label="规则条件(JSON)" @bind-Value="rule.RuleCondition" Lines="3" Placeholder='{"field":"status","op":"eq","value":"active"}' />
         </MudStack>
     </DialogContent>
     <DialogActions>

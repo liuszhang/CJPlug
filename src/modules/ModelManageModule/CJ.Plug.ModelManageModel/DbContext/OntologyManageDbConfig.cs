@@ -17,6 +17,7 @@ namespace CJ.Plug.ModelManageModel.DbContext
             modelBuilder.Entity<OntologyRule>(entity => entity.ToTable("OntologyRules"));
             modelBuilder.Entity<BasicEnum>(entity => entity.ToTable("BasicEnums"));
             modelBuilder.Entity<BasicEnumItem>(entity => entity.ToTable("BasicEnumItems"));
+            modelBuilder.Entity<PropertyConstraint>(entity => entity.ToTable("PropertyConstraints"));
 
             Console.WriteLine("------>Success Add OntologyManage Module DbSet Config");
         }
@@ -48,6 +49,10 @@ namespace CJ.Plug.ModelManageModel.DbContext
             modelBuilder.Entity<Property>(entity =>
             {
                 entity.HasIndex(e => new { e.OntologyId, e.Code }).IsUnique();
+                entity.HasMany(e => e.Constraints)
+                      .WithOne(c => c.Property)
+                      .HasForeignKey(c => c.PropertyId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<ObjectInstance>(entity =>

@@ -16,6 +16,15 @@
             </MudSelect>
             <MudTextField T="string" Label="行为名称 *" @bind-Value="behavior.Name" Required="true" />
             <MudTextField T="string" Label="行为描述" @bind-Value="behavior.Description" Lines="3" />
+            <MudSelect T="ActionType?" Label="动作类型" @bind-Value="behavior.ActionType" Clearable="true">
+                <MudSelectItem T="ActionType?" Value="@(ActionType.Submit)">Submit</MudSelectItem>
+                <MudSelectItem T="ActionType?" Value="@(ActionType.Button)">Button</MudSelectItem>
+                <MudSelectItem T="ActionType?" Value="@(ActionType.Reset)">Reset</MudSelectItem>
+                <MudSelectItem T="ActionType?" Value="@(ActionType.Navigate)">Navigate</MudSelectItem>
+                <MudSelectItem T="ActionType?" Value="@(ActionType.Custom)">Custom</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="API地址" @bind-Value="behavior.ApiUrl" />
+            <MudTextField T="string" Label="确认消息" @bind-Value="behavior.ConfirmMessage" Lines="2" />
             <MudSwitch T="bool" Label="启用" @bind-Checked="behavior.IsEnabled" Color="Color.Primary" />
             @if (availableRules.Any())
             {
@@ -61,7 +70,10 @@
                 Name = match.Name,
                 Description = match.Description,
                 IsEnabled = match.IsEnabled,
-                SortOrder = match.SortOrder
+                SortOrder = match.SortOrder,
+                ActionType = match.ActionType,
+                ApiUrl = match.ApiUrl,
+                ConfirmMessage = match.ConfirmMessage
             };
         }
 

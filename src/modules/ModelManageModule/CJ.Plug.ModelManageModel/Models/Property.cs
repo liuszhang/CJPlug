@@ -50,6 +50,15 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>是否在界面上可见/可编辑</summary>
         public bool IsBrowsable { get; set; } = true;
 
+        /// <summary>字段长度限制（字符串类型）</summary>
+        public int? Length { get; set; }
+
+        /// <summary>关联数据字典编码（如关联 BasicEnum.Code）</summary>
+        public string? DictCode { get; set; }
+
+        /// <summary>属性约束列表</summary>
+        public List<PropertyConstraint> Constraints { get; set; } = new();
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
     }

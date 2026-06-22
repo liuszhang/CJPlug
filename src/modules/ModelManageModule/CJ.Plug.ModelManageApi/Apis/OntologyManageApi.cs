@@ -43,6 +43,25 @@ namespace CJ.Plug.ModelManageApi.Apis
             api.MapPut("/properties/reorder/{ontologyId}", async (int ontologyId, [FromBody] List<int> propertyIds, IOntologyManageService service, CancellationToken ct) =>
                 await service.ReorderPropertiesAsync(ontologyId, propertyIds, ct));
 
+            // 属性约束 CRUD
+            api.MapGet("/properties/{propertyId}/constraints", async (int propertyId, IOntologyManageService service, CancellationToken ct) =>
+                await service.GetConstraintsByPropertyIdAsync(propertyId, ct));
+
+            api.MapPost("/properties/{propertyId}/constraints", async (int propertyId, [FromBody] PropertyConstraint constraint, IOntologyManageService service, CancellationToken ct) =>
+            {
+                constraint.PropertyId = propertyId;
+                return await service.CreateConstraintAsync(constraint, ct);
+            });
+
+            api.MapPut("/properties/constraints/{constraintId}", async (int constraintId, [FromBody] PropertyConstraint constraint, IOntologyManageService service, CancellationToken ct) =>
+            {
+                constraint.Id = constraintId;
+                return await service.UpdateConstraintAsync(constraint, ct);
+            });
+
+            api.MapDelete("/properties/constraints/{constraintId}", async (int constraintId, IOntologyManageService service, CancellationToken ct) =>
+                await service.DeleteConstraintAsync(constraintId, ct));
+
             // 关系 CRUD
             api.MapGet("/relationships/{ontologyId}", async (int ontologyId, IOntologyManageService service, CancellationToken ct) =>
                 await service.GetRelationshipsByOntologyIdAsync(ontologyId, ct));

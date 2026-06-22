@@ -74,6 +74,33 @@ namespace CJ.Plug.ModelManageApiClient
             return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
         }
 
+        // ========== 属性约束 CRUD ==========
+        public async Task<IEnumerable<PropertyConstraint?>> GetConstraintsByPropertyIdAsync(int propertyId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<PropertyConstraint>>($"/api/ontology/properties/{propertyId}/constraints", ct) ?? new List<PropertyConstraint>();
+        }
+
+        public async Task<PropertyConstraint?> CreateConstraintAsync(int propertyId, PropertyConstraint constraint, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync($"/api/ontology/properties/{propertyId}/constraints", constraint, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<PropertyConstraint>(cancellationToken: ct);
+        }
+
+        public async Task<PropertyConstraint?> UpdateConstraintAsync(int constraintId, PropertyConstraint constraint, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/properties/constraints/{constraintId}", constraint, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<PropertyConstraint>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteConstraintAsync(int constraintId, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/properties/constraints/{constraintId}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
         // ========== 关系 CRUD ==========
         public async Task<IEnumerable<OntologyRelationship?>> GetRelationshipsByOntologyIdAsync(int ontologyId, CancellationToken ct = default)
         {

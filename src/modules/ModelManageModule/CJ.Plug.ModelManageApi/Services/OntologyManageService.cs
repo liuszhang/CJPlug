@@ -106,6 +106,8 @@ namespace CJ.Plug.ModelManageApi.Services
             existing.UIHint = property.UIHint;
             existing.SelectOptions = property.SelectOptions;
             existing.ValidationRule = property.ValidationRule;
+            existing.Length = property.Length;
+            existing.DictCode = property.DictCode;
             existing.IsBrowsable = property.IsBrowsable;
             existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
             await _dbContext.SaveChangesAsync(ct);
@@ -257,6 +259,9 @@ namespace CJ.Plug.ModelManageApi.Services
             existing.Description = behavior.Description;
             existing.IsEnabled = behavior.IsEnabled;
             existing.SortOrder = behavior.SortOrder;
+            existing.ActionType = behavior.ActionType;
+            existing.ApiUrl = behavior.ApiUrl;
+            existing.ConfirmMessage = behavior.ConfirmMessage;
             existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
             await _dbContext.SaveChangesAsync(ct);
 
@@ -398,6 +403,8 @@ namespace CJ.Plug.ModelManageApi.Services
             existing.EffectiveFrom = rule.EffectiveFrom;
             existing.EffectiveTo = rule.EffectiveTo;
             existing.SortOrder = rule.SortOrder;
+            existing.RuleExpression = rule.RuleExpression;
+            existing.RuleCondition = rule.RuleCondition;
             existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
             await _dbContext.SaveChangesAsync(ct);
             return existing;
@@ -408,6 +415,44 @@ namespace CJ.Plug.ModelManageApi.Services
             var rule = await _dbContext.Set<OntologyRule>().FirstOrDefaultAsync(r => r.Id == id, ct);
             if (rule == null) return false;
             _dbContext.Set<OntologyRule>().Remove(rule);
+            await _dbContext.SaveChangesAsync(ct);
+            return true;
+        }
+
+        // ========== 属性约束 CRUD ==========
+        public async Task<IEnumerable<PropertyConstraint>> GetConstraintsByPropertyIdAsync(int propertyId, CancellationToken ct = default)
+        {
+            return await _dbContext.Set<PropertyConstraint>()
+                .Where(c => c.PropertyId == propertyId)
+                .OrderBy(c => c.SortOrder)
+                .ToListAsync(ct);
+        }
+
+        public async Task<PropertyConstraint?> CreateConstraintAsync(PropertyConstraint constraint, CancellationToken ct = default)
+        {
+            _dbContext.Set<PropertyConstraint>().Add(constraint);
+            await _dbContext.SaveChangesAsync(ct);
+            return constraint;
+        }
+
+        public async Task<PropertyConstraint?> UpdateConstraintAsync(PropertyConstraint constraint, CancellationToken ct = default)
+        {
+            var existing = await _dbContext.Set<PropertyConstraint>().FirstOrDefaultAsync(c => c.Id == constraint.Id, ct);
+            if (existing == null) return null;
+
+            existing.ConstraintType = constraint.ConstraintType;
+            existing.Value = constraint.Value;
+            existing.Message = constraint.Message;
+            existing.SortOrder = constraint.SortOrder;
+            await _dbContext.SaveChangesAsync(ct);
+            return existing;
+        }
+
+        public async Task<bool> DeleteConstraintAsync(int id, CancellationToken ct = default)
+        {
+            var constraint = await _dbContext.Set<PropertyConstraint>().FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (constraint == null) return false;
+            _dbContext.Set<PropertyConstraint>().Remove(constraint);
             await _dbContext.SaveChangesAsync(ct);
             return true;
         }

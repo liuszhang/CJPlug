@@ -19,6 +19,12 @@ namespace CJ.Plug.ModelManageApi.Contracts
         Task<bool> DeletePropertyAsync(int id, CancellationToken ct = default);
         Task<bool> ReorderPropertiesAsync(int ontologyId, List<int> propertyIds, CancellationToken ct = default);
 
+        // 属性约束 CRUD
+        Task<IEnumerable<PropertyConstraint>> GetConstraintsByPropertyIdAsync(int propertyId, CancellationToken ct = default);
+        Task<PropertyConstraint?> CreateConstraintAsync(PropertyConstraint constraint, CancellationToken ct = default);
+        Task<PropertyConstraint?> UpdateConstraintAsync(PropertyConstraint constraint, CancellationToken ct = default);
+        Task<bool> DeleteConstraintAsync(int id, CancellationToken ct = default);
+
         // 关系 CRUD
         Task<IEnumerable<OntologyRelationship>> GetRelationshipsByOntologyIdAsync(int ontologyId, CancellationToken ct = default);
         Task<IEnumerable<OntologyRelationship>> GetAllRelationshipsAsync(CancellationToken ct = default);

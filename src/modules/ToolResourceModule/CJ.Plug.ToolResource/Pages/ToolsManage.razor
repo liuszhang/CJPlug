@@ -47,7 +47,7 @@ else
                         </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.body2" Style="font-weight:600;">
+                                <MudText Typo="Typo.body2" Style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100px;">
                                     @(tool.ToolName ?? "未命名")
                                 </MudText>
                                 <MudStack Row Spacing="1">
@@ -149,11 +149,12 @@ else
     }
     .tool-card-wrapper {
         flex: 0 0 160px;
+        height: 210px;
     }
     .tool-card {
         display: flex;
         flex-direction: column;
-        height: 210px;
+        height: 100%;
         overflow: hidden;
         transition: all 0.25s ease;
         border-radius: 12px;

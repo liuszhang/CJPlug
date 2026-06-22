@@ -10,6 +10,16 @@
     <DialogContent>
         <MudStack Spacing="3">
             <MudTextField T="string" Label="本体标识" @bind-Value="ontology.Name" Disabled="true" />
+            <MudSelect T="MetaModelDimension?" Label="元模型维度" @bind-Value="ontology.Dimension" Clearable="true">
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M0)">M0 基础语义</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M1)">M1 对象结构</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M2)">M2 行为</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M3)">M3 规则</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M4)">M4 场景</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M5)">M5 主体</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M6)">M6 可靠性</MudSelectItem>
+                <MudSelectItem T="MetaModelDimension?" Value="@(MetaModelDimension.M7)">M7 质量</MudSelectItem>
+            </MudSelect>
             <MudTextField T="string" Label="显示名称" @bind-Value="ontology.DisplayName" />
             <MudTextField T="string" Label="描述" @bind-Value="ontology.Description" Lines="2" />
             <MudTextField T="string" Label="分类" @bind-Value="ontology.Category" />
