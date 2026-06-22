@@ -7,7 +7,8 @@ using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.PlugAction;
 using CJ.Plug.PlugBaseCore.Contracts;
 using CJ.Plug.PlugBaseCore.Models;
-using Aspose.Words;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Serilog;
 using WordReadPlug;
 
@@ -39,11 +40,9 @@ public class WordReadPlugCommonExecuteService(IServiceProvider serviceProvider) 
             }
 
             var tmpLocalFilePath = $"wordread_{DateTime.Now:yyyyMMdd_HHmmss}.docx";
-            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(fileId);
-
-            var doc = new Document(sourceStream);
-
-            var readResult = doc.ToString(SaveFormat.Text);
+            using var sourceStream = await MainApiClient.GetFileStreamByFileId(fileId);
+            using var wordDoc = WordprocessingDocument.Open(sourceStream, false);
+            var readResult = wordDoc.MainDocumentPart!.Document.Body!.InnerText;
 
             var resultVariableData = PlugDataZone?.PlugVariableDatas?
                 .Where(p => p.PlugDefinitionId == PlugDefinitionId)

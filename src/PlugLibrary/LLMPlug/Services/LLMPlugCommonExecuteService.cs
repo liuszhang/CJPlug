@@ -29,7 +29,6 @@ public class LLMPlugCommonExecuteService(IServiceProvider serviceProvider) : Bas
         }
 
         var PlugDefinitionId = plugExecutionRequest?.PlugDefinitionId;
-        var plugToExecute = context.plugToExecute;
 
         try
         {
@@ -41,11 +40,11 @@ public class LLMPlugCommonExecuteService(IServiceProvider serviceProvider) : Bas
                 return await ReportErrorResult(erd);
             }
 
-            // 从 Plug 定义层读取配置
-            var systemPrompt = plugToExecute?.GetPlugSetting("SystemPrompt") ?? "";
-            var llmUrl = plugToExecute?.GetPlugSetting("LlmUrl") ?? "";
-            var llmApiKey = plugToExecute?.GetPlugSetting("LlmApiKey") ?? "";
-            var llmModel = plugToExecute?.GetPlugSetting("LlmModel") ?? "";
+            // 从 PDZ 变量读取配置（由配置页面保存）
+            var systemPrompt = PlugDataZone?.GetVariableValue(PlugDefinitionId, "LLMSystemPrompt") ?? "";
+            var llmUrl = PlugDataZone?.GetVariableValue(PlugDefinitionId, "LLMUrl") ?? "";
+            var llmApiKey = PlugDataZone?.GetVariableValue(PlugDefinitionId, "LLMApiKey") ?? "";
+            var llmModel = PlugDataZone?.GetVariableValue(PlugDefinitionId, "LLMModel") ?? "";
 
             if (string.IsNullOrEmpty(llmUrl) || string.IsNullOrEmpty(llmModel))
             {
@@ -67,20 +66,20 @@ public class LLMPlugCommonExecuteService(IServiceProvider serviceProvider) : Bas
             var (thinking, answer) = ParseResponse(responseJson);
 
             // 写入 Thinking 参数
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.Thinking.ToString(), thinking ?? "");
             var thinkingVar = PlugDataZone?.PlugVariableDatas?
                 .Find(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.Thinking.ToString());
             if (thinkingVar != null)
             {
-                thinkingVar.Value = thinking ?? "";
                 await PDZApiClient.UpdatePlugVariableData(thinkingVar);
             }
 
             // 写入 Answer 参数
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.Answer.ToString(), answer ?? "");
             var answerVar = PlugDataZone?.PlugVariableDatas?
                 .Find(p => p.PlugDefinitionId == PlugDefinitionId && p.Name == InitVariableNames.Answer.ToString());
             if (answerVar != null)
             {
-                answerVar.Value = answer ?? "";
                 await PDZApiClient.UpdatePlugVariableData(answerVar);
             }
 
@@ -102,7 +101,13 @@ public class LLMPlugCommonExecuteService(IServiceProvider serviceProvider) : Bas
     /// </summary>
     private async Task<string> CallChatApiAsync(string apiBaseUrl, string apiKey, string model, List<(string role, string content)> messages)
     {
-        var endpoint = apiBaseUrl.TrimEnd('/') + "/chat/completions";
+        // 标准化 API 地址：自动补全 /v1 前缀（OpenAI 兼容 API 标准路径）
+        var baseUrl = apiBaseUrl.TrimEnd('/');
+        if (!baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl += "/v1";
+        }
+        var endpoint = baseUrl + "/chat/completions";
 
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromMinutes(10);

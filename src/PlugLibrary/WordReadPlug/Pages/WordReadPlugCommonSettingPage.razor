@@ -7,7 +7,7 @@
 @using MudBlazor
 @using Serilog
 @using WordReadPlug.Services
-@using Aspose.Words
+@using DocumentFormat.OpenXml.Packaging
 
 @inject MainApiClient MainApiClient
 @inject ILocalStorageService _localStorageService
@@ -87,8 +87,8 @@
                 await sourceStream?.CopyToAsync(stream);
             }
 
-            var doc = new Document(TmpLocalFilePath);
-            PreviewText = doc.ToString(SaveFormat.Text);
+            using var wordDoc = WordprocessingDocument.Open(TmpLocalFilePath, false);
+            PreviewText = wordDoc.MainDocumentPart!.Document.Body!.InnerText;
         }
         catch (Exception e)
         {
@@ -121,8 +121,8 @@
                 await sourceStream?.CopyToAsync(stream);
             }
 
-            var doc = new Document(TmpLocalFilePath);
-            PreviewText = doc.ToString(SaveFormat.Text);
+            using var wordDoc = WordprocessingDocument.Open(TmpLocalFilePath, false);
+            PreviewText = wordDoc.MainDocumentPart!.Document.Body!.InnerText;
         }
         catch (Exception ex)
         {

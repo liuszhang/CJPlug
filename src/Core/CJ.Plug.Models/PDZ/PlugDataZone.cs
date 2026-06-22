@@ -572,7 +572,7 @@ public partial class PlugDataZone
         public List<string?>? GetDataFlowData()
         {
             var DataFlows = DataFlowDatas?.FirstOrDefault();
-            if (DataFlows!=null)
+            if (DataFlows != null && DataFlows.Value != null)
             {
                 var dataFlowList = JsonSerializer.Deserialize<List<string?>>(DataFlows.Value);
                 return dataFlowList;

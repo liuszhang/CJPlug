@@ -22,7 +22,7 @@ namespace LLMPlug.Services
                 {
                     builder.OpenComponent<LLMPlugCommonSettingPage>(sequence++);
                     builder.SetKey(context.PlugTypeKey);
-                    builder.AddAttribute(sequence++, nameof(LLMPlugCommonSettingPage.PlugDefinitionId), context.PlugDefinitionId);
+                    builder.AddAttribute(sequence++, nameof(LLMPlugCommonSettingPage.SettingContext), context);
                     builder.AddComponentReferenceCapture(sequence++, @ref => _designerWrapper = (LLMPlugCommonSettingPage)@ref);
                     builder.CloseComponent();
                 });
@@ -57,6 +57,44 @@ namespace LLMPlug.Services
                 Name = InitVariableNames.Answer.ToString(),
                 Type = VariableTypeEnum.String.ToString(),
                 IsBrowsable = true
+            });
+
+            // 配置性参数，不显示在参数列表中
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMSystemPrompt",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMUrl",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMApiKey",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMModel",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMMcpEnabled",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
+            });
+            initVariables.Add(new BaseVariable()
+            {
+                Name = "LLMMcpServers",
+                Type = VariableTypeEnum.String.ToString(),
+                IsBrowsable = false
             });
 
             settings.SetSetting(PlugSettingKey.InitVariables.ToString(),
