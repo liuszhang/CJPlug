@@ -1,0 +1,159 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="说明" @bind-Value="model.Description" Lines="1" />
+
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.subtitle2">可访问的数据密级</MudText>
+
+            @if (dataLevelItems != null && dataLevelItems.Any())
+            {
+                @foreach (var dl in dataLevelItems)
+                {
+                    <MudCheckBox T="bool"
+                                 Label="@($"{dl.Name} ({dl.Code})")"
+                                 Checked="@(checkedDataLevelIds.Contains(dl.Id))"
+                                 CheckedChanged="@((bool v) => OnDataLevelChecked(dl.Id, v))" />
+                }
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">暂无数据密级项</MudText>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(!IsValid)">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public BasicEnumItem EnumItem { get; set; } = new();
+    [Parameter] public int EnumId { get; set; }
+    [Parameter] public int DataLevelEnumId { get; set; }
+
+    private BasicEnumItem model = new() { IsEnabled = true, SortOrder = 0 };
+    private bool isEdit;
+
+    private List<BasicEnumItem> dataLevelItems = new();
+    private HashSet<int> checkedDataLevelIds = new();
+
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(model.Name) &&
+        !string.IsNullOrWhiteSpace(model.Code);
+
+    protected override async Task OnInitializedAsync()
+    {
+        model = new BasicEnumItem
+        {
+            Id = EnumItem.Id,
+            EnumId = EnumItem.Id != 0 ? EnumItem.EnumId : EnumId,
+            Name = EnumItem.Name,
+            DisplayName = EnumItem.Name,
+            Code = EnumItem.Code,
+            Description = EnumItem.Description,
+            SortOrder = EnumItem.SortOrder,
+            IsEnabled = EnumItem.Id != 0 ? EnumItem.IsEnabled : true
+        };
+        isEdit = model.Id != 0;
+
+        // 加载数据密级列表
+        if (DataLevelEnumId > 0)
+        {
+            var items = await ApiClient.GetEnumItemsAsync(DataLevelEnumId);
+            dataLevelItems = items?.Cast<BasicEnumItem>().OrderBy(i => i.SortOrder).ToList() ?? new();
+
+            // 加载已有权限映射（编辑时）
+            if (isEdit && model.Id != 0)
+            {
+                var accesses = await ApiClient.GetSecurityLevelAccessByPersonnelAsync(model.Id);
+                if (accesses != null)
+                {
+                    foreach (var a in accesses)
+                    {
+                        if (a != null) checkedDataLevelIds.Add(a.DataLevelItemId);
+                    }
+                }
+            }
+        }
+    }
+
+    private void OnDataLevelChecked(int dataLevelId, bool isChecked)
+    {
+        if (isChecked)
+            checkedDataLevelIds.Add(dataLevelId);
+        else
+            checkedDataLevelIds.Remove(dataLevelId);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (!IsValid)
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+
+        BasicEnumItem? result;
+        int effectiveItemId;
+
+        if (!isEdit)
+        {
+            result = await ApiClient.CreateEnumItemAsync(model);
+            if (result != null)
+            {
+                model = result;
+                effectiveItemId = result.Id;
+            }
+            else
+            {
+                effectiveItemId = 0;
+            }
+        }
+        else
+        {
+            result = await ApiClient.UpdateEnumItemAsync(model);
+            effectiveItemId = model.Id;
+        }
+
+        if (result == null || effectiveItemId <= 0)
+        {
+            Snackbar.Add(isEdit ? "更新失败" : "创建失败", Severity.Error);
+            return;
+        }
+
+        // 保存密级访问权限
+        try
+        {
+            var dataLevelIds = checkedDataLevelIds.ToList();
+            var accessSaved = await ApiClient.UpdateSecurityLevelAccessAsync(effectiveItemId, dataLevelIds);
+            if (!accessSaved)
+            {
+                Snackbar.Add("密级访问权限保存失败", Severity.Error);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PersonnelSecurityEditDialog] UpdateSecurityLevelAccessAsync 失败: {ex.Message}");
+            Snackbar.Add($"密级访问权限保存失败: {ex.Message}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(isEdit ? "更新成功" : "创建成功", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

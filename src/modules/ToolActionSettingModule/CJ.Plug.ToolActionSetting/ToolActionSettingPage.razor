@@ -469,7 +469,7 @@
                         var host = stationIp;
                         try { host = new Uri(stationIp).Host; } catch { }
                         Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({protocol})...", Severity.Info);
-                        await JSRuntime.InvokeVoidAsync("open", $"/remote/{protocol}/{host}", "_blank");
+                        await JSRuntime.InvokeVoidAsync("open", $"/remote/{host}/{protocol}", "_blank");
                     });
                     return Task.CompletedTask;
                 },

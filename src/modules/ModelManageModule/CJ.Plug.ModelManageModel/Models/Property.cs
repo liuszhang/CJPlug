@@ -59,6 +59,9 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>属性约束列表</summary>
         public List<PropertyConstraint> Constraints { get; set; } = new();
 
+        /// <summary>是否被父对象同名字段覆盖（UI展示时标记为不生效）</summary>
+        public bool? IsOverridden { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
     }

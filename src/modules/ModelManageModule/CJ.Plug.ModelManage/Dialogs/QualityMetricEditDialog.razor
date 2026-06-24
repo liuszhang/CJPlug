@@ -1,0 +1,59 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudTextField T="string" Label="单位" @bind-Value="model.Unit" />
+            <MudNumericField Label="目标值" @bind-Value="model.TargetValue" />
+            <MudNumericField Label="当前值" @bind-Value="model.CurrentValue" />
+            <MudSelect T="string" Label="测量类型" @bind-Value="model.MeasureType">
+                <MudSelectItem Value="@("Continuous")">连续(Continuous)</MudSelectItem>
+                <MudSelectItem Value="@("Discrete")">离散(Discrete)</MudSelectItem>
+                <MudSelectItem Value="@("Boolean")">布尔(Boolean)</MudSelectItem>
+                <MudSelectItem Value="@("Percentage")">百分比(Percentage)</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public QualityMetric QualityMetric { get; set; } = new();
+
+    private QualityMetric model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = QualityMetric;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        QualityMetric? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateQualityMetricAsync(model);
+        else
+            result = await ApiClient.UpdateQualityMetricAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

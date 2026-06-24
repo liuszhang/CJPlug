@@ -402,7 +402,7 @@
                     try { host = new Uri(stationIp).Host; } catch { }
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
                     Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({resolvedProtocol})...", Severity.Info);
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{resolvedProtocol}/{host}", "_blank");
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{host}/{resolvedProtocol}", "_blank");
                 });
             });
     }

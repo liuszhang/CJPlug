@@ -1,0 +1,71 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" RequiredError="名称不能为空" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" RequiredError="代码不能为空" />
+            <MudSelect T="string" Label="类型 *" @bind-Value="model.SubjectType" Required="true">
+                <MudSelectItem Value="@("Person")">人员(Person)</MudSelectItem>
+                <MudSelectItem Value="@("Department")">部门(Department)</MudSelectItem>
+                <MudSelectItem Value="@("Role")">角色(Role)</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="int?" Label="父级主体" @bind-Value="model.ParentId" Clearable="true">
+                @foreach (var s in subjects.Where(x => x.Id != model.Id))
+                {
+                    <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudTextField T="string" Label="Properties (JSON)" @bind-Value="model.Properties" Lines="3" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Subject Subject { get; set; } = new();
+
+    private Subject model = new();
+    private List<Subject> subjects = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        model = Subject;
+        if (string.IsNullOrWhiteSpace(model.SubjectType))
+            model.SubjectType = "Person";
+        try
+        {
+            var result = await ApiClient.GetAllSubjectsAsync();
+            subjects = result?.Where(s => s != null).Cast<Subject>().ToList() ?? new();
+        }
+        catch { subjects = new(); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        Subject? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateSubjectAsync(model);
+        else
+            result = await ApiClient.UpdateSubjectAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

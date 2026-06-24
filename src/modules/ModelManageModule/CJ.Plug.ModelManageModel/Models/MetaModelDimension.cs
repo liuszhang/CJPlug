@@ -20,8 +20,14 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>M4 — 场景（用例、上下文、编排）</summary>
         M4 = 4,
 
+        /// <summary>M1.5 — 属性扩展（自定义属性、元字段定义）</summary>
+        M1_5 = 15,
+
         /// <summary>M5 — 主体（角色、权限、归属）</summary>
         M5 = 5,
+
+        /// <summary>M5.5 — 接口契约（外部系统、API 规范）</summary>
+        M5_5 = 55,
 
         /// <summary>M6 — 可靠性（审计、版本、追溯）</summary>
         M6 = 6,

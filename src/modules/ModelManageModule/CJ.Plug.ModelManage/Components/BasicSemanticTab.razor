@@ -1,0 +1,196 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="0" Class="pa-0" Style="min-height: 500px;">
+    <MudTabs Elevation="0" Rounded="true">
+        @* ===== 子标签 1: 基础枚举 ===== *@
+        <MudTabPanel Text="基础枚举">
+            <div class="d-flex" style="min-height: 400px;">
+                <div class="col-sm-4 pa-0" style="border-right: 1px solid var(--mud-palette-divider);">
+                    <MudPaper Elevation="0" Class="pa-3">
+                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                            <MudText Typo="Typo.h6">基础枚举</MudText>
+                            <MudSpacer />
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                           Color="Color.Primary" OnClick="OpenAddEnumDialog" Title="新增枚举" />
+                        </MudStack>
+                        <MudList T="BasicEnum" Clickable="true">
+                            @foreach (var e in allBasicEnums)
+                            {
+                                var currentEnum = e;
+                                <MudListItem Text="@(string.IsNullOrWhiteSpace(currentEnum.DisplayName) ? currentEnum.Name : currentEnum.DisplayName)" SecondaryText="@currentEnum.Code"
+                                             OnClick="@(() => SelectBasicEnum(currentEnum.Id))"
+                                             Selected="@(selectedBasicEnumId == currentEnum.Id)">
+                                    <ChildContent>
+                                        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Spacing="0" Style="margin-left: auto;">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                           OnClick="@(async () => await OpenEditEnumDialog(currentEnum))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                           OnClick="@(async () => await DeleteEnumAsync(currentEnum))" />
+                                        </MudStack>
+                                    </ChildContent>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudPaper>
+                </div>
+                <div class="col-sm-8 pa-0">
+                    @if (selectedBasicEnum != null)
+                    {
+                        <MudPaper Elevation="0" Class="pa-3">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                                <MudText Typo="Typo.h6">@selectedBasicEnum.DisplayName — 枚举项</MudText>
+                                <MudSpacer />
+                                <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddEnumItemDialog">添加项</MudButton>
+                            </MudStack>
+                            <MudDataGrid Items="@selectedBasicEnum.Items" T="BasicEnumItem" Dense="true" Hover="true" Elevation="0">
+                                <Columns>
+                                    <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                                    <PropertyColumn Property="x => x.Code" Title="代码" />
+                                    <PropertyColumn Property="x => x.DisplayName" Title="显示名" />
+                                    <PropertyColumn Property="x => x.Name" Title="名称" />
+                                    <TemplateColumn Style="text-align:right">
+                                        <CellTemplate>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                           OnClick="@(() => OpenEditEnumItemDialog(context.Item))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                           OnClick="@(() => DeleteEnumItem(context.Item))" />
+                                        </CellTemplate>
+                                    </TemplateColumn>
+                                </Columns>
+                                <NoRecordsContent><MudText>暂无常量项</MudText></NoRecordsContent>
+                            </MudDataGrid>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudPaper Elevation="0" Class="d-flex align-center justify-center" Style="min-height: 300px;">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">请选择一个基础枚举</MudText>
+                        </MudPaper>
+                    }
+                </div>
+            </div>
+        </MudTabPanel>
+
+        @* ===== 子标签 2: 基础属性 ===== *@
+        <MudTabPanel Text="基础属性">
+            <BasicAttributeTab />
+        </MudTabPanel>
+
+        @* ===== 子标签 3: 量纲 ===== *@
+        <MudTabPanel Text="量纲">
+            <DimensionUnitTab />
+        </MudTabPanel>
+
+        @* ===== 子标签 4: 数据密级 ===== *@
+        <MudTabPanel Text="数据密级">
+            <DataSecurityTab />
+        </MudTabPanel>
+
+        @* ===== 子标签 5: 人员密级 ===== *@
+        <MudTabPanel Text="人员密级">
+            <PersonnelSecurityTab />
+        </MudTabPanel>
+    </MudTabs>
+</MudPaper>
+
+@code {
+    private List<BasicEnum> allBasicEnums = new();
+    private int? selectedBasicEnumId;
+
+    private BasicEnum? selectedBasicEnum =>
+        selectedBasicEnumId == null ? null :
+        allBasicEnums.FirstOrDefault(e => e.Id == selectedBasicEnumId.Value);
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var basicEnums = await ApiClient.GetAllBasicEnumsAsync();
+            allBasicEnums = basicEnums.Where(e => e != null).Cast<BasicEnum>().ToList();
+        }
+        catch (Exception ex) { Console.WriteLine($"[BasicSemanticTab] GetAllBasicEnumsAsync 失败: {ex.Message}"); }
+
+        if (selectedBasicEnumId == null && allBasicEnums.Any())
+            selectedBasicEnumId = allBasicEnums.First().Id;
+
+        StateHasChanged();
+    }
+
+    private void SelectBasicEnum(int enumId) { selectedBasicEnumId = enumId; StateHasChanged(); }
+
+    // ===== 枚举 CRUD =====
+    private async Task OpenAddEnumDialog()
+    {
+        var parameters = new DialogParameters { ["BasicEnum"] = new BasicEnum() };
+        var dialog = await DialogService.ShowAsync<BasicEnumEditDialog>("新增枚举", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditEnumDialog(BasicEnum basicEnum)
+    {
+        var parameters = new DialogParameters { ["BasicEnum"] = basicEnum };
+        var dialog = await DialogService.ShowAsync<BasicEnumEditDialog>($"编辑枚举 — {basicEnum.DisplayName}", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteEnumAsync(BasicEnum basicEnum)
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除枚举「{basicEnum.DisplayName}」及其所有枚举项吗？此操作不可逆。",
+            yesText: "删除", cancelText: "取消");
+        if (result == true)
+        {
+            await ApiClient.DeleteBasicEnumAsync(basicEnum.Id);
+            if (selectedBasicEnumId == basicEnum.Id) selectedBasicEnumId = null;
+            await LoadData();
+        }
+    }
+
+    // ===== 枚举项 CRUD =====
+    private async Task OpenAddEnumItemDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["EnumItem"] = new BasicEnumItem(),
+            ["EnumId"] = selectedBasicEnumId ?? 0
+        };
+        var dialog = await DialogService.ShowAsync<BasicEnumItemEditDialog>("新建枚举项", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditEnumItemDialog(BasicEnumItem item)
+    {
+        var parameters = new DialogParameters
+        {
+            ["EnumItem"] = item,
+            ["EnumId"] = selectedBasicEnumId ?? 0
+        };
+        var dialog = await DialogService.ShowAsync<BasicEnumItemEditDialog>($"编辑枚举项 — {item.DisplayName}", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteEnumItem(BasicEnumItem item)
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync("确认删除", $"确定删除枚举项「{item.DisplayName}」吗？",
+            yesText: "删除", cancelText: "取消");
+        if (result == true)
+        {
+            await ApiClient.DeleteEnumItemAsync(item.Id);
+            await LoadData();
+        }
+    }
+}

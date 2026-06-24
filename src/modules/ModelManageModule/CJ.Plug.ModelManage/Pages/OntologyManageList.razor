@@ -1,4 +1,5 @@
 @page "/OntologyManage"
+@using CJ.Plug.ModelManage.Components
 @using CJ.Plug.ModelManageApiClient
 @using CJ.Plug.ModelManageModel.Models
 @using MudBlazor
@@ -11,857 +12,243 @@
 
 <MudContainer MaxWidth="MaxWidth.False">
     <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
-        @if (selectedTabIndex == 0)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAddDialog">添加对象</MudButton>
-        }
-        else if (selectedTabIndex == 1)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAddRelationshipDialog">添加关系</MudButton>
-        }
-        else if (selectedTabIndex == 2)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAddBehaviorDialog">添加行为</MudButton>
-        }
-        else if (selectedTabIndex == 3)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAddRuleDialog">添加规则</MudButton>
-        }
-        else if (selectedTabIndex == 4)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAddBasicEnumDialog">添加基础枚举</MudButton>
-        }
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">添加对象</MudButton>
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="ReloadData">刷新</MudButton>
-        <MudSpacer />
-        <MudTextField T="string" @bind-Value="searchString" Placeholder="搜索..." Variant="Variant.Outlined"
-                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Outlined.Search"
-                      Clearable="true" DebounceInterval="500" Style="width:300px" />
     </MudStack>
 
     <MudTabs Elevation="0" Rounded="true" Class="elevation-1"
              ActivePanelIndex="selectedTabIndex"
              ActivePanelIndexChanged="OnTabChanged">
-        @* 1. 对象 *@
-        <MudTabPanel Text="@($"对象 ({filteredOntologies.Count})")">
-            <MudDataGrid T="Ontology"
-                         Items="@filteredOntologies"
-                         Dense="true" Hover="true" Elevation="0"
-                         SortMode="SortMode.Single"
-                         RowClick="OnOntologyRowClick"
-                         RowStyle="cursor: pointer;">
-                <Columns>
-                    <TemplateColumn Style="width:48px">
-                        <CellTemplate>
-                            <MudIconButton Icon="@(IsRowExpanded(context.Item.Id) ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)"
-                                Size="Size.Small"
-                                OnClick="@(() => ToggleRowExpand(context.Item.Id))"
-                                Class="ml-n3" />
-                        </CellTemplate>
-                    </TemplateColumn>
-                    <PropertyColumn Property="x => x.Name" Title="标识" Sortable="true" />
-                    <PropertyColumn Property="x => x.DisplayName" Title="显示名称" Sortable="true" />
-                    <PropertyColumn Property="x => x.Category" Title="分类" Sortable="true" />
-                    <TemplateColumn Title="属性">
-                        <CellTemplate>
-                            <MudChip Color="Color.Primary" Label="true">@context.Item.Properties.Count 个属性</MudChip>
-                        </CellTemplate>
-                    </TemplateColumn>
-                    <TemplateColumn Title="系统">
-                        <CellTemplate>
-                            <MudCheckBox T="bool" @bind-Checked="context.Item.IsSystem" Disabled="true" />
-                        </CellTemplate>
-                    </TemplateColumn>
-                    <TemplateColumn Style="text-align:right">
-                        <CellTemplate>
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
-                                           OnClick="@(() => EditOntology(context.Item))" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
-                                           Color="Color.Error"
-                                           Disabled="@context.Item.IsSystem"
-                                           OnClick="@(() => DeleteOntology(context.Item))" />
-                        </CellTemplate>
-                    </TemplateColumn>
-                </Columns>
-                <NoRecordsContent>
-                    <MudText>暂无本体定义</MudText>
-                </NoRecordsContent>
-                <ChildRowContent>
-                    @if (IsRowExpanded(context.Item.Id))
-                    {
-                        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">属性列表</MudText>
-                            <MudTable Items="@context.Item.Properties" Dense="true" Hover="true" Elevation="0">
-                                <HeaderContent>
-                                    <MudTh>标识</MudTh>
-                                    <MudTh>显示名</MudTh>
-                                    <MudTh>类型</MudTh>
-                                    <MudTh>必填</MudTh>
-                                    <MudTh>默认值</MudTh>
-                                </HeaderContent>
-                                <RowTemplate Context="prop">
-                                    <MudTd>@prop.Name</MudTd>
-                                    <MudTd>@prop.DisplayName</MudTd>
-                                    <MudTd><MudChip Label="true" Size="Size.Small">@prop.PropertyType</MudChip></MudTd>
-                                    <MudTd>@(prop.IsRequired ? "✓" : "")</MudTd>
-                                    <MudTd>@prop.Value</MudTd>
-                                </RowTemplate>
-                            </MudTable>
-                        </MudContainer>
-                    }
-                </ChildRowContent>
-            </MudDataGrid>
+
+        @* ========== Tab 0: M0 基础语义 ========== *@
+        <MudTabPanel Text="M0 基础语义">
+            @if (!loadedTabs[0]) { loadedTabs[0] = true; }
+            <BasicSemanticTab />
         </MudTabPanel>
 
-        @* 2. 关系 *@
-        <MudTabPanel Text="@($"关系 ({allRelationships.Count})")">
-            <div style="display:flex; gap:16px; min-height:300px;">
-                @* 左栏：关系类型列表（来自Relation枚举项） *@
-                <div style="width:260px; flex-shrink:0; border-right:1px solid var(--mud-palette-divider); padding-right:8px;">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">关系类型</MudText>
-                    @{
-                        var relEnumItems = GetRelationEnumItems();
-                        var showAll = string.IsNullOrEmpty(selectedRelationshipType);
-                    }
-                    @if (relEnumItems.Any())
-                    {
-                        <MudStack Spacing="0">
-                            <MudButton Variant="@(showAll ? Variant.Filled : Variant.Text)"
-                                       Color="@(showAll ? Color.Primary : Color.Inherit)"
-                                       OnClick="ClearRelationshipType"
-                                       FullWidth="true"
-                                       Style="justify-content:flex-start; text-transform:none;"
-                                       Class="mb-1">
-                                <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Style="width:100%">
-                                    <MudText Style="@(showAll ? "color:inherit;" : "")">全部</MudText>
-                                    <MudSpacer />
-                                    <MudChip T="string" Label="true" Size="Size.Small" Color="@(showAll ? Color.Dark : Color.Default)">@allRelationships.Count</MudChip>
-                                </MudStack>
-                            </MudButton>
-                            @foreach (var item in relEnumItems)
-                            {
-                                var typeCount = allRelationships.Count(r => r.RelationshipType == item.Code);
-                                var isActive = selectedRelationshipType == item.Code;
-                                <MudButton Variant="@(isActive ? Variant.Filled : Variant.Text)"
-                                           Color="@(isActive ? Color.Primary : Color.Inherit)"
-                                           OnClick="@(() => SelectRelationshipType(item.Code))"
-                                           FullWidth="true"
-                                           Style="justify-content:flex-start; text-transform:none;"
-                                           Class="mb-1">
-                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Style="width:100%">
-                                        <MudText Style="@(isActive ? "color:inherit;" : "")">@item.DisplayName</MudText>
-                                        <MudSpacer />
-                                        <MudChip T="string" Label="true" Size="Size.Small" Color="@(isActive ? Color.Dark : Color.Default)">@typeCount</MudChip>
-                                    </MudStack>
-                                </MudButton>
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Default">暂无比对关系类型</MudText>
-                    }
+        @* ========== Tab 1: M1 对象结构 ========== *@
+        <MudTabPanel Text="@($"M1 对象结构 ({CountTreeNodes(dim1Tree)})")">
+            @if (!loadedTabs[1]) { loadedTabs[1] = true; BuildDim1Tree(); }
+            <div class="d-flex" style="min-height: 500px;">
+                <div class="col-sm-4 pa-0" style="border-right: 1px solid var(--mud-palette-divider);">
+                    <OntologyTreePanel
+                        TreeData="dim1Tree"
+                        SelectedNode="@dim1SelectedNode"
+                        SelectedNodeChanged="@(v => { dim1SelectedNode = v; StateHasChanged(); })"
+                        OnAddRoot="HandleAddRootM1"
+                        OnAddChild="HandleAddChildM1"
+                        OnEditSelected="HandleEditSelectedM1"
+                        OnDeleteSelected="HandleDeleteSelectedM1" />
                 </div>
-
-                @* 右栏：筛选区 + 关系列表 *@
-                <div style="flex:1;">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">
-                        关系列表 @(string.IsNullOrEmpty(selectedRelationshipType) ? "" : $"— {GetRelationTypeDisplayName(selectedRelationshipType)}")
-                    </MudText>
-
-                    @* 条件筛选区域 *@
-                    <MudCard Elevation="0" Class="pa-3 mb-3" Style="background:var(--mud-palette-action-default-hover);">
-                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
-                            <MudSelect T="int?" Label="源本体" @bind-Value="filterSourceOntologyId"
-                                       Clearable="true" Variant="Variant.Outlined" Style="width:200px;" Dense="true">
-                                @foreach (var o in allOntologies)
-                                {
-                                    <MudSelectItem T="int?" Value="o.Id">@o.DisplayName</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudSelect T="int?" Label="目标本体" @bind-Value="filterTargetOntologyId"
-                                       Clearable="true" Variant="Variant.Outlined" Style="width:200px;" Dense="true">
-                                @foreach (var o in allOntologies)
-                                {
-                                    <MudSelectItem T="int?" Value="o.Id">@o.DisplayName</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudSelect T="string" Label="基数" @bind-Value="filterCardinality"
-                                       Clearable="true" Variant="Variant.Outlined" Style="width:180px;" Dense="true">
-                                <MudSelectItem T="string" Value="@("OneToOne")">一对一</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("OneToMany")">一对多</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("ManyToMany")">多对多</MudSelectItem>
-                            </MudSelect>
-                            <MudSpacer />
-                            <MudButton Variant="Variant.Text" Size="Size.Small"
-                                       OnClick="ClearRelationshipFilters">清除筛选</MudButton>
-                        </MudStack>
-                    </MudCard>
-
-                    @if (selectedRelationshipTypeRelationships.Any())
-                    {
-                        <MudTable Items="@selectedRelationshipTypeRelationships" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent>
-                                <MudTh>ID</MudTh>
-                                <MudTh>关系类型</MudTh>
-                                <MudTh>源本体</MudTh>
-                                <MudTh>目标本体</MudTh>
-                                <MudTh>基数</MudTh>
-                                <MudTh>反向名</MudTh>
-                                <MudTh>必填</MudTh>
-                            </HeaderContent>
-                            <RowTemplate Context="rel">
-                                <MudTd>@rel.Id</MudTd>
-                                <MudTd><MudChip T="string" Label="true" Size="Size.Small">@GetRelationTypeDisplayName(rel.RelationshipType)</MudChip></MudTd>
-                                <MudTd><MudChip T="string" Label="true" Size="Size.Small" Color="Color.Primary">@GetOntologyName(rel.SourceOntologyId)</MudChip></MudTd>
-                                <MudTd><MudChip T="string" Label="true" Size="Size.Small" Color="Color.Secondary">@GetOntologyName(rel.TargetOntologyId)</MudChip></MudTd>
-                                <MudTd><MudChip T="string" Label="true" Size="Size.Small">@rel.Cardinality</MudChip></MudTd>
-                                <MudTd>@rel.InverseName</MudTd>
-                                <MudTd>@(rel.IsRequired ? "✓" : "")</MudTd>
-                            </RowTemplate>
-                            <NoRecordsContent>
-                                <MudText>该关系类型下暂无数据</MudText>
-                            </NoRecordsContent>
-                        </MudTable>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Default">暂无匹配的关系数据</MudText>
-                    }
+                <div class="col-sm-8 pa-0">
+                    <OntologyDetailPanel
+                        ActiveOntology="dim1SelectedNode"
+                        DataChanged="ReloadData" />
                 </div>
             </div>
         </MudTabPanel>
 
-        @* 3. 行为 *@
-        <MudTabPanel Text="@($"行为 ({allBehaviors.Count})")">
-            <div style="display:flex; gap:16px; min-height:300px;">
-                @* 左栏：对象→行为树形结构（无行为的对象不显示） *@
-                <div style="width:280px; flex-shrink:0; border-right:1px solid var(--mud-palette-divider); padding-right:8px; overflow-y:auto;">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">对象模型</MudText>
-                    @if (behaviorOntologyGroups.Any())
-                    {
-                        <MudStack Spacing="0">
-                            @foreach (var group in behaviorOntologyGroups)
-                            {
-                                var isExpanded = expandedBehaviorOntologyIds.Contains(group.Ontology.Id);
-                                <MudStack Spacing="0">
-                                    <MudButton Variant="Variant.Text"
-                                               Color="Color.Inherit"
-                                               OnClick="@(() => ToggleBehaviorOntologyExpand(group.Ontology.Id))"
-                                               FullWidth="true"
-                                               Style="justify-content:flex-start; text-transform:none; padding-left:4px;"
-                                               Class="mb-0">
-                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Style="width:100%">
-                                            <MudIcon Icon="@(isExpanded ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
-                                            <MudText>@group.Ontology.DisplayName</MudText>
-                                            <MudSpacer />
-                                            <MudChip T="string" Label="true" Size="Size.Small" Color="Color.Default">@group.Behaviors.Count</MudChip>
-                                        </MudStack>
-                                    </MudButton>
-                                    @if (isExpanded)
-                                    {
-                                        foreach (var bhv in group.Behaviors)
-                                        {
-                                            var isSelected = selectedBehaviorId == bhv.Id;
-                                            <MudButton Variant="@(isSelected ? Variant.Filled : Variant.Text)"
-                                                       Color="@(isSelected ? Color.Primary : Color.Inherit)"
-                                                       OnClick="@(() => SelectBehavior(bhv.Id))"
-                                                       FullWidth="true"
-                                                       Style="justify-content:flex-start; text-transform:none; padding-left:36px; font-size:0.875rem;">
-                                                @(bhv.Name ?? bhv.Description ?? $"行为 #{bhv.Id}")
-                                            </MudButton>
-                                        }
-                                    }
-                                </MudStack>
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Default">暂无行为定义</MudText>
-                    }
-                </div>
-
-                @* 右栏：选中行为的详情 *@
-                <div style="flex:1;">
-                    @if (selectedBehavior != null)
-                    {
-                        <MudStack Spacing="3">
-                            <MudText Typo="Typo.subtitle2">行为详情</MudText>
-                            <MudGrid Spacing="2">
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">所属对象</MudText>
-                                    <MudText>@GetOntologyName(selectedBehavior.OntologyId)</MudText>
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">行为名称</MudText>
-                                    <MudText>@(selectedBehavior.Name ?? "-")</MudText>
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">行为描述</MudText>
-                                    <MudText>@(selectedBehavior.Description ?? "-")</MudText>
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">启用状态</MudText>
-                                    <MudCheckBox T="bool" Checked="selectedBehavior.IsEnabled" Disabled="true" />
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">关联规则</MudText>
-                                    @if (selectedBehaviorRules.Any())
-                                    {
-                                        <MudTable Items="@selectedBehaviorRules" Dense="true" Hover="true" Elevation="0" Class="mt-1">
-                                            <HeaderContent>
-                                                <MudTh>ID</MudTh>
-                                                <MudTh>描述</MudTh>
-                                                <MudTh>启用</MudTh>
-                                            </HeaderContent>
-                                            <RowTemplate Context="rule">
-                                                <MudTd>@rule.Id</MudTd>
-                                                <MudTd>@(rule.Description ?? "-")</MudTd>
-                                                <MudTd><MudCheckBox T="bool" Checked="rule.IsEnabled" Disabled="true" /></MudTd>
-                                            </RowTemplate>
-                                        </MudTable>
-                                    }
-                                    else
-                                    {
-                                        <MudText Typo="Typo.body2" Color="Color.Default">无关联规则</MudText>
-                                    }
-                                </MudItem>
-                            </MudGrid>
-                            <MudStack Row Spacing="2">
-                                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="@(() => EditBehavior(selectedBehavior))">编辑</MudButton>
-                                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => DeleteBehavior(selectedBehavior))">删除</MudButton>
-                            </MudStack>
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:100%;">
-                            <MudIcon Icon="@Icons.Material.Outlined.TouchApp" Size="Size.Large" Color="Color.Default" />
-                            <MudText Typo="Typo.body1" Color="Color.Default" Class="mt-2">选择左侧行为查看详情</MudText>
-                        </MudStack>
-                    }
-                </div>
-            </div>
+        @* ========== Tab 2: M1.5 关系模型 ========== *@
+        <MudTabPanel Text="关系模型">
+            @if (!loadedTabs[2]) { loadedTabs[2] = true; }
+            <RelationTab />
         </MudTabPanel>
 
-        @* 4. 规则 *@
-        <MudTabPanel Text="@($"规则 ({filteredRules.Count})")">
-            <MudTable Items="@filteredRules" Dense="true" Hover="true" Elevation="0">
-                <HeaderContent>
-                    <MudTh>ID</MudTh>
-                    <MudTh>名称</MudTh>
-                    <MudTh>描述</MudTh>
-                    <MudTh>生效开始</MudTh>
-                    <MudTh>生效结束</MudTh>
-                    <MudTh>启用</MudTh>
-                    <MudTh Style="text-align:right">操作</MudTh>
-                </HeaderContent>
-                <RowTemplate Context="rule">
-                    <MudTd>@rule.Id</MudTd>
-                    <MudTd>
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                   Style="text-transform:none; padding:0; min-width:auto;"
-                                   OnClick="@(() => OpenRuleDrawer(rule))">
-                            @(rule.Name ?? "-")
-                        </MudButton>
-                    </MudTd>
-                    <MudTd>@rule.Description</MudTd>
-                    <MudTd>@(rule.EffectiveFrom?.ToString("yyyy-MM-dd") ?? "-")</MudTd>
-                    <MudTd>@(rule.EffectiveTo?.ToString("yyyy-MM-dd") ?? "-")</MudTd>
-                    <MudTd><MudCheckBox T="bool" @bind-Checked="rule.IsEnabled" Disabled="true" /></MudTd>
-                    <MudTd Style="text-align:right">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
-                                       OnClick="@(() => EditRule(rule))" />
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
-                                       Color="Color.Error"
-                                       OnClick="@(() => DeleteRule(rule))" />
-                    </MudTd>
-                </RowTemplate>
-                <NoRecordsContent>
-                    <MudText>暂无规则定义</MudText>
-                </NoRecordsContent>
-            </MudTable>
-            <RuleDetailDrawer @bind-Open="ruleDrawerOpen" Rule="selectedRuleDetail"
-                              OnClose="CloseRuleDrawer" />
+        @* ========== Tab 3: M2 行为 ========== *@
+        <MudTabPanel Text="M2 行为">
+            @if (!loadedTabs[3]) { loadedTabs[3] = true; }
+            <BehaviorTab />
         </MudTabPanel>
 
-        @* 5. 基础 *@
-        <MudTabPanel Text="@($"基础 ({allBasicEnums.Count})")">
-            <div style="display:flex; gap:16px; min-height:300px;">
-                @* 左栏：基础枚举列表 *@
-                <div style="width:260px; flex-shrink:0; border-right:1px solid var(--mud-palette-divider); padding-right:8px;">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">基础枚举</MudText>
-                    @if (allBasicEnums.Any())
-                    {
-                        <MudStack Spacing="0">
-                            @foreach (var e in allBasicEnums)
-                            {
-                                var isActive = selectedBasicEnumId == e.Id;
-                                <MudButton Variant="@(isActive ? Variant.Filled : Variant.Text)"
-                                           Color="@(isActive ? Color.Primary : Color.Inherit)"
-                                           OnClick="@(() => SelectBasicEnum(e.Id))"
-                                           FullWidth="true"
-                                           Style="justify-content:flex-start; text-transform:none;"
-                                           Class="mb-1">
-                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Style="width:100%">
-                                        <MudText Style="@(isActive ? "color:inherit;" : "")">@e.DisplayName</MudText>
-                                        <MudSpacer />
-                                        <MudChip T="string" Label="true" Size="Size.Small" Color="@(isActive ? Color.Dark : Color.Default)">@e.Items.Count</MudChip>
-                                    </MudStack>
-                                </MudButton>
-                            }
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Default">暂无基础枚举</MudText>
-                    }
-                </div>
-
-                @* 右栏：选中基础枚举的枚举项列表 *@
-                <div style="flex:1;">
-                    @if (selectedBasicEnum != null)
-                    {
-                        <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
-                            <MudText Typo="Typo.subtitle2">
-                                枚举项列表 — @selectedBasicEnum.DisplayName
-                            </MudText>
-                            <MudSpacer />
-                            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.Add"
-                                       OnClick="OpenAddEnumItemDialog">添加项</MudButton>
-                        </MudStack>
-                        @if (selectedBasicEnum.Items.Any())
-                        {
-                            <MudTable Items="@selectedBasicEnum.Items.OrderBy(i => i.SortOrder)" Dense="true" Hover="true" Elevation="0">
-                                <HeaderContent>
-                                    <MudTh>ID</MudTh>
-                                    <MudTh>名称</MudTh>
-                                    <MudTh>编码</MudTh>
-                                    <MudTh>排序</MudTh>
-                                    <MudTh>启用</MudTh>
-                                    <MudTh></MudTh>
-                                </HeaderContent>
-                                <RowTemplate Context="item">
-                                    <MudTd>@item.Id</MudTd>
-                                    <MudTd>@item.DisplayName</MudTd>
-                                    <MudTd>@item.Code</MudTd>
-                                    <MudTd>@item.SortOrder</MudTd>
-                                    <MudTd><MudCheckBox T="bool" @bind-Checked="item.IsEnabled" Disabled="true" /></MudTd>
-                                    <MudTd>
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                                       OnClick="@(() => DeleteEnumItem(item))" />
-                                    </MudTd>
-                                </RowTemplate>
-                                <NoRecordsContent>
-                                    <MudText>该枚举下暂无枚举项</MudText>
-                                </NoRecordsContent>
-                            </MudTable>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Default">该枚举下暂无枚举项</MudText>
-                        }
-                    }
-                    else
-                    {
-                        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:100%;">
-                            <MudIcon Icon="@Icons.Material.Outlined.TouchApp" Size="Size.Large" Color="Color.Default" />
-                            <MudText Typo="Typo.body1" Color="Color.Default" Class="mt-2">选择左侧基础枚举查看其枚举项</MudText>
-                        </MudStack>
-                    }
-                </div>
-            </div>
+        @* ========== Tab 4: M3 规则 ========== *@
+        <MudTabPanel Text="M3 规则">
+            @if (!loadedTabs[4]) { loadedTabs[4] = true; }
+            <RuleTab />
         </MudTabPanel>
+
+        @* ========== Tab 5: M4 场景 ========== *@
+        <MudTabPanel Text="M4 场景">
+            @if (!loadedTabs[5]) { loadedTabs[5] = true; }
+            <ScenarioTab />
+        </MudTabPanel>
+
+        @* ========== Tab 6: M5 主体 ========== *@
+        <MudTabPanel Text="M5 主体">
+            @if (!loadedTabs[6]) { loadedTabs[6] = true; }
+            <SubjectTab />
+        </MudTabPanel>
+
+        @* ========== Tab 7: M5.5 接口契约 ========== *@
+        <MudTabPanel Text="接口契约">
+            @if (!loadedTabs[7]) { loadedTabs[7] = true; }
+            <InterfaceContractTab />
+        </MudTabPanel>
+
+        @* ========== Tab 8: M6 可靠性 ========== *@
+        <MudTabPanel Text="M6 可靠性">
+            @if (!loadedTabs[8]) { loadedTabs[8] = true; }
+            <ReliabilityTab />
+        </MudTabPanel>
+
+        @* ========== Tab 9: M7 质量 ========== *@
+        <MudTabPanel Text="M7 质量">
+            @if (!loadedTabs[9]) { loadedTabs[9] = true; }
+            <QualityTab />
+        </MudTabPanel>
+
     </MudTabs>
 </MudContainer>
 
 @code {
     private List<Ontology> allOntologies = new();
-    private List<OntologyRelationship> allRelationships = new();
-    private List<ObjectBehavior> allBehaviors = new();
-    private List<OntologyRule> allRules = new();
-    private List<BasicEnum> allBasicEnums = new();
-    private OntologyRule? selectedRuleDetail;
-    private bool ruleDrawerOpen;
+    private List<Ontology> treeData = new();
     private Dictionary<int, string> ontologyNameMap = new();
-    private HashSet<int> expandedRowIds = new();
-    private string searchString = string.Empty;
     private int selectedTabIndex = 0;
-    private int? selectedBehaviorOntologyId;
-    private int? selectedBehaviorId;
-    private List<OntologyRule> selectedBehaviorRules = new();
-    private HashSet<int> expandedBehaviorOntologyIds = new();
-    private string? selectedRelationshipType;
-    private int? filterSourceOntologyId;
-    private int? filterTargetOntologyId;
-    private string? filterCardinality;
-    private int? selectedBasicEnumId;
 
-    private record BehaviorOntologyGroup(Ontology Ontology, List<ObjectBehavior> Behaviors);
+    // 懒加载标记（10 个 Tab）
+    private bool[] loadedTabs = new bool[10];
 
-    private List<BehaviorOntologyGroup> behaviorOntologyGroups =>
-        allBehaviors
-            .GroupBy(b => b.OntologyId)
-            .Select(g =>
-            {
-                var ontology = allOntologies.FirstOrDefault(o => o.Id == g.Key);
-                return ontology == null ? null : new BehaviorOntologyGroup(ontology, g.OrderBy(b => b.SortOrder).ToList());
-            })
-            .Where(g => g != null)
-            .Cast<BehaviorOntologyGroup>()
-            .OrderBy(g => g.Ontology.SortOrder)
-            .ToList();
+    // M1 对象结构页签专用：过滤后的树 + 选中节点
+    private List<Ontology> dim1Tree = new();
+    private Ontology? dim1SelectedNode;
 
-    private ObjectBehavior? selectedBehavior =>
-        selectedBehaviorId == null ? null :
-        allBehaviors.FirstOrDefault(b => b.Id == selectedBehaviorId.Value);
-
-    private BasicEnum? selectedBasicEnum =>
-        selectedBasicEnumId == null ? null :
-        allBasicEnums.FirstOrDefault(e => e.Id == selectedBasicEnumId.Value);
-
-    private List<OntologyRelationship> selectedRelationshipTypeRelationships
-    {
-        get
-        {
-            var source = string.IsNullOrEmpty(selectedRelationshipType)
-                ? allRelationships
-                : allRelationships.Where(r => r.RelationshipType == selectedRelationshipType).ToList();
-
-            if (filterSourceOntologyId.HasValue)
-                source = source.Where(r => r.SourceOntologyId == filterSourceOntologyId.Value).ToList();
-            if (filterTargetOntologyId.HasValue)
-                source = source.Where(r => r.TargetOntologyId == filterTargetOntologyId.Value).ToList();
-            if (!string.IsNullOrEmpty(filterCardinality))
-                source = source.Where(r => r.Cardinality == filterCardinality).ToList();
-
-            return source.ToList();
-        }
-    }
-
-    private void SelectRelationshipType(string typeCode)
-    {
-        selectedRelationshipType = typeCode;
-    }
-
-    private void ClearRelationshipType()
-    {
-        selectedRelationshipType = null;
-    }
-
-    private void ClearRelationshipFilters()
-    {
-        filterSourceOntologyId = null;
-        filterTargetOntologyId = null;
-        filterCardinality = null;
-    }
-
-    private void SelectBasicEnum(int enumId)
-    {
-        selectedBasicEnumId = enumId;
-    }
-
-    private string GetRelationTypeDisplayName(string? code)
-    {
-        if (string.IsNullOrEmpty(code)) return code ?? "";
-        var item = allBasicEnums
-            .FirstOrDefault(e => e.Code == "Relation")?
-            .Items.FirstOrDefault(i => i.Code == code);
-        return item?.DisplayName ?? code;
-    }
-
-    private List<BasicEnumItem> GetRelationEnumItems()
-    {
-        return allBasicEnums
-            .FirstOrDefault(e => e.Code == "Relation")?
-            .Items.OrderBy(i => i.SortOrder).ToList() ?? new();
-    }
-
-    private List<Ontology> filteredOntologies => Filter(allOntologies, o =>
-        o.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        o.DisplayName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        (o.Category ?? "").Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        (o.Description ?? "").Contains(searchString, StringComparison.OrdinalIgnoreCase));
-
-    private List<OntologyRelationship> filteredRelationships => Filter(allRelationships, r =>
-        r.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        r.DisplayName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        r.Code.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        GetOntologyName(r.SourceOntologyId).Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        GetOntologyName(r.TargetOntologyId).Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-        (r.Description ?? "").Contains(searchString, StringComparison.OrdinalIgnoreCase));
-
-    private List<OntologyRule> filteredRules => Filter(allRules, r =>
-        (r.Description ?? "").Contains(searchString, StringComparison.OrdinalIgnoreCase));
-
-    private List<T> Filter<T>(List<T> source, Func<T, bool> predicate)
-    {
-        if (string.IsNullOrWhiteSpace(searchString)) return source;
-        return source.Where(predicate).ToList();
-    }
-
+    // ====== 生命周期 ======
     protected override async Task OnInitializedAsync()
     {
-        await ReloadData();
+        try { await ReloadData(); }
+        catch (Exception ex) { Console.WriteLine($"[OntologyManageList] OnInitializedAsync 加载失败: {ex.Message}"); }
     }
 
     private async Task ReloadData()
     {
-        allOntologies = (await OntologyManageApiClient.GetAllOntologiesAsync()).Where(o => o != null).Cast<Ontology>().ToList();
-        var rels = await OntologyManageApiClient.GetAllRelationshipsAsync();
-        allRelationships = rels.Where(r => r != null).Cast<OntologyRelationship>().ToList();
-        var bhvs = await OntologyManageApiClient.GetAllBehaviorsAsync();
-        allBehaviors = bhvs.Where(b => b != null).Cast<ObjectBehavior>().ToList();
-        var rules = await OntologyManageApiClient.GetAllRulesAsync();
-        allRules = rules.Where(r => r != null).Cast<OntologyRule>().ToList();
-        var basicEnums = await OntologyManageApiClient.GetAllBasicEnumsAsync();
-        allBasicEnums = basicEnums.Where(e => e != null).Cast<BasicEnum>().ToList();
+        try { treeData = (await OntologyManageApiClient.GetOntologyTreeAsync()).Where(o => o != null).Cast<Ontology>().ToList(); }
+        catch (Exception ex) { Console.WriteLine($"[OntologyManageList] GetOntologyTreeAsync 失败: {ex.Message}"); }
+
+        try { allOntologies = (await OntologyManageApiClient.GetAllOntologiesAsync()).Where(o => o != null).Cast<Ontology>().ToList(); }
+        catch (Exception ex) { Console.WriteLine($"[OntologyManageList] GetAllOntologiesAsync 失败: {ex.Message}"); }
 
         ontologyNameMap = allOntologies.ToDictionary(o => o.Id, o => o.DisplayName);
 
-        // 首次加载时自动选中第一个基础枚举
-        if (selectedBasicEnumId == null && allBasicEnums.Any())
-        {
-            selectedBasicEnumId = allBasicEnums.First().Id;
-        }
+        // 重建 M1 过滤树
+        if (loadedTabs[1]) BuildDim1Tree();
 
         StateHasChanged();
     }
 
+    // ====== M1 对象结构 Tree 过滤 ======
+    private void BuildDim1Tree()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(treeData,
+            new System.Text.Json.JsonSerializerOptions { ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles });
+        var copy = System.Text.Json.JsonSerializer.Deserialize<List<Ontology>>(json,
+            new System.Text.Json.JsonSerializerOptions { ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles });
+        dim1Tree = FilterInPlace(copy ?? new(), MetaModelDimension.M1);
+    }
+
+    private static List<Ontology> FilterInPlace(List<Ontology> nodes, MetaModelDimension dim)
+    {
+        for (int i = nodes.Count - 1; i >= 0; i--)
+        {
+            var node = nodes[i];
+            bool match = node.Dimension == dim;
+            if (node.Children != null && node.Children.Count > 0)
+                FilterInPlace(node.Children, dim);
+            if (!match && (node.Children == null || node.Children.Count == 0))
+                nodes.RemoveAt(i);
+        }
+        return nodes;
+    }
+
+    // ====== Tab 切换 ======
+    private void OnTabChanged(int index)
+    {
+        selectedTabIndex = index;
+        StateHasChanged();
+    }
+
+    // ====== 工具方法 ======
     private string GetOntologyName(int? id)
     {
         if (id == null) return "（全局）";
         return ontologyNameMap.TryGetValue(id.Value, out var name) ? name : $"ID:{id}";
     }
 
-    private void OnTabChanged(int index)
+    private int CountTreeNodes(List<Ontology> nodes)
     {
-        selectedTabIndex = index;
-        ruleDrawerOpen = false;
+        int count = 0;
+        foreach (var node in nodes)
+            count += CountTreeNodes(node);
+        return count;
     }
 
-    private void SelectBehaviorOntology(int id)
+    private int CountTreeNodes(Ontology node)
     {
-        selectedBehaviorOntologyId = id;
-        StateHasChanged();
+        int count = 1;
+        if (node.Children != null)
+            foreach (var child in node.Children)
+                count += CountTreeNodes(child);
+        return count;
     }
 
-    private void ToggleBehaviorOntologyExpand(int ontologyId)
+    // ====== M1 树形面板事件 ======
+    private async Task HandleAddRootM1()
     {
-        if (expandedBehaviorOntologyIds.Contains(ontologyId))
-            expandedBehaviorOntologyIds.Remove(ontologyId);
-        else
-            expandedBehaviorOntologyIds.Add(ontologyId);
-        StateHasChanged();
-    }
-
-    private async Task SelectBehavior(int behaviorId)
-    {
-        selectedBehaviorId = behaviorId;
-        selectedBehaviorRules = new();
-        StateHasChanged();
-
-        try
-        {
-            var rules = await OntologyManageApiClient.GetRulesByBehaviorIdAsync(behaviorId);
-            selectedBehaviorRules = rules.Where(r => r != null).Cast<OntologyRule>().ToList();
-        }
-        catch
-        {
-            selectedBehaviorRules = new();
-        }
-        StateHasChanged();
-    }
-
-    private async Task EditBehavior(ObjectBehavior behavior)
-    {
-        var parameters = new DialogParameters { ["BehaviorId"] = behavior.Id };
-        var dialog = await DialogService.ShowAsync<Dialogs.EditBehaviorDialog>("编辑行为", parameters);
+        var ontology = new Ontology { ParentId = null, Dimension = MetaModelDimension.M1 };
+        var parameters = new DialogParameters { ["Ontology"] = ontology };
+        var dialog = await DialogService.ShowAsync<Dialogs.NewOntologyDialog>("新建根对象", parameters);
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-        {
-            await ReloadData();
-            if (selectedBehaviorId == behavior.Id)
-                await SelectBehavior(behavior.Id);
-        }
+        if (result != null && !result.Canceled) await ReloadData();
     }
 
-    private async Task DeleteBehavior(ObjectBehavior behavior)
+    private async Task HandleAddChildM1()
     {
-        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定删除行为「{behavior.Description}」吗？",
-            yesText: "删除", cancelText: "取消");
-        if (confirm == true)
-        {
-            var success = await OntologyManageApiClient.DeleteBehaviorAsync(behavior.Id);
-            if (success)
-            {
-                if (selectedBehaviorId == behavior.Id)
-                {
-                    selectedBehaviorId = null;
-                    selectedBehaviorRules = new();
-                }
-                Snackbar.Add("删除成功", Severity.Success);
-                await ReloadData();
-            }
-            else
-            {
-                Snackbar.Add("删除失败", Severity.Error);
-            }
-        }
+        if (dim1SelectedNode == null) return;
+        var ontology = new Ontology { ParentId = dim1SelectedNode.Id, Dimension = MetaModelDimension.M1 };
+        var parameters = new DialogParameters { ["Ontology"] = ontology };
+        var dialog = await DialogService.ShowAsync<Dialogs.NewOntologyDialog>($"新建 {dim1SelectedNode.DisplayName} 的子对象", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await ReloadData();
     }
 
-    private void OnOntologyRowClick(DataGridRowClickEventArgs<Ontology> e)
+    private async Task HandleEditSelectedM1()
     {
-        ToggleRowExpand(e.Item.Id);
+        if (dim1SelectedNode == null) return;
+        await EditOntology(dim1SelectedNode);
     }
 
-    private bool IsRowExpanded(int ontologyId) => expandedRowIds.Contains(ontologyId);
-
-    private void ToggleRowExpand(int ontologyId)
+    private async Task HandleDeleteSelectedM1()
     {
-        if (expandedRowIds.Contains(ontologyId))
-            expandedRowIds.Remove(ontologyId);
-        else
-            expandedRowIds.Add(ontologyId);
-        StateHasChanged();
+        if (dim1SelectedNode == null) return;
+        await DeleteOntology(dim1SelectedNode);
     }
 
     private async Task OpenAddDialog()
     {
-        var parameters = new DialogParameters { ["Ontology"] = new Ontology() };
-        var dialog = await DialogService.ShowAsync<Dialogs.NewOntologyDialog>("新建本体", parameters);
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
+        if (selectedTabIndex == 1) await HandleAddRootM1();
     }
 
-    private async Task OpenAddRelationshipDialog()
-    {
-        var dialog = await DialogService.ShowAsync<Dialogs.NewRelationshipDialog>("新建关系");
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task OpenAddBehaviorDialog()
-    {
-        var dialog = await DialogService.ShowAsync<Dialogs.NewBehaviorDialog>("新建行为");
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task OpenAddRuleDialog()
-    {
-        var dialog = await DialogService.ShowAsync<Dialogs.NewRuleDialog>("新建规则");
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task EditRule(OntologyRule rule)
-    {
-        var parameters = new DialogParameters { ["RuleId"] = rule.Id };
-        var dialog = await DialogService.ShowAsync<Dialogs.EditRuleDialog>("编辑规则", parameters);
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task DeleteRule(OntologyRule rule)
-    {
-        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
-            $"确定删除规则「{rule.Name ?? rule.Description ?? $"#{rule.Id}"}」吗？",
-            yesText: "删除", cancelText: "取消");
-        if (confirm == true)
-        {
-            var success = await OntologyManageApiClient.DeleteRuleAsync(rule.Id);
-            if (success)
-            {
-                Snackbar.Add("删除成功", Severity.Success);
-                await ReloadData();
-            }
-            else
-            {
-                Snackbar.Add("删除失败", Severity.Error);
-            }
-        }
-    }
-
-    private void OpenRuleDrawer(OntologyRule rule)
-    {
-        selectedRuleDetail = rule;
-        ruleDrawerOpen = true;
-    }
-
-    private void CloseRuleDrawer()
-    {
-        ruleDrawerOpen = false;
-    }
-
-    private async Task OpenAddBasicEnumDialog()
-    {
-        var dialog = await DialogService.ShowAsync<Dialogs.NewBasicEnumDialog>("新建基础枚举");
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task OpenAddEnumItemDialog()
-    {
-        var parameters = new DialogParameters { ["EnumId"] = selectedBasicEnumId ?? 0 };
-        var dialog = await DialogService.ShowAsync<Dialogs.NewEnumItemDialog>("新建枚举项", parameters);
-        var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
-    }
-
-    private async Task DeleteEnumItem(BasicEnumItem item)
-    {
-        bool? result = await DialogService.ShowMessageBoxAsync("确认删除", $"确定删除枚举项「{item.DisplayName}」吗？",
-            yesText: "删除", cancelText: "取消");
-        if (result == true)
-        {
-            await OntologyManageApiClient.DeleteEnumItemAsync(item.Id);
-            await ReloadData();
-        }
-    }
-
+    // ====== 通用 Ontology 编辑/删除 ======
     private async Task EditOntology(Ontology ontology)
     {
         var parameters = new DialogParameters { ["OntologyId"] = ontology.Id };
-        var dialog = await DialogService.ShowAsync<Dialogs.OntologyEditDialog>("编辑本体", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var dialog = await DialogService.ShowAsync<Dialogs.OntologyEditDialog>("编辑本体", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
         var result = await dialog.Result;
-        if (result != null && !result.Canceled)
-            await ReloadData();
+        if (result != null && !result.Canceled) await ReloadData();
     }
 
     private async Task DeleteOntology(Ontology ontology)
     {
-        if (ontology.IsSystem)
-        {
-            Snackbar.Add("系统内置本体不可删除", Severity.Warning);
-            return;
-        }
-        bool? result = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要删除本体 '{ontology.DisplayName}' 吗？这将同时删除其所有属性、关系和规则。", yesText: "删除", cancelText: "取消");
+        if (ontology.IsSystem) { Snackbar.Add("系统内置本体不可删除", Severity.Warning); return; }
+        bool? result = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定要删除本体 '{ontology.DisplayName}' 吗？这将同时删除其所有属性、关系和规则。",
+            yesText: "删除", cancelText: "取消");
         if (result == true)
         {
             var success = await OntologyManageApiClient.DeleteOntologyAsync(ontology.Id);
-            if (success)
-            {
-                Snackbar.Add("删除成功", Severity.Success);
-                await ReloadData();
-            }
-            else
-            {
-                Snackbar.Add("删除失败", Severity.Error);
-            }
+            if (success) { Snackbar.Add("删除成功", Severity.Success); await ReloadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
         }
     }
 }

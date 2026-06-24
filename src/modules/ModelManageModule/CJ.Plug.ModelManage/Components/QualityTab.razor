@@ -1,0 +1,229 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="1" Class="pa-3">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudText Typo="Typo.h6">质量指标列表</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddMetricDialog">新增指标</MudButton>
+    </MudStack>
+
+    <MudDataGrid Items="@metrics" T="QualityMetric" Dense="true" Hover="true" Elevation="0"
+                 SelectedItem="@selectedMetric" SelectedItemChanged="@OnMetricSelected">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="名称" />
+            <PropertyColumn Property="x => x.Code" Title="代码" />
+            <PropertyColumn Property="x => x.Unit" Title="单位" />
+            <PropertyColumn Property="x => x.TargetValue" Title="目标值" />
+            <PropertyColumn Property="x => x.CurrentValue" Title="当前值" />
+            <TemplateColumn Title="测量类型">
+                <CellTemplate>
+                    <MudChip Label="true" Size="Size.Small" Color="Color.Info">@context.Item.MeasureType</MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Style="text-align:right">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditMetric(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteMetric(context.Item))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>暂无质量指标</MudText></NoRecordsContent>
+    </MudDataGrid>
+
+    @if (selectedMetric != null)
+    {
+        <MudDivider Class="my-3" />
+        <MudTabs Elevation="0" Rounded="true" Outlined="true" PanelClass="pa-3">
+            <MudTabPanel Text="告警规则">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudSpacer />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddAlertDialog">新增告警</MudButton>
+                </MudStack>
+
+                <MudDataGrid Items="@alertRules" T="AlertRule" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="名称" />
+                        <PropertyColumn Property="x => x.Code" Title="代码" />
+                        <TemplateColumn Title="条件">
+                            <CellTemplate>@context.Item.Condition @context.Item.Threshold</CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.Severity" Title="严重程度" />
+                        <TemplateColumn Title="启用">
+                            <CellTemplate>
+                                <MudIcon Icon="@(context.Item.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                         Color="@(context.Item.IsEnabled ? Color.Success : Color.Default)" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Style="text-align:right">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditAlert(context.Item))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAlert(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent><MudText>暂无告警规则</MudText></NoRecordsContent>
+                </MudDataGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="改进措施">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudSpacer />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddImproveDialog">新增改进</MudButton>
+                </MudStack>
+
+                <MudDataGrid Items="@improvements" T="ImprovementAction" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="名称" />
+                        <PropertyColumn Property="x => x.Code" Title="代码" />
+                        <PropertyColumn Property="x => x.Description" Title="描述" />
+                        <PropertyColumn Property="x => x.ProposedBy" Title="提议人" />
+                        <TemplateColumn Title="状态">
+                            <CellTemplate>
+                                <MudChip Label="true" Size="Size.Small"
+                                          Color="@(context.Item.Status == "Completed" ? Color.Success : context.Item.Status == "InProgress" ? Color.Warning : Color.Default)">
+                                    @context.Item.Status
+                                </MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Style="text-align:right">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditImprovement(context.Item))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteImprovement(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent><MudText>暂无改进措施</MudText></NoRecordsContent>
+                </MudDataGrid>
+            </MudTabPanel>
+        </MudTabs>
+    }
+</MudPaper>
+
+@code {
+    private List<QualityMetric> metrics = new();
+    private List<AlertRule> alertRules = new();
+    private List<ImprovementAction> improvements = new();
+    private QualityMetric? selectedMetric;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        var result = await ApiClient.GetAllQualityMetricsAsync();
+        metrics = result?.Where(m => m != null).Cast<QualityMetric>().ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task OnMetricSelected(QualityMetric? item)
+    {
+        selectedMetric = item;
+        if (item != null)
+        {
+            var alerts = await ApiClient.GetAlertRulesByQualityMetricIdAsync(item.Id);
+            alertRules = alerts?.Where(a => a != null).Cast<AlertRule>().ToList() ?? new();
+            var imps = await ApiClient.GetImprovementActionsByQualityMetricIdAsync(item.Id);
+            improvements = imps?.Where(i => i != null).Cast<ImprovementAction>().ToList() ?? new();
+        }
+        else { alertRules = new(); improvements = new(); }
+        StateHasChanged();
+    }
+
+    private async Task OpenAddMetricDialog()
+    {
+        var parameters = new DialogParameters { ["QualityMetric"] = new QualityMetric() };
+        var dialog = await DialogService.ShowAsync<QualityMetricEditDialog>("新建质量指标", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task EditMetric(QualityMetric metric)
+    {
+        var parameters = new DialogParameters { ["QualityMetric"] = metric };
+        var dialog = await DialogService.ShowAsync<QualityMetricEditDialog>("编辑质量指标", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteMetric(QualityMetric metric)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除质量指标「{metric.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteQualityMetricAsync(metric.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private async Task OpenAddAlertDialog()
+    {
+        if (selectedMetric == null) return;
+        var alert = new AlertRule { QualityMetricId = selectedMetric.Id, IsEnabled = true };
+        var parameters = new DialogParameters { ["AlertRule"] = alert };
+        var dialog = await DialogService.ShowAsync<AlertRuleEditDialog>("新建告警规则", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedMetric != null)
+            await OnMetricSelected(selectedMetric);
+    }
+
+    private async Task EditAlert(AlertRule alert)
+    {
+        var parameters = new DialogParameters { ["AlertRule"] = alert };
+        var dialog = await DialogService.ShowAsync<AlertRuleEditDialog>("编辑告警规则", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedMetric != null)
+            await OnMetricSelected(selectedMetric);
+    }
+
+    private async Task DeleteAlert(AlertRule alert)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除告警规则「{alert.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteAlertRuleAsync(alert.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); if (selectedMetric != null) await OnMetricSelected(selectedMetric); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private async Task OpenAddImproveDialog()
+    {
+        if (selectedMetric == null) return;
+        var imp = new ImprovementAction { QualityMetricId = selectedMetric.Id };
+        var parameters = new DialogParameters { ["ImprovementAction"] = imp };
+        var dialog = await DialogService.ShowAsync<ImprovementActionEditDialog>("新建改进措施", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedMetric != null)
+            await OnMetricSelected(selectedMetric);
+    }
+
+    private async Task EditImprovement(ImprovementAction imp)
+    {
+        var parameters = new DialogParameters { ["ImprovementAction"] = imp };
+        var dialog = await DialogService.ShowAsync<ImprovementActionEditDialog>("编辑改进措施", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedMetric != null)
+            await OnMetricSelected(selectedMetric);
+    }
+
+    private async Task DeleteImprovement(ImprovementAction imp)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除改进措施「{imp.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteImprovementActionAsync(imp.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); if (selectedMetric != null) await OnMetricSelected(selectedMetric); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}

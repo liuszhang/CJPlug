@@ -1,0 +1,67 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" RequiredError="名称不能为空" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" RequiredError="代码不能为空" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudSelect T="int?" Label="关联对象" @bind-Value="model.OntologyId" Clearable="true">
+                @foreach (var o in ontologies)
+                {
+                    <MudSelectItem T="int?" Value="@o.Id">@o.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="Steps (JSON)" @bind-Value="model.Steps" Lines="4" />
+            <MudSwitch T="bool" Label="激活" @bind-Checked="model.IsActive" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Scenario Scenario { get; set; } = new();
+
+    private Scenario model = new();
+    private List<Ontology> ontologies = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        model = Scenario;
+        if (model.Id == 0)
+            model.IsActive = true;
+        try
+        {
+            var result = await ApiClient.GetAllOntologiesAsync();
+            ontologies = result?.Where(o => o != null).Cast<Ontology>().ToList() ?? new();
+        }
+        catch { ontologies = new(); }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        Scenario? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateScenarioAsync(model);
+        else
+            result = await ApiClient.UpdateScenarioAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

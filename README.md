@@ -1,4 +1,5 @@
 # 寸金插座平台（CJPlug）
+LLM+**MCP TOOL**=AI Agent,寸金插座平台（CJPlug）可以将**任意软件工具、接口、脚本**或它们组合的流程**一键发布**为 MCP Tool的平台。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)

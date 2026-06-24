@@ -1,0 +1,83 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="0" Class="pa-3" Style="min-height: 500px;">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudText Typo="Typo.h6">规则列表</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddRuleDialog">新建规则</MudButton>
+    </MudStack>
+
+    <MudDataGrid Items="@allRules" T="OntologyRule" Dense="true" Hover="true" Elevation="0">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="名称" />
+            <PropertyColumn Property="x => x.Description" Title="描述" />
+            <TemplateColumn Style="text-align:right">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInFull" Size="Size.Small" OnClick="@(() => OpenRuleDrawer(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditRule(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteRule(context.Item))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>暂无规则</MudText></NoRecordsContent>
+    </MudDataGrid>
+</MudPaper>
+
+<RuleDetailDrawer Rule="selectedRuleDetail" IsOpen="ruleDrawerOpen" IsOpenChanged="v => ruleDrawerOpen = v" />
+
+@code {
+    private List<OntologyRule> allRules = new();
+    private OntologyRule? selectedRuleDetail;
+    private bool ruleDrawerOpen;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var rules = await ApiClient.GetAllRulesAsync();
+            allRules = rules?.Where(r => r != null).Cast<OntologyRule>().ToList() ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine($"[RuleTab] GetAllRulesAsync 失败: {ex.Message}"); }
+
+        StateHasChanged();
+    }
+
+    private async Task OpenAddRuleDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NewRuleDialog>("新建规则");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private void OpenRuleDrawer(OntologyRule rule) { selectedRuleDetail = rule; ruleDrawerOpen = true; }
+
+    private async Task EditRule(OntologyRule rule)
+    {
+        var parameters = new DialogParameters { ["RuleId"] = rule.Id };
+        var dialog = await DialogService.ShowAsync<EditRuleDialog>("编辑规则", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteRule(OntologyRule rule)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除规则「{rule.Name ?? rule.Description ?? $"#{rule.Id}"}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var success = await ApiClient.DeleteRuleAsync(rule.Id);
+            if (success) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}

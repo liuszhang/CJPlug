@@ -358,7 +358,7 @@
                     var pureIp = ExtractHost(stationIp);
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
                     // 打开新的浏览器页签显示远程桌面
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}?protocol={resolvedProtocol}", "_blank");
+                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}/{resolvedProtocol}", "_blank");
                     Snackbar.Add($"正在打开远程桌面: {pureIp} ({resolvedProtocol})", Severity.Info);
                 });
             });

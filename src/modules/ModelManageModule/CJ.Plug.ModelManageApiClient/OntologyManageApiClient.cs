@@ -14,6 +14,11 @@ namespace CJ.Plug.ModelManageApiClient
             return await httpClient.GetFromJsonAsync<List<Ontology>>("/api/ontology/getAll", ct) ?? new List<Ontology>();
         }
 
+        public async Task<IEnumerable<Ontology?>> GetOntologyTreeAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Ontology>>("/api/ontology/tree", ct) ?? new List<Ontology>();
+        }
+
         public async Task<Ontology?> GetOntologyByIdAsync(int id, CancellationToken ct = default)
         {
             return await httpClient.GetFromJsonAsync<Ontology>($"/api/ontology/getById/{id}", ct);
@@ -267,5 +272,376 @@ namespace CJ.Plug.ModelManageApiClient
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
         }
+
+        // ========== SecurityLevelAccess CRUD ==========
+        public async Task<IEnumerable<SecurityLevelAccess?>> GetSecurityLevelAccessByPersonnelAsync(int personnelLevelItemId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<SecurityLevelAccess>>($"/api/ontology/security-level-access/{personnelLevelItemId}", ct) ?? new List<SecurityLevelAccess>();
+        }
+
+        public async Task<bool> UpdateSecurityLevelAccessAsync(int personnelLevelItemId, List<int> dataLevelItemIds, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/security-level-access/{personnelLevelItemId}", dataLevelItemIds, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteSecurityLevelAccessAsync(int personnelLevelItemId, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/security-level-access/{personnelLevelItemId}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M4 场景 CRUD ==========
+        public async Task<IEnumerable<Scenario?>> GetAllScenariosAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Scenario>>("/api/ontology/scenarios", ct) ?? new List<Scenario>();
+        }
+
+        public async Task<Scenario?> GetScenarioByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<Scenario>($"/api/ontology/scenarios/{id}", ct);
+        }
+
+        public async Task<Scenario?> CreateScenarioAsync(Scenario scenario, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/scenarios", scenario, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Scenario>(cancellationToken: ct);
+        }
+
+        public async Task<Scenario?> UpdateScenarioAsync(Scenario scenario, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/scenarios/{scenario.Id}", scenario, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Scenario>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteScenarioAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/scenarios/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M5 主体 CRUD ==========
+        public async Task<IEnumerable<Subject?>> GetAllSubjectsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Subject>>("/api/ontology/subjects", ct) ?? new List<Subject>();
+        }
+
+        public async Task<Subject?> GetSubjectByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<Subject>($"/api/ontology/subjects/{id}", ct);
+        }
+
+        public async Task<IEnumerable<Subject?>> GetChildrenByParentIdAsync(int parentId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Subject>>($"/api/ontology/subjects/{parentId}/children", ct) ?? new List<Subject>();
+        }
+
+        public async Task<Subject?> CreateSubjectAsync(Subject subject, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/subjects", subject, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Subject>(cancellationToken: ct);
+        }
+
+        public async Task<Subject?> UpdateSubjectAsync(Subject subject, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/subjects/{subject.Id}", subject, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Subject>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteSubjectAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/subjects/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M5 权限 CRUD ==========
+        public async Task<IEnumerable<Permission?>> GetAllPermissionsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Permission>>("/api/ontology/permissions", ct) ?? new List<Permission>();
+        }
+
+        public async Task<Permission?> GetPermissionByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<Permission>($"/api/ontology/permissions/{id}", ct);
+        }
+
+        public async Task<IEnumerable<Permission?>> GetPermissionsBySubjectIdAsync(int subjectId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<Permission>>($"/api/ontology/subjects/{subjectId}/permissions", ct) ?? new List<Permission>();
+        }
+
+        public async Task<Permission?> CreatePermissionAsync(Permission permission, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/permissions", permission, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Permission>(cancellationToken: ct);
+        }
+
+        public async Task<Permission?> UpdatePermissionAsync(Permission permission, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/permissions/{permission.Id}", permission, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Permission>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeletePermissionAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/permissions/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M5.5 外部系统 CRUD ==========
+        public async Task<IEnumerable<ExternalSystem?>> GetAllExternalSystemsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<ExternalSystem>>("/api/ontology/external-systems", ct) ?? new List<ExternalSystem>();
+        }
+
+        public async Task<ExternalSystem?> GetExternalSystemByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<ExternalSystem>($"/api/ontology/external-systems/{id}", ct);
+        }
+
+        public async Task<ExternalSystem?> CreateExternalSystemAsync(ExternalSystem externalSystem, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/external-systems", externalSystem, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExternalSystem>(cancellationToken: ct);
+        }
+
+        public async Task<ExternalSystem?> UpdateExternalSystemAsync(ExternalSystem externalSystem, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/external-systems/{externalSystem.Id}", externalSystem, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExternalSystem>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteExternalSystemAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/external-systems/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M5.5 接口契约 CRUD ==========
+        public async Task<IEnumerable<InterfaceContract?>> GetAllInterfaceContractsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<InterfaceContract>>("/api/ontology/interface-contracts", ct) ?? new List<InterfaceContract>();
+        }
+
+        public async Task<InterfaceContract?> GetInterfaceContractByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<InterfaceContract>($"/api/ontology/interface-contracts/{id}", ct);
+        }
+
+        public async Task<IEnumerable<InterfaceContract?>> GetInterfaceContractsByExternalSystemIdAsync(int externalSystemId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<InterfaceContract>>($"/api/ontology/external-systems/{externalSystemId}/contracts", ct) ?? new List<InterfaceContract>();
+        }
+
+        public async Task<InterfaceContract?> CreateInterfaceContractAsync(InterfaceContract interfaceContract, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/interface-contracts", interfaceContract, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<InterfaceContract>(cancellationToken: ct);
+        }
+
+        public async Task<InterfaceContract?> UpdateInterfaceContractAsync(InterfaceContract interfaceContract, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/interface-contracts/{interfaceContract.Id}", interfaceContract, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<InterfaceContract>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteInterfaceContractAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/interface-contracts/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M6 异常类型 CRUD ==========
+        public async Task<IEnumerable<ExceptionType?>> GetAllExceptionTypesAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<ExceptionType>>("/api/ontology/exception-types", ct) ?? new List<ExceptionType>();
+        }
+
+        public async Task<ExceptionType?> GetExceptionTypeByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<ExceptionType>($"/api/ontology/exception-types/{id}", ct);
+        }
+
+        public async Task<ExceptionType?> CreateExceptionTypeAsync(ExceptionType exceptionType, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/exception-types", exceptionType, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExceptionType>(cancellationToken: ct);
+        }
+
+        public async Task<ExceptionType?> UpdateExceptionTypeAsync(ExceptionType exceptionType, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/exception-types/{exceptionType.Id}", exceptionType, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExceptionType>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteExceptionTypeAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/exception-types/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M6 补偿动作 CRUD ==========
+        public async Task<IEnumerable<CompensationAction?>> GetAllCompensationActionsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<CompensationAction>>("/api/ontology/compensation-actions", ct) ?? new List<CompensationAction>();
+        }
+
+        public async Task<CompensationAction?> GetCompensationActionByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<CompensationAction>($"/api/ontology/compensation-actions/{id}", ct);
+        }
+
+        public async Task<IEnumerable<CompensationAction?>> GetCompensationActionsByExceptionTypeIdAsync(int exceptionTypeId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<CompensationAction>>($"/api/ontology/exception-types/{exceptionTypeId}/compensation-actions", ct) ?? new List<CompensationAction>();
+        }
+
+        public async Task<CompensationAction?> CreateCompensationActionAsync(CompensationAction compensationAction, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/compensation-actions", compensationAction, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CompensationAction>(cancellationToken: ct);
+        }
+
+        public async Task<CompensationAction?> UpdateCompensationActionAsync(CompensationAction compensationAction, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/compensation-actions/{compensationAction.Id}", compensationAction, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CompensationAction>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteCompensationActionAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/compensation-actions/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M7 质量指标 CRUD ==========
+        public async Task<IEnumerable<QualityMetric?>> GetAllQualityMetricsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<QualityMetric>>("/api/ontology/quality-metrics", ct) ?? new List<QualityMetric>();
+        }
+
+        public async Task<QualityMetric?> GetQualityMetricByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<QualityMetric>($"/api/ontology/quality-metrics/{id}", ct);
+        }
+
+        public async Task<QualityMetric?> CreateQualityMetricAsync(QualityMetric qualityMetric, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/quality-metrics", qualityMetric, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<QualityMetric>(cancellationToken: ct);
+        }
+
+        public async Task<QualityMetric?> UpdateQualityMetricAsync(QualityMetric qualityMetric, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/quality-metrics/{qualityMetric.Id}", qualityMetric, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<QualityMetric>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteQualityMetricAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/quality-metrics/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M7 告警规则 CRUD ==========
+        public async Task<IEnumerable<AlertRule?>> GetAllAlertRulesAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<AlertRule>>("/api/ontology/alert-rules", ct) ?? new List<AlertRule>();
+        }
+
+        public async Task<AlertRule?> GetAlertRuleByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<AlertRule>($"/api/ontology/alert-rules/{id}", ct);
+        }
+
+        public async Task<IEnumerable<AlertRule?>> GetAlertRulesByQualityMetricIdAsync(int qualityMetricId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<AlertRule>>($"/api/ontology/quality-metrics/{qualityMetricId}/alert-rules", ct) ?? new List<AlertRule>();
+        }
+
+        public async Task<AlertRule?> CreateAlertRuleAsync(AlertRule alertRule, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/alert-rules", alertRule, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<AlertRule>(cancellationToken: ct);
+        }
+
+        public async Task<AlertRule?> UpdateAlertRuleAsync(AlertRule alertRule, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/alert-rules/{alertRule.Id}", alertRule, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<AlertRule>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteAlertRuleAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/alert-rules/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
+        // ========== M7 改进措施 CRUD ==========
+        public async Task<IEnumerable<ImprovementAction?>> GetAllImprovementActionsAsync(CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<ImprovementAction>>("/api/ontology/improvement-actions", ct) ?? new List<ImprovementAction>();
+        }
+
+        public async Task<ImprovementAction?> GetImprovementActionByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<ImprovementAction>($"/api/ontology/improvement-actions/{id}", ct);
+        }
+
+        public async Task<IEnumerable<ImprovementAction?>> GetImprovementActionsByQualityMetricIdAsync(int qualityMetricId, CancellationToken ct = default)
+        {
+            return await httpClient.GetFromJsonAsync<List<ImprovementAction>>($"/api/ontology/quality-metrics/{qualityMetricId}/improvement-actions", ct) ?? new List<ImprovementAction>();
+        }
+
+        public async Task<ImprovementAction?> CreateImprovementActionAsync(ImprovementAction improvementAction, CancellationToken ct = default)
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ontology/improvement-actions", improvementAction, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ImprovementAction>(cancellationToken: ct);
+        }
+
+        public async Task<ImprovementAction?> UpdateImprovementActionAsync(ImprovementAction improvementAction, CancellationToken ct = default)
+        {
+            var response = await httpClient.PutAsJsonAsync($"/api/ontology/improvement-actions/{improvementAction.Id}", improvementAction, ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ImprovementAction>(cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteImprovementActionAsync(int id, CancellationToken ct = default)
+        {
+            var response = await httpClient.DeleteAsync($"/api/ontology/improvement-actions/{id}", ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<bool>(cancellationToken: ct);
+        }
+
     }
 }

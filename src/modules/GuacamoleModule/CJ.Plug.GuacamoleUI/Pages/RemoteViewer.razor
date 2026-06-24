@@ -47,9 +47,9 @@
 
         var targetUrl = protocol switch
         {
-            "vnc" => $"/remote/vnc/{StationIp}{queryString}",
+            "vnc" or "rdp" => $"/remote/vnc/{StationIp}{queryString}",
             "ssh" => $"/remote/ssh/{StationIp}{queryString}",
-            _ => $"/remote/ssh/{StationIp}{queryString}"
+            _ => $"/remote/vnc/{StationIp}{queryString}"
         };
 
         NavigationManager.NavigateTo(targetUrl, replace: true);
