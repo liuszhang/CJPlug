@@ -1,0 +1,64 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudSelect T="string" Label="严重程度 *" @bind-Value="model.Severity" Required="true">
+                <MudSelectItem Value="@("Critical")">致命(Critical)</MudSelectItem>
+                <MudSelectItem Value="@("High")">高(High)</MudSelectItem>
+                <MudSelectItem Value="@("Medium")">中(Medium)</MudSelectItem>
+                <MudSelectItem Value="@("Low")">低(Low)</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" Label="类别" @bind-Value="model.Category">
+                <MudSelectItem Value="@("System")">系统(System)</MudSelectItem>
+                <MudSelectItem Value="@("Business")">业务(Business)</MudSelectItem>
+                <MudSelectItem Value="@("Integration")">集成(Integration)</MudSelectItem>
+                <MudSelectItem Value="@("Security")">安全(Security)</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ExceptionType ExceptionType { get; set; } = new();
+
+    private ExceptionType model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = ExceptionType;
+        if (string.IsNullOrWhiteSpace(model.Severity))
+            model.Severity = "Medium";
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        ExceptionType? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateExceptionTypeAsync(model);
+        else
+            result = await ApiClient.UpdateExceptionTypeAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

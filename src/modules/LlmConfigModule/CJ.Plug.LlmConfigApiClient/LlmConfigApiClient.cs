@@ -106,15 +106,32 @@ public class LlmConfigApiClient : BaseApiClient, ILlmConfigApiClient
 
     // ---- MCP Server 配置 ----
 
-    public async Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default)
+    public async Task<List<McpServerConfig>> GetMcpServerConfigsAsync(CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<McpServerConfig>("/api/llm/getMcpServerConfig", ct);
+        return await httpClient.GetFromJsonAsync<List<McpServerConfig>>("/api/llm/getMcpServerConfigs", ct)
+               ?? new List<McpServerConfig>();
     }
 
-    public async Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    public async Task<McpServerConfig?> CreateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync("/api/llm/saveMcpServerConfig", config, ct);
+        var response = await httpClient.PostAsJsonAsync("/api/llm/createMcpServerConfig", config, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<McpServerConfig>(cancellationToken: ct);
+    }
+
+    public async Task<McpServerConfig?> UpdateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    {
+        var response = await httpClient.PutAsJsonAsync("/api/llm/updateMcpServerConfig", config, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<McpServerConfig>(cancellationToken: ct);
+    }
+
+    public async Task<bool> DeleteMcpServerConfigAsync(int id, CancellationToken ct = default)
+    {
+        var response = await httpClient.DeleteAsync($"/api/llm/deleteMcpServerConfig/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+        response.EnsureSuccessStatusCode();
+        return true;
     }
 }

@@ -3,6 +3,7 @@
 @using MudBlazor
 
 @inject IOntologyManageApiClient OntologyManageApiClient
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -26,7 +27,40 @@
             </MudStack>
             <MudNumericField T="int" Label="排序" @bind-Value="prop.SortOrder" />
             <MudTextField T="string" Label="UI提示" @bind-Value="prop.UIHint" />
+            <MudNumericField T="int?" Label="最大长度" @bind-Value="prop.Length" />
+            <MudTextField T="string" Label="字典编码" @bind-Value="prop.DictCode" />
             <MudTextField T="string" Label="校验规则" @bind-Value="prop.ValidationRule" />
+
+            @if (prop.Id > 0)
+            {
+                <MudDivider Class="my-2" />
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.subtitle1">属性约束</MudText>
+                    <MudSpacer />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="AddConstraint">添加约束</MudButton>
+                </MudStack>
+                <MudDataGrid Items="@constraints" T="PropertyConstraint" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                        <TemplateColumn Title="约束类型">
+                            <CellTemplate>
+                                <MudChip Label="true" Size="Size.Small" Color="Color.Info">@context.Item.ConstraintType</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.Value" Title="值" />
+                        <PropertyColumn Property="x => x.Message" Title="消息" />
+                        <TemplateColumn Style="text-align:right">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditConstraint(context.Item))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteConstraint(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent>
+                        <MudText>暂无约束</MudText>
+                    </NoRecordsContent>
+                </MudDataGrid>
+            }
 
             @if (prop.PropertyType == "Select")
             {
@@ -45,10 +79,19 @@
     [Parameter] public Property Property { get; set; } = new();
 
     private Property prop = new();
+    private List<PropertyConstraint> constraints = new();
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         prop = Property;
+        if (prop.Id > 0)
+            await LoadConstraints();
+    }
+
+    private async Task LoadConstraints()
+    {
+        var result = await OntologyManageApiClient.GetConstraintsByPropertyIdAsync(prop.Id);
+        constraints = result?.Where(c => c != null).Cast<PropertyConstraint>().OrderBy(c => c.SortOrder).ToList() ?? new();
     }
 
     private void Cancel() => MudDialog.Cancel();
@@ -79,6 +122,69 @@
         else
         {
             Snackbar.Add(prop.Id == 0 ? "添加失败" : "更新失败", Severity.Error);
+        }
+    }
+
+    private async Task AddConstraint()
+    {
+        var constraint = new PropertyConstraint { PropertyId = prop.Id, SortOrder = constraints.Count };
+        var parameters = new DialogParameters { ["Constraint"] = constraint };
+        var dialog = await DialogService.ShowAsync<ConstraintEditDialog>("添加约束", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && result.Data is PropertyConstraint newConstraint)
+        {
+            var created = await OntologyManageApiClient.CreateConstraintAsync(newConstraint.PropertyId, newConstraint);
+            if (created != null)
+            {
+                Snackbar.Add("约束已添加", Severity.Success);
+                await LoadConstraints();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("添加约束失败", Severity.Error);
+            }
+        }
+    }
+
+    private async Task EditConstraint(PropertyConstraint constraint)
+    {
+        var parameters = new DialogParameters { ["Constraint"] = constraint };
+        var dialog = await DialogService.ShowAsync<ConstraintEditDialog>("编辑约束", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && result.Data is PropertyConstraint updated)
+        {
+            updated.Id = constraint.Id;
+            var saved = await OntologyManageApiClient.UpdateConstraintAsync(updated.Id, updated);
+            if (saved != null)
+            {
+                Snackbar.Add("约束已更新", Severity.Success);
+                await LoadConstraints();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("更新约束失败", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteConstraint(PropertyConstraint constraint)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要删除此约束吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var success = await OntologyManageApiClient.DeleteConstraintAsync(constraint.Id);
+            if (success)
+            {
+                Snackbar.Add("约束已删除", Severity.Success);
+                await LoadConstraints();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("删除约束失败", Severity.Error);
+            }
         }
     }
 }

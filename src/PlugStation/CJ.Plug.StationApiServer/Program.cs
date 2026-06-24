@@ -50,20 +50,43 @@ Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetVa
 Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
 Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
 
+// 从 StationSettingUI 共享的 SQLite 配置读取用户设置的平台服务地址
+// 必须在 Serilog/SignalRLogSink 初始化之前完成 GlobalData 覆盖，
+// 否则 SignalRLogSink 会在构造时捕获默认的 localhost:8686 地址
+StaticData.MainServerUrl = StationConfigHelper.ReadMainServerUrl() ?? GlobalData.MainDispatcherServer;
+Console.WriteLine("the main serverUrl is:" + StaticData.MainServerUrl);
+
+// 将用户配置的主服务地址同步到 GlobalData，确保远程图站的 HTTP API 回调能正确路由到主服务
+// 若不覆盖，远程图站会尝试向 localhost:8686/8687 回调，导致执行结果永远无法上报
+if (!string.IsNullOrEmpty(StaticData.MainServerUrl) && StaticData.MainServerUrl != GlobalData.MainDispatcherServer)
+{
+    GlobalData.MainDispatcherServer = StaticData.MainServerUrl;
+    try
+    {
+        var uri = new Uri(StaticData.MainServerUrl);
+        // 主服务典型架构：Dispatcher 8686，API Server 8687
+        GlobalData.MainApiServer = $"{uri.Scheme}://{uri.Host}:8687";
+        Console.WriteLine($"[GlobalData] MainDispatcherServer -> {GlobalData.MainDispatcherServer}");
+        Console.WriteLine($"[GlobalData] MainApiServer -> {GlobalData.MainApiServer}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[GlobalData] Failed to override with configured URL: {ex.Message}");
+    }
+}
+
+//StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
+StaticData.MainServerHostIp = GlobalData.MainDispatcherServer;
+Console.WriteLine("the main serverIp is:" + StaticData.MainServerHostIp);
+
+// Serilog 初始化（含 SignalRLogSink）：必须在 GlobalData 覆盖之后，
+// 确保 SignalRLogSink 使用用户配置的远程主服务地址而非默认的 localhost:8686
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File("StationLogs/log.txt",
         rollingInterval: RollingInterval.Day,
         rollOnFileSizeLimit: true)
     .WriteTo.Sink(new SignalRLogSink("Station"))
     .CreateLogger();
-
-//StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
-StaticData.MainServerHostIp = GlobalData.MainDispatcherServer;
-Console.WriteLine("the main serverIp is:" + StaticData.MainServerHostIp);
-
-// 从 StationSettingUI 共享的 SQLite 配置读取用户设置的平台服务地址
-StaticData.MainServerUrl = StationConfigHelper.ReadMainServerUrl() ?? GlobalData.MainDispatcherServer;
-Console.WriteLine("the main serverUrl is:" + StaticData.MainServerUrl);
 //StaticData.ToolAgentServerHttpsPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Https").GetSection("Url").Value.Split(':')[2];
 //StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
 //StaticData.ToolAgentServerHttpPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[2];

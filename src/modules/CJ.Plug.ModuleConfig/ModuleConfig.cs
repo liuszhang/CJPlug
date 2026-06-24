@@ -14,6 +14,7 @@ using CJ.Plug.KnowledgeManage;
 using CJ.Plug.KnowledgeManageApi;
 using CJ.Plug.LlmConfig;
 using CJ.Plug.LlmConfigApi;
+using CJ.Plug.SystemConfig;
 using CJ.Plug.ModelManage;
 using CJ.Plug.ModelManageApi;
 using CJ.Plug.Models.Contracts;
@@ -74,6 +75,9 @@ namespace CJ.Plug.ModuleConfig
 
             // LLM 配置模块
             services.AddLlmConfigPageModuleServices();
+
+            // 系统配置模块
+            services.AddSystemConfigPageModuleServices();
 
             //放在最后，因为用户名需要放在最后
             services.AddLoginModulePageServices();

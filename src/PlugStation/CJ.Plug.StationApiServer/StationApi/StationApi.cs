@@ -194,10 +194,10 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                     Log.Warning("图站未配置 ToolsRootPath，使用默认路径: {FallbackPath}", targetPath);
                 }
 
-                // 优先使用 MainApiServer，因为 API 端点在 ApiServer 上注册（非 DispatchServer）
-                var mainServerUrl = !string.IsNullOrEmpty(GlobalData.MainApiServer)
-                    ? GlobalData.MainApiServer
-                    : StaticData.MainServerUrl;
+                // 优先使用 SQLite 用户配置的主服务地址
+                var mainServerUrl = !string.IsNullOrWhiteSpace(StaticData.MainServerUrl)
+                    ? StaticData.MainServerUrl
+                    : GlobalData.MainApiServer;
                 var baseUrl = mainServerUrl.TrimEnd('/');
                 var downloadUrl = $"{baseUrl}/api/file/downloadTool?name={Uri.EscapeDataString(toolName!)}&version={Uri.EscapeDataString(toolVersion!)}";
                 if (!string.IsNullOrEmpty(toolFilePath))

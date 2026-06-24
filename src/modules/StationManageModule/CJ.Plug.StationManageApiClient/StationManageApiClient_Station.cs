@@ -2,13 +2,32 @@
 using CJ.Plug.Models.Station;
 using Serilog;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace CJ.Plug.StationManageApiClient
 {
     public partial class StationManageApiClient
     {
-        
-            public async Task<string?> GetStationToUse(CancellationToken cancellationToken = default)
+        public async Task<string?> GetStationVersionAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var response = await httpClient.GetAsync("api/Station/version", cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(json);
+                return doc.RootElement.TryGetProperty("version", out var v) ? v.GetString() : null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetStationVersionAsync] 获取版本失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<string?> GetStationToUse(CancellationToken cancellationToken = default)
             {
                 //通过调度服务获取使用的图站
                 return await DispatcherClient.GetStringAsync("api/dispatch/GetStationToExecute", cancellationToken);

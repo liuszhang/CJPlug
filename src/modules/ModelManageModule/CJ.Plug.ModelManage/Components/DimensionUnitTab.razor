@@ -1,0 +1,111 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="0" Class="pa-3" Style="min-height: 300px;">
+    @if (isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-3" />
+    }
+
+    @if (basicEnum == null && !isLoading)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3">暂未配置量纲枚举，请先运行种子数据初始化。</MudAlert>
+    }
+    else if (basicEnum != null)
+    {
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+            <MudText Typo="Typo.h6">量纲 — 计量单位类型</MudText>
+            <MudSpacer />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">新增量纲</MudButton>
+        </MudStack>
+        <MudDataGrid Items="@(basicEnum.Items ?? new())" T="BasicEnumItem" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                <PropertyColumn Property="x => x.Code" Title="代码" />
+                <PropertyColumn Property="x => x.DisplayName" Title="显示名" />
+                <PropertyColumn Property="x => x.Description" Title="说明" />
+                <TemplateColumn Style="text-align:right">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeleteItemAsync(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent><MudText>暂无量纲项</MudText></NoRecordsContent>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@code {
+    private BasicEnum? basicEnum;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var allEnums = await ApiClient.GetAllBasicEnumsAsync();
+            basicEnum = allEnums
+                .Where(e => e != null)
+                .Cast<BasicEnum>()
+                .FirstOrDefault(e => e.Code == "DimensionUnit");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DimensionUnitTab] 加载失败: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["EnumItem"] = new BasicEnumItem(),
+            ["EnumId"] = basicEnum?.Id ?? 0
+        };
+        var dialog = await DialogService.ShowAsync<DimensionUnitEditDialog>("新增量纲", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task OpenEditDialog(BasicEnumItem item)
+    {
+        var parameters = new DialogParameters
+        {
+            ["EnumItem"] = item,
+            ["EnumId"] = basicEnum?.Id ?? 0
+        };
+        var dialog = await DialogService.ShowAsync<DimensionUnitEditDialog>($"编辑量纲 — {item.DisplayName}", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteItemAsync(BasicEnumItem item)
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除「{item.DisplayName}」吗？", yesText: "删除", cancelText: "取消");
+        if (result == true)
+        {
+            await ApiClient.DeleteEnumItemAsync(item.Id);
+            await LoadData();
+        }
+    }
+}

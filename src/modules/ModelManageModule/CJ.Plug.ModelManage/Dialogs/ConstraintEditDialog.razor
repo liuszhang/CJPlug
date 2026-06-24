@@ -1,0 +1,52 @@
+@using CJ.Plug.ModelManageModel.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="ConstraintType" Label="约束类型 *" @bind-Value="constraint.ConstraintType" Required="true">
+                <MudSelectItem Value="@(ConstraintType.StringLength)">StringLength</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Min)">Min</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Max)">Max</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Pattern)">Pattern</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Required)">Required</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Email)">Email</MudSelectItem>
+                <MudSelectItem Value="@(ConstraintType.Url)">Url</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="约束值" @bind-Value="constraint.Value" />
+            <MudTextField T="string" Label="提示消息" @bind-Value="constraint.Message" />
+            <MudNumericField T="int" Label="排序" @bind-Value="constraint.SortOrder" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public PropertyConstraint Constraint { get; set; } = new();
+
+    private PropertyConstraint constraint = new();
+
+    protected override void OnParametersSet()
+    {
+        constraint = new PropertyConstraint
+        {
+            Id = Constraint.Id,
+            PropertyId = Constraint.PropertyId,
+            ConstraintType = Constraint.ConstraintType,
+            Value = Constraint.Value,
+            Message = Constraint.Message,
+            SortOrder = Constraint.SortOrder
+        };
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Save()
+    {
+        MudDialog.Close(DialogResult.Ok(constraint));
+    }
+}

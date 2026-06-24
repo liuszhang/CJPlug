@@ -1,0 +1,155 @@
+@using CJ.Plug.ModelManageModel.Models
+@using MudBlazor
+
+<MudStack Spacing="2" Class="pa-2">
+    <MudTextField Label="搜索过滤" @bind-Value="searchText" Immediate="true"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  OnKeyUp="OnSearchChanged" />
+
+    <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-1" Style="background:transparent;">
+        <MudText Typo="Typo.body2" Class="font-weight-bold">对象层级</MudText>
+        <MudStack Row Spacing="1">
+            <MudTooltip Text="新增根对象">
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                               OnClick="OnAddRoot" />
+            </MudTooltip>
+            <MudTooltip Text="新增子对象">
+                <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small" Color="Color.Secondary"
+                               OnClick="OnAddChild" Disabled="SelectedNode == null" />
+            </MudTooltip>
+            <MudTooltip Text="编辑选中">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                               OnClick="OnEditSelected" Disabled="SelectedNode == null" />
+            </MudTooltip>
+            <MudTooltip Text="删除选中">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="OnDeleteSelected" Disabled="SelectedNode == null" />
+            </MudTooltip>
+        </MudStack>
+    </MudPaper>
+
+    <MudDivider />
+
+    @if (filteredRoots == null || !filteredRoots.Any())
+    {
+        <MudText Typo="Typo.body2" Class="text-center pa-4 mud-text-secondary">暂无对象数据</MudText>
+    }
+    else
+    {
+        <MudTreeView T="Ontology" Items="filteredRoots" SelectedValue="@SelectedNode" SelectedValueChanged="OnTreeSelectionChanged"
+                     MultiSelection="false" AutoExpand="true" CanSelect="OnCanSelect" ExpandOnClick="true"
+                     Style="max-height: calc(100vh - 280px); overflow-y: auto;">
+            <ItemTemplate>
+                <MudTreeViewItem T="Ontology" Items="context.Children" Value="context.Value" Text="@GetNodeLabel(context.Value)" />
+            </ItemTemplate>
+        </MudTreeView>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public List<Ontology> TreeData { get; set; } = new();
+    [Parameter] public Ontology? SelectedNode { get; set; }
+    [Parameter] public EventCallback<Ontology?> SelectedNodeChanged { get; set; }
+    [Parameter] public EventCallback OnAddRoot { get; set; }
+    [Parameter] public EventCallback OnAddChild { get; set; }
+    [Parameter] public EventCallback OnEditSelected { get; set; }
+    [Parameter] public EventCallback OnDeleteSelected { get; set; }
+
+    private string searchText = string.Empty;
+    private List<TreeItemData<Ontology>> filteredRoots = new();
+
+    protected override void OnParametersSet()
+    {
+        ApplyFilter();
+    }
+
+    private string GetNodeLabel(Ontology o)
+    {
+        var label = string.IsNullOrEmpty(o.DisplayName) ? o.Name : o.DisplayName;
+        if (!string.IsNullOrEmpty(o.Code))
+            label += $" [{o.Code}]";
+        if (o.Dimension.HasValue)
+            label += $" ({o.Dimension})";
+        return label;
+    }
+
+    private bool OnCanSelect(Ontology? node)
+    {
+        return node != null;
+    }
+
+    private async Task OnSearchChanged()
+    {
+        ApplyFilter();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyFilter()
+    {
+        if (TreeData == null || !TreeData.Any())
+        {
+            filteredRoots = new();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            filteredRoots = WrapTree(TreeData);
+            return;
+        }
+
+        var lower = searchText.Trim().ToLowerInvariant();
+        filteredRoots = FilterTree(TreeData, lower);
+    }
+
+    private List<TreeItemData<Ontology>> FilterTree(List<Ontology> nodes, string lower)
+    {
+        var result = new List<TreeItemData<Ontology>>();
+        foreach (var node in nodes)
+        {
+            var matches = (node.Name?.ToLowerInvariant().Contains(lower) == true)
+                       || (node.DisplayName?.ToLowerInvariant().Contains(lower) == true)
+                       || (node.Code?.ToLowerInvariant().Contains(lower) == true);
+
+            var filteredChildren = node.Children != null && node.Children.Any()
+                ? FilterTree(node.Children, lower)
+                : new List<TreeItemData<Ontology>>();
+
+            if (matches || filteredChildren.Any())
+            {
+                var treeItem = new TreeItemData<Ontology>
+                {
+                    Value = node,
+                    Children = new HashSet<TreeItemData<Ontology>>(filteredChildren)
+                };
+                result.Add(treeItem);
+            }
+        }
+        return result;
+    }
+
+    private static List<TreeItemData<Ontology>> WrapTree(List<Ontology> nodes)
+    {
+        var result = new List<TreeItemData<Ontology>>();
+        foreach (var node in nodes)
+        {
+            var children = node.Children != null && node.Children.Any()
+                ? WrapTree(node.Children)
+                : new List<TreeItemData<Ontology>>();
+
+            var treeItem = new TreeItemData<Ontology>
+            {
+                Value = node,
+                Children = new HashSet<TreeItemData<Ontology>>(children)
+            };
+            result.Add(treeItem);
+        }
+        return result;
+    }
+
+    private async Task OnTreeSelectionChanged(Ontology? value)
+    {
+        SelectedNode = value;
+        await SelectedNodeChanged.InvokeAsync(value);
+    }
+}

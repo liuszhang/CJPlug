@@ -28,6 +28,8 @@ using System.Reflection;
 using TextReaderPlug.Extensions;
 using TextWriterPlug.Extensions;
 using WordPlug.Extensions;
+using WordReadPlug.Extensions;
+using LLMPlug.Extensions;
 using PPTPlug.Extensions;
 using AndPlug.Extensions;
 using CalculatorPlug.Extensions;
@@ -66,6 +68,8 @@ namespace PlugsBundle
             //services.AddMCDataGet();
             services.AddMatlab();
             services.AddWord();
+            services.AddWordRead();
+            services.AddLLMPlug();
             services.AddPPT();
             services.AddAiAgent();
             services.AddNXAIModel();
@@ -121,6 +125,8 @@ namespace PlugsBundle
             services.AddMCDataGetExecute();
             services.AddMatlabExecute();
             services.AddWordExecute();
+            services.AddWordReadExecute();
+            services.AddLLMPlugExecute();
             services.AddPPTExecute();
             services.AddNXAIModelExecute();
             //services.AddWhileExecute();

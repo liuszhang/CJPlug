@@ -219,24 +219,27 @@ public class SignalRLogSink : ILogEventSink
         logEvent.Properties.TryGetValue(LogContextEnum.PlugDefinitionId.ToString(), out var plugDefValue);
         var PlugDefinitionId = ExtractValue(plugDefValue);
 
-        // StationIp is inside the JSON data in the message
+        // StationIp and Protocol are inside the JSON data in the message
         var rendered = logEvent.RenderMessage().ToString();
         string StationIp = "";
+        string Protocol = "vnc";
         try
         {
             var info = System.Text.Json.JsonSerializer.Deserialize<StationExecutingData>(rendered);
             StationIp = info?.StationIp ?? "";
+            Protocol = info?.Protocol ?? "vnc";
         }
         catch { StationIp = rendered; }
 
-        Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp}");
-        await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp);
+        Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp} protocol:{Protocol}");
+        await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol);
     }
 
     private class StationExecutingData
     {
         public string? PlugDefinitionId { get; set; }
         public string? StationIp { get; set; }
+        public string? Protocol { get; set; }
     }
 
 }

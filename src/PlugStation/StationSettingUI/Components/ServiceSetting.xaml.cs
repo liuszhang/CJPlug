@@ -383,13 +383,108 @@ public partial class ServiceSetting : UserControl
     private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         BtnCheckUpdate.IsEnabled = false;
+        BtnDownloadUpdate.Visibility = Visibility.Collapsed;
         TxtUpdateStatus.Text = "正在检查...";
+        TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.RoyalBlue);
+
         var (hasUpdate, latestVersion, message) = await _apiService.CheckUpdateAsync();
+
         BtnCheckUpdate.IsEnabled = true;
         TxtUpdateStatus.Text = message;
-        TxtUpdateStatus.Foreground = hasUpdate
-            ? new SolidColorBrush(Colors.OrangeRed)
-            : new SolidColorBrush(Colors.Green);
+
+        if (hasUpdate)
+        {
+            TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            BtnDownloadUpdate.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.Green);
+            BtnDownloadUpdate.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private CancellationTokenSource? _downloadCts;
+
+    private async void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        BtnDownloadUpdate.IsEnabled = false;
+        BtnCheckUpdate.IsEnabled = false;
+        PanelDownloadProgress.Visibility = Visibility.Visible;
+        ProgressDownload.Value = 0;
+        TxtProgressPercent.Text = "0%";
+        TxtProgressLabel.Text = "正在生成部署包并下载...";
+
+        _downloadCts = new CancellationTokenSource();
+
+        try
+        {
+            var platform = Environment.Is64BitOperatingSystem ? "win-x64" : "win-x86";
+            var saveDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+            // 下载进度回调（服务端打包期间进度条保持为 0，响应头到达后才有 ContentLength 追踪下载进度）
+            var downloadProgress = new Progress<int>(percent =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ProgressDownload.Value = percent;
+                    TxtProgressPercent.Text = $"{percent}%";
+                    TxtProgressLabel.Text = percent < 100
+                        ? $"正在下载... {percent}%"
+                        : "下载完成";
+                });
+            });
+
+            // 一步完成：服务端打包完成后直接返回文件流
+            var filePath = await _apiService.DownloadStationPackageDirectAsync(
+                platform, saveDir, downloadProgress, _downloadCts.Token);
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                SetStatusMessage("下载部署包失败，请确认主服务端运行正常", true);
+                ResetDownloadUi();
+                return;
+            }
+
+            ProgressDownload.Value = 100;
+            TxtProgressPercent.Text = "100%";
+            TxtProgressLabel.Text = "下载完成";
+            SetStatusMessage($"部署包已下载到: {filePath}", false);
+
+            // 询问是否打开下载目录
+            var result = System.Windows.MessageBox.Show(
+                $"图站部署包已下载完成。\n\n文件: {filePath}\n\n是否打开下载目录?",
+                "下载完成",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatusMessage("下载已取消", false);
+        }
+        catch (Exception ex)
+        {
+            SetStatusMessage($"下载失败: {ex.Message}", true);
+        }
+        finally
+        {
+            _downloadCts?.Dispose();
+            _downloadCts = null;
+            ResetDownloadUi();
+        }
+    }
+
+    private void ResetDownloadUi()
+    {
+        PanelDownloadProgress.Visibility = Visibility.Collapsed;
+        BtnDownloadUpdate.IsEnabled = true;
+        BtnCheckUpdate.IsEnabled = true;
     }
 
     private void BtnBrowsePath_Click(object sender, RoutedEventArgs e)

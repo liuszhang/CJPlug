@@ -1,0 +1,59 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudTextField T="string" Label="BaseUrl" @bind-Value="model.BaseUrl" />
+            <MudSelect T="string" Label="认证类型" @bind-Value="model.AuthType">
+                <MudSelectItem Value="@("None")">无(None)</MudSelectItem>
+                <MudSelectItem Value="@("Basic")">基本认证(Basic)</MudSelectItem>
+                <MudSelectItem Value="@("Bearer")">Bearer Token</MudSelectItem>
+                <MudSelectItem Value="@("OAuth2")">OAuth2</MudSelectItem>
+                <MudSelectItem Value="@("ApiKey")">API Key</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="AuthConfig (JSON)" @bind-Value="model.AuthConfig" Lines="4" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ExternalSystem ExternalSystem { get; set; } = new();
+
+    private ExternalSystem model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = ExternalSystem;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        ExternalSystem? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateExternalSystemAsync(model);
+        else
+            result = await ApiClient.UpdateExternalSystemAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

@@ -25,6 +25,12 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>排序</summary>
         public int SortOrder { get; set; } = 0;
 
+        /// <summary>规则表达式（可执行的条件/推导表达式）</summary>
+        public string? RuleExpression { get; set; }
+
+        /// <summary>规则触发条件（JSON 格式，如 {"property":"Status","op":"eq","value":"Approved"}）</summary>
+        public string? RuleCondition { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
     }

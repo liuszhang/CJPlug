@@ -70,5 +70,18 @@
     <script src="_content/CJ.Plug.GuacamoleUI/xtermInterop.js"></script>
 
     <script src="_framework/blazor.server.js"></script>
+    <script>
+        window.downloadFileFromBytes = (fileName, bytes) => {
+            const blob = new Blob([bytes], { type: 'application/zip' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+    </script>
 </body>
 </html>

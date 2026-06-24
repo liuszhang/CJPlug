@@ -1,0 +1,216 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="0" Class="pa-0" Style="min-height: 500px;">
+    <div class="d-flex">
+        @* ===== 左栏：关系类型列表 ===== *@
+        <div class="col-sm-3 pa-0" style="border-right: 1px solid var(--mud-palette-divider);">
+            <MudPaper Elevation="0" Class="pa-3">
+                <MudText Typo="Typo.h6" Class="mb-2">关系类型</MudText>
+                <MudList T="string" Clickable="true">
+                    <MudListItem Text="@($"全部 ({allRelationships.Count})")"
+                                 OnClick="@(() => SelectType(null))"
+                                 Selected="@(selectedType == null)" />
+                    @foreach (var type in relationshipTypes)
+                    {
+                        <MudStack Row AlignItems="AlignItems.Center">
+                            <MudListItem Text="@($"{type.Key} ({type.Value})")"
+                                         OnClick="@(() => SelectType(type.Key))"
+                                         Selected="@(selectedType == type.Key)"
+                                         Style="flex:1;" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteType(type.Key))"
+                                           Title="删除此类型及所有关联关系" />
+                        </MudStack>
+                    }
+                </MudList>
+                <MudDivider Class="my-2" />
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           FullWidth="true"
+                           OnClick="OpenAddTypeDialog">新增类型</MudButton>
+            </MudPaper>
+        </div>
+
+        @* ===== 右栏：关系记录列表 ===== *@
+        <div class="col-sm-9 pa-0">
+            <MudPaper Elevation="0" Class="pa-3">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.h6">
+                        @(selectedType == null ? "全部关系" : $"「{selectedType}」关系")
+                    </MudText>
+                    <MudSpacer />
+                    <MudButton Color="Color.Secondary"
+                               Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.AccountTree"
+                               Size="Size.Small"
+                               OnClick="OpenVisualizationHint">可视化</MudButton>
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Size="Size.Small"
+                               OnClick="OpenAddRelationshipDialog">新建关系</MudButton>
+                </MudStack>
+
+                <MudDataGrid Items="@filteredRelationships" T="OntologyRelationship" Dense="true" Hover="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="名称" />
+                        <TemplateColumn Title="类型">
+                            <CellTemplate>
+                                <MudChip Label="true" Size="Size.Small" Color="Color.Info">
+                                    @GetTypeDisplayName(context.Item.RelationshipType)
+                                </MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="源对象">
+                            <CellTemplate>@GetOntologyName(context.Item.SourceOntologyId)</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="目标对象">
+                            <CellTemplate>@GetOntologyName(context.Item.TargetOntologyId)</CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.Cardinality" Title="基数" />
+                        <PropertyColumn Property="x => x.Description" Title="描述" />
+                        <TemplateColumn Style="text-align:right">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(() => EditRelationship(context.Item))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => DeleteRelationship(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent><MudText>暂无关系</MudText></NoRecordsContent>
+                </MudDataGrid>
+            </MudPaper>
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    private List<OntologyRelationship> allRelationships = new();
+    private List<Ontology> allOntologies = new();
+    private List<BasicEnumItem> relationEnumItems = new();
+    private Dictionary<int, string> ontologyNameMap = new();
+    private string? selectedType;
+
+    private Dictionary<string, int> relationshipTypes
+        => allRelationships
+            .GroupBy(r => r.RelationshipType ?? "")
+            .Where(g => !string.IsNullOrEmpty(g.Key))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+    private List<OntologyRelationship> filteredRelationships
+        => string.IsNullOrEmpty(selectedType)
+            ? allRelationships
+            : allRelationships.Where(r => r.RelationshipType == selectedType).ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var rels = await ApiClient.GetAllRelationshipsAsync();
+            allRelationships = rels.Where(r => r != null).Cast<OntologyRelationship>().ToList();
+        }
+        catch (Exception ex) { Console.WriteLine($"[RelationTab] GetAllRelationshipsAsync 失败: {ex.Message}"); }
+
+        try
+        {
+            var ontologies = await ApiClient.GetAllOntologiesAsync();
+            allOntologies = ontologies.Where(o => o != null).Cast<Ontology>().ToList();
+            ontologyNameMap = allOntologies.ToDictionary(o => o.Id, o => o.DisplayName);
+        }
+        catch (Exception ex) { Console.WriteLine($"[RelationTab] GetAllOntologiesAsync 失败: {ex.Message}"); }
+
+        try
+        {
+            var basicEnums = await ApiClient.GetAllBasicEnumsAsync();
+            var relationEnum = basicEnums?.FirstOrDefault(e => e.Code == "Relation");
+            relationEnumItems = relationEnum?.Items.OrderBy(i => i.SortOrder).ToList() ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine($"[RelationTab] GetAllBasicEnumsAsync 失败: {ex.Message}"); }
+
+        StateHasChanged();
+    }
+
+    private void SelectType(string? type) { selectedType = type; }
+
+    private string GetOntologyName(int id) =>
+        ontologyNameMap.TryGetValue(id, out var name) ? name : $"ID:{id}";
+
+    private string GetTypeDisplayName(string? code)
+    {
+        if (string.IsNullOrEmpty(code)) return code ?? "";
+        return relationEnumItems.FirstOrDefault(i => i.Code == code)?.DisplayName ?? code;
+    }
+
+    private async Task OpenAddTypeDialog()
+    {
+        var parameters = new DialogParameters { ["Title"] = "新增关系类型" };
+        var dialog = await DialogService.ShowAsync<NewEnumItemDialog>("新增关系类型",
+            new DialogParameters { ["EnumId"] = relationEnumItems.FirstOrDefault()?.EnumId ?? 0 });
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteType(string typeCode)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除关系类型「{GetTypeDisplayName(typeCode)}」及其所有关联关系吗？",
+            yesText: "删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        var toDelete = allRelationships.Where(r => r.RelationshipType == typeCode).ToList();
+        foreach (var rel in toDelete)
+        {
+            try { await ApiClient.DeleteRelationshipAsync(rel.Id); }
+            catch (Exception ex) { Console.WriteLine($"[RelationTab] 删除关系 {rel.Id} 失败: {ex.Message}"); }
+        }
+        Snackbar.Add($"已删除类型「{GetTypeDisplayName(typeCode)}」及 {toDelete.Count} 条关系", Severity.Success);
+        if (selectedType == typeCode) selectedType = null;
+        await LoadData();
+    }
+
+    private async Task OpenAddRelationshipDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NewRelationshipDialog>("新建关系");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task EditRelationship(OntologyRelationship rel)
+    {
+        var parameters = new DialogParameters { ["Relationship"] = rel };
+        var dialog = await DialogService.ShowAsync<NewRelationshipDialog>("编辑关系", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteRelationship(OntologyRelationship rel)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除关系「{rel.Name ?? $"#{rel.Id}"}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var success = await ApiClient.DeleteRelationshipAsync(rel.Id);
+            if (success) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private void OpenVisualizationHint()
+    {
+        Snackbar.Add("可视化构建功能开发中", Severity.Info);
+    }
+}

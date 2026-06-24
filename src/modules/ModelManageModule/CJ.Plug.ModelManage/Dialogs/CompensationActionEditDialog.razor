@@ -1,0 +1,59 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudSelect T="string" Label="动作类型 *" @bind-Value="model.ActionType" Required="true">
+                <MudSelectItem Value="@("Retry")">重试(Retry)</MudSelectItem>
+                <MudSelectItem Value="@("Rollback")">回滚(Rollback)</MudSelectItem>
+                <MudSelectItem Value="@("Notify")">通知(Notify)</MudSelectItem>
+                <MudSelectItem Value="@("Skip")">跳过(Skip)</MudSelectItem>
+                <MudSelectItem Value="@("Escalate")">升级(Escalate)</MudSelectItem>
+                <MudSelectItem Value="@("Custom")">自定义(Custom)</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="ActionConfig (JSON)" @bind-Value="model.ActionConfig" Lines="4" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public CompensationAction CompensationAction { get; set; } = new();
+
+    private CompensationAction model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = CompensationAction;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        CompensationAction? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateCompensationActionAsync(model);
+        else
+            result = await ApiClient.UpdateCompensationActionAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

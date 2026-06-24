@@ -67,24 +67,38 @@
         {
             try
             {
-                //CLog.Information(PlugData?.WorkPath, EditorContext.PlugDataZone.PDZId);
-                //CLog.Information($"参数信息：{PlugVariableData?.PlugDataZoneId}", EditorContext.PlugDataZone.PDZId);
-                if(PlugData == null)
+                // 定义模式：通过 Plug 对象的 WorkPath 上传文件
+                if (PlugData == null)
                 {
-                    CLog.Warning("PlugData is null.插头定义暂不支持设置参数默认值。");
-					Snackbar.Add("插头定义暂不支持设置参数默认值。", Severity.Error);
-                    return;
-				}
+                    var plug = EditorContext.Plug;
+                    if (plug == null)
+                    {
+                        CLog.Warning("PlugData and Plug are both null. 插头定义暂不支持设置参数默认值。");
+                        Snackbar.Add("插头定义暂不支持设置参数默认值。", Severity.Error);
+                        return;
+                    }
 
-                (string? RealValuePath, fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+                    using var stream = browserFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+                    (string? RealValuePath, fileId) = await MainApiClient.UploadFileStreamToWorkPath(stream, browserFile.Name, plug);
+                    Variable.Value = browserFile.Name + ":" + fileId;
+                    Variable.Type = VariableTypeEnum.File.ToString();
+                    fileName = browserFile.Name;
+
+                    if (EditorContext.OnValueChanged != null)
+                    {
+                        await EditorContext.OnValueChanged();
+                    }
+                    return;
+                }
+
+                // PDZ 模式：通过 PlugData 的 WorkPath 上传文件
+                (string? _realValuePath, fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
                 PlugVariableData.Value = browserFile.Name + ":" + fileId;
                 PlugVariableData.Type = VariableTypeEnum.File.ToString();
 
                 fileName = browserFile.Name;
-                //fileId = fileId;
 
                 await MainApiClient.UpdatePlugVariableData(PlugVariableData);
-                //await MainApiClient.CreateOrUpdatePDZ(EditorContext.PlugDataZone);
 
                 if (EditorContext.OnValueChanged != null)
                 {
@@ -113,9 +127,14 @@
     {
         Variable.Value = "";
         fileName = null;
-        PlugVariableData.Value = "";
-        PlugVariableData.DisplayValue = "";
-        await MainApiClient.UpdatePlugVariableData(PlugVariableData);
+        fileId = null;
+
+        if (PlugVariableData != null)
+        {
+            PlugVariableData.Value = "";
+            PlugVariableData.DisplayValue = "";
+            await MainApiClient.UpdatePlugVariableData(PlugVariableData);
+        }
 
         if (EditorContext.OnValueChanged != null)
         {

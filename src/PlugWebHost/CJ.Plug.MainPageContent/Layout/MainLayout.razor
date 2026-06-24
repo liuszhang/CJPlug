@@ -67,8 +67,8 @@
     <MudDrawer @bind-Open="@_open" Variant="@DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="1" Width="200px">
         <MudDrawerHeader>
             <MudText Typo="Typo.h6">CJ.Plug</MudText>
-            <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Edge="Edge.End" OnClick="@ToggleDrawer" />
+            @* <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Edge="Edge.End" OnClick="@ToggleDrawer" /> *@
         </MudDrawerHeader>
 
         <MyNavMenu />

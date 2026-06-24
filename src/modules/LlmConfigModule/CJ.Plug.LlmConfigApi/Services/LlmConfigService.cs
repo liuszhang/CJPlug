@@ -322,37 +322,47 @@ public class LlmConfigService : ILlmConfigService
     // ---- MCP Server 配置 ----
 
 
-    public async Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default)
+    public async Task<List<McpServerConfig>> GetMcpServerConfigsAsync(CancellationToken ct = default)
     {
-        var config = await _dbContext.Set<McpServerConfig>()
+        var configs = await _dbContext.Set<McpServerConfig>()
             .OrderBy(c => c.Id)
-            .FirstOrDefaultAsync(ct);
-        return config == null ? null : MapMcpServerConfigToDto(config);
+            .ToListAsync(ct);
+        return configs.Select(MapMcpServerConfigToDto).ToList();
     }
 
-    public async Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    public async Task<McpServerConfig?> CreateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
+    {
+        config.Id = 0;
+        config.CreatedAt = DateTime.UtcNow.ToLocalTime();
+        config.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+        _dbContext.Set<McpServerConfig>().Add(config);
+        await _dbContext.SaveChangesAsync(ct);
+        return MapMcpServerConfigToDto(config);
+    }
+
+    public async Task<McpServerConfig?> UpdateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default)
     {
         var existing = await _dbContext.Set<McpServerConfig>()
-            .OrderBy(c => c.Id)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(c => c.Id == config.Id, ct);
+        if (existing == null) return null;
 
-        if (existing != null)
-        {
-            existing.IsEnabled = config.IsEnabled;
-            existing.ConnectionString = config.ConnectionString;
-            existing.Description = config.Description;
-            existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
-            await _dbContext.SaveChangesAsync(ct);
-            return MapMcpServerConfigToDto(existing);
-        }
-        else
-        {
-            config.CreatedAt = DateTime.UtcNow.ToLocalTime();
-            config.UpdatedAt = DateTime.UtcNow.ToLocalTime();
-            _dbContext.Set<McpServerConfig>().Add(config);
-            await _dbContext.SaveChangesAsync(ct);
-            return MapMcpServerConfigToDto(config);
-        }
+        existing.IsEnabled = config.IsEnabled;
+        existing.ConnectionString = config.ConnectionString;
+        existing.Description = config.Description;
+        existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+        await _dbContext.SaveChangesAsync(ct);
+        return MapMcpServerConfigToDto(existing);
+    }
+
+    public async Task<bool> DeleteMcpServerConfigAsync(int id, CancellationToken ct = default)
+    {
+        var entity = await _dbContext.Set<McpServerConfig>()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (entity == null) return false;
+
+        _dbContext.Set<McpServerConfig>().Remove(entity);
+        await _dbContext.SaveChangesAsync(ct);
+        return true;
     }
 
     public static McpServerConfig MapMcpServerConfigToDto(McpServerConfig c) => new()

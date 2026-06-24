@@ -1,0 +1,60 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudTextField T="string" Label="提议人" @bind-Value="model.ProposedBy" />
+            <MudSelect T="string" Label="状态" @bind-Value="model.Status">
+                <MudSelectItem Value="@("Proposed")">提议(Proposed)</MudSelectItem>
+                <MudSelectItem Value="@("Approved")">批准(Approved)</MudSelectItem>
+                <MudSelectItem Value="@("InProgress")">进行中(InProgress)</MudSelectItem>
+                <MudSelectItem Value="@("Completed")">已完成(Completed)</MudSelectItem>
+            </MudSelect>
+            <MudTextField T="string" Label="结果" @bind-Value="model.Result" Lines="3" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ImprovementAction ImprovementAction { get; set; } = new();
+
+    private ImprovementAction model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = ImprovementAction;
+        if (string.IsNullOrWhiteSpace(model.Status))
+            model.Status = "Proposed";
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        ImprovementAction? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateImprovementActionAsync(model);
+        else
+            result = await ApiClient.UpdateImprovementActionAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

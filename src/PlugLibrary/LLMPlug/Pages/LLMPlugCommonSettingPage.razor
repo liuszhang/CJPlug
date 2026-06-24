@@ -1,0 +1,144 @@
+@using System.Text.Json
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.PlugBaseCore.Models
+@using MudBlazor
+
+<MudText Typo="Typo.subtitle1" Style="margin-top:12px;">系统提示词</MudText>
+<MudTextField T="string"
+    Text="@SystemPrompt"
+    TextChanged="@(v => { SystemPrompt = v; SaveSettings(); })"
+    Lines="6"
+    Variant="Variant.Outlined"
+    Immediate="true" />
+
+<MudExpansionPanels Style="margin-top:16px;">
+    <MudExpansionPanel Text="大模型连接">
+        <ChildContent>
+            <MudTextField T="string"
+                Label="API 地址 (url)"
+                Text="@LlmUrl"
+                TextChanged="@(v => { LlmUrl = v; SaveSettings(); })"
+                Variant="Variant.Outlined"
+                Immediate="true"
+                Style="margin-top:8px;" />
+            <MudTextField T="string"
+                Label="API Key"
+                Text="@LlmApiKey"
+                TextChanged="@(v => { LlmApiKey = v; SaveSettings(); })"
+                Variant="Variant.Outlined"
+                Immediate="true"
+                Style="margin-top:8px;" />
+            <MudTextField T="string"
+                Label="模型 (model Name)"
+                Text="@LlmModel"
+                TextChanged="@(v => { LlmModel = v; SaveSettings(); })"
+                Variant="Variant.Outlined"
+                Immediate="true"
+                Style="margin-top:8px;" />
+        </ChildContent>
+    </MudExpansionPanel>
+
+    <MudExpansionPanel Text="MCP Server">
+        <ChildContent>
+            <MudCheckBox T="bool"
+                Label="启用本地 MCP Server"
+                Value="@McpEnabled"
+                ValueChanged="@(v => { McpEnabled = v; SaveSettings(); })"
+                Style="margin-top:8px;" />
+
+            <MudText Typo="Typo.subtitle2" Style="margin-top:16px;">其他 MCP Server 地址</MudText>
+
+            @for (int i = 0; i < McpServers.Count; i++)
+            {
+                var index = i;
+                <MudStack Row AlignItems="AlignItems.Center" Style="margin-top:4px;">
+                    <MudTextField T="string"
+                        Text="@McpServers[index]"
+                        TextChanged="@(v => { McpServers[index] = v; SaveSettings(); })"
+                        Variant="Variant.Outlined"
+                        Placeholder="MCP Server 地址"
+                        Immediate="true"
+                        Style="flex-grow:1;" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                        Size="Size.Small"
+                        Color="Color.Error"
+                        OnClick="@(() => { McpServers.RemoveAt(index); SaveSettings(); StateHasChanged(); })" />
+                </MudStack>
+            }
+
+            <MudButton OnClick="@(() => { McpServers.Add(""); SaveSettings(); StateHasChanged(); })"
+                StartIcon="@Icons.Material.Filled.Add"
+                Size="Size.Small"
+                Variant="Variant.Outlined"
+                Color="Color.Primary"
+                Style="margin-top:8px;">
+                添加 MCP Server
+            </MudButton>
+        </ChildContent>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public GetSettingContext? SettingContext { get; set; }
+
+    private string SystemPrompt { get; set; } = "";
+    private string LlmUrl { get; set; } = "";
+    private string LlmApiKey { get; set; } = "";
+    private string LlmModel { get; set; } = "";
+    private bool McpEnabled { get; set; } = false;
+    private List<string> McpServers { get; set; } = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadSettings();
+    }
+
+    private Task LoadSettings()
+    {
+        var definitionId = SettingContext?.PlugDefinitionId;
+        if (PlugDataZone == null || definitionId == null) return Task.CompletedTask;
+
+        SystemPrompt = PlugDataZone.GetVariableValue(definitionId, "LLMSystemPrompt") ?? "";
+        LlmUrl = PlugDataZone.GetVariableValue(definitionId, "LLMUrl") ?? "";
+        LlmApiKey = PlugDataZone.GetVariableValue(definitionId, "LLMApiKey") ?? "";
+        LlmModel = PlugDataZone.GetVariableValue(definitionId, "LLMModel") ?? "";
+        McpEnabled = PlugDataZone.GetVariableValue(definitionId, "LLMMcpEnabled") == "true";
+
+        var serversJson = PlugDataZone.GetVariableValue(definitionId, "LLMMcpServers");
+        if (!string.IsNullOrEmpty(serversJson))
+        {
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<string>>(serversJson);
+                if (list != null)
+                    McpServers = list;
+            }
+            catch { }
+        }
+
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void SaveSettings()
+    {
+        var definitionId = SettingContext?.PlugDefinitionId;
+        if (PlugDataZone == null || definitionId == null) return;
+
+        var v1 = PlugDataZone.SetVariableValue(definitionId, "LLMSystemPrompt", SystemPrompt);
+        if (v1 != null) v1.IsBrowsable = false;
+        var v2 = PlugDataZone.SetVariableValue(definitionId, "LLMUrl", LlmUrl);
+        if (v2 != null) v2.IsBrowsable = false;
+        var v3 = PlugDataZone.SetVariableValue(definitionId, "LLMApiKey", LlmApiKey);
+        if (v3 != null) v3.IsBrowsable = false;
+        var v4 = PlugDataZone.SetVariableValue(definitionId, "LLMModel", LlmModel);
+        if (v4 != null) v4.IsBrowsable = false;
+        var v5 = PlugDataZone.SetVariableValue(definitionId, "LLMMcpEnabled", McpEnabled.ToString());
+        if (v5 != null) v5.IsBrowsable = false;
+        var v6 = PlugDataZone.SetVariableValue(definitionId, "LLMMcpServers", JsonSerializer.Serialize(McpServers));
+        if (v6 != null) v6.IsBrowsable = false;
+    }
+}

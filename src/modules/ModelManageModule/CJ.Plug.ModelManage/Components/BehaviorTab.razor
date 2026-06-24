@@ -1,0 +1,117 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="0" Class="pa-3" Style="min-height: 500px;">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudText Typo="Typo.h6">行为列表</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddBehaviorDialog">新建行为</MudButton>
+    </MudStack>
+
+    <MudExpansionPanels MultiExpansion="true">
+        @foreach (var group in behaviorOntologyGroups)
+        {
+            <MudExpansionPanel>
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.body1"><b>@group.Ontology.DisplayName</b></MudText>
+                        <MudSpacer />
+                        <MudChip T="string" Label="true" Size="Size.Small" Color="Color.Primary">@group.Behaviors.Count</MudChip>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    <MudDataGrid Items="@group.Behaviors" T="ObjectBehavior" Dense="true" Hover="true" Elevation="0">
+                        <Columns>
+                            <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                            <PropertyColumn Property="x => x.Name" Title="名称" />
+                            <PropertyColumn Property="x => x.Description" Title="描述" />
+                            <PropertyColumn Property="x => x.ActionType" Title="动作类型" />
+                            <TemplateColumn Style="text-align:right">
+                                <CellTemplate>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditBehavior(context.Item))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteBehavior(context.Item))" />
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                        <NoRecordsContent><MudText>暂无行为</MudText></NoRecordsContent>
+                    </MudDataGrid>
+                </ChildContent>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+</MudPaper>
+
+@code {
+    private List<ObjectBehavior> allBehaviors = new();
+    private List<Ontology> allOntologies = new();
+
+    private record BehaviorOntologyGroup(Ontology Ontology, List<ObjectBehavior> Behaviors);
+
+    private List<BehaviorOntologyGroup> behaviorOntologyGroups =>
+        allBehaviors
+            .GroupBy(b => b.OntologyId)
+            .Select(g =>
+            {
+                var ontology = allOntologies.FirstOrDefault(o => o.Id == g.Key);
+                return ontology == null ? null : new BehaviorOntologyGroup(ontology, g.OrderBy(b => b.SortOrder).ToList());
+            })
+            .Where(g => g != null)
+            .Cast<BehaviorOntologyGroup>()
+            .OrderBy(g => g.Ontology.SortOrder)
+            .ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var ontologies = await ApiClient.GetAllOntologiesAsync();
+            allOntologies = ontologies?.Where(o => o != null).Cast<Ontology>().ToList() ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine($"[BehaviorTab] GetAllOntologiesAsync 失败: {ex.Message}"); }
+
+        try
+        {
+            var bhvs = await ApiClient.GetAllBehaviorsAsync();
+            allBehaviors = bhvs?.Where(b => b != null).Cast<ObjectBehavior>().ToList() ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine($"[BehaviorTab] GetAllBehaviorsAsync 失败: {ex.Message}"); }
+
+        StateHasChanged();
+    }
+
+    private async Task OpenAddBehaviorDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NewBehaviorDialog>("新建行为");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task EditBehavior(ObjectBehavior behavior)
+    {
+        var parameters = new DialogParameters { ["BehaviorId"] = behavior.Id };
+        var dialog = await DialogService.ShowAsync<EditBehaviorDialog>("编辑行为", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteBehavior(ObjectBehavior behavior)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定删除行为「{behavior.Description}」吗？",
+            yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var success = await ApiClient.DeleteBehaviorAsync(behavior.Id);
+            if (success) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}

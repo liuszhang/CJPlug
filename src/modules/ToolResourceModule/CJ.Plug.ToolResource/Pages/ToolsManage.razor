@@ -33,20 +33,21 @@
 }
 else
 {
-    <MudGrid Spacing="2">
+    <div class="tool-card-grid">
         @foreach (var tool in _filteredTools)
         {
-            <MudItem xs="12" sm="6" md="4" lg="3" xl="3">
+            <div class="tool-card-wrapper">
+                <MudTooltip Text="@tool.ToolDescription" Placement="Placement.Top" Delay="500">
                 <MudCard Elevation="2" Class="tool-card">
                     @* 卡片头部 *@
-                    <MudCardHeader>
+                    <MudCardHeader Class="pa-2">
                         <CardHeaderAvatar>
                             <MudIconButton Icon="@GetToolIcon(tool.ToolType)" Color="Color.Primary"
                                            Size="Size.Small" DisableRipple="true" />
                         </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
+                                <MudText Typo="Typo.body2" Style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100px;">
                                     @(tool.ToolName ?? "未命名")
                                 </MudText>
                                 <MudStack Row Spacing="1">
@@ -74,14 +75,14 @@ else
                     </MudCardHeader>
 
                     @* 卡片内容 *@
-                    <MudCardContent Class="pa-2">
-                        <MudStack Spacing="1">
+                    <MudCardContent Class="pa-1">
+                        <MudStack Spacing="0">
                             @* 版本 + 厂商 *@
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
                                 <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text">
                                     v@(tool.ToolVersion)
                                 </MudChip>
-                                <MudText Typo="Typo.body2">
+                                <MudText Typo="Typo.caption">
                                     @(string.IsNullOrEmpty(tool.ToolCompany) ? "-" : tool.ToolCompany)
                                 </MudText>
                             </MudStack>
@@ -91,39 +92,24 @@ else
                                 <MudIcon Icon="@(tool.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
                                          Size="Size.Small"
                                          Color="@(tool.IsEnabled ? Color.Success : Color.Error)" />
-                                <MudText Typo="Typo.body2">
+                                <MudText Typo="Typo.caption">
                                     @(tool.IsEnabled ? "已启用" : "已禁用")
                                 </MudText>
                             </MudStack>
 
-                            @* 工具路径 (可折叠) *@
-                            @if (!string.IsNullOrEmpty(tool.ToolPath))
-                            {
-                                <MudText Typo="Typo.caption" Class="text-muted text-truncate" Style="max-width:100%;">
-                                    路径: @tool.ToolPath
-                                </MudText>
-                            }
-
-                            @* 工具描述 (截断显示) *@
-                            @if (!string.IsNullOrEmpty(tool.ToolDescription))
-                            {
-                                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                    @tool.ToolDescription
-                                </MudText>
-                            }
                         </MudStack>
                     </MudCardContent>
 
                     @* 卡片操作区 *@
                     <MudCardActions Class="card-actions">
                         <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
-                            <MudTooltip Text="启动工具并打开远程可视化窗口">
+                            @* <MudTooltip Text="启动工具并打开远程可视化窗口">
                                 <MudButton OnClick="@(() => LaunchToolWithVisualization(tool))"
                                            Variant="Variant.Filled" Size="Size.Small" Color="Color.Info"
                                            StartIcon="@Icons.Material.Filled.PlayArrow">
                                     启动
                                 </MudButton>
-                            </MudTooltip>
+                            </MudTooltip> *@
                             <MudTooltip Text="编辑工具配置">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                                OnClick="@(() => EditToolItem(tool))" />
@@ -149,13 +135,27 @@ else
                         </MudStack>
                     </MudCardActions>
                 </MudCard>
-            </MudItem>
+                </MudTooltip>
+            </div>
         }
-    </MudGrid>
+    </div>
 }
 
 <style>
+    .tool-card-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .tool-card-wrapper {
+        flex: 0 0 160px;
+        height: 210px;
+    }
     .tool-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
         transition: all 0.25s ease;
         border-radius: 12px;
         border: 1px solid var(--mud-palette-divider);
@@ -164,9 +164,13 @@ else
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }
+    .tool-card .mud-card-content {
+        flex: 1;
+        overflow: hidden;
+    }
     .card-actions {
         background: var(--mud-palette-background-grey);
-        padding: 4px 8px;
+        padding: 2px 6px;
         border-top: 1px solid var(--mud-palette-divider);
     }
     .text-muted {

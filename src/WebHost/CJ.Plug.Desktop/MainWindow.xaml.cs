@@ -72,7 +72,7 @@ public partial class MainWindow : Window
         };
 
         // 初始化服务管理视图（仪表盘 WebView2 + 控制面板 + 数据库配置）
-        await ServiceManagementView.InitializeAsync(_serviceControlVm, _databaseConfigVm, "http://localhost:15288");
+        await ServiceManagementView.InitializeAsync(_serviceControlVm, _databaseConfigVm, "http://localhost:15288", "http://localhost:5066/SystemConfig");
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

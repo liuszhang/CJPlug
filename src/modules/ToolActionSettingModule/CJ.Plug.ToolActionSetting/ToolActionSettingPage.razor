@@ -452,23 +452,24 @@
             _actionPanelPlug = SelectedPlug;
             StateHasChanged();
 
-            // 监听图站执行事件：直接运行插头时触发 VNC 远程桌面弹窗
+            // 监听图站执行事件：直接运行插头时触发远程桌面弹窗
             HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
             HubConnectionManagerService._hubConnection.On(
                 LogTypeEnum.StationExecuting.ToString(),
-                new[] { typeof(string), typeof(string), typeof(string) },
+                new[] { typeof(string), typeof(string), typeof(string), typeof(string) },
                 (args, _) =>
                 {
                     var pdzId = (string?)args[0];
                     var plugDefinitionId = (string?)args[1];
                     var stationIp = (string?)args[2];
+                    var protocol = (string?)args[3] ?? "vnc";
                     if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
                     InvokeAsync(async () =>
                     {
                         var host = stationIp;
                         try { host = new Uri(stationIp).Host; } catch { }
-                        Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面...", Severity.Info);
-                        await JSRuntime.InvokeVoidAsync("open", $"/remote/vnc/{host}", "_blank");
+                        Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({protocol})...", Severity.Info);
+                        await JSRuntime.InvokeVoidAsync("open", $"/remote/{host}/{protocol}", "_blank");
                     });
                     return Task.CompletedTask;
                 },

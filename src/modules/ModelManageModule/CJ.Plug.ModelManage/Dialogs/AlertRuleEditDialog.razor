@@ -1,0 +1,60 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
+            <MudSelect T="string" Label="条件 *" @bind-Value="model.Condition" Required="true">
+                <MudSelectItem Value="@("Above")">高于(Above)</MudSelectItem>
+                <MudSelectItem Value="@("Below")">低于(Below)</MudSelectItem>
+                <MudSelectItem Value="@("Equals")">等于(Equals)</MudSelectItem>
+            </MudSelect>
+            <MudNumericField Label="阈值 *" @bind-Value="model.Threshold" />
+            <MudTextField T="string" Label="严重程度" @bind-Value="model.Severity" />
+            <MudSwitch T="bool" Label="启用" @bind-Checked="model.IsEnabled" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public AlertRule AlertRule { get; set; } = new();
+
+    private AlertRule model = new();
+
+    protected override void OnParametersSet()
+    {
+        model = AlertRule;
+        if (model.Id == 0)
+            model.IsEnabled = true;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Code))
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        AlertRule? result;
+        if (model.Id == 0)
+            result = await ApiClient.CreateAlertRuleAsync(model);
+        else
+            result = await ApiClient.UpdateAlertRuleAsync(model);
+        if (result != null) { Snackbar.Add(model.Id == 0 ? "创建成功" : "更新成功", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+        else Snackbar.Add(model.Id == 0 ? "创建失败" : "更新失败", Severity.Error);
+    }
+}

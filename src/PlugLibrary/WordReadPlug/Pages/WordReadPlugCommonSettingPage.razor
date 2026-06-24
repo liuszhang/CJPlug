@@ -1,0 +1,137 @@
+@using Blazored.LocalStorage
+@using CJ.Plug.Models.Plug
+@using CJ.Plug.Models.Shared
+@using CJ.Plug.SharedPages
+@using CJ.Plug.SharedPages.Contracts
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using Serilog
+@using WordReadPlug.Services
+@using DocumentFormat.OpenXml.Packaging
+
+@inject MainApiClient MainApiClient
+@inject ILocalStorageService _localStorageService
+@inject IDomInteropService DomInteropService
+
+<MudStack Row AlignItems="AlignItems.Center" StretchItems="StretchItems.None">
+    <MudFileUpload T="IBrowserFile" FilesChanged="@((f) => CheckLocalFile(f))" Style="margin-bottom:-4px;">
+        <CustomContent>
+            <MudButton OnClick="@context.OpenFilePickerAsync" StartIcon="@Icons.Material.Filled.UploadFile" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">导入Word文件</MudButton>
+        </CustomContent>
+        <SelectedTemplate />
+    </MudFileUpload>
+</MudStack>
+
+<MudText Style="margin-top:12px;">当前文件：@FileName</MudText>
+
+@if (Processing)
+{
+    <MudProgressCircular Indeterminate="true" Size="Size.Small"></MudProgressCircular>
+}
+
+@if (!string.IsNullOrEmpty(PreviewText))
+{
+    <MudText Typo="Typo.subtitle1" Style="margin-top:12px;">文件内容预览</MudText>
+    <MudPaper Elevation="1" Class="pa-4" Style="max-height:400px;overflow-y:auto;white-space:pre-wrap;background-color:#fafafa;">
+        <MudText>@PreviewText</MudText>
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter]
+    public PlugDataZone? PlugDataZone { get; set; }
+    [Parameter]
+    public string? PlugDefinitionId { get; set; }
+
+    public PlugData? PlugData { get; set; } = new();
+
+    private string? FileId { get; set; }
+    private string? FileName { get; set; }
+    private string? TmpLocalFilePath { get; set; }
+    private string? PreviewText { get; set; }
+    private bool Processing { get; set; } = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PlugDataZone == null)
+            return;
+
+        if (!string.IsNullOrEmpty(PlugDefinitionId))
+        {
+            PlugData = PlugDataZone.GetPlugData(PlugDefinitionId);
+        }
+        await LoadRootData();
+    }
+
+    private async Task LoadRootData()
+    {
+        Processing = true;
+        var fileVariable = PlugDataZone?.GetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString());
+        if (!string.IsNullOrEmpty(fileVariable))
+        {
+            FileName = fileVariable.Split(':').FirstOrDefault();
+            FileId = fileVariable.Split(':').LastOrDefault();
+        }
+        if (string.IsNullOrEmpty(FileId) || string.IsNullOrEmpty(FileName))
+        {
+            Processing = false;
+            return;
+        }
+
+        TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+        try
+        {
+            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+            using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
+            {
+                await sourceStream?.CopyToAsync(stream);
+            }
+
+            using var wordDoc = WordprocessingDocument.Open(TmpLocalFilePath, false);
+            PreviewText = wordDoc.MainDocumentPart!.Document.Body!.InnerText;
+        }
+        catch (Exception e)
+        {
+            Log.Information("加载Word文件预览出错：" + e.Message);
+        }
+        finally
+        {
+            Processing = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task CheckLocalFile(IBrowserFile browserFile)
+    {
+        if (browserFile == null) return;
+        try
+        {
+            Processing = true;
+            (var filePath, var fileId) = await MainApiClient.UploadFileToWorkPath(browserFile, PlugData);
+            PlugDataZone?.SetVariableValue(PlugDefinitionId, InitVariableNames.WordFile.ToString(), browserFile.Name + ":" + fileId);
+            if (PlugDataZone != null)
+                await MainApiClient.CreateOrUpdatePDZ(PlugDataZone);
+
+            FileName = browserFile.Name;
+            FileId = fileId;
+            TmpLocalFilePath = Path.Combine(GlobalData.MainWebFileServer, FileName);
+            await using var sourceStream = await MainApiClient.GetFileStreamByFileId(FileId);
+            using (var stream = new FileStream(TmpLocalFilePath, FileMode.Create))
+            {
+                await sourceStream?.CopyToAsync(stream);
+            }
+
+            using var wordDoc = WordprocessingDocument.Open(TmpLocalFilePath, false);
+            PreviewText = wordDoc.MainDocumentPart!.Document.Body!.InnerText;
+        }
+        catch (Exception ex)
+        {
+            Log.Information("上传文件出错：" + ex.Message);
+        }
+        finally
+        {
+            Processing = false;
+            StateHasChanged();
+        }
+    }
+}

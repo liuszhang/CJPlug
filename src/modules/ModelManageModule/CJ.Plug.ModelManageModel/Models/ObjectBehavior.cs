@@ -22,6 +22,15 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>排序</summary>
         public int SortOrder { get; set; } = 0;
 
+        /// <summary>行为动作类型（Submit/Button/Reset/Navigate/Custom）</summary>
+        public ActionType? ActionType { get; set; } = Models.ActionType.Submit;
+
+        /// <summary>API 调用地址（Submit/Custom 类型时使用）</summary>
+        public string? ApiUrl { get; set; }
+
+        /// <summary>执行前确认提示消息</summary>
+        public string? ConfirmMessage { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
     }

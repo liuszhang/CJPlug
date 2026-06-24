@@ -169,23 +169,45 @@ public static class LlmConfigApi
         .WithDescription("测试 LLM 连接");
 
         // ---- MCP Server 配置 ----
-        api.MapGet("/getMcpServerConfig", async (
+        api.MapGet("/getMcpServerConfigs", async (
             ILlmConfigService service,
             CancellationToken ct) =>
         {
-            var config = await service.GetMcpServerConfigAsync(ct);
-            return config == null ? Results.Ok(null) : Results.Ok(config);
+            var configs = await service.GetMcpServerConfigsAsync(ct);
+            return Results.Ok(configs);
         })
-        .WithName("GetMcpServerConfig")
-        .WithDescription("获取 MCP Server 配置");
+        .WithName("GetMcpServerConfigs")
+        .WithDescription("获取所有 MCP Server 配置");
 
-        api.MapPost("/saveMcpServerConfig", async (
+        api.MapPost("/createMcpServerConfig", async (
             [FromBody] McpServerConfig config,
             ILlmConfigService service,
             CancellationToken ct) =>
-            await service.SaveMcpServerConfigAsync(config, ct))
-        .WithName("SaveMcpServerConfig")
-        .WithDescription("保存 MCP Server 配置");
+            await service.CreateMcpServerConfigAsync(config, ct))
+        .WithName("CreateMcpServerConfig")
+        .WithDescription("创建 MCP Server 配置");
+
+        api.MapPut("/updateMcpServerConfig", async (
+            [FromBody] McpServerConfig config,
+            ILlmConfigService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.UpdateMcpServerConfigAsync(config, ct);
+            return result == null ? Results.NotFound() : Results.Ok(result);
+        })
+        .WithName("UpdateMcpServerConfig")
+        .WithDescription("更新 MCP Server 配置");
+
+        api.MapDelete("/deleteMcpServerConfig/{id}", async (
+            int id,
+            ILlmConfigService service,
+            CancellationToken ct) =>
+        {
+            var success = await service.DeleteMcpServerConfigAsync(id, ct);
+            return success ? Results.Ok(true) : Results.NotFound();
+        })
+        .WithName("DeleteMcpServerConfig")
+        .WithDescription("删除 MCP Server 配置");
 
         return app;
     }

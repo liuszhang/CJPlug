@@ -98,10 +98,10 @@ public class MainHub(IStationService stationService):Hub
         /// <summary>
         /// 图站开始执行通知 (用于触发 Guacamole 远程桌面)
         /// </summary>
-        public async Task StationExecuting(string PDZId, string PlugDefinitionId, string StationIp)
+        public async Task StationExecuting(string PDZId, string PlugDefinitionId, string StationIp, string Protocol = "vnc")
         {
-            Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp}");
-            await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp);
+            Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp} protocol={Protocol}");
+            await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol);
         }
 
         /// <summary>

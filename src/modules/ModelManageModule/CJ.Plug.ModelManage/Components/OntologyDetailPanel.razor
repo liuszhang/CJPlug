@@ -1,0 +1,605 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient OntologyManageApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@if (ActiveOntology == null)
+{
+    <MudPaper Elevation="0" Class="d-flex align-center justify-center" Style="min-height: 300px;">
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">请在左侧选择一个对象以查看详情</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Elevation="1" Class="pa-3">
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true"
+                 Outlined="true" PanelClass="pa-4" ActivePanelIndexChanged="OnTabChanged">
+
+            @* ========== 页签1: 详情 ========== *@
+            <MudTabPanel Text="详情" BadgeData="null">
+                <MudStack Spacing="3">
+                    <MudTextField T="string" Label="编码" @bind-Value="ActiveOntology.Code" />
+                    <MudTextField T="string" Label="名称" @bind-Value="ActiveOntology.Name" />
+                    <MudTextField T="string" Label="显示名称" @bind-Value="ActiveOntology.DisplayName" />
+                    <MudSelect T="MetaModelDimension?" Label="元模型维度" @bind-Value="ActiveOntology.Dimension" Clearable="true">
+                        @foreach (var dim in Enum.GetValues<MetaModelDimension>())
+                        {
+                            <MudSelectItem T="MetaModelDimension?" Value="@dim">@GetDimensionLabel(dim)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField T="string" Label="分类" @bind-Value="ActiveOntology.Category" />
+                    <MudTextField T="string" Label="版本" @bind-Value="ActiveOntology.Version" />
+                    <MudTextField T="string" Label="描述" @bind-Value="ActiveOntology.Description" Lines="3" />
+                    <MudStack Row>
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveDetail">保存详情</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudTabPanel>
+
+            @* ========== 页签2: 字段列表 ========== *@
+            <MudTabPanel Text="字段列表">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.h6">字段属性</MudText>
+                    <MudSpacer />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="AddProperty">添加字段</MudButton>
+                </MudStack>
+
+                <MudDataGrid Items="allFields" T="Property" Dense="true" Hover="true" Elevation="0"
+                             RowClassFunc="GetFieldRowClass">
+                    <Columns>
+                        <PropertyColumn Property="x => x.SortOrder" Title="排序" />
+                        <PropertyColumn Property="x => x.Name" Title="标识" />
+                        <PropertyColumn Property="x => x.DisplayName" Title="显示名" />
+                        <TemplateColumn Title="类型">
+                            <CellTemplate>
+                                <MudChip Label="true" Size="Size.Small" Color="Color.Info">@context.Item.PropertyType</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="来源">
+                            <CellTemplate>
+                                @if (context.Item.IsOverridden == true)
+                                {
+                                    <MudTooltip Text="与父对象字段重名，不生效">
+                                        <MudChip Label="true" Size="Size.Small" Color="Color.Warning">覆盖</MudChip>
+                                    </MudTooltip>
+                                }
+                                else if (context.Item.OntologyId != ActiveOntology.Id)
+                                {
+                                    <MudChip Label="true" Size="Size.Small" Color="Color.Default">继承</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip Label="true" Size="Size.Small" Color="Color.Success">自有</MudChip>
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.Value" Title="默认值" />
+                        <TemplateColumn Style="text-align:right">
+                            <CellTemplate>
+                                @if (context.Item.OntologyId == ActiveOntology.Id)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                   OnClick="@(() => EditProperty(context.Item))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => DeleteProperty(context.Item))" />
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">只读</MudText>
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <NoRecordsContent>
+                        <MudText>暂无字段</MudText>
+                    </NoRecordsContent>
+                </MudDataGrid>
+            </MudTabPanel>
+
+            @* ========== 页签3: 生命周期 ========== *@
+            <MudTabPanel Text="生命周期">
+                <MudStack Spacing="4">
+                    @* 状态列表 *@
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">状态列表</MudText>
+                        @if (lifecycleStates == null || !lifecycleStates.Any())
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mb-2">暂无关联状态</MudAlert>
+                        }
+                        else
+                        {
+                            <MudTable Items="lifecycleStates" T="Ontology" Dense="true" Hover="true" Elevation="0" Class="mb-2">
+                                <HeaderContent>
+                                    <MudTh>名称</MudTh>
+                                    <MudTh>编码</MudTh>
+                                    <MudTh Style="text-align:right">操作</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>
+                                        <MudTextField T="string" Value="@context.Name"
+                                                      ValueChanged="@(v => { context.Name = v; })"
+                                                      Immediate="true" Variant="Variant.Text" />
+                                    </MudTd>
+                                    <MudTd><MudText Typo="Typo.body2">@context.Code</MudText></MudTd>
+                                    <MudTd Style="text-align:right">
+                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                                   OnClick="@(() => SaveState(context))">保存</MudButton>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                       OnClick="@(() => DeleteState(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                            <MudTextField T="string" Label="新状态名称" @bind-Value="newStateName" Variant="Variant.Outlined"
+                                          Style="width:200px" />
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddState"
+                                       Disabled="@string.IsNullOrWhiteSpace(newStateName)">添加状态</MudButton>
+                        </MudStack>
+                    </div>
+
+                    <MudDivider />
+
+                    @* 转换列表 *@
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">状态转换（Transition）</MudText>
+                        @if (lifecycleTransitions == null || !lifecycleTransitions.Any())
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mb-2">暂无转换关系</MudAlert>
+                        }
+                        else
+                        {
+                            <MudTable Items="lifecycleTransitions" T="OntologyRelationship" Dense="true" Hover="true" Elevation="0" Class="mb-2">
+                                <HeaderContent>
+                                    <MudTh>源状态</MudTh>
+                                    <MudTh>目标状态</MudTh>
+                                    <MudTh Style="text-align:right">操作</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>@GetStateName(context.SourceOntologyId)</MudTd>
+                                    <MudTd>@GetStateName(context.TargetOntologyId)</MudTd>
+                                    <MudTd Style="text-align:right">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                       OnClick="@(() => DeleteTransition(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        @if (lifecycleStates.Count >= 2)
+                        {
+                            <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                                <MudSelect T="int?" Label="源状态" @bind-Value="transitionSourceId" Variant="Variant.Outlined"
+                                           Style="width:180px" AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var s in lifecycleStates)
+                                    {
+                                        <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudText Typo="Typo.body1" Class="mx-1">→</MudText>
+                                <MudSelect T="int?" Label="目标状态" @bind-Value="transitionTargetId" Variant="Variant.Outlined"
+                                           Style="width:180px" AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var s in lifecycleStates)
+                                    {
+                                        <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddTransition"
+                                           Disabled="@(transitionSourceId == null || transitionTargetId == null || transitionSourceId == transitionTargetId)">
+                                    添加转换
+                                </MudButton>
+                            </MudStack>
+                        }
+                    </div>
+                </MudStack>
+            </MudTabPanel>
+
+            @* ========== 页签4: 备注 ========== *@
+            <MudTabPanel Text="备注">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        创建：@ActiveOntology.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                        | 更新：@ActiveOntology.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                        | 创建者：@(ActiveOntology.CreatedBy ?? "-")
+                        | ID：@ActiveOntology.Id
+                    </MudText>
+                    <MudTextField T="string" Label="备注" @bind-Value="noteText" Lines="10" Variant="Variant.Outlined" />
+                    <MudStack Row>
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveNote">保存备注</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudTabPanel>
+
+        </MudTabs>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Ontology? ActiveOntology { get; set; }
+    [Parameter] public EventCallback DataChanged { get; set; }
+
+    private List<Property> allFields = new();
+    private List<Ontology> lifecycleStates = new();
+    private List<OntologyRelationship> lifecycleTransitions = new();
+    private string newStateName = string.Empty;
+    private int? transitionSourceId;
+    private int? transitionTargetId;
+    private string noteText = string.Empty;
+
+    private static string GetDimensionLabel(MetaModelDimension dim) => dim switch
+    {
+        MetaModelDimension.M0 => "M0 基础语义",
+        MetaModelDimension.M1 => "M1 对象结构",
+        MetaModelDimension.M2 => "M2 行为",
+        MetaModelDimension.M3 => "M3 规则",
+        MetaModelDimension.M4 => "M4 场景",
+        MetaModelDimension.M5 => "M5 主体",
+        MetaModelDimension.M6 => "M6 可靠性",
+        MetaModelDimension.M7 => "M7 质量",
+        _ => dim.ToString()
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ActiveOntology != null)
+        {
+            noteText = ActiveOntology.Description ?? string.Empty;
+
+            try { await LoadFieldsAsync(); }
+            catch (Exception ex) { Console.WriteLine($"[OntologyDetailPanel] LoadFieldsAsync 失败: {ex.Message}"); }
+
+            try { await LoadLifecycleAsync(); }
+            catch (Exception ex) { Console.WriteLine($"[OntologyDetailPanel] LoadLifecycleAsync 失败: {ex.Message}"); }
+        }
+        else
+        {
+            allFields = new();
+            lifecycleStates = new();
+            lifecycleTransitions = new();
+            noteText = string.Empty;
+        }
+    }
+
+    private async Task LoadFieldsAsync()
+    {
+        if (ActiveOntology == null) return;
+
+        // 1. 从 API 获取当前对象的最新属性
+        var latest = await OntologyManageApiClient.GetOntologyByIdAsync(ActiveOntology.Id);
+        if (latest?.Properties != null)
+        {
+            ActiveOntology.Properties = latest.Properties.OrderBy(p => p.SortOrder).ToList();
+        }
+
+        // 2. 递归收集祖先属性
+        var inherited = await CollectAncestorPropertiesAsync(ActiveOntology.ParentId);
+
+        // 3. 合并：祖先属性在前，自有属性在后，标记重名
+        var ownNames = ActiveOntology.Properties.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        allFields = new List<Property>();
+
+        foreach (var ip in inherited)
+        {
+            if (ownNames.Contains(ip.Name))
+            {
+                ip.IsOverridden = true;
+            }
+            else
+            {
+                ip.IsOverridden = false;
+            }
+            allFields.Add(ip);
+        }
+
+        foreach (var op in ActiveOntology.Properties)
+        {
+            op.IsOverridden = null; // 自有字段不标记覆盖
+            allFields.Add(op);
+        }
+    }
+
+    private async Task<List<Property>> CollectAncestorPropertiesAsync(int? parentId)
+    {
+        var result = new List<Property>();
+        var visited = new HashSet<int>();
+        int? currentParentId = parentId;
+
+        while (currentParentId.HasValue && visited.Add(currentParentId.Value))
+        {
+            var parent = await OntologyManageApiClient.GetOntologyByIdAsync(currentParentId.Value);
+            if (parent?.Properties != null)
+            {
+                result.InsertRange(0, parent.Properties.OrderBy(p => p.SortOrder));
+            }
+            currentParentId = parent?.ParentId;
+        }
+
+        return result;
+    }
+
+    private async Task LoadLifecycleAsync()
+    {
+        if (ActiveOntology == null) return;
+
+        // 1. 加载关联的状态本体（Transition关系，目标为M2）
+        var relationships = await OntologyManageApiClient.GetRelationshipsByOntologyIdAsync(ActiveOntology.Id);
+        var stateIds = relationships
+            ?.Where(r => r.RelationshipType == "Transition" && r.TargetOntologyId > 0)
+            .Select(r => r.TargetOntologyId)
+            .Distinct()
+            .ToList() ?? new();
+
+        var states = new List<Ontology>();
+        foreach (var stateId in stateIds)
+        {
+            var state = await OntologyManageApiClient.GetOntologyByIdAsync(stateId);
+            if (state != null && state.Dimension == MetaModelDimension.M2)
+            {
+                states.Add(state);
+            }
+        }
+        lifecycleStates = states;
+
+        // 2. 加载状态之间的转换关系
+        lifecycleTransitions = new List<OntologyRelationship>();
+        if (lifecycleStates.Count >= 2)
+        {
+            var stateIdSet = lifecycleStates.Select(s => s.Id).ToHashSet();
+            // 逐个加载每个状态的Transition关系，筛选源和目标都在状态列表中的
+            foreach (var state in lifecycleStates)
+            {
+                var stateRels = await OntologyManageApiClient.GetRelationshipsByOntologyIdAsync(state.Id);
+                var transitions = stateRels
+                    ?.Where(r => r.RelationshipType == "Transition"
+                              && stateIdSet.Contains(r.SourceOntologyId)
+                              && stateIdSet.Contains(r.TargetOntologyId))
+                    .ToList() ?? new();
+                foreach (var t in transitions)
+                {
+                    if (!lifecycleTransitions.Any(lt => lt.Id == t.Id))
+                        lifecycleTransitions.Add(t);
+                }
+            }
+        }
+    }
+
+    // ===== 生命周期操作方法 =====
+
+    private string GetStateName(int ontologyId)
+    {
+        return lifecycleStates.FirstOrDefault(s => s.Id == ontologyId)?.Name ?? $"ID:{ontologyId}";
+    }
+
+    private async Task AddState()
+    {
+        if (ActiveOntology == null || string.IsNullOrWhiteSpace(newStateName)) return;
+
+        // 创建新的 M2 状态本体
+        var newState = new Ontology
+        {
+            Name = newStateName.Trim(),
+            DisplayName = newStateName.Trim(),
+            Code = $"State_{DateTime.Now:yyyyMMddHHmmss}",
+            Category = "State",
+            Dimension = MetaModelDimension.M2,
+            SortOrder = lifecycleStates.Count + 1
+        };
+
+        var created = await OntologyManageApiClient.CreateOntologyAsync(newState);
+        if (created == null)
+        {
+            Snackbar.Add("创建状态失败", Severity.Error);
+            return;
+        }
+
+        // 创建当前对象到新状态的 Transition 关系
+        var rel = new OntologyRelationship
+        {
+            SourceOntologyId = ActiveOntology.Id,
+            TargetOntologyId = created.Id,
+            Name = $"到{created.Name}",
+            DisplayName = $"转换为 {created.Name}",
+            Code = $"Transition_{ActiveOntology.Id}_{created.Id}",
+            RelationshipType = "Transition",
+            Cardinality = "OneToOne"
+        };
+        await OntologyManageApiClient.CreateRelationshipAsync(rel);
+
+        // 刷新状态列表
+        lifecycleStates.Add(created);
+        newStateName = string.Empty;
+        Snackbar.Add($"状态「{created.Name}」已创建", Severity.Success);
+        StateHasChanged();
+        await DataChanged.InvokeAsync();
+    }
+
+    private async Task SaveState(Ontology state)
+    {
+        var result = await OntologyManageApiClient.UpdateOntologyAsync(state);
+        if (result != null)
+        {
+            Snackbar.Add($"状态「{state.Name}」已保存", Severity.Success);
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+
+    private async Task DeleteState(Ontology state)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除状态「{state.Name}」吗？相关转换关系也将被删除。",
+            yesText: "删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        // 删除涉及该状态的所有 Transition 关系
+        var stateRels = await OntologyManageApiClient.GetRelationshipsByOntologyIdAsync(state.Id);
+        var toDeleteRels = stateRels?.Where(r => r.RelationshipType == "Transition").ToList() ?? new();
+        foreach (var rel in toDeleteRels)
+        {
+            await OntologyManageApiClient.DeleteRelationshipAsync(rel.Id);
+        }
+
+        // 同时删除当前对象到该状态的Transition关系
+        var mainRels = await OntologyManageApiClient.GetRelationshipsByOntologyIdAsync(ActiveOntology!.Id);
+        var mainDeleteRels = mainRels?.Where(r => r.RelationshipType == "Transition" && r.TargetOntologyId == state.Id).ToList() ?? new();
+        foreach (var rel in mainDeleteRels)
+        {
+            await OntologyManageApiClient.DeleteRelationshipAsync(rel.Id);
+        }
+
+        await OntologyManageApiClient.DeleteOntologyAsync(state.Id);
+
+        lifecycleStates.Remove(state);
+        lifecycleTransitions.RemoveAll(t => t.SourceOntologyId == state.Id || t.TargetOntologyId == state.Id);
+        Snackbar.Add($"状态「{state.Name}」已删除", Severity.Success);
+        StateHasChanged();
+        await DataChanged.InvokeAsync();
+    }
+
+    private async Task AddTransition()
+    {
+        if (ActiveOntology == null || transitionSourceId == null || transitionTargetId == null) return;
+        if (transitionSourceId == transitionTargetId)
+        {
+            Snackbar.Add("源状态和目标状态不能相同", Severity.Warning);
+            return;
+        }
+
+        var srcName = GetStateName(transitionSourceId.Value);
+        var tgtName = GetStateName(transitionTargetId.Value);
+
+        var rel = new OntologyRelationship
+        {
+            SourceOntologyId = transitionSourceId.Value,
+            TargetOntologyId = transitionTargetId.Value,
+            Name = $"{srcName}→{tgtName}",
+            DisplayName = $"{srcName} → {tgtName}",
+            Code = $"Transition_{transitionSourceId}_{transitionTargetId}",
+            RelationshipType = "Transition",
+            Cardinality = "OneToOne"
+        };
+
+        var created = await OntologyManageApiClient.CreateRelationshipAsync(rel);
+        if (created != null)
+        {
+            lifecycleTransitions.Add(created);
+            transitionSourceId = null;
+            transitionTargetId = null;
+            Snackbar.Add("转换关系已添加", Severity.Success);
+            StateHasChanged();
+            await DataChanged.InvokeAsync();
+        }
+        else
+        {
+            Snackbar.Add("添加转换关系失败", Severity.Error);
+        }
+    }
+
+    private async Task DeleteTransition(OntologyRelationship rel)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除转换「{GetStateName(rel.SourceOntologyId)} → {GetStateName(rel.TargetOntologyId)}」吗？",
+            yesText: "删除", cancelText: "取消");
+        if (confirm != true) return;
+
+        await OntologyManageApiClient.DeleteRelationshipAsync(rel.Id);
+        lifecycleTransitions.Remove(rel);
+        Snackbar.Add("转换关系已删除", Severity.Success);
+        StateHasChanged();
+        await DataChanged.InvokeAsync();
+    }
+
+    private async Task SaveNote()
+    {
+        if (ActiveOntology == null) return;
+        ActiveOntology.Description = noteText;
+        var result = await OntologyManageApiClient.UpdateOntologyAsync(ActiveOntology);
+        if (result != null)
+        {
+            Snackbar.Add("备注已保存", Severity.Success);
+            await DataChanged.InvokeAsync();
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+
+    // 字段行样式：继承灰底、重名浅粉底、自有白底
+    private string GetFieldRowClass(Property prop, int rowIndex)
+    {
+        if (prop.IsOverridden == true)
+            return "mud-theme-warning mud-background-opacity-1";
+        if (prop.OntologyId != ActiveOntology?.Id)
+            return "mud-background-gray";
+        return string.Empty;
+    }
+
+    private async Task SaveDetail()
+    {
+        if (ActiveOntology == null) return;
+        var result = await OntologyManageApiClient.UpdateOntologyAsync(ActiveOntology);
+        if (result != null)
+        {
+            Snackbar.Add("保存成功", Severity.Success);
+            await DataChanged.InvokeAsync();
+        }
+        else
+        {
+            Snackbar.Add("保存失败", Severity.Error);
+        }
+    }
+
+    private async Task AddProperty()
+    {
+        if (ActiveOntology == null) return;
+        var parameters = new DialogParameters { ["Property"] = new Property { OntologyId = ActiveOntology.Id, SortOrder = ActiveOntology.Properties?.Count ?? 0 } };
+        var dialog = await DialogService.ShowAsync<NewPropertyDialog>("添加属性字段", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadFieldsAsync();
+            StateHasChanged();
+            await DataChanged.InvokeAsync();
+        }
+    }
+
+    private async Task EditProperty(Property prop)
+    {
+        var parameters = new DialogParameters { ["Property"] = prop };
+        var dialog = await DialogService.ShowAsync<NewPropertyDialog>("编辑属性字段", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadFieldsAsync();
+            StateHasChanged();
+            await DataChanged.InvokeAsync();
+        }
+    }
+
+    private async Task DeleteProperty(Property prop)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除", $"确定要删除属性 '{prop.DisplayName}' 吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            await OntologyManageApiClient.DeletePropertyAsync(prop.Id);
+            await LoadFieldsAsync();
+            StateHasChanged();
+            await DataChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        if (ActiveOntology == null) return;
+        if (index == 1) await LoadFieldsAsync();
+        else if (index == 2) await LoadLifecycleAsync();
+        StateHasChanged();
+    }
+}

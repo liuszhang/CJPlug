@@ -68,6 +68,9 @@ public partial class App : Application
             return;
         }
 
+        // 将用户配置的主服务地址同步到 GlobalData，确保远程图站的 SignalR 日志连接正确
+        OverrideGlobalDataFromConfig();
+
         // 连接 MainHub 订阅 CommonLog 事件，实时接收 StationApiServer 推送的日志
         _ = ConnectToLogHubAsync();
     }
@@ -116,6 +119,39 @@ public partial class App : Application
         catch
         {
             // Hub 不可用时静默忽略 — 方案 B（读取日志文件）作为兜底
+        }
+    }
+
+    /// <summary>
+    /// 从 StationSettingUI 共享的 SQLite 配置中读取用户设置的主服务地址，
+    /// 并覆盖 GlobalData 中的硬编码 localhost，确保远程图站能连接到正确的主服务。
+    /// </summary>
+    private static void OverrideGlobalDataFromConfig()
+    {
+        try
+        {
+            var dbPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "CJStation", "station_config.db");
+
+            if (!File.Exists(dbPath))
+                return;
+
+            using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT Value FROM AppConfig WHERE Key = 'MainServerUrl'";
+            var result = cmd.ExecuteScalar() as string;
+
+            if (!string.IsNullOrWhiteSpace(result) && result != GlobalData.MainDispatcherServer)
+            {
+                GlobalData.MainDispatcherServer = result;
+            }
+        }
+        catch
+        {
+            // 配置读取失败静默忽略，保留默认的 localhost 值
         }
     }
 }

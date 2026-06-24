@@ -31,8 +31,11 @@ namespace CJ.Plug.Models.Services
             {
                 if (c.Contains('[') && c.Contains(']') &&c!="[ToolPath]")
                 {
-
-                    var value = plug.PlugVariables.Find(p => p.Name == (c.Trim('[').Trim(']')))?.Value;
+                    var rawName = c.Trim('[').Trim(']');
+                    // 解析 [Name:Type] 格式，提取 Name 部分作为查找键
+                    var colonIdx = rawName.IndexOf(':');
+                    var lookupName = colonIdx > 0 ? rawName.Substring(0, colonIdx) : rawName;
+                    var value = plug.PlugVariables.Find(p => p.Name == lookupName)?.Value;
                     commandLine = commandLine.Replace(c, value);
                     Console.WriteLine($"replace {c} with {value}");
                 }
@@ -131,8 +134,11 @@ namespace CJ.Plug.Models.Services
                 {
                     if (c.Contains('[') && c.Contains(']') && c != "[ToolPath]")
                     {
-
-                        var value = inputVariables.Find(p => p.Name == (c.TrimStart('[').TrimEnd(']')))?.Value;
+                        var rawName = c.TrimStart('[').TrimEnd(']');
+                        // 解析 [Name:Type] 格式，提取 Name 部分作为查找键
+                        var colonIdx = rawName.IndexOf(':');
+                        var lookupName = colonIdx > 0 ? rawName.Substring(0, colonIdx) : rawName;
+                        var value = inputVariables.Find(p => p.Name == lookupName)?.Value;
                         commandLine = commandLine.Replace(c, value);
                         //Log.Information($"replace {c} with {value}");
                     }

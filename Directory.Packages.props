@@ -11,18 +11,18 @@
     <PackageVersion Include="BlazorMonaco" Version="3.4.0" />
     <PackageVersion Include="Crane.MethodHook" Version="1.1.1" />
     <PackageVersion Include="Elsa.Agents.Api" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Agents.Core" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Agents.Core" Version="3.7.1" />
     <PackageVersion Include="Elsa.JavaScript" Version="3.5.3" />
     <PackageVersion Include="Elsa.Liquid" Version="3.5.3" />
-    <PackageVersion Include="Elsa.Persistence.EFCore" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Persistence.EFCore.PostgreSql" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Persistence.EFCore.SqlServer" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Persistence.EFCore.Sqlite" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Agents" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.DomInterop" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Localization.BlazorServer" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Persistence.EFCore" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Persistence.EFCore.PostgreSql" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Persistence.EFCore.SqlServer" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Persistence.EFCore.Sqlite" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio.Agents" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio.DomInterop" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio.Localization.BlazorServer" Version="3.7.1" />
     <PackageVersion Include="Elsa.Studio.Localization.BlazorWasm" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Translations" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Studio.Translations" Version="3.7.1" />
     <PackageVersion Include="Elsa.Studio.Workflows.Designer" Version="3.3.2" />
     <PackageVersion Include="EventAggregator.Blazor" Version="2.0.0" />
     <PackageVersion Include="FastEndpoints" Version="7.0.1" />
@@ -104,14 +104,14 @@
     <PackageVersion Include="Z.Blazor.Diagrams" Version="3.0.4.1" />
     <PackageVersion Include="Z.Blazor.Diagrams.Algorithms" Version="3.0.2" />
     <PackageVersion Include="Z.Blazor.Diagrams.Core" Version="3.0.4.1" />
-    <PackageVersion Include="Elsa.Api.Client" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Identity" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Http" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Api.Client" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Identity" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Http" Version="3.7.1" />
     <PackageVersion Include="Elsa.Workflows.Management" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Workflows.Runtime" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Workflows.Runtime" Version="3.7.1" />
     <PackageVersion Include="Elsa.Workflows.Core" Version="3.3.5" />
     <PackageVersion Include="Elsa.WorkflowProviders.BlobStorage" Version="3.2.0" />
-    <PackageVersion Include="Elsa" Version="3.7.0" />
+    <PackageVersion Include="Elsa" Version="3.7.1" />
     <PackageVersion Include="Elsa.CSharp" Version="3.5.3" />
     <PackageVersion Include="Elsa.Email" Version="3.2.0" />
     <PackageVersion Include="Elsa.EntityFrameworkCore" Version="3.5.3" />
@@ -124,16 +124,16 @@
     <PackageVersion Include="Elsa.MassTransit.RabbitMq" Version="3.2.0" />
     <PackageVersion Include="Elsa.ProtoActor" Version="3.2.0" />
     <PackageVersion Include="Elsa.Python" Version="3.2.0" />
-    <PackageVersion Include="Elsa.Scheduling" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Scheduling" Version="3.7.1" />
     <PackageVersion Include="Elsa.Webhooks" Version="3.5.3" />
-    <PackageVersion Include="Elsa.Workflows.Api" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Core" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Core.BlazorServer" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Workflows.Api" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio.Core" Version="3.7.1" />
+    <PackageVersion Include="Elsa.Studio.Core.BlazorServer" Version="3.7.1" />
     <PackageVersion Include="Elsa.Studio.Core.BlazorWasm" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Login" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Studio.Login" Version="3.7.1" />
     <PackageVersion Include="Elsa.Studio.Login.BlazorWasm" Version="3.7.0" />
-    <PackageVersion Include="Elsa.Studio.Login.BlazorServer" Version="3.7.0" />
+    <PackageVersion Include="Elsa.Studio.Login.BlazorServer" Version="3.7.1" />
     <PackageVersion Include="Elsa.Studio.Shell" Version="3.7.0" />
     <PackageVersion Include="Elsa.Studio.Workflows" Version="3.7.0" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.9" />
@@ -158,10 +158,10 @@
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="9.0.1" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="10.0.9" />
     <PackageVersion Include="System.Drawing.Common" Version="10.0.9" />
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.5" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.3" />
-    <PackageVersion Include="Aspire.Npgsql" Version="13.4.5" />
-    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.5" />
+    <PackageVersion Include="Aspire.Npgsql" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />

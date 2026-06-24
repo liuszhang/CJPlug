@@ -1,0 +1,74 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="说明" @bind-Value="model.Description" Lines="1" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(!IsValid)">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public BasicEnumItem EnumItem { get; set; } = new();
+    [Parameter] public int EnumId { get; set; }
+
+    private BasicEnumItem model = new() { IsEnabled = true, SortOrder = 0 };
+    private bool isEdit;
+
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(model.Name) &&
+        !string.IsNullOrWhiteSpace(model.Code);
+
+    protected override void OnInitialized()
+    {
+        model = new BasicEnumItem
+        {
+            Id = EnumItem.Id,
+            EnumId = EnumItem.Id != 0 ? EnumItem.EnumId : EnumId,
+            Name = EnumItem.Name,
+            DisplayName = EnumItem.Name,
+            Code = EnumItem.Code,
+            Description = EnumItem.Description,
+            SortOrder = EnumItem.SortOrder,
+            IsEnabled = EnumItem.Id != 0 ? EnumItem.IsEnabled : true
+        };
+        isEdit = model.Id != 0;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (!IsValid)
+        {
+            Snackbar.Add("名称和代码不能为空", Severity.Warning);
+            return;
+        }
+        BasicEnumItem? result;
+        if (!isEdit)
+            result = await ApiClient.CreateEnumItemAsync(model);
+        else
+            result = await ApiClient.UpdateEnumItemAsync(model);
+        if (result != null)
+        {
+            Snackbar.Add(isEdit ? "更新成功" : "创建成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add(isEdit ? "更新失败" : "创建失败", Severity.Error);
+        }
+    }
+}

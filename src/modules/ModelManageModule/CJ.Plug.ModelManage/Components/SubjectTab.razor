@@ -1,0 +1,155 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="1" Class="pa-3">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudText Typo="Typo.h6">主体列表</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddSubjectDialog">新增主体</MudButton>
+    </MudStack>
+
+    <MudDataGrid Items="@subjects" T="Subject" Dense="true" Hover="true" Elevation="0"
+                 SelectedItem="@selectedSubject" SelectedItemChanged="@OnSubjectSelected">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="名称" />
+            <PropertyColumn Property="x => x.Code" Title="代码" />
+            <TemplateColumn Title="类型">
+                <CellTemplate>
+                    <MudChip Label="true" Size="Size.Small" Color="Color.Info">@context.Item.SubjectType</MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.Description" Title="描述" />
+            <TemplateColumn Style="text-align:right">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditSubject(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteSubject(context.Item))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>暂无主体</MudText></NoRecordsContent>
+    </MudDataGrid>
+
+    @if (selectedSubject != null)
+    {
+        <MudDivider Class="my-3" />
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+            <MudText Typo="Typo.subtitle1">权限列表 — @selectedSubject.Name</MudText>
+            <MudSpacer />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddPermissionDialog">新增权限</MudButton>
+        </MudStack>
+
+        <MudDataGrid Items="@permissions" T="Permission" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.Name" Title="名称" />
+                <PropertyColumn Property="x => x.Code" Title="代码" />
+                <PropertyColumn Property="x => x.ResourceType" Title="资源类型" />
+                <PropertyColumn Property="x => x.ResourceId" Title="资源ID" />
+                <TemplateColumn Title="操作">
+                    <CellTemplate>
+                        <MudChip Label="true" Size="Size.Small" Color="Color.Warning">@context.Item.Action</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Style="text-align:right">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditPermission(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeletePermission(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent><MudText>暂无权限</MudText></NoRecordsContent>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@code {
+    private List<Subject> subjects = new();
+    private List<Permission> permissions = new();
+    private Subject? selectedSubject;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        var result = await ApiClient.GetAllSubjectsAsync();
+        subjects = result?.Where(s => s != null).Cast<Subject>().ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task OnSubjectSelected(Subject? item)
+    {
+        selectedSubject = item;
+        if (item != null)
+        {
+            var result = await ApiClient.GetPermissionsBySubjectIdAsync(item.Id);
+            permissions = result?.Where(p => p != null).Cast<Permission>().ToList() ?? new();
+        }
+        else permissions = new();
+        StateHasChanged();
+    }
+
+    private async Task OpenAddSubjectDialog()
+    {
+        var parameters = new DialogParameters { ["Subject"] = new Subject() };
+        var dialog = await DialogService.ShowAsync<SubjectEditDialog>("新建主体", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task EditSubject(Subject subject)
+    {
+        var parameters = new DialogParameters { ["Subject"] = subject };
+        var dialog = await DialogService.ShowAsync<SubjectEditDialog>("编辑主体", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteSubject(Subject subject)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除主体「{subject.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteSubjectAsync(subject.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private async Task OpenAddPermissionDialog()
+    {
+        if (selectedSubject == null) return;
+        var permission = new Permission { SubjectId = selectedSubject.Id };
+        var parameters = new DialogParameters { ["Permission"] = permission };
+        var dialog = await DialogService.ShowAsync<PermissionEditDialog>("新建权限", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedSubject != null)
+            await OnSubjectSelected(selectedSubject);
+    }
+
+    private async Task EditPermission(Permission permission)
+    {
+        var parameters = new DialogParameters { ["Permission"] = permission };
+        var dialog = await DialogService.ShowAsync<PermissionEditDialog>("编辑权限", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedSubject != null)
+            await OnSubjectSelected(selectedSubject);
+    }
+
+    private async Task DeletePermission(Permission permission)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除权限「{permission.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeletePermissionAsync(permission.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); if (selectedSubject != null) await OnSubjectSelected(selectedSubject); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}

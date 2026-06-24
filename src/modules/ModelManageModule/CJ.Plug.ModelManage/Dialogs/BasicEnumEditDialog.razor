@@ -1,0 +1,75 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string" Label="标识 *" @bind-Value="model.Name" Required="true" />
+            <MudTextField T="string" Label="显示名称 *" @bind-Value="model.DisplayName" Required="true" />
+            <MudTextField T="string" Label="编码 *" @bind-Value="model.Code" Required="true" />
+            <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="2" />
+            <MudNumericField T="int" Label="排序号" @bind-Value="model.SortOrder" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(!IsValid)">确定</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public BasicEnum BasicEnum { get; set; } = new();
+
+    private BasicEnum model = new() { SortOrder = 0 };
+    private bool isEdit;
+
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(model.Name) &&
+        !string.IsNullOrWhiteSpace(model.DisplayName) &&
+        !string.IsNullOrWhiteSpace(model.Code);
+
+    protected override void OnInitialized()
+    {
+        model = new BasicEnum
+        {
+            Id = BasicEnum.Id,
+            Name = BasicEnum.Name,
+            DisplayName = BasicEnum.DisplayName,
+            Code = BasicEnum.Code,
+            Description = BasicEnum.Description,
+            SortOrder = BasicEnum.SortOrder,
+            IsSystem = BasicEnum.IsSystem
+        };
+        isEdit = model.Id != 0;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        if (!IsValid)
+        {
+            Snackbar.Add("标识、显示名称和编码不能为空", Severity.Warning);
+            return;
+        }
+        BasicEnum? result;
+        if (!isEdit)
+            result = await ApiClient.CreateBasicEnumAsync(model);
+        else
+            result = await ApiClient.UpdateBasicEnumAsync(model);
+        if (result != null)
+        {
+            Snackbar.Add(isEdit ? "更新成功" : "创建成功", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add(isEdit ? "更新失败" : "创建失败", Severity.Error);
+        }
+    }
+}

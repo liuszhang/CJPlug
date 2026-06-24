@@ -46,7 +46,31 @@
                 </EditTemplate>
             </PropertyColumn>
             <PropertyColumn Property="x => x.Name" Title="名称"></PropertyColumn>
-            <PropertyColumn Property="x => x.Value" Title="默认值"></PropertyColumn>
+            <TemplateColumn Title="默认值">
+                <EditTemplate>
+                    <MudStack Row Spacing="0" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                        @if (context.Item.IsValueFromOtherVariable)
+                        {
+                            <MudAutocomplete T="string"
+                                Value="@context.Item.DisplayValue"
+                                ValueChanged="@((v) => OnBindVariableSelected(context.Item, v))"
+                                SearchFunc="@SearchVariablesForBinding"
+                                CoerceValue="false"
+                                CoerceText="false"
+                                Dense Clearable
+                                MinWidth="120px" />
+                        }
+                        else
+                        {
+                            <MudTextField T="string" @bind-Value="context.Item.Value"
+                                Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" />
+                        }
+                        <MudCheckBox T="bool" Label="绑定" Dense Size="Size.Small"
+                            Value="@context.Item.IsValueFromOtherVariable"
+                            ValueChanged="@((bool b) => ChangedIsFromOtherValue(context.Item, b))" />
+                    </MudStack>
+                </EditTemplate>
+            </TemplateColumn>
             <PropertyColumn Property="x => x.IsRequired" Title="必需">
                 <EditTemplate>
                     <MudSwitch @bind-Value="context.Item.IsRequired" Color="Color.Primary"
@@ -54,10 +78,10 @@
                 </EditTemplate>
             </PropertyColumn>
             <TemplateColumn Title="操作">
-                <CellTemplate>
+                <EditTemplate>
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                    Color="Color.Error" OnClick="@(() => RemoveServiceParam(context.Item))" />
-                </CellTemplate>
+                </EditTemplate>
             </TemplateColumn>
         </Columns>
     </MudDataGrid>
@@ -88,6 +112,64 @@
     private void RemoveServiceParam(PDZVariable param)
     {
         ServiceParams.Remove(param);
+    }
+
+    private void ChangedIsFromOtherValue(PDZVariable item, bool value)
+    {
+        item.IsValueFromOtherVariable = value;
+        if (!value)
+        {
+            item.SourceValueVariableName = null;
+            item.DisplayValue = null;
+        }
+    }
+
+    private async Task<IEnumerable<string>> SearchVariablesForBinding(string searchText, CancellationToken cancellationToken)
+    {
+        if (Plug?.PlugVariables == null)
+            return Enumerable.Empty<string>();
+
+        var names = Plug.PlugVariables
+            .Select(v => v.Name)
+            .Where(n => n != null)
+            .Cast<string>();
+
+        if (string.IsNullOrEmpty(searchText))
+            return names;
+
+        return names.Where(n => n.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnBindVariableSelected(PDZVariable item, string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            // 清空选择 → 解除绑定
+            ChangedIsFromOtherValue(item, false);
+            return;
+        }
+
+        // 判断输入值是否匹配已有变量名
+        var existingVar = Plug?.PlugVariables?.FirstOrDefault(v =>
+            v.Name != null && v.Name.Equals(value, StringComparison.OrdinalIgnoreCase));
+
+        if (existingVar != null)
+        {
+            // 选中已有变量 → 标记为引用
+            item.IsValueFromOtherVariable = true;
+            item.SourceValueVariableName = existingVar.Name;
+            item.Value = null;
+            item.DisplayValue = existingVar.Name;
+        }
+        else
+        {
+            // 手动输入的新变量名 → 自动创建并绑定
+            Plug?.AddVariable(value, "String");
+            item.IsValueFromOtherVariable = true;
+            item.SourceValueVariableName = value;
+            item.Value = null;
+            item.DisplayValue = value;
+        }
     }
 
     private void LoadFromPlug()
@@ -149,7 +231,12 @@
                 p.Type,
                 p.Name,
                 p.Value,
-                p.IsRequired
+                p.IsRequired,
+                p.IsValueFromOtherVariable,
+                p.SourceValueVariableName,
+                p.SourceValueVariableId,
+                p.SourceValuePlugDefinitionId,
+                p.DisplayValue
             }));
             plug.SetVariableValue("RequestHeaders", paramsJson);
         }

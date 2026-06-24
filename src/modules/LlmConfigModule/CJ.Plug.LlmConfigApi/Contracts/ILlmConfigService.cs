@@ -29,6 +29,8 @@ public interface ILlmConfigService
     Task<(bool Success, string Message)> TestConnectionAsync(int modelConfigId, CancellationToken ct = default);
 
     // MCP Server 配置 CRUD
-    Task<McpServerConfig?> GetMcpServerConfigAsync(CancellationToken ct = default);
-    Task<McpServerConfig?> SaveMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default);
+    Task<List<McpServerConfig>> GetMcpServerConfigsAsync(CancellationToken ct = default);
+    Task<McpServerConfig?> CreateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default);
+    Task<McpServerConfig?> UpdateMcpServerConfigAsync(McpServerConfig config, CancellationToken ct = default);
+    Task<bool> DeleteMcpServerConfigAsync(int id, CancellationToken ct = default);
 }

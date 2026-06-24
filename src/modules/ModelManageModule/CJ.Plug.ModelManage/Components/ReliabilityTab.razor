@@ -1,0 +1,158 @@
+@using CJ.Plug.ModelManageModel.Models
+@using CJ.Plug.ModelManageApiClient
+@using CJ.Plug.ModelManage.Dialogs
+@using MudBlazor
+
+@inject IOntologyManageApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="1" Class="pa-3">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudText Typo="Typo.h6">异常类型列表</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddExceptionDialog">新增异常</MudButton>
+    </MudStack>
+
+    <MudDataGrid Items="@exceptions" T="ExceptionType" Dense="true" Hover="true" Elevation="0"
+                 SelectedItem="@selectedException" SelectedItemChanged="@OnExceptionSelected">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="名称" />
+            <PropertyColumn Property="x => x.Code" Title="代码" />
+            <TemplateColumn Title="严重程度">
+                <CellTemplate>
+                    <MudChip Label="true" Size="Size.Small"
+                              Color="@(context.Item.Severity == "Critical" ? Color.Error : context.Item.Severity == "High" ? Color.Warning : context.Item.Severity == "Medium" ? Color.Info : Color.Default)">
+                        @context.Item.Severity
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.Category" Title="类别" />
+            <PropertyColumn Property="x => x.Description" Title="描述" />
+            <TemplateColumn Style="text-align:right">
+                <CellTemplate>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditException(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteException(context.Item))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>暂无异常类型</MudText></NoRecordsContent>
+    </MudDataGrid>
+
+    @if (selectedException != null)
+    {
+        <MudDivider Class="my-3" />
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+            <MudText Typo="Typo.subtitle1">补偿动作 — @selectedException.Name</MudText>
+            <MudSpacer />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddActionDialog">新增补偿</MudButton>
+        </MudStack>
+
+        <MudDataGrid Items="@actions" T="CompensationAction" Dense="true" Hover="true" Elevation="0">
+            <Columns>
+                <PropertyColumn Property="x => x.Name" Title="名称" />
+                <PropertyColumn Property="x => x.Code" Title="代码" />
+                <PropertyColumn Property="x => x.Description" Title="描述" />
+                <TemplateColumn Title="动作类型">
+                    <CellTemplate>
+                        <MudChip Label="true" Size="Size.Small" Color="Color.Warning">@context.Item.ActionType</MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Style="text-align:right">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditAction(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAction(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <NoRecordsContent><MudText>暂无补偿动作</MudText></NoRecordsContent>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@code {
+    private List<ExceptionType> exceptions = new();
+    private List<CompensationAction> actions = new();
+    private ExceptionType? selectedException;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        var result = await ApiClient.GetAllExceptionTypesAsync();
+        exceptions = result?.Where(e => e != null).Cast<ExceptionType>().ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task OnExceptionSelected(ExceptionType? item)
+    {
+        selectedException = item;
+        if (item != null)
+        {
+            var result = await ApiClient.GetCompensationActionsByExceptionTypeIdAsync(item.Id);
+            actions = result?.Where(a => a != null).Cast<CompensationAction>().ToList() ?? new();
+        }
+        else actions = new();
+        StateHasChanged();
+    }
+
+    private async Task OpenAddExceptionDialog()
+    {
+        var parameters = new DialogParameters { ["ExceptionType"] = new ExceptionType() };
+        var dialog = await DialogService.ShowAsync<ExceptionTypeEditDialog>("新建异常类型", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task EditException(ExceptionType exception)
+    {
+        var parameters = new DialogParameters { ["ExceptionType"] = exception };
+        var dialog = await DialogService.ShowAsync<ExceptionTypeEditDialog>("编辑异常类型", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await LoadData();
+    }
+
+    private async Task DeleteException(ExceptionType exception)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除异常类型「{exception.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteExceptionTypeAsync(exception.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); await LoadData(); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private async Task OpenAddActionDialog()
+    {
+        if (selectedException == null) return;
+        var action = new CompensationAction { ExceptionTypeId = selectedException.Id };
+        var parameters = new DialogParameters { ["CompensationAction"] = action };
+        var dialog = await DialogService.ShowAsync<CompensationActionEditDialog>("新建补偿动作", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedException != null)
+            await OnExceptionSelected(selectedException);
+    }
+
+    private async Task EditAction(CompensationAction action)
+    {
+        var parameters = new DialogParameters { ["CompensationAction"] = action };
+        var dialog = await DialogService.ShowAsync<CompensationActionEditDialog>("编辑补偿动作", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && selectedException != null)
+            await OnExceptionSelected(selectedException);
+    }
+
+    private async Task DeleteAction(CompensationAction action)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定删除补偿动作「{action.Name}」吗？", yesText: "删除", cancelText: "取消");
+        if (confirm == true)
+        {
+            var ok = await ApiClient.DeleteCompensationActionAsync(action.Id);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); if (selectedException != null) await OnExceptionSelected(selectedException); }
+            else Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}

@@ -1,12 +1,8 @@
 @using MudBlazor
-@using System.Timers
-@using System.Net.Http.Json
 @inject ISnackbar Snackbar
-@inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
-@implements IDisposable
 
-<MudDialog>
+<MudDialog DisableBackdropClick="true">
     <DialogContent>
         <MudStack Spacing="3">
             @* 平台选择 *@
@@ -59,7 +55,7 @@
                             @if (_isStationDownloading)
                             {
                                 <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                <MudText Class="ms-2">正在生成图站部署包...</MudText>
+                                <MudText Class="ms-2">正在生成图站部署包并下载...</MudText>
                             }
                             else
                             {
@@ -73,86 +69,6 @@
                     </div>
                 </MudCardContent>
             </MudCard>
-
-            @* 进度监控区域 *@
-            @if (_currentTaskId != null)
-            {
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">
-                                <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
-                                打包进度监控
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            @if (_progress?.Status == "Completed")
-                            {
-                                <MudButton Variant="Variant.Filled" 
-                                           Color="Color.Success"
-                                           StartIcon="@Icons.Material.Filled.Download"
-                                           OnClick="DownloadCompletedFileAsync">
-                                    下载文件
-                                </MudButton>
-                            }
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (_progress != null)
-                        {
-                            @* 进度条 *@
-                            <div class="mb-4">
-                                <div class="d-flex justify-space-between mb-2">
-                                    <MudText Typo="Typo.body2">@_progress.Message</MudText>
-                                    <MudText Typo="Typo.body2">@_progress.Progress%</MudText>
-                                </div>
-                                <MudProgressLinear Value="@_progress.Progress" 
-                                                   Color="@GetProgressColor()" 
-                                                   Size="Size.Large" />
-                            </div>
-
-                            @* 状态信息 *@
-                            <div class="d-flex gap-4 mb-4">
-                                <MudChip T="string" Icon="@GetStatusIcon()" 
-                                         Color="@GetStatusColor()" 
-                                         Size="Size.Small">
-                                    @GetStatusText()
-                                </MudChip>
-                                <MudText Typo="Typo.caption">
-                                    开始时间: @_progress.StartTime.ToLocalTime().ToString("HH:mm:ss")
-                                </MudText>
-                                @if (_progress.EndTime.HasValue)
-                                {
-                                    <MudText Typo="Typo.caption">
-                                        结束时间: @_progress.EndTime.Value.ToLocalTime().ToString("HH:mm:ss")
-                                    </MudText>
-                                }
-                            </div>
-
-                            @* 日志区域 *@
-                            <MudExpansionPanels>
-                                <MudExpansionPanel Text="@($"执行日志 ({_progress.Logs.Count} 条)")" IsExpanded="_showLogs">
-                                    <div class="log-container" style="max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                                        @foreach (var log in _progress.Logs)
-                                        {
-                                            <div class="log-entry mb-1">
-                                                <span class="log-time" style="color: #666;">@log.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
-                                                <span class="log-level mx-2" style="color: @GetLogLevelColor(log.Level);">[@log.Level]</span>
-                                                <span class="log-message">@log.Message</span>
-                                            </div>
-                                        }
-                                    </div>
-                                </MudExpansionPanel>
-                            </MudExpansionPanels>
-                        }
-                        else
-                        {
-                            <MudProgressCircular Indeterminate="true" />
-                            <MudText Class="ml-2">正在获取进度信息...</MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            }
         </MudStack>
     </DialogContent>
     <DialogActions>
@@ -164,258 +80,25 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     private string _selectedPlatform = "win-x64";
     private bool _isStationDownloading = false;
-    private string? _currentTaskId;
-    private PackageProgressInfo? _progress;
-    private Timer? _progressTimer;
-    private bool _showLogs = true;
 
     /// <summary>
-    /// 打包进度信息
-    /// </summary>
-    private class PackageProgressInfo
-    {
-        public string TaskId { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public int Progress { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public DateTime StartTime { get; set; }
-        public DateTime? EndTime { get; set; }
-        public List<LogEntryInfo> Logs { get; set; } = new();
-    }
-
-    /// <summary>
-    /// 日志条目信息
-    /// </summary>
-    private class LogEntryInfo
-    {
-        public DateTime Timestamp { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public string Level { get; set; } = "Info";
-    }
-
-    /// <summary>
-    /// 启动下载响应
-    /// </summary>
-    private class StartDownloadResponse
-    {
-        public string TaskId { get; set; } = string.Empty;
-    }
-
-    protected override void OnInitialized()
-    {
-        // 初始化定时器，每2秒刷新一次进度
-        _progressTimer = new Timer(2000);
-        _progressTimer.Elapsed += async (sender, e) => await RefreshProgressAsync();
-    }
-
-    /// <summary>
-    /// 开始下载图站部署包
+    /// 浏览器原生下载：导航到 GET 端点，由服务端返回 Content-Disposition: attachment 触发下载
+    /// NavigateTo(forceLoad: false) 不会卸载当前组件，loading 状态会持续显示在页面上
     /// </summary>
     private async Task StartStationDownloadAsync()
     {
-        try
-        {
-            _isStationDownloading = true;
-            _currentTaskId = null;
-            _progress = null;
-            StateHasChanged();
+        _isStationDownloading = true;
 
-            // 构建API地址
-            var apiBaseUrl = $"http://{new Uri(NavigationManager.Uri).Host}:8687";
-            var url = $"{apiBaseUrl}/api/package/download-station?platform={_selectedPlatform}";
+        var apiBaseUrl = $"http://{new Uri(NavigationManager.Uri).Host}:8687";
+        var downloadUrl = $"{apiBaseUrl}/api/package/download-station-direct?platform={_selectedPlatform}";
 
-            // 发送POST请求启动任务
-            using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync(url, null);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<StartDownloadResponse>();
-                _currentTaskId = result?.TaskId;
-
-                if (_currentTaskId != null)
-                {
-                    // 开始轮询进度
-                    _progressTimer?.Start();
-                    Snackbar.Add("图站部署包打包任务已启动", Severity.Info);
-                }
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                Snackbar.Add($"启动失败: {error}", Severity.Error);
-                _isStationDownloading = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"请求失败: {ex.Message}", Severity.Error);
-            _isStationDownloading = false;
-        }
-
-        StateHasChanged();
+        // 延迟让 Blazor 先渲染 loading UI，再触发下载
+        await Task.Delay(100);
+        NavigationManager.NavigateTo(downloadUrl, false);
     }
 
-    /// <summary>
-    /// 刷新进度
-    /// </summary>
-    private async Task RefreshProgressAsync()
-    {
-        if (_currentTaskId == null) return;
-
-        try
-        {
-            var apiBaseUrl = $"http://{new Uri(NavigationManager.Uri).Host}:8687";
-            var url = $"{apiBaseUrl}/api/package/progress/{_currentTaskId}";
-
-            using var httpClient = new HttpClient();
-            var progress = await httpClient.GetFromJsonAsync<PackageProgressInfo>(url);
-
-            if (progress != null)
-            {
-                _progress = progress;
-
-                // 如果任务完成或失败，停止轮询
-                if (progress.Status == "Completed" || progress.Status == "Failed")
-                {
-                    _progressTimer?.Stop();
-                    _isStationDownloading = false;
-
-                    if (progress.Status == "Completed")
-                    {
-                        Snackbar.Add("打包完成！", Severity.Success);
-                    }
-                    else
-                    {
-                        Snackbar.Add($"打包失败: {progress.Message}", Severity.Error);
-                    }
-                }
-
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch (Exception ex)
-        {
-            // 记录错误并停止轮询，避免无限轮询
-            _progressTimer?.Stop();
-            _isStationDownloading = false;  // ← 添加这行
-            Snackbar.Add($"进度查询失败: {ex.Message}", Severity.Warning);
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    /// <summary>
-    /// 下载完成的文件
-    /// </summary>
-    private async Task DownloadCompletedFileAsync()
-    {
-        if (_currentTaskId == null) return;
-
-        try
-        {
-            var apiBaseUrl = $"http://{new Uri(NavigationManager.Uri).Host}:8687";
-            var url = $"{apiBaseUrl}/api/package/download/{_currentTaskId}";
-
-            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
-            Snackbar.Add("开始下载文件", Severity.Info);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"下载失败: {ex.Message}", Severity.Error);
-        }
-    }
-
-    /// <summary>
-    /// 获取进度条颜色
-    /// </summary>
-    private Color GetProgressColor()
-    {
-        if (_progress == null) return Color.Primary;
-        return _progress.Status switch
-        {
-            "Completed" => Color.Success,
-            "Failed" => Color.Error,
-            _ => Color.Primary
-        };
-    }
-
-    /// <summary>
-    /// 获取状态图标
-    /// </summary>
-    private string GetStatusIcon()
-    {
-        if (_progress == null) return Icons.Material.Filled.HourglassEmpty;
-        return _progress.Status switch
-        {
-            "Pending" => Icons.Material.Filled.HourglassEmpty,
-            "Processing" => Icons.Material.Filled.Sync,
-            "Completed" => Icons.Material.Filled.CheckCircle,
-            "Failed" => Icons.Material.Filled.Error,
-            _ => Icons.Material.Filled.HourglassEmpty
-        };
-    }
-
-    /// <summary>
-    /// 获取状态颜色
-    /// </summary>
-    private Color GetStatusColor()
-    {
-        if (_progress == null) return Color.Default;
-        return _progress.Status switch
-        {
-            "Pending" => Color.Warning,
-            "Processing" => Color.Info,
-            "Completed" => Color.Success,
-            "Failed" => Color.Error,
-            _ => Color.Default
-        };
-    }
-
-    /// <summary>
-    /// 获取状态文本
-    /// </summary>
-    private string GetStatusText()
-    {
-        if (_progress == null) return "未知";
-        return _progress.Status switch
-        {
-            "Pending" => "等待中",
-            "Processing" => "处理中",
-            "Completed" => "已完成",
-            "Failed" => "失败",
-            _ => "未知"
-        };
-    }
-
-    /// <summary>
-    /// 获取日志级别颜色
-    /// </summary>
-    private string GetLogLevelColor(string level)
-    {
-        return level switch
-        {
-            "Error" => "#f44336",
-            "Warning" => "#ff9800",
-            "Info" => "#2196f3",
-            _ => "#666"
-        };
-    }
-
-    /// <summary>
-    /// 取消并关闭对话框
-    /// </summary>
     private void CancelAsync()
     {
-        // 停止定时器
-        _progressTimer?.Stop();
-
-        // 关闭对话框
         MudDialog.Close();
-    }
-
-    public void Dispose()
-    {
-        _progressTimer?.Stop();
-        _progressTimer?.Dispose();
     }
 }

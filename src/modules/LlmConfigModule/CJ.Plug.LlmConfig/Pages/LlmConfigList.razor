@@ -179,48 +179,57 @@
             <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" Size="Size.Large" />
             <MudText Typo="Typo.h6">MCP Server 配置</MudText>
             <MudSpacer />
-            @if (_mcpConfig != null)
-            {
-                <MudChip T="string" Icon="@(_mcpConfig.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                         Color="@(_mcpConfig.IsEnabled ? Color.Success : Color.Default)" Size="Size.Small" Variant="Variant.Outlined">
-                    @(_mcpConfig.IsEnabled ? "已启用" : "已禁用")
-                </MudChip>
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
-                           StartIcon="@Icons.Material.Outlined.Edit" OnClick="EditMcpServerConfig">编辑</MudButton>
-            }
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="CreateMcpServerConfig">
+                添加 MCP Server
+            </MudButton>
         </MudStack>
 
         @if (_mcpLoading)
         {
             <MudProgressCircular Indeterminate="true" Size="Size.Small" />
         }
-        else if (_mcpConfig == null)
+        else if (!_mcpConfigs.Any())
         {
-            <MudText Color="Color.Secondary">暂未配置 MCP Server</MudText>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Add" OnClick="CreateMcpServerConfig" Class="mt-2">
-                添加 MCP Server
-            </MudButton>
+            <MudText Color="Color.Secondary">暂未配置 MCP Server，点击上方按钮添加</MudText>
         }
         else
         {
-            <MudGrid>
-                <MudItem xs="12" sm="2">
-                    <MudText Typo="Typo.subtitle2">连接状态</MudText>
-                    <MudSwitch T="bool" Value="@_mcpConfig.IsEnabled" Disabled="true" Color="Color.Primary" />
-                </MudItem>
-                <MudItem xs="12" sm="5">
-                    <MudText Typo="Typo.subtitle2">描述</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(_mcpConfig.Description ?? "（无）")</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="5">
-                    <MudText Typo="Typo.subtitle2">连接字符串</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="word-break:break-all;">
-                        @(string.IsNullOrEmpty(_mcpConfig.ConnectionString) ? "（未设置）" : _mcpConfig.ConnectionString)
-                    </MudText>
-                </MudItem>
-            </MudGrid>
-
+            <MudDataGrid T="McpServerConfig" Items="@_mcpConfigs" Dense="true" Hover="true" Elevation="0">
+                <Columns>
+                    <TemplateColumn Title="状态">
+                        <CellTemplate>
+                            <MudChip T="string"
+                                     Icon="@(context.Item.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                     Color="@(context.Item.IsEnabled ? Color.Success : Color.Default)"
+                                     Size="Size.Small" Variant="Variant.Outlined">
+                                @(context.Item.IsEnabled ? "已启用" : "已禁用")
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Description" Title="描述" />
+                    <TemplateColumn Title="连接字符串">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Style="word-break:break-all; max-width:400px;">
+                                @(string.IsNullOrEmpty(context.Item.ConnectionString) ? "（未设置）" : context.Item.ConnectionString)
+                            </MudText>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Style="text-align:right">
+                        <CellTemplate>
+                            <MudStack Row Spacing="1" Justify="Justify.FlexEnd">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
+                                               OnClick="@(() => EditMcpServerConfig(context.Item))" Title="编辑" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                               Color="Color.Error" OnClick="@(() => DeleteMcpServerConfig(context.Item))" Title="删除" />
+                            </MudStack>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+                <NoRecordsContent>
+                    <MudText>暂无 MCP Server 配置</MudText>
+                </NoRecordsContent>
+            </MudDataGrid>
         }
     </MudPaper>
 
@@ -236,7 +245,7 @@
     private (string ProviderName, string ModelName)? _activeConfig;
 
     // MCP Server
-    private McpServerConfig? _mcpConfig;
+    private List<McpServerConfig> _mcpConfigs = new();
     private bool _mcpLoading;
 
     protected override async Task OnInitializedAsync()
@@ -462,11 +471,11 @@
         _mcpLoading = true;
         try
         {
-            _mcpConfig = await LlmConfigApiClient.GetMcpServerConfigAsync();
+            _mcpConfigs = await LlmConfigApiClient.GetMcpServerConfigsAsync();
         }
         catch
         {
-            _mcpConfig = null;
+            _mcpConfigs = new();
         }
         finally
         {
@@ -482,21 +491,42 @@
         var result = await dialog.Result;
         if (result != null && !result.Canceled && result.Data is McpServerConfig created)
         {
-            _mcpConfig = await LlmConfigApiClient.SaveMcpServerConfigAsync(created);
-            Snackbar.Add("MCP Server 配置已保存", Severity.Success);
+            await LlmConfigApiClient.CreateMcpServerConfigAsync(created);
+            await LoadMcpConfig();
+            Snackbar.Add("MCP Server 已添加", Severity.Success);
         }
     }
 
-    private async Task EditMcpServerConfig()
+    private async Task EditMcpServerConfig(McpServerConfig config)
     {
-        if (_mcpConfig == null) return;
         var dialog = await DialogService.ShowAsync<Dialogs.McpServerDialog>("编辑 MCP Server",
-            new DialogParameters { ["Config"] = _mcpConfig });
+            new DialogParameters { ["Config"] = config });
         var result = await dialog.Result;
         if (result != null && !result.Canceled && result.Data is McpServerConfig updated)
         {
-            _mcpConfig = await LlmConfigApiClient.SaveMcpServerConfigAsync(updated);
-            Snackbar.Add("MCP Server 配置已更新", Severity.Success);
+            await LlmConfigApiClient.UpdateMcpServerConfigAsync(updated);
+            await LoadMcpConfig();
+            Snackbar.Add("MCP Server 已更新", Severity.Success);
+        }
+    }
+
+    private async Task DeleteMcpServerConfig(McpServerConfig config)
+    {
+        bool? confirmed = await DialogService.ShowMessageBoxAsync("确认删除",
+            $"确定要删除 MCP Server '{config.Description ?? config.ConnectionString}' 吗？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed == true)
+        {
+            var success = await LlmConfigApiClient.DeleteMcpServerConfigAsync(config.Id);
+            if (success)
+            {
+                await LoadMcpConfig();
+                Snackbar.Add("删除成功", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("删除失败", Severity.Error);
+            }
         }
     }
 }

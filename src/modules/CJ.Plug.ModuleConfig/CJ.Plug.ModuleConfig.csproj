@@ -31,6 +31,7 @@
     <ProjectReference Include="..\RelationManageModule\CJ.Plug.Relation\CJ.Plug.Relation.csproj" />
     <ProjectReference Include="..\SkillsManageModule\CJ.Plug.SkillsManage\CJ.Plug.SkillsManage.csproj" />
     <ProjectReference Include="..\StationManageModule\CJ.Plug.StationManage\CJ.Plug.StationManage.csproj" />
+    <ProjectReference Include="..\SystemConfigModule\CJ.Plug.SystemConfig\CJ.Plug.SystemConfig.csproj" />
     <ProjectReference Include="..\ToolResourceModule\CJ.Plug.ToolResource\CJ.Plug.ToolResource.csproj" />
     <ProjectReference Include="..\ToolActionSettingModule\CJ.Plug.ToolActionSetting\CJ.Plug.ToolActionSetting.csproj" />
     <ProjectReference Include="..\UnitTestModule\CJ.Plug.UnitTest\CJ.Plug.UnitTest.csproj" />

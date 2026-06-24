@@ -34,6 +34,18 @@ namespace CJ.Plug.ModelManageModel.Models
         /// <summary>是否系统内置</summary>
         public bool IsSystem { get; set; } = false;
 
+        /// <summary>元模型维度（M0-M7 七维架构）</summary>
+        public MetaModelDimension? Dimension { get; set; }
+
+        /// <summary>父对象ID，用于构建树形层级结构</summary>
+        public int? ParentId { get; set; }
+
+        /// <summary>父对象导航属性</summary>
+        public Ontology? Parent { get; set; }
+
+        /// <summary>子对象集合导航属性</summary>
+        public List<Ontology> Children { get; set; } = new();
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow.ToLocalTime();
         public string? CreatedBy { get; set; }
