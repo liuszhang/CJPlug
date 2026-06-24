@@ -49,32 +49,57 @@
 
     private async Task ProcessStationList(string ip, string toolsRootPath)
     {
-        // 从 DB 刷新图站列表，获取主服务器刚更新的 StationBasePath 等字段
-        var latestStations = await StationManageApiClient.GetAllStationsAsync();
-        if (latestStations != null && latestStations.Count > 0)
+        // 在现有列表中查找匹配的图站并更新状态
+        // 注意：不能重新从 DB 拉取覆盖 AllStations，否则之前已标记为在线的其他图站 IsStarted 会被重置为 false
+        var existingStation = AllStations?.FirstOrDefault(s => s.StationIp == ip);
+        if (existingStation != null)
         {
-            AllStations = latestStations;
+            existingStation.IsStarted = true;
+            existingStation.StationBasePath = toolsRootPath;
+        }
+        else
+        {
+            // 新上线的图站（AllStations 中尚不存在），从 DB 刷新列表获取新条目
+            var latestStations = await StationManageApiClient.GetAllStationsAsync();
+            if (latestStations != null && latestStations.Count > 0)
+            {
+                // 保留已有在线状态的图站：遍历新的 DB 列表，对已在线的不重置
+                foreach (var station in latestStations)
+                {
+                    var alreadyOnline = AllStations?.FirstOrDefault(s => s.StationIp == station.StationIp);
+                    if (alreadyOnline != null)
+                    {
+                        // 保留已在线图站的状态，仅更新 StationBasePath
+                        if (!string.IsNullOrEmpty(station.StationBasePath))
+                            alreadyOnline.StationBasePath = station.StationBasePath;
+                    }
+                    else
+                    {
+                        // DB 中新增的图站
+                        station.IsStarted = false;
+                        AllStations?.Add(station);
+                    }
+                }
+            }
+            existingStation = AllStations?.FirstOrDefault(s => s.StationIp == ip);
+            if (existingStation != null)
+            {
+                existingStation.IsStarted = true;
+                existingStation.StationBasePath = toolsRootPath;
+            }
         }
 
-        foreach (var station in AllStations!)
-        {
-            if (station.StationIp == ip)
-            {
-                station.IsStarted = true;
-                station.StationBasePath = toolsRootPath;
-                OnlineStations.Add(station);
-            }
-            else
-            {
-                station.IsStarted = false;
-            }
-        }
-        //去重
-        // 按 StationIp 去重
+        // 按 StationIp 去重，避免重复添加
         OnlineStations = OnlineStations
             .GroupBy(s => s.StationIp)
             .Select(g => g.First())
             .ToList();
+
+        // 将该 IP 添加到在线列表（如果尚未存在）
+        if (existingStation != null && !OnlineStations.Any(s => s.StationIp == ip))
+        {
+            OnlineStations.Add(existingStation);
+        }
     }
 
     private async Task GetStationStatus()

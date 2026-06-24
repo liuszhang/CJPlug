@@ -110,13 +110,29 @@
         <!-- Row 5: 工具版本和更新 -->
         <Label Grid.Row="5" Grid.Column="0" Content="工具版本：" 
                VerticalAlignment="Center" Margin="0,5,10,5"/>
-        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,5,0,5">
-            <TextBlock x:Name="TxtVersion" Text="0.2.0" 
-                       VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,15,0"/>
-            <Button x:Name="BtnCheckUpdate" Content="检查更新" Width="80"
-                    Click="BtnCheckUpdate_Click"/>
-            <TextBlock x:Name="TxtUpdateStatus" Text="" 
-                       VerticalAlignment="Center" Margin="10,0,0,0" Foreground="RoyalBlue"/>
+        <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,5,0,5">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="TxtVersion" Text="0.2.0" 
+                           VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,15,0"/>
+                <Button x:Name="BtnCheckUpdate" Content="检查更新" Width="80"
+                        Click="BtnCheckUpdate_Click"/>
+                <Button x:Name="BtnDownloadUpdate" Content="下载包" Width="80"
+                        Visibility="Visible" Margin="5,0,0,0"
+                        Click="BtnDownloadUpdate_Click"/>
+                <TextBlock x:Name="TxtUpdateStatus" Text="" 
+                           VerticalAlignment="Center" Margin="10,0,0,0" Foreground="RoyalBlue"/>
+            </StackPanel>
+            <!-- 下载进度条 -->
+            <StackPanel x:Name="PanelDownloadProgress" Visibility="Collapsed" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock x:Name="TxtProgressLabel" Text="正在生成部署包..." 
+                               VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
+                    <TextBlock x:Name="TxtProgressPercent" Text="0%" 
+                               VerticalAlignment="Center" FontSize="11" FontWeight="Bold"/>
+                </StackPanel>
+                <ProgressBar x:Name="ProgressDownload" Height="16" 
+                             Minimum="0" Maximum="100" Value="0"/>
+            </StackPanel>
         </StackPanel>
 
         <!-- Row 6: 工具安装路径 -->

@@ -73,6 +73,77 @@ public static class PackageApi
         .WithName("StartDownloadStationPackage")
         .WithDescription("启动图站部署包下载");
 
+        // 图站部署包下载 - 同步一步完成，直接返回文件流
+        api.MapPost("/download-station-direct", async (
+            [FromQuery] string platform,
+            PackageService packageService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("PackageApi");
+            try
+            {
+                logger.LogInformation("收到图站部署包同步下载请求，平台: {Platform}", platform);
+
+                var supportedPlatforms = new[] { "win-x64", "linux-x64", "osx-x64", "win-arm64", "linux-arm64", "osx-arm64" };
+                if (!supportedPlatforms.Contains(platform))
+                {
+                    return Results.BadRequest($"不支持的平台: {platform}。支持的平台: {string.Join(", ", supportedPlatforms)}");
+                }
+
+                // 同步：打包完成后直接返回文件流，不经过进度轮询
+                var zipBytes = await packageService.GenerateStationPackageDirectAsync(platform, ct);
+                return Results.File(zipBytes, "application/zip", $"CJPlug-Station-{platform}.zip");
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogWarning("图站部署包同步打包被取消");
+                return Results.StatusCode(499); // Client Closed Request
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "图站部署包同步打包失败");
+                return Results.Problem($"打包失败: {ex.Message}");
+            }
+        })
+        .WithName("DownloadStationPackageDirect")
+        .WithDescription("同步下载图站部署包（一步完成，直接返回文件流）");
+
+        // 图站部署包下载 - GET 端点，浏览器原生下载
+        api.MapGet("/download-station-direct", async (
+            [FromQuery] string platform,
+            PackageService packageService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("PackageApi");
+            try
+            {
+                logger.LogInformation("收到图站部署包 GET 下载请求，平台: {Platform}", platform);
+
+                var supportedPlatforms = new[] { "win-x64", "linux-x64", "osx-x64", "win-arm64", "linux-arm64", "osx-arm64" };
+                if (!supportedPlatforms.Contains(platform))
+                {
+                    return Results.BadRequest($"不支持的平台: {platform}。支持的平台: {string.Join(", ", supportedPlatforms)}");
+                }
+
+                var zipBytes = await packageService.GenerateStationPackageDirectAsync(platform, ct);
+                return Results.File(zipBytes, "application/zip", $"CJPlug-Station-{platform}.zip");
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogWarning("图站部署包 GET 打包被取消");
+                return Results.StatusCode(499);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "图站部署包 GET 打包失败");
+                return Results.Problem($"打包失败: {ex.Message}");
+            }
+        })
+        .WithName("DownloadStationPackageGet")
+        .WithDescription("浏览器原生下载图站部署包（GET，直接导航即可下载）");
+
         // 获取任务进度
         api.MapGet("/progress/{taskId}", (
             string taskId,

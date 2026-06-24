@@ -177,6 +177,64 @@ public class PackageService
     }
 
     /// <summary>
+    /// 同步生成图站部署包，直接在内存中打包并返回字节数组（不走进度跟踪器）
+    /// </summary>
+    public async Task<byte[]> GenerateStationPackageDirectAsync(string platform, CancellationToken ct = default)
+    {
+        _logger.LogInformation("开始同步生成图站部署包，平台: {Platform}", platform);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"CJPlug-Station-{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // 1. 复制图站相关服务
+            CopyStationServicesInternal(tempDir, platform);
+
+            ct.ThrowIfCancellationRequested();
+
+            // 2. 创建图站启动脚本
+            CreateStationStartupScriptsInternal(tempDir, platform);
+
+            ct.ThrowIfCancellationRequested();
+
+            // 3. 创建图站配置文件
+            CreateStationConfigurationFilesInternal(tempDir);
+
+            ct.ThrowIfCancellationRequested();
+
+            // 4. 创建README文档
+            CreateStationDocumentationInternal(tempDir);
+
+            ct.ThrowIfCancellationRequested();
+
+            // 5. 打包成ZIP（在内存中完成，不写临时文件）
+            using var memoryStream = new MemoryStream();
+            ZipFile.CreateFromDirectory(tempDir, memoryStream);
+            var zipBytes = memoryStream.ToArray();
+
+            _logger.LogInformation("图站部署包同步生成完成，大小: {Size} bytes", zipBytes.Length);
+            return zipBytes;
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                try
+                {
+                    Directory.Delete(tempDir, true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "清理临时目录失败: {TempDir}", tempDir);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// 复制主程序部署包（直接复制02.Publish下已发布的文件，无需编译）
     /// </summary>
     private void CopyMainServices(string outputDir, string platform, string taskId)
@@ -220,6 +278,23 @@ public class PackageService
     private void CopyStationServices(string outputDir, string platform, string taskId)
     {
         _progressTracker.AddLog(taskId, "开始复制图站服务...");
+        CopyStationServicesCore(outputDir, platform,
+            (progress, msg) => _progressTracker.UpdateProgress(taskId, progress, msg),
+            (msg, level) => _progressTracker.AddLog(taskId, msg, level));
+    }
+
+    /// <summary>
+    /// 复制图站服务（内部实现，不依赖进度跟踪器）
+    /// </summary>
+    private void CopyStationServicesInternal(string outputDir, string platform)
+    {
+        CopyStationServicesCore(outputDir, platform, null, null);
+    }
+
+    private void CopyStationServicesCore(string outputDir, string platform,
+        Action<int, string>? onProgress, Action<string, string>? onLog)
+    {
+        onLog?.Invoke("开始复制图站服务...", "Info");
 
         var services = new[] { "CJ.Plug.StationAgent", "CJ.Plug.StationApiServer", "StationSettingUI" };
         var repoRoot = GetRepositoryRoot();
@@ -238,7 +313,7 @@ public class PackageService
         {
             current++;
             var progress = 10 + (int)((double)current / total * 40);
-            _progressTracker.UpdateProgress(taskId, progress, $"正在复制 {service}...");
+            onProgress?.Invoke(progress, $"正在复制 {service}...");
 
             var sourceDir = Path.Combine(publishBaseDir, service);
             var destDir = service == "StationSettingUI"
@@ -247,14 +322,14 @@ public class PackageService
 
             if (!Directory.Exists(sourceDir))
             {
-                _progressTracker.AddLog(taskId, $"发布目录不存在: {sourceDir}，跳过", "Warning");
+                onLog?.Invoke($"发布目录不存在: {sourceDir}，跳过", "Warning");
                 _logger.LogWarning("发布目录不存在: {SourceDir}", sourceDir);
                 continue;
             }
 
-            _progressTracker.AddLog(taskId, $"复制图站{(service == "StationSettingUI" ? "工具" : "服务")}: {service}");
+            onLog?.Invoke($"复制图站{(service == "StationSettingUI" ? "工具" : "服务")}: {service}", "Info");
             CopyDirectory(sourceDir, destDir);
-            _progressTracker.AddLog(taskId, $"{service} 复制完成");
+            onLog?.Invoke($"{service} 复制完成", "Info");
         }
     }
 
@@ -746,6 +821,17 @@ http://localhost:8690/mcp
     private void CreateStationStartupScripts(string outputDir, string platform, string taskId)
     {
         _progressTracker.AddLog(taskId, "创建图站启动脚本...");
+        CreateStationStartupScriptsCore(outputDir, platform);
+        _progressTracker.AddLog(taskId, "图站启动脚本创建完成");
+    }
+
+    private void CreateStationStartupScriptsInternal(string outputDir, string platform)
+    {
+        CreateStationStartupScriptsCore(outputDir, platform);
+    }
+
+    private void CreateStationStartupScriptsCore(string outputDir, string platform)
+    {
 
         // Windows启动脚本
         var batContent = @"@echo off
@@ -830,8 +916,6 @@ wait
                 // 忽略权限设置错误
             }
         }
-
-        _progressTracker.AddLog(taskId, "图站启动脚本创建完成");
     }
 
     /// <summary>
@@ -840,7 +924,17 @@ wait
     private void CreateStationConfigurationFiles(string outputDir, string taskId)
     {
         _progressTracker.AddLog(taskId, "创建图站配置文件...");
+        CreateStationConfigurationFilesCore(outputDir);
+        _progressTracker.AddLog(taskId, "图站配置文件创建完成");
+    }
 
+    private void CreateStationConfigurationFilesInternal(string outputDir)
+    {
+        CreateStationConfigurationFilesCore(outputDir);
+    }
+
+    private void CreateStationConfigurationFilesCore(string outputDir)
+    {
         var configDir = Path.Combine(outputDir, "config");
         Directory.CreateDirectory(configDir);
 
@@ -868,8 +962,6 @@ wait
 }";
 
         File.WriteAllText(Path.Combine(configDir, "appsettings.json"), appSettingsContent);
-
-        _progressTracker.AddLog(taskId, "图站配置文件创建完成");
     }
 
     /// <summary>
@@ -878,7 +970,17 @@ wait
     private void CreateStationDocumentation(string outputDir, string taskId)
     {
         _progressTracker.AddLog(taskId, "创建图站文档...");
+        CreateStationDocumentationCore(outputDir);
+        _progressTracker.AddLog(taskId, "图站文档创建完成");
+    }
 
+    private void CreateStationDocumentationInternal(string outputDir)
+    {
+        CreateStationDocumentationCore(outputDir);
+    }
+
+    private void CreateStationDocumentationCore(string outputDir)
+    {
         var readmeContent = @"# CJPlug 图站部署包
 
 ## 概述
@@ -967,7 +1069,5 @@ CJPlug-Station/
 ";
 
         File.WriteAllText(Path.Combine(outputDir, "README.md"), readmeContent);
-
-        _progressTracker.AddLog(taskId, "图站文档创建完成");
     }
 }

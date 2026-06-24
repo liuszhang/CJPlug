@@ -10,6 +10,9 @@ namespace CJ.Plug.Models.Shared
     {
         public static string MainDispatcherServer = "http://localhost:8686";
         public static string MainApiServer = "http://localhost:8687";
+
+        /// <summary>主服务器上记录的最新图站部署包版本号</summary>
+        public static string StationVersion = "0.2.0";
         public static string ElsaEngineServer = "http://localhost:5001";
         public static string ElsaEngineApiKey = "00000000-0000-0000-0000-000000000000";
         public static string MainWebFileServerUrl = "http://localhost:5066";

@@ -138,4 +138,11 @@ public partial class MainApiClient : IStationManageApiClient
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Update, "更新工作站工具配置");
         return result;
     }
+
+    public async Task<string?> GetStationVersionAsync(CancellationToken ct = default)
+    {
+        var result = await StationManageApiClient.Value.GetStationVersionAsync(ct);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取图站版本号");
+        return result;
+    }
 }

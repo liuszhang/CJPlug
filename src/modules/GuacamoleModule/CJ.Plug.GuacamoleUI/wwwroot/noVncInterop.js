@@ -70,6 +70,14 @@ window.noVncInterop = {
                         settled = true;
                         clearTimeout(timeout);
                         console.log('[noVNC] VNC connected successfully');
+
+                        // 强制使用系统默认箭头光标，覆盖 noVNC 内部的 cursor 样式
+                        container.style.setProperty('cursor', 'default', 'important');
+                        var canvas = container.querySelector('canvas');
+                        if (canvas) {
+                            canvas.style.setProperty('cursor', 'default', 'important');
+                        }
+
                         this.connected = true;
                         resolve(true);
                     }

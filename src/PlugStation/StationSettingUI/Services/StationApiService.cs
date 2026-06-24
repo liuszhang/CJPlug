@@ -172,23 +172,289 @@ public class StationApiService
     {
         try
         {
-            // 先通过 StationApiServer 获取连接状态信息
-            var connStatus = await GetConnectionStatusAsync();
-            if (connStatus == null)
-                return (false, null, "无法获取服务器信息");
-
-            if (!connStatus.HubConnected)
-                return (false, null, "未连接到平台服务器，无法检查更新");
-
-            // 通过 StationApiServer 尝试获取版本
-            // (实际版本获取需主服务器提供对应端点，这里用现有信息)
             var currentVersion = AppConfig.AppVersion;
-            return (false, null, $"当前版本: {currentVersion}，服务器: {connStatus.MainServerUrl}");
+            var mainApiBaseUrl = GetMainApiBaseUrl();
+
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(mainApiBaseUrl),
+                Timeout = TimeSpan.FromSeconds(10),
+            };
+
+            var response = await client.GetAsync("/api/station/version");
+            if (!response.IsSuccessStatusCode)
+                return (false, null, $"无法获取服务器版本 (HTTP {(int)response.StatusCode})");
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var serverVersion = doc.RootElement.TryGetProperty("version", out var v) ? v.GetString() : null;
+
+            if (string.IsNullOrEmpty(serverVersion))
+                return (false, null, "服务器未返回有效版本号");
+
+            if (currentVersion == serverVersion)
+                return (false, serverVersion, $"已是最新版本 ({currentVersion})");
+
+            // 简单版本比较：按语义版本号规则
+            if (IsNewerVersion(serverVersion, currentVersion))
+                return (true, serverVersion, $"发现新版本: {serverVersion} (当前: {currentVersion})");
+
+            return (false, serverVersion, $"当前版本 ({currentVersion})，服务器版本 ({serverVersion})");
         }
         catch (Exception ex)
         {
             return (false, null, $"检查失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 比较两个语义版本号字符串，返回 v1 > v2
+    /// </summary>
+    private static bool IsNewerVersion(string v1, string v2)
+    {
+        try
+        {
+            var parts1 = v1.TrimStart('v').Split('.');
+            var parts2 = v2.TrimStart('v').Split('.');
+            for (int i = 0; i < Math.Max(parts1.Length, parts2.Length); i++)
+            {
+                int n1 = i < parts1.Length && int.TryParse(parts1[i], out var p1) ? p1 : 0;
+                int n2 = i < parts2.Length && int.TryParse(parts2[i], out var p2) ? p2 : 0;
+                if (n1 != n2) return n1 > n2;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 从 MainServerUrl 推导出主 API 服务器地址（端口 8687）
+    /// </summary>
+    private string GetMainApiBaseUrl()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_config.MainServerUrl))
+            {
+                var uri = new Uri(_config.MainServerUrl);
+                return $"{uri.Scheme}://{uri.Host}:8687";
+            }
+        }
+        catch { }
+        return "http://127.0.0.1:8687";
+    }
+
+    // ==================== 图站部署包下载 ====================
+
+    /// <summary>
+    /// 一步完成图站部署包的打包+下载（服务端同步打包完成后直接返回文件流）。
+    /// 通过 IProgress 回调上报下载进度（0-100），支持 CancellationToken 取消。
+    /// </summary>
+    public async Task<string?> DownloadStationPackageDirectAsync(
+        string platform, string saveDir,
+        IProgress<int>? downloadProgress = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(GetMainApiBaseUrl()),
+                Timeout = TimeSpan.FromMinutes(10),
+            };
+
+            // POST 到一步端点，服务端打包完成后直接返回文件流
+            var response = await client.PostAsync(
+                $"/api/package/download-station-direct?platform={platform}",
+                null, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"打包下载失败: HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+                return null;
+            }
+
+            Directory.CreateDirectory(saveDir);
+            var fileName = $"CJPlug-Station-{DateTime.Now:yyyyMMdd-HHmmss}.zip";
+            var filePath = Path.Combine(saveDir, fileName);
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            await using var fileStream = File.Create(filePath);
+
+            if (totalBytes > 0 && downloadProgress != null)
+            {
+                var buffer = new byte[8192];
+                long totalRead = 0;
+                int bytesRead;
+                int lastReportedPercent = 0;
+
+                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesRead, ct);
+                    totalRead += bytesRead;
+                    var percent = (int)(totalRead * 100 / totalBytes);
+                    if (percent != lastReportedPercent)
+                    {
+                        lastReportedPercent = percent;
+                        downloadProgress.Report(percent);
+                    }
+                }
+            }
+            else
+            {
+                await stream.CopyToAsync(fileStream, ct);
+                downloadProgress?.Report(100);
+            }
+
+            return filePath;
+        }
+        catch (OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine("下载已取消");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"下载文件失败: {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 启动图站部署包打包任务，返回 taskId
+    /// </summary>
+    public async Task<string?> StartStationPackageAsync(string platform = "win-x64")
+    {
+        try
+        {
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(GetMainApiBaseUrl()),
+                Timeout = TimeSpan.FromSeconds(15),
+            };
+
+            var response = await client.PostAsync(
+                $"/api/package/download-station?platform={platform}", null);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("taskId", out var tid) ? tid.GetString() : null;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"启动打包失败: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 查询打包任务进度
+    /// </summary>
+    public async Task<PackageProgressInfo?> GetPackageProgressAsync(string taskId)
+    {
+        try
+        {
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(GetMainApiBaseUrl()),
+                Timeout = TimeSpan.FromSeconds(10),
+            };
+
+            var progress = await client.GetFromJsonAsync<PackageProgressInfo>(
+                $"/api/package/progress/{taskId}", JsonOptions);
+            return progress;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"查询进度失败: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 下载已完成打包的文件到本地，通过 progress 回调上报下载进度（0-100）
+    /// </summary>
+    public async Task<string?> DownloadStationPackageAsync(
+        string taskId, string saveDir, IProgress<int>? progress = null)
+    {
+        try
+        {
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(GetMainApiBaseUrl()),
+                Timeout = TimeSpan.FromMinutes(10),
+            };
+
+            var response = await client.GetAsync(
+                $"/api/package/download/{taskId}",
+                HttpCompletionOption.ResponseHeadersRead);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"下载请求失败: HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+                return null;
+            }
+
+            Directory.CreateDirectory(saveDir);
+            var fileName = $"CJPlug-Station-{DateTime.Now:yyyyMMdd-HHmmss}.zip";
+            var filePath = Path.Combine(saveDir, fileName);
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            await using var fileStream = File.Create(filePath);
+
+            if (totalBytes > 0 && progress != null)
+            {
+                var buffer = new byte[8192];
+                long totalRead = 0;
+                int bytesRead;
+                int lastReportedPercent = 0;
+
+                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+                    var percent = (int)(totalRead * 100 / totalBytes);
+                    if (percent != lastReportedPercent)
+                    {
+                        lastReportedPercent = percent;
+                        progress.Report(percent);
+                    }
+                }
+            }
+            else
+            {
+                await stream.CopyToAsync(fileStream);
+                progress?.Report(100);
+            }
+
+            return filePath;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"下载文件失败: {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 打包进度信息
+    /// </summary>
+    public class PackageProgressInfo
+    {
+        public string TaskId { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public int Progress { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     // ==================== 工具管理 API (通过主服务器) ====================

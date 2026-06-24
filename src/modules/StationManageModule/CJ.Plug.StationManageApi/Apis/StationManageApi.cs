@@ -18,7 +18,8 @@ public static class StationManageApi
         api.MapPut("/UpdateStation", async (IStationManageService service, [FromBody] Station updatedStation) => await service.UpdateStationAsync(updatedStation));
         //api.MapGet("/GetToolPathOnIp/{ip}/{toolName}/{version}", async (IStationManageService service, string ip, string toolName, string? version) => await service.GetToolPathOnIp(ip, toolName, version));
 
-
+        // 获取主服务器上图站部署包的最新版本号
+        api.MapGet("/version", () => Results.Ok(new { Version = GlobalData.StationVersion }));
 
 
         return app;

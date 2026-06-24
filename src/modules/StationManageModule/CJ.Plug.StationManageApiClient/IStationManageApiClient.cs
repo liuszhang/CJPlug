@@ -27,5 +27,8 @@ namespace CJ.Plug.StationManageApiClient
         Task<string?> GetToolPathOnIp(string ip, string toolName, string? version = null);
         Task<string?> GetToolPathByFilter(ToolConfigFilter ToolConfigFilter);
         Task<ToolDeploySettingModel?> GetToolDeploySettingAsync(ToolConfigFilter filter);
+
+        // 版本管理
+        Task<string?> GetStationVersionAsync(CancellationToken cancellationToken = default);
     }
 }
