@@ -1,0 +1,94 @@
+﻿@using MudBlazor
+@using System.Text.Json
+@using System.Text.Json.Nodes
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">配置 Trae MCP Server</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2" Style="font-family:'Consolas','Courier New',monospace;">@ConfigFilePath</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            直接编辑下方的 JSON 配置内容，点击「配置并保存」覆盖写入 Trae 配置文件。
+        </MudText>
+
+        <MudTextField T="string"
+                      Text="@_editableJson"
+                      TextChanged="OnJsonChanged"
+                      Lines="20"
+                      TextUpdateSuppression="false"
+                      Variant="Variant.Outlined"
+                      Style="font-family:'Consolas','Courier New',monospace; background-color:#1e1e1e; color:#d4d4d4;" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Success" OnClick="Enable">启用 MCP Server</MudButton>
+        <MudSpacer />
+        <MudButton Color="Color.Default" OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirm">配置并保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string CurrentConfig { get; set; } = "{}";
+    [Parameter] public string ConfigFilePath { get; set; } = "";
+
+    private string _editableJson = "{}";
+
+    protected override void OnParametersSet()
+    {
+        _editableJson = FormatJson(CurrentConfig);
+    }
+
+    private void OnJsonChanged(string value)
+    {
+        _editableJson = value;
+    }
+
+    private static string FormatJson(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "{}";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Enable()
+    {
+        try
+        {
+            var root = JsonNode.Parse(_editableJson);
+            if (root == null) return;
+
+            var mcpServers = root["mcpServers"] as JsonObject;
+            if (mcpServers == null)
+            {
+                mcpServers = new JsonObject();
+                root["mcpServers"] = mcpServers;
+            }
+
+            mcpServers["cj-mcpserver"] = new JsonObject
+            {
+                ["type"] = "streamableHttp",
+                ["url"] = "http://localhost:3001"
+            };
+
+            _editableJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            // ignore parse errors
+        }
+    }
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(_editableJson));
+}

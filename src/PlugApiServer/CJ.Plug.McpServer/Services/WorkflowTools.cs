@@ -40,7 +40,7 @@ public sealed class WorkflowTools
         {
             var workflows = await _httpClient
                 .GetFromJsonAsync<List<PublishedWorkflowDto>>(
-                    "/api/mcptools/getPublishedWorkflows");
+                    "/api/mcp/getPublishedWorkflows");
 
             if (workflows == null || workflows.Count == 0)
                 return "当前没有已发布的工作流。请在 ProcessManage 中将工作流标记为发布。";
@@ -201,7 +201,7 @@ public sealed class WorkflowTools
         {
             var workflows = await _httpClient
                 .GetFromJsonAsync<List<PublishedWorkflowDto>>(
-                    "/api/mcptools/getPublishedWorkflows");
+                    "/api/mcp/getPublishedWorkflows");
 
             var wf = workflows?.FirstOrDefault(
                 w => w.WorkflowDefinitionId == workflowDefinitionId);

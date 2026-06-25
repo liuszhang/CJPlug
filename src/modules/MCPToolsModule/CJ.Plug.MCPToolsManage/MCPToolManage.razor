@@ -1,5 +1,6 @@
 ﻿@page "/MCPToolManage"
 
+@using CJ.Plug.MCPToolsManage.Dialogs
 @using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugProcess
@@ -33,6 +34,8 @@
         <MudSpacer />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Refresh">刷新</MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenDeployGuide" Class="ms-2">配置指南</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" OnClick="ConfigureTrae" Class="ms-2" StartIcon="@Icons.Material.Filled.CloudUpload">配置 Trae</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ConfigureClaude" Class="ms-2">配置 Claude Code</MudButton>
         @* <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenDeployGuide" Class="ms-2">发布为Skill</MudButton> *@
     </ToolBarContent>
     <Columns>
@@ -139,6 +142,69 @@
         var parameters = new DialogParameters { { "Tool", tool } };
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
         await DialogService.ShowAsync<MCPToolDetailDialog>($"MCPTool 详情 — {tool.Name}", parameters, options);
+    }
+
+    private async Task ConfigureTrae()
+    {
+        try
+        {
+            // 1. 获取当前配置内容
+            var (config, filePath) = await MainApiClient.GetTraePreviewAsync();
+
+            // 2. 弹窗展示（用户可编辑）
+            var parameters = new DialogParameters
+            {
+                { "CurrentConfig", config },
+                { "ConfigFilePath", filePath }
+            };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<ConfigureTraeDialog>("配置 Trae MCP Server", parameters, options);
+            var dialogResult = await dialog.Result;
+
+            if (dialogResult == null || dialogResult.Canceled)
+                return;
+
+            // 3. 获取用户编辑后的 JSON 并写入
+            var editedJson = dialogResult.Data as string ?? "{}";
+            var message = await MainApiClient.ConfigureTraeMcpAsync(editedJson);
+            Snackbar.Add(message, Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 Trae 失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+
+    private async Task ConfigureClaude()
+    {
+        try
+        {
+            // 1. 获取当前配置内容
+            var (config, filePath) = await MainApiClient.GetClaudePreviewAsync();
+
+            // 2. 弹窗展示（用户可编辑）
+            var parameters = new DialogParameters
+            {
+                { "CurrentConfig", config },
+                { "ConfigFilePath", filePath }
+            };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<ConfigureClaudeDialog>("配置 Claude Code MCP Server", parameters, options);
+            var dialogResult = await dialog.Result;
+
+            if (dialogResult == null || dialogResult.Canceled)
+                return;
+
+            // 3. 获取用户编辑后的 JSON 并写入
+            var editedJson = dialogResult.Data as string ?? "{}";
+            var message = await MainApiClient.ConfigureClaudeMcpAsync(editedJson);
+            Snackbar.Add(message, Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 Claude Code 失败: {ex.Message}", Severity.Error);
+        }
     }
 
     // private class MCPToolDto

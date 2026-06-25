@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
+    <ProjectReference Include="..\..\LlmConfigModule\CJ.Plug.LlmConfigModel\CJ.Plug.LlmConfigModel.csproj" />
   </ItemGroup>
 
 </Project>

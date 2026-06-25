@@ -68,7 +68,7 @@ public class DynamicToolRegistry : IDisposable
         {
             var workflows = await _apiClient
                 .GetFromJsonAsync<List<PublishedWorkflowDto>>(
-                    "/api/mcptools/getPublishedWorkflows",
+                    "/api/mcp/getPublishedWorkflows",
                     cancellationToken: ct) ?? new();
 
             var newTools = new Dictionary<string, DynamicWorkflowTool>();

@@ -4,6 +4,8 @@ using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace CJ.Plug.MCPToolsManageApi.Services
 {
@@ -11,11 +13,16 @@ namespace CJ.Plug.MCPToolsManageApi.Services
     {
         private readonly IMcpToolChangeNotifier? _notifier;
         private readonly CapabilityRegistry? _capabilityRegistry;
+        private readonly ILogger<MCPToolsManageService>? _logger;
 
-        public MCPToolsManageService(MainDbContext dbContext, IMcpToolChangeNotifier? notifier = null, CapabilityRegistry? capabilityRegistry = null) : base(dbContext)
+        public MCPToolsManageService(MainDbContext dbContext,
+            IMcpToolChangeNotifier? notifier = null,
+            CapabilityRegistry? capabilityRegistry = null,
+            ILogger<MCPToolsManageService>? logger = null) : base(dbContext)
         {
             _notifier = notifier;
             _capabilityRegistry = capabilityRegistry;
+            _logger = logger;
         }
 
         public override async Task<MCPTool> CreateAsync(MCPTool entity, CancellationToken cancellationToken = default)
@@ -241,5 +248,191 @@ namespace CJ.Plug.MCPToolsManageApi.Services
                 Value = v.Value,
             };
         }
+
+        // ---- Trae MCP 配置 ---- 
+
+        /// <inheritdoc/>
+        public async Task<(string content, string filePath)> PreviewTraeMcpAsync(string? traeConfigPath = null)
+        {
+            var configPath = ResolveTraeConfigPath(traeConfigPath);
+
+            if (!File.Exists(configPath))
+            {
+                _logger?.LogInformation("PreviewTraeMcp: 配置文件不存在 {Path}，返回空对象", configPath);
+                return ("{}", configPath);
+            }
+
+            var content = await File.ReadAllTextAsync(configPath);
+            _logger?.LogInformation("PreviewTraeMcp: 已读取配置文件 {Path}，{Length} 字符", configPath, content.Length);
+            return (string.IsNullOrWhiteSpace(content) ? "{}" : content, configPath);
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> ConfigureTraeMcpAsync(string configContent, string? traeConfigPath = null)
+        {
+            var configPath = ResolveTraeConfigPath(traeConfigPath);
+            _logger?.LogInformation("ConfigureTraeMcp: 目标配置文件 {Path}", configPath);
+
+            // 备份
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var bakPath = configPath + ".bak";
+                    File.Copy(configPath, bakPath, overwrite: true);
+                    _logger?.LogInformation("ConfigureTraeMcp: 已备份到 {BakPath}", bakPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "备份 Trae 配置文件失败");
+                }
+            }
+
+            // 写入用户编辑后的内容
+            var dir = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(configPath, (configContent ?? "{}") + Environment.NewLine);
+
+            _logger?.LogInformation("ConfigureTraeMcp: 已写入用户编辑内容到 {Path}", configPath);
+            return "已将配置写入 Trae 配置文件";
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> EnableTraeMcpAsync(string? traeConfigPath = null)
+        {
+            var configPath = ResolveTraeConfigPath(traeConfigPath);
+            _logger?.LogInformation("EnableTraeMcp: 目标配置文件 {Path}", configPath);
+
+            // 读取现有配置
+            JsonObject? root;
+            if (File.Exists(configPath))
+            {
+                var existingJson = await File.ReadAllTextAsync(configPath);
+                root = string.IsNullOrWhiteSpace(existingJson)
+                    ? new JsonObject()
+                    : JsonNode.Parse(existingJson) as JsonObject ?? new JsonObject();
+
+                // 备份
+                try
+                {
+                    var bakPath = configPath + ".bak";
+                    File.Copy(configPath, bakPath, overwrite: true);
+                    _logger?.LogInformation("EnableTraeMcp: 已备份到 {BakPath}", bakPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "备份 Trae 配置文件失败");
+                }
+            }
+            else
+            {
+                root = new JsonObject();
+            }
+
+            // 确保 mcpServers 节点存在
+            if (root["mcpServers"] is not JsonObject mcpServers)
+            {
+                mcpServers = new JsonObject();
+                root["mcpServers"] = mcpServers;
+            }
+
+            // 写入固定 cj-mcpserver 配置
+            mcpServers["cj-mcpserver"] = new JsonObject
+            {
+                ["type"] = "streamableHttp",
+                ["url"] = "http://localhost:3001"
+            };
+
+            // 写入文件
+            var dir = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var newJson = JsonSerializer.Serialize(root, options);
+            await File.WriteAllTextAsync(configPath, newJson + Environment.NewLine);
+
+            _logger?.LogInformation("EnableTraeMcp: 已成功写入 cj-mcpserver 到 {Path}", configPath);
+            return "已启用 MCP Server";
+        }
+
+        private static string ResolveTraeConfigPath(string? traeConfigPath)
+        {
+            if (!string.IsNullOrEmpty(traeConfigPath))
+                return traeConfigPath;
+
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var path = Path.Combine(appData, "Trae", "User", "mcp.json");
+
+            if (!File.Exists(path))
+            {
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                path = Path.Combine(userProfile, ".trae", "mcp.json");
+            }
+
+            return path;
+        }
+
+        // ---- Claude Code MCP 配置 ----
+
+        /// <inheritdoc/>
+        public async Task<(string content, string filePath)> PreviewClaudeMcpAsync(string? claudeConfigPath = null)
+        {
+            var configPath = ResolveClaudeConfigPath(claudeConfigPath);
+
+            if (!File.Exists(configPath))
+            {
+                _logger?.LogInformation("PreviewClaudeMcp: 配置文件不存在 {Path}，返回空对象", configPath);
+                return ("{}", configPath);
+            }
+
+            var content = await File.ReadAllTextAsync(configPath);
+            _logger?.LogInformation("PreviewClaudeMcp: 已读取配置文件 {Path}，{Length} 字符", configPath, content.Length);
+            return (string.IsNullOrWhiteSpace(content) ? "{}" : content, configPath);
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> ConfigureClaudeMcpAsync(string configContent, string? claudeConfigPath = null)
+        {
+            var configPath = ResolveClaudeConfigPath(claudeConfigPath);
+            _logger?.LogInformation("ConfigureClaudeMcp: 目标配置文件 {Path}", configPath);
+
+            // 备份
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var bakPath = configPath + ".bak";
+                    File.Copy(configPath, bakPath, overwrite: true);
+                    _logger?.LogInformation("ConfigureClaudeMcp: 已备份到 {BakPath}", bakPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "备份 Claude Code 配置文件失败");
+                }
+            }
+
+            // 写入用户编辑后的内容
+            var dir = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(configPath, (configContent ?? "{}") + Environment.NewLine);
+
+            _logger?.LogInformation("ConfigureClaudeMcp: 已写入用户编辑内容到 {Path}", configPath);
+            return "已将配置写入 Claude Code 配置文件";
+        }
+
+        private static string ResolveClaudeConfigPath(string? claudeConfigPath)
+        {
+            if (!string.IsNullOrEmpty(claudeConfigPath))
+                return claudeConfigPath;
+
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(userProfile, ".claude", "mcp.json");
+        }
+
     }
 }

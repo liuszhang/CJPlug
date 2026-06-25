@@ -5,6 +5,7 @@
 @using CJ.Plug.LlmConfigApiClient
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 @using MudX
 @using Radzen.Blazor
@@ -30,7 +31,25 @@
                         MessageAdded="@OnMessageAdded"
                         MessageSent="@OnMessageSent"
                         ChatCleared="@OnChatCleared"
-                        TypingChanged="@OnTypingChanged" />
+                        TypingChanged="@OnTypingChanged">
+                
+                    <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-top:1px solid #e0e0e0;background:#fafafa;">
+                        <label for="chat-file-upload" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:4px;" title="上传文件">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </label>
+                        <InputFile id="chat-file-upload" OnChange="HandleFileSelectedAsync" multiple style="display:none;" />
+                        @foreach (var file in attachedFiles)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClose="() => RemoveFile(file)">
+                                @file.FileName
+                            </MudChip>
+                        }
+                    </div>
+                
+            </RadzenChat>
         </CJ.Plug.SharedPages.Layout.VerticalWell>
 
         <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mt-2 mb-4">
@@ -69,9 +88,14 @@
     ChatMessage TmpMessage = new ChatMessage();
     private DefaultModelInfoResponse? _defaultModelInfo;
     private string? _mcpConnectionString;
+    private List<FileAttachmentInfo> attachedFiles = new();
+    private string _uploadTempDir = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        _uploadTempDir = Path.Combine(Path.GetTempPath(), "CJ.Plug.AI", "uploads");
+        Directory.CreateDirectory(_uploadTempDir);
+
         users.AddRange(new[]
         {
             new ChatUser { Id = "user1", Name = "ME", Color = "#1976d2" },
@@ -127,7 +151,14 @@
 
     async void OnMessageSent(ChatMessage message)
     {
-        await TestDeepSeek(message.Content);
+        string content = message.Content;
+        if (attachedFiles.Count > 0)
+        {
+            var attachmentLines = attachedFiles.Select(f => $"{f.FileName}:{f.FileId}");
+            content = $"[UserAttachedFiles] {string.Join("; ", attachmentLines)}\n\n{content}";
+        }
+        await TestDeepSeek(content);
+        attachedFiles.Clear();
     }
 
     void OnMessagesChanged(IEnumerable<ChatMessage> newMessages)
@@ -244,5 +275,37 @@
             new ChatMessage { Content = "以上。", UserId = "user2", Timestamp = DateTime.Now }
         });
         StateHasChanged();
+    }
+
+    public class FileAttachmentInfo
+    {
+        public string FileId { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string LocalPath { get; set; } = string.Empty;
+    }
+
+    private async Task HandleFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles())
+        {
+            var fileId = Guid.NewGuid().ToString("N");
+            var localPath = Path.Combine(_uploadTempDir, $"{fileId}_{file.Name}");
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            await using var fs = File.Create(localPath);
+            await stream.CopyToAsync(fs);
+
+            attachedFiles.Add(new FileAttachmentInfo
+            {
+                FileId = fileId,
+                FileName = file.Name,
+                LocalPath = localPath
+            });
+        }
+    }
+
+    private void RemoveFile(FileAttachmentInfo f)
+    {
+        attachedFiles.Remove(f);
     }
 }

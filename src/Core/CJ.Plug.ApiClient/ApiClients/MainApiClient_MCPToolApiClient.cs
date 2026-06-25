@@ -42,4 +42,35 @@ public partial class MainApiClient : IMCPToolApiClient
         await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "获取已发布工作流");
         return result;
     }
+
+    public async Task<(string content, string filePath)> GetTraePreviewAsync(CancellationToken cancellationToken = default)
+    {
+        return await MCPToolApiClient.Value.GetTraePreviewAsync(cancellationToken);
+    }
+
+    public async Task<string> ConfigureTraeMcpAsync(string configContent, CancellationToken cancellationToken = default)
+    {
+        var result = await MCPToolApiClient.Value.ConfigureTraeMcpAsync(configContent, cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "配置Trae MCP: 覆盖写入配置");
+        return result;
+    }
+
+    public async Task<string> EnableTraeMcpAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await MCPToolApiClient.Value.EnableTraeMcpAsync(cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "启用Trae MCP: 写入cj-mcpserver");
+        return result;
+    }
+
+    public async Task<(string content, string filePath)> GetClaudePreviewAsync(CancellationToken cancellationToken = default)
+    {
+        return await MCPToolApiClient.Value.GetClaudePreviewAsync(cancellationToken);
+    }
+
+    public async Task<string> ConfigureClaudeMcpAsync(string configContent, CancellationToken cancellationToken = default)
+    {
+        var result = await MCPToolApiClient.Value.ConfigureClaudeMcpAsync(configContent, cancellationToken);
+        await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Other, "配置Claude Code MCP: 覆盖写入配置");
+        return result;
+    }
 }
