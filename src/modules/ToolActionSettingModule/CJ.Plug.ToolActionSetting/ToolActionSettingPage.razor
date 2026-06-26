@@ -57,6 +57,8 @@
     </div>
     <MudStack Row AlignItems="AlignItems.Center">
         <MudButton OnClick="CreateToolItem" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建插头</MudButton>
+        <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary">一键插入</MudButton>
+        <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary">一键拔出</MudButton>
        
         @if (IsSelectedPlugPublished())
         {
@@ -105,8 +107,6 @@
                                 </MudSelect> *@
                                 @if (_plugListTabIndex == 0)
                                 {
-                                    <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键插入</MudButton>
-                                    <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键拔出</MudButton>
                                     <MudCheckBox T="bool" Dense Value="IsShowSystemTool" ValueChanged="OnShowSystemToolChanged" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
                                 }
                             </MudStack>

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- 统一发布输出到 02.Publish\Services\ -->
+    <PublishDir>$(MSBuildThisFileDirectory)..\02.Publish\Services\</PublishDir>
+  </PropertyGroup>
+</Project>
