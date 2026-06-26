@@ -1,0 +1,161 @@
+@using MudBlazor
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@inject MainApiClient MainApiClient
+
+<MudDialog>
+    <DialogContent>
+        @* <MudText Typo="Typo.h6" Class="mb-3">@Title</MudText> *@
+
+        <MudGrid Class="mb-2" Spacing="1">
+            <MudItem xs="10">
+                <MudText Typo="Typo.caption" Color="Color.Error" Style="font-family:'Consolas','Courier New',monospace; word-break:break-all;">@_configFilePath</MudText>
+            </MudItem>
+            <MudItem xs="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Default" OnClick="ChangeFile" FullWidth="true">更换</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_fileNotFound)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-2" Style="font-size:0.85rem;">无法找到配置文件，请点击右侧更换按钮手动定位</MudAlert>
+        }
+
+        <MudText Typo="Typo.body2" Class="mb-2">
+            直接编辑下方的 JSON 配置内容，点击「配置并保存」覆盖写入配置文件。
+        </MudText>
+
+        <MudTextField T="string"
+                      Text="@_editableJson"
+                      TextChanged="OnJsonChanged"
+                      Lines="20"
+                      TextUpdateSuppression="false"
+                      Variant="Variant.Outlined"
+                      Style="font-family:'Consolas','Courier New',monospace; background-color:#1e1e1e; color:#d4d4d4;" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Success" OnClick="Enable">启用 MCP Server</MudButton>
+        <MudButton Color="Color.Warning" OnClick="Reset">重置</MudButton>
+        <MudSpacer />
+        <MudButton Color="Color.Default" OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirm">配置并保存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "配置 MCP Server";
+    [Parameter] public string ConfigFilePath { get; set; } = "";
+    [Parameter] public string ConfigContent { get; set; } = "{}";
+    [Parameter] public string ConfigKey { get; set; } = "";
+
+    private string _configFilePath = "";
+    private string _editableJson = "{}";
+    private string _originalConfig = "{}";
+    private bool _fileNotFound;
+
+    protected override void OnParametersSet()
+    {
+        _configFilePath = ConfigFilePath;
+        _editableJson = FormatJson(ConfigContent);
+        _originalConfig = ConfigContent;
+        _fileNotFound = string.IsNullOrWhiteSpace(ConfigContent) || ConfigContent == "{}";
+    }
+
+    private void OnJsonChanged(string value)
+    {
+        _editableJson = value;
+    }
+
+    private static string FormatJson(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "{}";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+
+    private async Task ChangeFile()
+    {
+        try
+        {
+            var path = await MainApiClient.PickFileAsync();
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                _configFilePath = path;
+                await ReloadFromPath();
+
+                // 如果有 ConfigKey，持久化新路径
+                if (!string.IsNullOrWhiteSpace(ConfigKey))
+                {
+                    await MainApiClient.SaveConfigPathAsync(ConfigKey, path);
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task ReloadFromPath()
+    {
+        try
+        {
+            var (content, fp) = await MainApiClient.GetPreviewAsync(_configFilePath);
+            _configFilePath = fp;
+            _editableJson = FormatJson(content);
+            _originalConfig = content;
+            _fileNotFound = string.IsNullOrWhiteSpace(content) || content == "{}";
+        }
+        catch
+        {
+            _editableJson = "{}";
+            _fileNotFound = true;
+        }
+    }
+
+    private async Task Reset()
+    {
+        await ReloadFromPath();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Enable()
+    {
+        try
+        {
+            var root = JsonNode.Parse(_editableJson);
+            if (root == null) return;
+
+            var mcpServers = root["mcpServers"] as JsonObject;
+            if (mcpServers == null)
+            {
+                mcpServers = new JsonObject();
+                root["mcpServers"] = mcpServers;
+            }
+
+            mcpServers["cj-mcpserver"] = new JsonObject
+            {
+                ["type"] = "streamableHttp",
+                ["url"] = "http://localhost:3001"
+            };
+
+            _editableJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+        }
+    }
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok((_editableJson, _configFilePath)));
+}

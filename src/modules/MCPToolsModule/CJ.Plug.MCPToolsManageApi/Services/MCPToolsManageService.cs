@@ -434,5 +434,82 @@ namespace CJ.Plug.MCPToolsManageApi.Services
             return Path.Combine(userProfile, ".claude", "mcp.json");
         }
 
+        // ---- 通用 MCP 配置 ----
+
+        /// <inheritdoc/>
+        public async Task<(string content, string filePath)> PreviewMcpAsync(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                _logger?.LogInformation("PreviewMcp: 配置文件不存在 {Path}，返回空对象", filePath);
+                return ("{}", filePath);
+            }
+
+            var content = await File.ReadAllTextAsync(filePath);
+            _logger?.LogInformation("PreviewMcp: 已读取配置文件 {Path}，{Length} 字符", filePath, content.Length);
+            return (string.IsNullOrWhiteSpace(content) ? "{}" : content, filePath);
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> ConfigureMcpAsync(string filePath, string configContent)
+        {
+            _logger?.LogInformation("ConfigureMcp: 目标配置文件 {Path}", filePath);
+
+            // 备份
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    var bakPath = filePath + ".bak";
+                    File.Copy(filePath, bakPath, overwrite: true);
+                    _logger?.LogInformation("ConfigureMcp: 已备份到 {BakPath}", bakPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "备份配置文件失败");
+                }
+            }
+
+            // 写入用户编辑后的内容
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(filePath, (configContent ?? "{}") + Environment.NewLine);
+
+            _logger?.LogInformation("ConfigureMcp: 已写入用户编辑内容到 {Path}", filePath);
+            return "已将配置写入配置文件";
+        }
+
+        // ---- MCP 配置路径持久化 ----
+
+        public async Task<string> GetConfigPathAsync(string key)
+        {
+            var entity = await _dbContext.Set<CJ.Plug.LlmConfigModel.Models.McpConfigPath>()
+                .FindAsync(key);
+            return entity?.FilePath ?? "";
+        }
+
+        public async Task SaveConfigPathAsync(string key, string filePath)
+        {
+            var set = _dbContext.Set<CJ.Plug.LlmConfigModel.Models.McpConfigPath>();
+            var entity = await set.FindAsync(key);
+            if (entity != null)
+            {
+                entity.FilePath = filePath ?? "";
+                entity.UpdatedAt = DateTime.UtcNow.ToLocalTime();
+            }
+            else
+            {
+                set.Add(new CJ.Plug.LlmConfigModel.Models.McpConfigPath
+                {
+                    Id = key,
+                    FilePath = filePath ?? "",
+                    UpdatedAt = DateTime.UtcNow.ToLocalTime()
+                });
+            }
+            await _dbContext.SaveChangesAsync();
+            _logger?.LogInformation("SaveConfigPath: {Key} => {Path}", key, filePath);
+        }
     }
 }

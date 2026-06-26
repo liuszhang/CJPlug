@@ -1,6 +1,7 @@
 ﻿using CJ.Plug.MCPToolsManageApi.Contracts;
 using CJ.Plug.Models.MCPTools;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace CJ.Plug.MCPToolsManageApi.Apis
 {
@@ -66,6 +67,67 @@ namespace CJ.Plug.MCPToolsManageApi.Apis
             })
             .WithName("ConfigureClaudeMcp")
             .WithDescription("将用户编辑的 JSON 内容覆盖写入 Claude Code MCP 配置文件");
+
+            // 通用自定义路径 MCP 配置
+            api.MapGet("/config/custom/preview", async (IMCPToolsManageService service, string filePath) =>
+            {
+                var (content, fp) = await service.PreviewMcpAsync(filePath);
+                return Results.Ok(new { content, filePath = fp });
+            })
+            .WithName("PreviewCustomMcp")
+            .WithDescription("读取指定路径的 MCP 配置文件");
+
+            api.MapPost("/config/custom", async (IMCPToolsManageService service, [FromBody] ConfigureCustomRequest request) =>
+            {
+                var message = await service.ConfigureMcpAsync(request.FilePath, request.ConfigContent);
+                return Results.Ok(new { success = true, message });
+            })
+            .WithName("ConfigureCustomMcp")
+            .WithDescription("将用户编辑的 JSON 覆盖写入指定路径的 MCP 配置文件");
+
+            // 文件选择对话框
+            api.MapGet("/config/pick-file", () =>
+            {
+                try
+                {
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = "-NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; $d=new-object System.Windows.Forms.OpenFileDialog; $d.Filter='JSON files (*.json)|*.json|All files (*.*)|*.*'; if($d.ShowDialog() -eq 'OK'){$d.FileName}else{''}\"",
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var proc = System.Diagnostics.Process.Start(psi)!;
+                    var output = proc.StandardOutput.ReadToEnd().Trim();
+                    proc.WaitForExit();
+                    return Results.Ok(new { filePath = output });
+                }
+                catch (Exception ex)
+                {
+                    return Results.Ok(new { filePath = "", error = ex.Message });
+                }
+            })
+            .WithName("PickConfigFile")
+            .WithDescription("打开 Windows 文件选择对话框，返回用户选中的 JSON 文件路径");
+
+            // MCP 配置路径持久化
+            api.MapGet("/config/path/{key}", async (IMCPToolsManageService service, string key) =>
+            {
+                var filePath = await service.GetConfigPathAsync(key);
+                return Results.Ok(new { filePath });
+            })
+            .WithName("GetConfigPath")
+            .WithDescription("获取已持久化的 MCP 配置文件路径");
+
+            api.MapPost("/config/path/{key}", async (IMCPToolsManageService service, string key, [FromBody] JsonElement body) =>
+            {
+                var filePath = body.TryGetProperty("filePath", out var f) ? f.GetString() ?? "" : "";
+                await service.SaveConfigPathAsync(key, filePath);
+                return Results.Ok(new { success = true });
+            })
+            .WithName("SaveConfigPath")
+            .WithDescription("持久化 MCP 配置文件路径");
 
             return app;
         }

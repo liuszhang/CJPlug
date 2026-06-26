@@ -43,5 +43,25 @@ public interface IMCPToolsManageService : IBaseRepositoryService<MCPTool, int>
     /// 将用户编辑后的 JSON 内容直接覆盖写入 Claude Code 的 MCP 配置文件
     /// </summary>
     Task<string> ConfigureClaudeMcpAsync(string configContent, string? claudeConfigPath = null);
+
+    /// <summary>
+    /// 读取指定路径的 MCP 配置文件，返回 (content, filePath)
+    /// </summary>
+    Task<(string content, string filePath)> PreviewMcpAsync(string filePath);
+
+    /// <summary>
+    /// 将用户编辑后的 JSON 覆盖写入指定路径的 MCP 配置文件
+    /// </summary>
+    Task<string> ConfigureMcpAsync(string filePath, string configContent);
+
+    /// <summary>
+    /// 获取已持久化的 MCP 配置文件路径。key: WorkBuddy / Codex / Hermes。未设置返回空字符串
+    /// </summary>
+    Task<string> GetConfigPathAsync(string key);
+
+    /// <summary>
+    /// 持久化 MCP 配置文件路径。key: WorkBuddy / Codex / Hermes
+    /// </summary>
+    Task SaveConfigPathAsync(string key, string filePath);
 }
 }

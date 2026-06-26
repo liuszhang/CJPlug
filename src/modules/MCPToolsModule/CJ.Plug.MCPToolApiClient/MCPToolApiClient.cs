@@ -87,4 +87,39 @@ public class MCPToolApiClient : BaseApiClient, IMCPToolApiClient
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
         return result.TryGetProperty("message", out var msg) ? msg.GetString() ?? "配置完成" : "配置完成";
     }
+
+    public async Task<(string content, string filePath)> GetPreviewAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var encodedPath = Uri.EscapeDataString(filePath);
+        var result = await httpClient.GetFromJsonAsync<JsonElement>($"/api/mcp/config/custom/preview?filePath={encodedPath}", cancellationToken);
+        var content = result.TryGetProperty("content", out var c) ? c.GetString() ?? "{}" : "{}";
+        var fp = result.TryGetProperty("filePath", out var f) ? f.GetString() ?? "" : "";
+        return (content, fp);
+    }
+
+    public async Task<string> ConfigureMcpAsync(string filePath, string configContent, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/api/mcp/config/custom", new { filePath, configContent }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+        return result.TryGetProperty("message", out var msg) ? msg.GetString() ?? "配置完成" : "配置完成";
+    }
+
+    public async Task<string> PickFileAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<JsonElement>("/api/mcp/config/pick-file", cancellationToken);
+        return result.TryGetProperty("filePath", out var f) ? f.GetString() ?? "" : "";
+    }
+
+    public async Task<string> GetConfigPathAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<JsonElement>($"/api/mcp/config/path/{Uri.EscapeDataString(key)}", cancellationToken);
+        return result.TryGetProperty("filePath", out var f) ? f.GetString() ?? "" : "";
+    }
+
+    public async Task SaveConfigPathAsync(string key, string filePath, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/api/mcp/config/path/{Uri.EscapeDataString(key)}", new { filePath }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 }
