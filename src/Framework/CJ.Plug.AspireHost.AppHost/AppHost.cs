@@ -177,7 +177,7 @@ builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApi
 //builder.AddProject<Projects.CJ_Plug_ElsaStudio>("elsastudio");
 //builder.AddProject("elsastudio", @"../PlugWebHost/CJ.Plug.ElsaStudio/CJ.Plug.ElsaStudio.csproj");
 //builder.AddProject("elsastudio", elsaStudio);
-builder.AddExecutable("elsastudio", "dotnet", elsaStudioDirectory, elsaStudioDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5010");
+//builder.AddExecutable("elsastudio", "dotnet", elsaStudioDirectory, elsaStudioDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5010");
 
 //builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
 //builder.AddProject("webfrontend", @"../PlugWebHost/CJ.Plug.HostWebServer/CJ.Plug.HostWebServer.csproj");
