@@ -26,9 +26,10 @@ namespace CJ.Plug.LicenseApi.Apis
                 if (current.IsValid && current.License != null)
                 {
                     response.Licensee = current.License.Licensee;
-                    response.Features = current.License.Features;
-                    response.ExpiresAt = current.License.ExpiresAt;
-                    response.IsExpired = current.License.IsExpired;
+                    response.IssuedAt = current.License.IssuedAt;
+                    response.CodeExpiresAt = current.License.CodeExpiresAt;
+                    response.IsExpired = current.License.CodeExpiresAt.HasValue
+                        && current.License.CodeExpiresAt.Value < DateTime.UtcNow;
                 }
 
                 return Results.Ok(response);
@@ -48,9 +49,10 @@ namespace CJ.Plug.LicenseApi.Apis
                 {
                     IsActivated = true,
                     Licensee = result.License!.Licensee,
-                    Features = result.License.Features,
-                    ExpiresAt = result.License.ExpiresAt,
-                    IsExpired = result.License.IsExpired,
+                    IssuedAt = result.License.IssuedAt,
+                    CodeExpiresAt = result.License.CodeExpiresAt,
+                    IsExpired = result.License.CodeExpiresAt.HasValue
+                        && result.License.CodeExpiresAt.Value < DateTime.UtcNow,
                     Message = "激活成功"
                 };
 
@@ -71,11 +73,8 @@ namespace CJ.Plug.LicenseApi.Apis
             {
                 if (string.IsNullOrWhiteSpace(request.Licensee))
                     return Results.BadRequest(new { error = "被许可人不能为空" });
-                if (request.Features == null || request.Features.Count == 0)
-                    return Results.BadRequest(new { error = "请至少选择一个功能" });
 
-                var licenseKey = service.GenerateLicenseKey(
-                    request.Features, request.ExpiresAt, request.Licensee);
+                var licenseKey = service.GenerateLicenseKey(request.Licensee, request.ValidDays);
 
                 var validation = LicenseSigner.ValidateLicense(licenseKey);
 

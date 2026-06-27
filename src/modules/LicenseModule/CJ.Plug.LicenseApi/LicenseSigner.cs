@@ -14,19 +14,17 @@ namespace CJ.Plug.LicenseApi
         // ═══════════════════════════════════════════════════════
         // AES-256 密钥（硬编码，管理后台与客户端共享）
         // ═══════════════════════════════════════════════════════
-        private const string AES_KEY_HEX = "A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6A7B8C9D0E1F2A3B4C5D6A7B8C9D0";
+        private const string AES_KEY_HEX = "672A4A5421F03B1EB4EBF3C3C5646CC0E3789841D5241762DA702997779E3446";
 
         /// <summary>
         /// 生成许可证密钥（仅管理后台/服务端使用）
         /// </summary>
-        public static string SignLicense(List<LicenseFeature> features, DateTime? expiresAt, string licensee)
+        public static string SignLicense(string licensee, int validDays)
         {
             var license = new LicenseInfo
             {
-                Features = features,
                 IssuedAt = DateTime.UtcNow,
-                ExpiresAt = expiresAt,
-                CodeExpiresAt = DateTime.UtcNow.AddMonths(3),
+                CodeExpiresAt = validDays == -1 ? null : DateTime.UtcNow.AddDays(validDays),
                 Licensee = licensee
             };
 

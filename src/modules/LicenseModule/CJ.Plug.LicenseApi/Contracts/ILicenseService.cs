@@ -10,9 +10,6 @@ namespace CJ.Plug.LicenseApi.Contracts
         /// <summary>获取当前激活的许可证</summary>
         LicenseValidationResult GetCurrentLicense();
 
-        /// <summary>检查指定功能是否已激活</summary>
-        bool IsFeatureEnabled(LicenseFeature feature);
-
         /// <summary>激活许可证并持久化</summary>
         LicenseValidationResult ActivateLicense(string licenseKey);
 
@@ -20,6 +17,6 @@ namespace CJ.Plug.LicenseApi.Contracts
         bool RevokeLicense();
 
         /// <summary>生成许可证密钥（管理后台）</summary>
-        string GenerateLicenseKey(List<LicenseFeature> features, DateTime? expiresAt, string licensee);
+        string GenerateLicenseKey(string licensee, int validDays);
     }
 }

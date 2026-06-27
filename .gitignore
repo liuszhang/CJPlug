@@ -383,3 +383,9 @@ FodyWeavers.xsd
 
 # 开发类文档
 .workbuddy/
+/02.Publish/Services/main-elsa.db
+/02.Publish/Services/main-elsa.db-shm
+/02.Publish/Services/main-elsa.db-wal
+/02.Publish/Services/main.db
+/02.Publish/Services/main.db-shm
+/02.Publish/Services/main.db-wal

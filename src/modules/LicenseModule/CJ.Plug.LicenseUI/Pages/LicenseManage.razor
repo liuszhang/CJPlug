@@ -43,25 +43,21 @@
                             <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">被许可人</MudText></MudItem>
                             <MudItem xs="8"><MudText Typo="Typo.body1">@_licensee</MudText></MudItem>
 
-                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">到期时间</MudText></MudItem>
+                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">签发时间</MudText></MudItem>
+                            <MudItem xs="8"><MudText Typo="Typo.body1">@_issuedAt.ToString("yyyy-MM-dd HH:mm")</MudText></MudItem>
+
+                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">授权码过期</MudText></MudItem>
                             <MudItem xs="8">
-                                @if (_expiresAt.HasValue)
+                                @if (_codeExpiresAt.HasValue)
                                 {
-                                    <MudText Typo="Typo.body1">@_expiresAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                    <MudText Typo="Typo.body1">@_codeExpiresAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
                                 }
                                 else
                                 {
-                                    <MudChip T="string" Color="Color.Info" Size="Size.Small">永久有效</MudChip>
+                                    <MudChip T="string" Color="Color.Info" Size="Size.Small">不限</MudChip>
                                 }
                             </MudItem>
 
-                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">功能列表</MudText></MudItem>
-                            <MudItem xs="8">
-                                @foreach (var feature in _features)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Class="mr-1 mb-1">@GetFeatureName(feature)</MudChip>
-                                }
-                            </MudItem>
                         </MudGrid>
                     }
                     else
@@ -124,24 +120,22 @@
                     <MudGrid Spacing="2">
                         <MudItem xs="12">
                             <MudTextField T="string" @bind-Value="_genLicensee"
-                                          @bind-Value:after="OnGenFormChanged"
                                           Label="被许可人 / 公司"
                                           Variant="Variant.Outlined" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-1">功能选择</MudText>
-                            <MudCheckBox T="bool" Checked="_genMultiStation" CheckedChanged="(v) => OnGenFormChanged()" Label="多图站部署" />
-                            <MudCheckBox T="bool" Checked="_genRemoteVis" CheckedChanged="(v) => OnGenFormChanged()" Label="远程可视化" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudDatePicker T="DateTime?" @bind-Date="_genExpiresDate" Label="到期时间（留空为永久）"
-                                           Variant="Variant.Outlined" Clearable="true" />
                         </MudItem>
                     </MudGrid>
                 </MudCardContent>
                 <MudCardActions>
+                    <MudSelect T="int" @bind-Value="_validDays" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Label="有效期限" AnchorOrigin="Origin.BottomCenter"
+                               Style="min-width:130px;" Disabled="_isGenerating">
+                        <MudSelectItem T="int" Value="1">1天</MudSelectItem>
+                        <MudSelectItem T="int" Value="7">1周</MudSelectItem>
+                        <MudSelectItem T="int" Value="90">3个月</MudSelectItem>
+                        <MudSelectItem T="int" Value="-1">永久</MudSelectItem>
+                    </MudSelect>
                     <MudButton Variant="Variant.Filled" Color="Color.Tertiary"
-                               OnClick="GenerateLicense" Disabled="@(!CanGenerate())">
+                               OnClick="GenerateLicense" Disabled="_isGenerating">
                         @(_isGenerating ? "生成中..." : "生成 License Key")
                     </MudButton>
                 </MudCardActions>
@@ -162,19 +156,17 @@
     private bool _isActivated;
     private bool _isExpired;
     private string _licensee = string.Empty;
-    private List<LicenseFeature> _features = new();
-    private DateTime? _expiresAt;
+    private DateTime _issuedAt;
+    private DateTime? _codeExpiresAt;
 
     private string _activateKey = string.Empty;
     private bool _isActivating;
     private bool _isRevoking;
 
     private string _genLicensee = string.Empty;
-    private bool _genMultiStation;
-    private bool _genRemoteVis;
-    private DateTime? _genExpiresDate;
     private string _generatedKey = string.Empty;
     private bool _isGenerating;
+    private int _validDays = 90;
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,8 +181,8 @@
             _isActivated = status.IsActivated;
             _isExpired = status.IsExpired;
             _licensee = status.Licensee;
-            _features = status.Features;
-            _expiresAt = status.ExpiresAt;
+            _issuedAt = status.IssuedAt;
+            _codeExpiresAt = status.CodeExpiresAt;
 
             StateHasChanged();
         }
@@ -250,32 +242,18 @@
         }
     }
 
-    private bool CanGenerate()
-    {
-        return !string.IsNullOrWhiteSpace(_genLicensee)
-            && (_genMultiStation || _genRemoteVis);
-    }
-
-    private void OnGenFormChanged()
-    {
-        StateHasChanged();
-    }
-
     private async Task GenerateLicense()
     {
         _isGenerating = true;
         _generatedKey = string.Empty;
+        StateHasChanged();
+
         try
         {
-            var features = new List<LicenseFeature>();
-            if (_genMultiStation) features.Add(LicenseFeature.MultiStation);
-            if (_genRemoteVis) features.Add(LicenseFeature.RemoteVisualization);
-
             var request = new GenerateLicenseRequest
             {
                 Licensee = _genLicensee.Trim(),
-                Features = features,
-                ExpiresAt = _genExpiresDate?.ToUniversalTime()
+                ValidDays = _validDays
             };
 
             var response = await LicenseApiClient.GenerateAsync(request);
@@ -290,11 +268,4 @@
             _isGenerating = false;
         }
     }
-
-    private static string GetFeatureName(LicenseFeature feature) => feature switch
-    {
-        LicenseFeature.MultiStation => "多图站部署",
-        LicenseFeature.RemoteVisualization => "远程可视化",
-        _ => feature.ToString()
-    };
 }

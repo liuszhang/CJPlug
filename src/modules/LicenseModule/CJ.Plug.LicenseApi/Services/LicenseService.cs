@@ -3,7 +3,6 @@ using CJ.Plug.LicenseApi.DbContext;
 using CJ.Plug.LicenseModels;
 using Serilog;
 using System.Collections.Concurrent;
-using System.Text.Json;
 
 namespace CJ.Plug.LicenseApi.Services
 {
@@ -44,16 +43,8 @@ namespace CJ.Plug.LicenseApi.Services
         }
 
         /// <inheritdoc/>
-        public bool IsFeatureEnabled(LicenseFeature feature)
-        {
-            var current = GetCurrentLicense();
-            return current.IsValid && current.License != null && current.License.Features.Contains(feature);
-        }
-
-        /// <inheritdoc/>
         public LicenseValidationResult ActivateLicense(string licenseKey)
         {
-            // 1. 验签 + 机器指纹校验
             var validationResult = LicenseSigner.ValidateLicense(licenseKey);
             if (!validationResult.IsValid)
             {
@@ -61,7 +52,7 @@ namespace CJ.Plug.LicenseApi.Services
                 return validationResult;
             }
 
-            // 2. 持久化到数据库
+            // 持久化到数据库
             try
             {
                 PersistToDatabase(validationResult.License!);
@@ -72,15 +63,14 @@ namespace CJ.Plug.LicenseApi.Services
                 PersistToFile(validationResult.License!);
             }
 
-            // 3. 更新缓存
+            // 更新缓存
             lock (_cacheLock)
             {
                 _cachedResult = validationResult;
             }
 
-            Log.Information("许可证激活成功：{Licensee}，功能={Features}",
-                validationResult.License!.Licensee,
-                string.Join(",", validationResult.License.Features));
+            Log.Information("许可证激活成功：{Licensee}",
+                validationResult.License!.Licensee);
 
             return validationResult;
         }
@@ -90,7 +80,6 @@ namespace CJ.Plug.LicenseApi.Services
         {
             try
             {
-                // 从数据库标记为非活跃
                 RemoveFromDatabase();
             }
             catch (Exception ex)
@@ -120,9 +109,9 @@ namespace CJ.Plug.LicenseApi.Services
         }
 
         /// <inheritdoc/>
-        public string GenerateLicenseKey(List<LicenseFeature> features, DateTime? expiresAt, string licensee)
+        public string GenerateLicenseKey(string licensee, int validDays)
         {
-            return LicenseSigner.SignLicense(features, expiresAt, licensee);
+            return LicenseSigner.SignLicense(licensee, validDays);
         }
 
         // ═══════════════════════════════════════════════════════
@@ -133,12 +122,10 @@ namespace CJ.Plug.LicenseApi.Services
         {
             try
             {
-                // 优先从数据库加载
                 var license = LoadFromDatabase();
                 if (license != null)
                 {
                     var result = LicenseSigner.ValidateLicense(license.LicenseKey);
-                    // 即使验签失败也恢复缓存（可能是密钥更新等，让用户重新激活）
                     lock (_cacheLock)
                     {
                         _cachedResult = result;
@@ -187,9 +174,7 @@ namespace CJ.Plug.LicenseApi.Services
                 return new LicenseInfo
                 {
                     LicenseKey = entity.LicenseKey,
-                    Features = JsonSerializer.Deserialize<List<LicenseFeature>>(entity.Features) ?? new(),
                     IssuedAt = entity.IssuedAt,
-                    ExpiresAt = entity.ExpiresAt,
                     Licensee = entity.Licensee
                 };
             }
@@ -213,9 +198,8 @@ namespace CJ.Plug.LicenseApi.Services
             var entity = new LicenseEntity
             {
                 LicenseKey = license.LicenseKey,
-                Features = JsonSerializer.Serialize(license.Features),
                 IssuedAt = license.IssuedAt,
-                ExpiresAt = license.ExpiresAt,
+                ExpiresAt = null,
                 Licensee = license.Licensee,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow

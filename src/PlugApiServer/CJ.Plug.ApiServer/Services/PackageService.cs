@@ -337,9 +337,19 @@ public class PackageService
         // 按依赖清单从共享目录精确复制
         var copiedCount = 0;
 
+        // 需跳过的文件扩展名（生产环境不需要）
+        var skipExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdb",   // 调试符号
+            ".map",   // JS source map
+        };
+
         // 复制托管 DLL（扁平结构，在发布根目录）
         foreach (var fileName in requiredFlatFiles)
         {
+            if (skipExtensions.Contains(Path.GetExtension(fileName)))
+                continue;
+
             var sourceFile = Path.Combine(sharedServicesDir, fileName);
             if (File.Exists(sourceFile))
             {
@@ -352,6 +362,9 @@ public class PackageService
         // 复制原生库（保留 runtimes/ 子目录结构）
         foreach (var relativePath in requiredRelativeFiles)
         {
+            if (skipExtensions.Contains(Path.GetExtension(relativePath)))
+                continue;
+
             var sourceFile = Path.Combine(sharedServicesDir, relativePath);
             if (File.Exists(sourceFile))
             {
@@ -457,24 +470,24 @@ public class PackageService
                         }
                     }
 
-                    // native 条目 → 原生库，保留 runtimes/ 子目录
+                    // native 条目 → 原生库，仅保留 win-x64 平台
                     if (package.Value.TryGetProperty("native", out var native))
                     {
                         foreach (var entry in native.EnumerateObject())
                         {
                             var relativePath = entry.Name; // 如 runtimes/win-x64/native/e_sqlite3.dll
-                            if (!string.IsNullOrEmpty(relativePath))
+                            if (!string.IsNullOrEmpty(relativePath) && relativePath.StartsWith("runtimes/win-x64/"))
                                 relativeFiles.Add(relativePath);
                         }
                     }
 
-                    // runtimeTargets 条目 → RID 特定原生库，保留子目录
+                    // runtimeTargets 条目 → RID 特定原生库，仅保留 win-x64 平台
                     if (package.Value.TryGetProperty("runtimeTargets", out var runtimeTargets))
                     {
                         foreach (var entry in runtimeTargets.EnumerateObject())
                         {
                             var relativePath = entry.Name; // 如 runtimes/win-x64/native/e_sqlite3.dll
-                            if (!string.IsNullOrEmpty(relativePath))
+                            if (!string.IsNullOrEmpty(relativePath) && relativePath.StartsWith("runtimes/win-x64/"))
                                 relativeFiles.Add(relativePath);
                         }
                     }

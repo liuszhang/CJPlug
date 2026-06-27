@@ -19,7 +19,6 @@ namespace CJ.Plug.LicenseApi.DbContext
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.LicenseKey).IsRequired();
-                entity.Property(e => e.Features).IsRequired();
                 entity.Property(e => e.Licensee).HasMaxLength(256);
             });
         }
@@ -32,7 +31,6 @@ namespace CJ.Plug.LicenseApi.DbContext
     {
         public int Id { get; set; }
         public string LicenseKey { get; set; } = string.Empty;
-        public string Features { get; set; } = string.Empty;
         public DateTime IssuedAt { get; set; }
         public DateTime? ExpiresAt { get; set; }
         public string Licensee { get; set; } = string.Empty;

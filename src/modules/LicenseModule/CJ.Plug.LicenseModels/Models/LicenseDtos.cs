@@ -15,8 +15,8 @@
     {
         public bool IsActivated { get; set; }
         public string Licensee { get; set; } = string.Empty;
-        public List<LicenseFeature> Features { get; set; } = new();
-        public DateTime? ExpiresAt { get; set; }
+        public DateTime IssuedAt { get; set; }
+        public DateTime? CodeExpiresAt { get; set; }
         public bool IsExpired { get; set; }
         public string Message { get; set; } = string.Empty;
     }
@@ -27,8 +27,8 @@
     public class GenerateLicenseRequest
     {
         public string Licensee { get; set; } = string.Empty;
-        public List<LicenseFeature> Features { get; set; } = new();
-        public DateTime? ExpiresAt { get; set; }
+        /// <summary>有效天数，-1 表示永久</summary>
+        public int ValidDays { get; set; } = 90;
     }
 
     /// <summary>
