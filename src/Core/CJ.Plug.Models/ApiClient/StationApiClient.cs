@@ -54,11 +54,44 @@ public class StationApiClient(HttpClient httpClient)
 
     public async Task<ExecuteResultData?> StationExecutionWaitResultAsync(PlugExecutionRequest stationExectionRequest)
     {
-        //提交到图站，并等待结果
-        var response = await httpClient.PostAsJsonAsync($"/api/station/executeToolCommand", stationExectionRequest);
-        var result = await response.Content.ReadFromJsonAsync<ExecuteResultData>();
-        return result;
-
+        // 提交到图站，并等待结果
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync($"/api/station/executeToolCommand", stationExectionRequest);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return new ExecuteResultData
+                {
+                    Ids = stationExectionRequest.ExecuteResultData.Ids,
+                    ExecuteStatus = JobStatus.完成,
+                    ExecuteSubStatus = JobSubStatus.出错,
+                    ResultString = $"图站执行失败: HTTP {(int)response.StatusCode} {response.StatusCode}, {error}"
+                };
+            }
+            var result = await response.Content.ReadFromJsonAsync<ExecuteResultData>();
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            return new ExecuteResultData
+            {
+                Ids = stationExectionRequest.ExecuteResultData.Ids,
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                ResultString = $"图站执行结果JSON反序列化失败: {ex.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ExecuteResultData
+            {
+                Ids = stationExectionRequest.ExecuteResultData.Ids,
+                ExecuteStatus = JobStatus.完成,
+                ExecuteSubStatus = JobSubStatus.出错,
+                ResultString = $"提交执行到图站失败: {ex.Message}"
+            };
+        }
     }
 
     public async Task SendLog(LogModel logModel)
@@ -120,7 +153,7 @@ public class StationApiClient(HttpClient httpClient)
             var ExecuteResultData = ExecuteRequest.ExecuteResultData ?? new ExecuteResultData();
             ExecuteResultData.ResultString = resultString;
             ExecuteResultData.ExecuteSubStatus = status;
-            ExecuteResultData.ExecuteStatus = JobStatus.完成;
+            ExecuteResultData.ExecuteStatus = JobStatus.执行中;
             Console.WriteLine($"发送执行结果状态：{JsonSerializer.Serialize(ExecuteResultData)}");
             var result = await httpClient.PostAsJsonAsync<ExecuteResultData>("/api/station/reportResult", ExecuteResultData);
             if (!result.IsSuccessStatusCode)

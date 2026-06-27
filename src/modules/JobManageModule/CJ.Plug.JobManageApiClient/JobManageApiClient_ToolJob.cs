@@ -10,8 +10,21 @@ namespace CJ.Plug.JobManageApiClient
         
             public async Task<ToolJob?> GetToolJobByCorrelationIdAsync(string CorrelationId, CancellationToken cancellationToken = default)
             {
-                var response = await httpClient.GetFromJsonAsync<ToolJob>($"/api/Job/getJobByCorrelationId/{CorrelationId}", cancellationToken);
-                return response;
+                try
+                {
+                    var response = await httpClient.GetFromJsonAsync<ToolJob>($"/api/Job/getJobByCorrelationId/{CorrelationId}", cancellationToken);
+                    return response;
+                }
+                catch (JsonException ex)
+                {
+                    CLog.Error($"获取工具作业JSON反序列化失败 (CorrelationId: {CorrelationId}): {ex.Message}");
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    CLog.Error($"获取工具作业失败 (CorrelationId: {CorrelationId}): {ex.Message}");
+                    return null;
+                }
             }
 
             public async Task<List<ToolJob>?> GetToolJobsByParentJobAsync(string ParentJobCorrelationId, CancellationToken cancellationToken = default)
@@ -32,23 +45,19 @@ namespace CJ.Plug.JobManageApiClient
             {
                 try
                 {
-                    var filter = new JobFilter()
-                    {
-                        CorrelationId = CorrelationId
-                    };
-                    //var job = (await GetJobsByFilter(filter, cancellationToken))?.FirstOrDefault();
                     var job = (await GetToolJobByCorrelationIdAsync(CorrelationId, cancellationToken));
-                    if (job != null)
-                    {
-                        //Log.Information($"获取工具作业结果: {JsonSerializer.Serialize(job)}");
-                        var result = JsonSerializer.Deserialize<ExecuteResultData>(job.ExecuteResultData ?? "", new JsonSerializerOptions
-                        {
-                            PropertyNameCaseInsensitive = true,
-                        });
-                        return result;
-                    }
-                    return null;
+                    if (job == null)
+                        return null;
 
+                    // 防御：如果 ExecuteResultData 为空或 null，直接返回 null，避免 JsonSerializer.Deserialize("") 抛出异常
+                    if (string.IsNullOrEmpty(job.ExecuteResultData))
+                        return null;
+
+                    var result = JsonSerializer.Deserialize<ExecuteResultData>(job.ExecuteResultData, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                    });
+                    return result;
                 }
                 catch (Exception ex)
                 {

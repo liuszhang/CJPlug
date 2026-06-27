@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>d6f4775e-86af-4a29-81e0-3e7fd73d87fa</UserSecretsId>
-    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
 	  <!-- 添加此属性以控制是否跳过构建 -->
 	  <!--<SkipBuild Condition="'$(SkipBuild)' == 'true'">true</SkipBuild>-->
 	  <SkipBuild>true</SkipBuild>

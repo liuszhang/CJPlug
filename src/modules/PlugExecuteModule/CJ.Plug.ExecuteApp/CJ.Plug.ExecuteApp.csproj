@@ -9,7 +9,7 @@
     <AssemblyName>CJ.Plug.ExecuteApp</AssemblyName>
     <RootNamespace>CJ.Plug.ExecuteApp</RootNamespace>
     <ApplicationIcon />
-	<BaseOutputPath>..\..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseOutputPath>..\..\..\..\02.Publish\Services</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

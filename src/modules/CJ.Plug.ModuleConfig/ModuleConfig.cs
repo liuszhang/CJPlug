@@ -6,30 +6,18 @@ using CJ.Plug.GuacamoleApi;
 using CJ.Plug.GuacamoleUI;
 using CJ.Plug.HomePage;
 using CJ.Plug.Login;
-using CJ.Plug.LoginApiClient.ApiClients;
-using CJ.Plug.LoginApis.Apis;
-using CJ.Plug.LoginApis.Contracts;
-using CJ.Plug.LoginApis.Services;
 using CJ.Plug.KnowledgeManage;
-using CJ.Plug.KnowledgeManageApi;
 using CJ.Plug.LlmConfig;
+using CJ.Plug.LicenseApi;
+using CJ.Plug.LicenseUI;
 using CJ.Plug.LlmConfigApi;
 using CJ.Plug.SystemConfig;
 using CJ.Plug.ModelManage;
 using CJ.Plug.ModelManageApi;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
-using CJ.Plug.MCPToolsManage;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CJ.Plug.ModuleConfig
 {
@@ -79,6 +67,9 @@ namespace CJ.Plug.ModuleConfig
             // 系统配置模块
             services.AddSystemConfigPageModuleServices();
 
+            //许可证管理模块
+            services.AddLicenseModulePageServices();
+
             //放在最后，因为用户名需要放在最后
             services.AddLoginModulePageServices();
 
@@ -121,6 +112,9 @@ namespace CJ.Plug.ModuleConfig
             // 模型管理模块API
             services.AddOntologyManageModuleApiServices();
 
+            // 许可证模块API
+            services.AddLicenseModuleApiServices();
+
             // LLM 配置模块API
             services.AddLlmConfigModuleApiServices();
 
@@ -158,6 +152,9 @@ namespace CJ.Plug.ModuleConfig
 
             // 模型管理模块API
             app.AddOntologyManageModuleApi();
+
+            // 许可证模块API
+            app.AddLicenseModuleApi();
 
             // LLM 配置模块API
             app.AddLlmConfigModuleApi();

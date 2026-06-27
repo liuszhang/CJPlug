@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CJ.Plug_Aspire.ElsaStudio</RootNamespace>
-	  <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+	  <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

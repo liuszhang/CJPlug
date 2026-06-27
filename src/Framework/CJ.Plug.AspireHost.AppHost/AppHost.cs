@@ -35,8 +35,6 @@ Environment.SetEnvironmentVariable("ASPNETCORE_URLS", "http://localhost:15288");
 Environment.SetEnvironmentVariable("DOTNET_DASHBOARD_OTLP_ENDPOINT_URL", "http://localhost:19275");
 Environment.SetEnvironmentVariable("DOTNET_RESOURCE_SERVICE_ENDPOINT_URL", "http://localhost:19276");
 Environment.SetEnvironmentVariable("ASPIRE_ALLOW_UNSECURED_TRANSPORT", "true");
-Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
-Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
 
 // 强制所有子进程 (dotnet xxx.dll) 的控制台输出使用 UTF-8 编码
 // Aspire Dashboard 日志收集管道按 UTF-8 解码，不设置的话 Windows 默认 GBK 会导致中文乱码
@@ -45,11 +43,19 @@ Environment.SetEnvironmentVariable("DOTNET_SYSTEM_CONSOLE_DEFAULT_ENCODING", "ut
 // UTF-8 编码环境变量，通过 .WithEnvironment 传递给各 AddExecutable 资源
 const string Utf8EnvKey = "DOTNET_SYSTEM_CONSOLE_DEFAULT_ENCODING";
 const string Utf8EnvVal = "utf-8";
-Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); ;
 
+// 共享输出目录配置：每个服务的 appsettings.json 以 appsettings.{项目名}.json 命名，
+// 通过 ASPNETCORE_CONFIG_PATH 环境变量指定各自的配置文件，避免互相覆盖
+const string ConfigPathEnvKey = "ASPNETCORE_CONFIG_PATH";
+
+// Kestrel 端口环境变量：优先级最高，确保每个服务绑定到正确端口
+// 当 ASPNETCORE_CONFIG_PATH 未生效时，此变量作为兜底覆盖 Kestrel EndPoints 配置
+const string KestrelUrlEnvKey = "Kestrel__EndPoints__Http__Url";
 
 // If running on Windows and not elevated, restart the entire application with elevation (UAC)
-if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+// --no-elevate: 由 Desktop 服务管理器启动时跳过自身提权，Desktop 会自行处理管理员权限
+var skipElevation = args.Any(a => a.Equals("--no-elevate", StringComparison.OrdinalIgnoreCase));
+if (!skipElevation && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 {
     try
     {
@@ -61,7 +67,6 @@ if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             if (!string.IsNullOrEmpty(currentExe))
             {
                 args = Environment.GetCommandLineArgs();
-                // Skip the first arg (program path)
                 var arguments = string.Empty;
                 if (args.Length > 1)
                 {
@@ -79,12 +84,10 @@ if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 try
                 {
                     Process.Start(psi);
-                    // Exit current process so elevated instance continues
                     Environment.Exit(0);
                 }
                 catch (System.ComponentModel.Win32Exception)
                 {
-                    // User cancelled elevation or elevation failed. Continue without elevation.
                     Console.WriteLine("Elevation was cancelled or failed. Continuing without administrator privileges.");
                 }
             }
@@ -96,50 +99,41 @@ if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
     }
 }
 
+// AppHost 输出目录：02.Publish/CJ.Plug.AspireHost.AppHost/{Configuration}/net10.0/
+var appHostDir = AppContext.BaseDirectory;
+Console.WriteLine($"AppHost directory: {appHostDir}");
 
-var builder = DistributedApplication.CreateBuilder(args);
+// 加载配置（仅 appsettings.json，不再依赖 appsettings.Development.json）
+var configure = new ConfigurationBuilder()
+    .SetBasePath(appHostDir)
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .Build()
+    .GetSection("ResourceStrings");
+
+// 动态计算服务目录：AppHost -> 02.Publish/ -> Services/{Configuration}/net10.0/
+// 自动适配 Debug/Release 构建配置，无需手动修改路径
+var publishDir = Path.GetFullPath(Path.Combine(appHostDir, "..", "..", ".."));
+var configName = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+var servicesDir = Path.Combine(publishDir, "Services", configName, "net10.0");
+Console.WriteLine($"Services directory: {servicesDir}");
+
+// 服务路径解析辅助方法：获取 DLL 文件名
+string ServiceDll(string configKey, string defaultDll) =>
+    configure.GetValue<string>(configKey) ?? defaultDll;
+
+// 所有服务共享同一个输出目录作为工作目录
+var dispatchServerDllName = ServiceDll("DispatchServer", "CJ.Plug.DispatchServer.dll");
+var apiServerDllName = ServiceDll("ApiServer", "CJ.Plug.ApiServer.dll");
+var stationApiServerDllName = ServiceDll("StationApiServer", "CJ.Plug.StationApiServer.dll");
+var elsaApiServerDllName = ServiceDll("ElsaApiServer", "CJ.Plug.ElsaApiServer.dll");
+var webFrontendDllName = ServiceDll("WebFrontend", "CJ.Plug.HostWebServer.dll");
+var mcpServerDllName = ServiceDll("McpServer", "CJ.Plug.McpServer.dll");
+
+var builder = DistributedApplication.CreateBuilder(
+    args.Where(a => !a.Equals("--no-elevate", StringComparison.OrdinalIgnoreCase)).ToArray());
 
 // 重新设置 Console.OutputEncoding — CreateBuilder 内部可能重置了编码
 Console.OutputEncoding = Encoding.UTF8;
-
-//获取当前运行程序的路径
-var currentDirectory = Directory.GetCurrentDirectory();
-Console.WriteLine($"currentDirectory: {currentDirectory}");
-
-var configure = builder.Configuration.GetSection("ResourceStrings");
-//Console.WriteLine("test:"+configure.GetValue<string>("DispatchServer"));
-
-var dispatchServerFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("DispatchServer")));
-var dispatchServerDirectory = dispatchServerFileInfo.Directory?.FullName;
-var dispatchServerDllName = dispatchServerFileInfo.Name;
-//Console.WriteLine($"dispatchServerDirectory: {dispatchServerDirectory}");
-//Console.WriteLine($"dispatchServerDllName: {dispatchServerDllName}");
-
-var apiServerFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("ApiServer")));
-var apiServerDirectory = apiServerFileInfo.Directory?.FullName;
-var apiServerDllName = apiServerFileInfo.Name;
-
-var stationApiServer = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("StationApiServer")));
-var stationApiServerDirectory = stationApiServer.Directory?.FullName;
-var stationApiServerDllName = stationApiServer.Name;
-
-var webFrontendFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("WebFrontend")));
-var webFrontendDirectory = webFrontendFileInfo.Directory?.FullName;
-var webFrontendDllName = webFrontendFileInfo.Name;
-
-var elsaApiServerFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("ElsaApiServer")));
-var elsaApiServerDirectory = elsaApiServerFileInfo.Directory?.FullName;
-var elsaApiServerDllName = elsaApiServerFileInfo.Name;
-
-var elsaStudioFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("ElsaStudio")));
-var elsaStudioDirectory = elsaStudioFileInfo.Directory?.FullName;
-var elsaStudioDllName = elsaStudioFileInfo.Name;
-
-//var mcSlm = Path.Combine(currentDirectory, configure.GetValue<string>("McSlm"),dllFolder);
-
-var mcpServerFileInfo = new FileInfo(Path.Combine(currentDirectory, configure.GetValue<string>("McpServer")));
-var mcpServerDirectory = mcpServerFileInfo.Directory?.FullName;
-var mcpServerDllName = mcpServerFileInfo.Name;
 
 
 //var postgresdb = builder.AddPostgres("pg")
@@ -153,26 +147,28 @@ var mcpServerDllName = mcpServerFileInfo.Name;
 builder.AddExecutable(
         name: "sds",
         command: "dotnet",
-        workingDirectory: dispatchServerDirectory,
+        workingDirectory: servicesDir,
         args: dispatchServerDllName // DLL 文件名
     ).WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+     .WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.DispatchServer.json"))
+     .WithEnvironment(KestrelUrlEnvKey, "http://*:8686")
      .WithUrl("http://localhost:8686");
 
 //builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice").WithEnvironment(Utf8EnvKey, Utf8EnvVal);
 //builder.AddProject("apiservice", @"../PlugApiServer/CJ.Plug.ApiServer/CJ.Plug.ApiServer.csproj");
 //builder.AddProject("apiservice", apiServer);
-builder.AddExecutable("apiservice", "dotnet", apiServerDirectory, apiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:8687");
+builder.AddExecutable("apiservice", "dotnet", servicesDir, apiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:8687").WithUrl("http://localhost:8687");
 
 //builder.AddProject<Projects.CJ_Plug_StationApiServer>("stationapi");
 //builder.AddProject("stationapi", @"../PlugStation/CJ.Plug.StationApiServer/CJ.Plug.StationApiServer.csproj");
 //builder.AddProject("stationapi", stationApiServer);
-builder.AddExecutable("stationapi", "dotnet", stationApiServerDirectory, stationApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:7660");
+builder.AddExecutable("stationapi", "dotnet", servicesDir, stationApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.StationApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:7660").WithUrl("http://localhost:7660");
 
 
 //builder.AddProject<Projects.CJ_Plug_ElsaApiServer>("elsaapiserver");
 //builder.AddProject("elsaapiserver", @"../PlugApiServer/CJ.Plug.ElsaApiServer/CJ.Plug.ElsaApiServer.csproj");
 //builder.AddProject("elsaapiserver", elsaApiServer);
-builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5001");
+builder.AddExecutable("elsaapiserver", "dotnet", servicesDir, elsaApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ElsaApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5001").WithUrl("http://localhost:5001");
 
 //builder.AddProject<Projects.CJ_Plug_ElsaStudio>("elsastudio");
 //builder.AddProject("elsastudio", @"../PlugWebHost/CJ.Plug.ElsaStudio/CJ.Plug.ElsaStudio.csproj");
@@ -182,16 +178,20 @@ builder.AddExecutable("elsaapiserver", "dotnet", elsaApiServerDirectory, elsaApi
 //builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
 //builder.AddProject("webfrontend", @"../PlugWebHost/CJ.Plug.HostWebServer/CJ.Plug.HostWebServer.csproj");
 //builder.AddProject("webfrontend", webFrontend);
-builder.AddExecutable("webfrontend", "dotnet", webFrontendDirectory, webFrontendDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
+builder.AddExecutable("webfrontend", "dotnet", servicesDir, webFrontendDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.HostWebServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5066").WithUrl("http://localhost:5066");
 
 //builder.AddProject<Projects.CJ_Plug_McpServer>("cj-plug-mcpserver");
 //builder.AddProject("cj-plug-mcpserver", @"../PlugApiServer/CJ.Plug.McpServer/CJ.Plug.McpServer.csproj");
 //builder.AddProject("cj-plug-mcpserver", mcpServer);
-builder.AddExecutable("mcpserver", "dotnet", mcpServerDirectory, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:3001");
+builder.AddExecutable("mcpserver", "dotnet", servicesDir, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.McpServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:3001").WithUrl("http://localhost:3001");
 
 
 //MCP TOOL测试工具：mcp inspector，基于 @modelcontextprotocol/inspector 实现的 MCP 协议调试工具，提供可视化界面查看 MCP 消息交互
-builder.AddExecutable("mcpInspector", "npx", mcpServerDirectory, "@modelcontextprotocol/inspector").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:6274");
+builder.AddExecutable("mcpInspector", "npx", servicesDir, "@modelcontextprotocol/inspector", "--server-port", "6277")
+    .WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+    .WithEnvironment("HOST", "localhost")
+    .WithEnvironment("NODE_OPTIONS", "--dns-result-order=ipv4first")
+    .WithUrl("http://localhost:6274");
 
 //打开浏览器
 try

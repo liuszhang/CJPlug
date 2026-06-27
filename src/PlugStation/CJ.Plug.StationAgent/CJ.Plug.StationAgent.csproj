@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

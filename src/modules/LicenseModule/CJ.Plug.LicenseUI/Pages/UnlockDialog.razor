@@ -1,0 +1,83 @@
+@using CJ.Plug.LicenseModels
+@using CJ.Plug.LicenseApiClient
+@using MudBlazor
+@using MudBlazor.Services
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">升级解锁</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            当前为免费版，该功能需要商业许可证才能使用。
+        </MudAlert>
+
+        <MudGrid Spacing="2">
+            @* 支付二维码占位区 *@
+            <MudItem xs="12">
+                <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="0"
+                          Style="background-color: var(--mud-palette-background-grey);">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">支付二维码（后续对接支付系统）</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large"
+                             Style="font-size: 120px; color: var(--mud-palette-text-disabled);" />
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2">扫码支付后获取 License Key</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.subtitle2" Class="mb-2">手动输入 License Key</MudText>
+                <MudTextField @bind-Value="_licenseKey" Label="License Key"
+                              Lines="3" Variant="Variant.Outlined"
+                              Placeholder="粘贴许可证密钥..."
+                              Disabled="_isActivating" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" OnClick="Cancel">取消</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="Activate" Disabled="@(_isActivating || string.IsNullOrWhiteSpace(_licenseKey))">
+            @(_isActivating ? "激活中..." : "激活")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] private ILicenseApiClient LicenseApiClient { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private string _licenseKey = string.Empty;
+    private bool _isActivating;
+
+
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Activate()
+    {
+        _isActivating = true;
+        try
+        {
+            var result = await LicenseApiClient.ActivateAsync(_licenseKey.Trim());
+            Snackbar.Add("激活成功！功能已解锁。", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            Snackbar.Add($"激活失败：{ex.Message}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"激活失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isActivating = false;
+        }
+    }
+}

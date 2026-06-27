@@ -74,6 +74,28 @@ if (!string.IsNullOrEmpty(StaticData.MainServerUrl) && StaticData.MainServerUrl 
         Console.WriteLine($"[GlobalData] Failed to override with configured URL: {ex.Message}");
     }
 }
+else
+{
+    // SQLite 无配置时，尝试从环境变量 MAIN_SERVER_HOST 获取主服务地址
+    // 用于简化远程部署：无需依赖 StationSettingUI 写入 SQLite
+    var envMainServerHost = Environment.GetEnvironmentVariable("MAIN_SERVER_HOST");
+    if (!string.IsNullOrEmpty(envMainServerHost))
+    {
+        try
+        {
+            var uri = new Uri(envMainServerHost);
+            StaticData.MainServerUrl = envMainServerHost;
+            GlobalData.MainDispatcherServer = envMainServerHost;
+            GlobalData.MainApiServer = $"{uri.Scheme}://{uri.Host}:8687";
+            Console.WriteLine($"[GlobalData] 从环境变量 MAIN_SERVER_HOST 获取主服务地址: {envMainServerHost}");
+            Console.WriteLine($"[GlobalData] MainApiServer -> {GlobalData.MainApiServer}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GlobalData] 环境变量 MAIN_SERVER_HOST 格式无效: {envMainServerHost}, 错误: {ex.Message}");
+        }
+    }
+}
 
 //StaticData.MainServerHostIp = configuration.GetSection("MainServer").GetSection("Url").Value;
 StaticData.MainServerHostIp = GlobalData.MainDispatcherServer;
@@ -90,7 +112,7 @@ Log.Logger = new LoggerConfiguration()
 //StaticData.ToolAgentServerHttpsPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Https").GetSection("Url").Value.Split(':')[2];
 //StaticData.ToolAgentServerHttpScheme = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[0];
 //StaticData.ToolAgentServerHttpPort = configuration.GetSection("Kestrel").GetSection("Endpoints").GetSection("Http").GetSection("Url").Value.Split(':')[2];
-StaticData.ToolAgentServer = configuration.GetSection("FileServer").GetSection("ToolAgentServer").Value.ToString();
+StaticData.ToolAgentServer = configuration.GetSection("FileServer").GetSection("ToolAgentServer").Value ?? "";
 
 // 从 StationSettingUI 共享的 SQLite 配置读取用户设置的工具安装根目录
 StaticData.ToolsRootPath = StationConfigHelper.ReadToolsRootPath() ?? "";

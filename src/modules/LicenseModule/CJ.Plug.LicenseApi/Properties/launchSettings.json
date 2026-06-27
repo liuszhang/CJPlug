@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "CJ.Plug.LicenseApi": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

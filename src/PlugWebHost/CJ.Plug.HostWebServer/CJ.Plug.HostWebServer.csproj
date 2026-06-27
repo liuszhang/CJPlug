@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
     <!-- Disable build-time compression of static web assets to avoid MSB4018 DiscoverPrecompressedAssets duplicate-key errors -->
     <DisableBuildCompression>true</DisableBuildCompression>
   </PropertyGroup>

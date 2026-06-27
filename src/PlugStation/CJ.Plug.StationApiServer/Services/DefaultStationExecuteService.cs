@@ -177,40 +177,52 @@ namespace CJ.Plug_Aspire.StationApiService.Services
         /// </summary>
         public async Task ReportExecuteResult(ExecuteResultData executeResultData)
         {
-            var toolJob = await MainApiClient.GetToolJobByCorrelationIdAsync(executeResultData.Ids.ToolJobCorrelationId);
-            if (toolJob == null)
+            try
             {
-                CLog.Error($"未找到对应的作业，CorrelationId: {executeResultData.Ids.ToolJobCorrelationId}");
-                return;
+                // 诊断日志：输出当前回调目标地址，便于排查分离部署时回调失败问题
+                CLog.Information($"图站开始上报执行结果 (CorrelationId: {executeResultData.Ids.ToolJobCorrelationId})，" +
+                    $"回调主服务地址: {GlobalData.MainApiServer}");
+
+                var toolJob = await MainApiClient.GetToolJobByCorrelationIdAsync(executeResultData.Ids.ToolJobCorrelationId);
+                if (toolJob == null)
+                {
+                    CLog.Error($"未找到对应的作业，CorrelationId: {executeResultData.Ids.ToolJobCorrelationId}");
+                    return;
+                }
+
+                if (toolJob.JobCategory != JobCategoryEnum.ToolJob.ToString())
+                {
+                    CLog.Error($"作业类型不匹配，预期 ToolJob，但实际为{toolJob.JobCategory}");
+                    return;
+                }
+
+                toolJob.JobStatus = executeResultData.ExecuteStatus.ToString();
+                toolJob.JobSubStatus = executeResultData.ExecuteSubStatus.ToString();
+                toolJob.ExecuteResultData = JsonSerializer.Serialize(executeResultData);
+
+                var result = await MainApiClient.UpdateToolJobAsync(toolJob);
+
+                // 更新本地任务状态
+                var status = executeResultData.ExecuteSubStatus == JobSubStatus.出错 ||
+                             executeResultData.ExecuteSubStatus == JobSubStatus.已取消
+                             ? "failed" : "completed";
+                _taskStore.UpdateStatusByCorrelationId(
+                    executeResultData.Ids.ToolJobCorrelationId!,
+                    status,
+                    executeResultData.ExecuteSubStatus.ToString(),
+                    JsonSerializer.Serialize(executeResultData));
+
+                StatusReporter.JobStatusUpdated(executeResultData.Ids.ToolJobCorrelationId);
+
+                if (!string.IsNullOrEmpty(executeResultData.Ids.PlugDefinitionId))
+                {
+                    await MainApiClient.ExecuteResultReport(executeResultData);
+                }
             }
-
-            if (toolJob.JobCategory != JobCategoryEnum.ToolJob.ToString())
+            catch (Exception ex)
             {
-                CLog.Error($"作业类型不匹配，预期 ToolJob，但实际为{toolJob.JobCategory}");
-                return;
-            }
-
-            toolJob.JobStatus = executeResultData.ExecuteStatus.ToString();
-            toolJob.JobSubStatus = executeResultData.ExecuteSubStatus.ToString();
-            toolJob.ExecuteResultData = JsonSerializer.Serialize(executeResultData);
-
-            var result = await MainApiClient.UpdateToolJobAsync(toolJob);
-
-            // 更新本地任务状态
-            var status = executeResultData.ExecuteSubStatus == JobSubStatus.出错 ||
-                         executeResultData.ExecuteSubStatus == JobSubStatus.已取消
-                         ? "failed" : "completed";
-            _taskStore.UpdateStatusByCorrelationId(
-                executeResultData.Ids.ToolJobCorrelationId!,
-                status,
-                executeResultData.ExecuteSubStatus.ToString(),
-                JsonSerializer.Serialize(executeResultData));
-
-            StatusReporter.JobStatusUpdated(executeResultData.Ids.ToolJobCorrelationId);
-
-            if (!string.IsNullOrEmpty(executeResultData.Ids.PlugDefinitionId))
-            {
-                await MainApiClient.ExecuteResultReport(executeResultData);
+                CLog.Error($"图站上报执行结果失败 (CorrelationId: {executeResultData.Ids.ToolJobCorrelationId})，" +
+                    $"回调地址: {GlobalData.MainApiServer}，错误: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
