@@ -22,9 +22,6 @@ public class LlmProvider
     /// <summary>供应商描述</summary>
     public string? Description { get; set; }
 
-    /// <summary>是否启用</summary>
-    public bool IsEnabled { get; set; } = true;
-
     /// <summary>排序</summary>
     public int SortOrder { get; set; }
 

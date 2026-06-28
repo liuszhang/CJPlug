@@ -37,6 +37,14 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isUpgradeVisible;
 
+    /// <summary>折叠按钮图标。</summary>
+    [ObservableProperty]
+    private string _collapseButtonIcon = "\u2261";
+
+    /// <summary>升级按钮图标。</summary>
+    [ObservableProperty]
+    private string _upgradeButtonIcon = "\u2605";
+
     /// <summary>
     /// License 是否已激活。
     /// </summary>
@@ -112,12 +120,6 @@ public partial class MainViewModel : ObservableObject
         });
         MenuItems.Add(new MenuItemViewModel
         {
-            Name = "图站管理",
-            Url = "http://localhost:5066/StationManage?hideMenu=true",
-            Icon = "\u2606"
-        });
-        MenuItems.Add(new MenuItemViewModel
-        {
             Name = "工具资源",
             Url = "http://localhost:5066/ToolResource?hideMenu=true",
             Icon = "\u2692"
@@ -160,6 +162,24 @@ public partial class MainViewModel : ObservableObject
     {
         if (_licenseClient == null) return;
 
+        // 先检查是否已被激活，避免重复升级
+        try
+        {
+            var status = await _licenseClient.GetStatusAsync();
+            if (status != null && status.IsActivated)
+            {
+                System.Windows.MessageBox.Show("系统已经被激活，欢迎使用！", "提示");
+                IsLicenseActivated = true;
+                IsUpgradeVisible = false;
+                EnsureStationManageMenuItem();
+                return;
+            }
+        }
+        catch
+        {
+            // 检查失败则继续走弹窗流程
+        }
+
         var dialog = new Views.UpgradeDialog(new UpgradeViewModel(_licenseClient, _httpClient!));
         dialog.Owner = System.Windows.Application.Current.MainWindow;
         dialog.ShowDialog();
@@ -180,6 +200,7 @@ public partial class MainViewModel : ObservableObject
             {
                 IsUpgradeVisible = false;
                 IsLicenseActivated = true;
+                EnsureStationManageMenuItem();
             }
             else
             {
@@ -189,7 +210,26 @@ public partial class MainViewModel : ObservableObject
         }
         catch
         {
-            // 检查失败时保持按钮可见，允许用户手动重试
+            // 检查失败时显示按钮，允许用户手动重试
+            IsUpgradeVisible = true;
+        }
+    }
+
+    /// <summary>确保"图站管理"菜单项存在（仅 License 激活后调用，幂等）。</summary>
+    private void EnsureStationManageMenuItem()
+    {
+        if (MenuItems.Any(m => m.Name == "图站管理")) return;
+
+        // 插入到"工具资源"之前
+        var index = MenuItems.ToList().FindIndex(m => m.Name == "工具资源");
+        if (index >= 0)
+        {
+            MenuItems.Insert(index, new MenuItemViewModel
+            {
+                Name = "图站管理",
+                Url = "http://localhost:5066/StationManage?hideMenu=true",
+                Icon = "\u2606"
+            });
         }
     }
 

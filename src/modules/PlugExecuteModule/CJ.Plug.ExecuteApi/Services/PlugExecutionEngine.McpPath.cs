@@ -52,13 +52,13 @@ internal partial class PlugExecutionEngine
                 Category = plug.Category,
                 OnlyExecuteAction = plug.OnlyExecuteAction,
             };
-            CLog.Information($"[TRACE-MCP] PlugData 不存在，从 Plug 定义构建临时 PlugData");
+            //CLog.Information($"[TRACE-MCP] PlugData 不存在，从 Plug 定义构建临时 PlugData");
         }
         // 同步到 ctx，供后续 partial 方法（如有）引用
         ctx.PlugData = plugData;
 
         // 直接将 MCP 输入参数设置到插头变量，供 handler 内部 VariableResolver.ResolveStandalone() 回退使用
-        CLog.Information($"[TRACE-MCP] InputVariables 数量: {request.InputVariables?.Count ?? 0}");
+        //CLog.Information($"[TRACE-MCP] InputVariables 数量: {request.InputVariables?.Count ?? 0}");
         foreach (var v in request.InputVariables ?? new())
             CLog.Information($"[TRACE-MCP] InputVariable: Name={v.Name}, Value={v.Value}, Type={v.Type}");
         foreach (var v in request.InputVariables)
@@ -81,12 +81,12 @@ internal partial class PlugExecutionEngine
             });
         }
 
-        CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}, InputVariables 数: {request.InputVariables?.Count ?? 0}");
+        //CLog.Information($"[TRACE-MCP] 已设置插头变量，总变量数: {plug.PlugVariables?.Count ?? 0}, InputVariables 数: {request.InputVariables?.Count ?? 0}");
 
         // 将插头类型信息注入到 request，确保下游 handler 能正确使用
         request.PlugTypeKey = plug.PlugTypeKey;
 
-        CLog.Information($"[TRACE-MCP] handler调用前 — PlugTypeKey={plug.PlugTypeKey}");
+        //CLog.Information($"[TRACE-MCP] handler调用前 — PlugTypeKey={plug.PlugTypeKey}");
         foreach (var v in request.InputVariables ?? new())
             CLog.Information($"[TRACE-MCP] request.InputVariables: {v.Name}={v.Value}");
         var plugTypeKey = plug?.PlugTypeKey;
@@ -118,18 +118,18 @@ internal partial class PlugExecutionEngine
             if (!string.IsNullOrEmpty(toolName) && !string.IsNullOrEmpty(toolVersion))
             {
                 var displayName = $"{toolName}({toolVersion})";
-                CLog.Information($"[TRACE-MCP] 从本地 DB 解析工具: {displayName}");
+                //CLog.Information($"[TRACE-MCP] 从本地 DB 解析工具: {displayName}");
                 request.ResolvedTool = await _dbContext.Set<Tool>()
                     .FirstOrDefaultAsync(t => t.ToolName == toolName && t.ToolVersion == toolVersion);
                 if (request.ResolvedTool != null)
                 {
-                    CLog.Information($"[TRACE-MCP] 工具已找到, ToolPath={request.ResolvedTool.ToolPath}");
+                    //CLog.Information($"[TRACE-MCP] 工具已找到, ToolPath={request.ResolvedTool.ToolPath}");
                     // 同时解析可用的图站
                     request.ResolvedStation = await _dbContext.Set<Station>()
                         .FirstOrDefaultAsync(s => s.IsStarted == true);
                     if (request.ResolvedStation != null)
                     {
-                        CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
+                        //CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
                         request.SpecifiedStationIp = request.ResolvedStation.StationIp;
                     }
                     else
@@ -153,14 +153,14 @@ internal partial class PlugExecutionEngine
             {
                 request.ToolName = request.ResolvedTool.ToolName;
                 request.ToolVersion = request.ResolvedTool.ToolVersion;
-                CLog.Information($"[TRACE-MCP] 通过 ToolId={plug.ToolId} 解析工具: {request.ResolvedTool.ToolName}({request.ResolvedTool.ToolVersion}), ToolPath={request.ResolvedTool.ToolPath}");
+                //CLog.Information($"[TRACE-MCP] 通过 ToolId={plug.ToolId} 解析工具: {request.ResolvedTool.ToolName}({request.ResolvedTool.ToolVersion}), ToolPath={request.ResolvedTool.ToolPath}");
 
                 request.ResolvedStation = await _dbContext.Set<Station>()
                     .FirstOrDefaultAsync(s => s.IsStarted == true);
                 if (request.ResolvedStation != null)
                 {
                     request.SpecifiedStationIp = request.ResolvedStation.StationIp;
-                    CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
+                    //CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
                 }
             }
             else
@@ -218,7 +218,7 @@ internal partial class PlugExecutionEngine
             if (request.ResolvedStation != null)
             {
                 request.SpecifiedStationIp = request.ResolvedStation.StationIp;
-                CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
+                //CLog.Information($"[TRACE-MCP] 图站已找到, StationIp={request.ResolvedStation.StationIp}");
             }
         }
         return await handler?.PlugCommonExecute(new(plug, request));

@@ -135,9 +135,9 @@ public static class LlmConfigApi
                 provider.Name, provider.ApiBaseUrl, model.ModelName, provider.ApiKey?.Length ?? 0);
             return Results.Ok(new ApiResult<DefaultModelInfoResponse?>(0, new DefaultModelInfoResponse(
                 provider.Id, provider.Name, provider.DisplayName,
-                provider.ApiBaseUrl, provider.ApiKey, provider.IsEnabled,
+                provider.ApiBaseUrl, provider.ApiKey,
                 model.Id, model.ModelName, model.DisplayName,
-                model.ModelType, model.MaxTokens, model.Temperature, model.IsEnabled)));
+                model.ModelType, model.MaxTokens, model.Temperature)));
         })
         .WithName("GetDefaultModelInfo")
         .WithDescription("获取当前默认模型及供应商信息");
@@ -215,9 +215,9 @@ public static class LlmConfigApi
 
 public record DefaultModelInfoResponse(
     int ProviderId, string ProviderName, string ProviderDisplayName,
-    string ApiBaseUrl, string? ApiKey, bool ProviderIsEnabled,
+    string ApiBaseUrl, string? ApiKey,
     int ModelId, string ModelName, string ModelDisplayName,
-    string ModelType, int? MaxTokens, double? Temperature, bool ModelIsEnabled);
+    string ModelType, int? MaxTokens, double? Temperature);
 
 /// <summary>通用 API 响应包装，确保空结果也返回合法 JSON。</summary>
 public record ApiResult<T>(int Code, T? Data, string? Message = null);
