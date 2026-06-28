@@ -39,4 +39,35 @@
         public string LicenseKey { get; set; } = string.Empty;
         public LicenseInfo License { get; set; } = new();
     }
+
+    // ═══════════════════════════════════════════════════════
+    // 升级 / 支付相关 DTO
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 创建升级订单响应
+    /// </summary>
+    public class UpgradeOrderResponse
+    {
+        public string OrderId { get; set; } = string.Empty;
+        /// <summary>订单状态：pending / paid / activated / expired</summary>
+        public string Status { get; set; } = "pending";
+        public string QrCodePath { get; set; } = string.Empty;
+        /// <summary>码支付返回的二维码 URL</summary>
+        public string QrCodeUrl { get; set; } = string.Empty;
+        public decimal Amount { get; set; } = 6.00m;
+    }
+
+    /// <summary>
+    /// 升级订单状态响应
+    /// </summary>
+    public class UpgradeStatusResponse
+    {
+        public string OrderId { get; set; } = string.Empty;
+        /// <summary>pending / paid / activated / expired</summary>
+        public string Status { get; set; } = "pending";
+        public string Message { get; set; } = string.Empty;
+        /// <summary>激活成功后返回的许可证状态</summary>
+        public LicenseStatusResponse? LicenseStatus { get; set; }
+    }
 }

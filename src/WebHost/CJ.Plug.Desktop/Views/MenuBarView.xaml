@@ -8,6 +8,7 @@
              d:DesignHeight="800" d:DesignWidth="220">
     <UserControl.Resources>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
     <Grid Background="#2D2D3F">
         <Grid.RowDefinitions>
@@ -94,32 +95,64 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <!-- 底部折叠/展开按钮 -->
+        <!-- 底部折叠/展开按钮 + 升级按钮 -->
         <Border Grid.Row="2"
                 Padding="0,8"
                 BorderBrush="#3D3D5F" BorderThickness="0,1,0,0">
-            <Button Width="32" Height="32"
-                    Background="#3D3D5F"
-                    BorderThickness="1"
-                    BorderBrush="#5C5C8F"
-                    Cursor="Hand"
-                    ToolTip="收起/展开菜单"
-                    HorizontalAlignment="Center"
-                    Command="{Binding DataContext.ToggleMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="4"/>
-                    </Style>
-                </Button.Resources>
-                <Button.Content>
-                    <TextBlock Text="&#x2630;"
-                               FontSize="18"
-                               FontFamily="Segoe UI"
-                               Foreground="#E0E0F0"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Button.Content>
-            </Button>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 折叠按钮（始终居中） -->
+                <Button Grid.Column="0" Grid.ColumnSpan="3" Width="32" Height="32"
+                        Background="#3D3D5F"
+                        BorderThickness="1"
+                        BorderBrush="#5C5C8F"
+                        Cursor="Hand"
+                        ToolTip="收起/展开菜单"
+                        HorizontalAlignment="Center"
+                        Command="{Binding DataContext.ToggleMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="4"/>
+                        </Style>
+                    </Button.Resources>
+                    <Button.Content>
+                        <TextBlock Text="&#x2630;"
+                                   FontSize="18"
+                                   Foreground="#E0E0F0"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Button.Content>
+                </Button>
+
+                <!-- 升级按钮（右侧，仅未激活时可见） -->
+                <Button Grid.Column="2" Width="32" Height="32"
+                        Background="#4A3D5F"
+                        BorderThickness="1"
+                        BorderBrush="#7C5C8F"
+                        Cursor="Hand"
+                        ToolTip="升级授权"
+                        HorizontalAlignment="Center"
+                        Visibility="{Binding DataContext.IsUpgradeVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding DataContext.UpgradeCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="4"/>
+                        </Style>
+                    </Button.Resources>
+                    <Button.Content>
+                        <TextBlock Text="&#x2B50;"
+                                   FontSize="16"
+                                   Foreground="#FFD700"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Button.Content>
+                </Button>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

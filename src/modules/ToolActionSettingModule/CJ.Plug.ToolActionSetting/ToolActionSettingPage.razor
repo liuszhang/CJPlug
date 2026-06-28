@@ -34,6 +34,7 @@
 @using DialogOptions=MudBlazor.DialogOptions
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.JSInterop
+@using CJ.Plug.LicenseApiClient
 
 
 @inject NavigationManager NavigationManager
@@ -45,6 +46,7 @@
 @inject IDomInteropService DomInteropService
 @inject IJSRuntime JSRuntime
 @inject HubConnectionManagerService HubConnectionManagerService
+@inject ILicenseApiClient LicenseApiClient
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -466,6 +468,9 @@
                     if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
                     InvokeAsync(async () =>
                     {
+                        var status = await LicenseApiClient.GetStatusAsync();
+                        if (!status.IsActivated || status.IsExpired) return;
+
                         var host = stationIp;
                         try { host = new Uri(stationIp).Host; } catch { }
                         Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({protocol})...", Severity.Info);

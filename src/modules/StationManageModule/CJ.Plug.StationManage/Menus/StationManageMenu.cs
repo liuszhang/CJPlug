@@ -1,4 +1,5 @@
-﻿using CJ.Plug.Models.Contracts;
+﻿using CJ.Plug.LicenseApiClient;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using MudBlazor;
 using System;
@@ -11,8 +12,19 @@ namespace CJ.Plug.StationManage.Menus
 {
     public class StationManageMenu : IMenuService
     {
-        public ValueTask<IEnumerable<MenuItem>> GetMenuItemsAsync(CancellationToken cancellationToken = default)
+        private readonly ILicenseApiClient _licenseApiClient;
+
+        public StationManageMenu(ILicenseApiClient licenseApiClient)
         {
+            _licenseApiClient = licenseApiClient;
+        }
+
+        public async ValueTask<IEnumerable<MenuItem>> GetMenuItemsAsync(CancellationToken cancellationToken = default)
+        {
+            var status = await _licenseApiClient.GetStatusAsync(cancellationToken);
+            if (!status.IsActivated || status.IsExpired)
+                return Array.Empty<MenuItem>();
+
             var menuItems = new List<MenuItem>
             {
                 new()
@@ -24,7 +36,7 @@ namespace CJ.Plug.StationManage.Menus
                 }
             };
 
-            return new ValueTask<IEnumerable<MenuItem>>(menuItems);
+            return menuItems;
         }
     }
 }

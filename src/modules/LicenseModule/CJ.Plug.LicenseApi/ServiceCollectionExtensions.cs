@@ -6,6 +6,7 @@ using CJ.Plug.Models.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace CJ.Plug.LicenseApi
 {
@@ -15,6 +16,9 @@ namespace CJ.Plug.LicenseApi
         {
             services.AddSingleton<IModuleDbConfig, LicenseModuleDbConfig>();
             services.AddSingleton<ILicenseService, LicenseService>();
+
+            // 为码支付 API 调用注册 HttpClient（如宿主已注册则跳过）
+            services.TryAddSingleton(_ => new HttpClient());
 
             return services;
         }

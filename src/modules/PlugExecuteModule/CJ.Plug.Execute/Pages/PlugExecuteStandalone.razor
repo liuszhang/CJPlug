@@ -38,6 +38,7 @@
 @using Serilog
 @using System.Timers
 @using Microsoft.JSInterop
+@using CJ.Plug.LicenseApiClient
 
 @layout BasicLayout
 
@@ -49,6 +50,7 @@
 @inject IDomInteropService DomInteropService
 @inject ElsaApiClient ElsaApiClient
 @inject IJSRuntime JSRuntime
+@inject ILicenseApiClient LicenseApiClient
 
 
 
@@ -354,6 +356,9 @@
                 Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp} protocol={protocol}");
                 InvokeAsync(async () =>
                 {
+                    var status = await LicenseApiClient.GetStatusAsync();
+                    if (!status.IsActivated || status.IsExpired) return;
+
                     // 从完整 URL 中提取纯 IP（stationIp 可能是 "http://192.168.161.237:7660"）
                     var pureIp = ExtractHost(stationIp);
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;

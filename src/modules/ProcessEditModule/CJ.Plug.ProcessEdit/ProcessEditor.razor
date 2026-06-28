@@ -45,6 +45,7 @@
 @using Serilog
 @using Size = MudBlazor.Size
 @using ThrottleDebounce
+@using CJ.Plug.LicenseApiClient
 
 
 
@@ -54,6 +55,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
+@inject ILicenseApiClient LicenseApiClient
 
 
 
@@ -397,6 +399,9 @@
                 if (string.IsNullOrEmpty(stationIp)) return;
                 InvokeAsync(async () =>
                 {
+                    var status = await LicenseApiClient.GetStatusAsync();
+                    if (!status.IsActivated || status.IsExpired) return;
+
                     // StationIp 格式为 "http://192.168.1.100:7660"，提取纯 IP/主机名
                     var host = stationIp;
                     try { host = new Uri(stationIp).Host; } catch { }

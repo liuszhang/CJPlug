@@ -9,6 +9,11 @@ namespace CJ.Plug.LicenseApiClient
         Task<LicenseStatusResponse> ActivateAsync(string licenseKey, CancellationToken cancellationToken = default);
         Task<bool> RevokeAsync(CancellationToken cancellationToken = default);
         Task<GenerateLicenseResponse> GenerateAsync(GenerateLicenseRequest request, CancellationToken cancellationToken = default);
+
+        // 升级 / 支付
+        Task<UpgradeOrderResponse> CreateUpgradeAsync(CancellationToken cancellationToken = default);
+        Task<UpgradeStatusResponse> GetUpgradeStatusAsync(string orderId, CancellationToken cancellationToken = default);
+        Task<UpgradeStatusResponse> ConfirmUpgradeAsync(string orderId, CancellationToken cancellationToken = default);
     }
 
     public class LicenseApiClient : BaseApiClient, ILicenseApiClient
@@ -40,6 +45,32 @@ namespace CJ.Plug.LicenseApiClient
             var response = await httpClient.PostAsJsonAsync("/api/license/generate", request, cancellationToken);
             response.EnsureSuccessStatusCode();
             return (await response.Content.ReadFromJsonAsync<GenerateLicenseResponse>(cancellationToken: cancellationToken))!;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 升级 / 支付
+        // ═══════════════════════════════════════════════════════
+
+        public async Task<UpgradeOrderResponse> CreateUpgradeAsync(CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsync("/api/license/upgrade/create", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<UpgradeOrderResponse>(cancellationToken: cancellationToken))!;
+        }
+
+        public async Task<UpgradeStatusResponse> GetUpgradeStatusAsync(string orderId, CancellationToken cancellationToken = default)
+        {
+            return await httpClient.GetFromJsonAsync<UpgradeStatusResponse>(
+                $"/api/license/upgrade/status?orderId={Uri.EscapeDataString(orderId)}", cancellationToken)
+                ?? new UpgradeStatusResponse { OrderId = orderId, Status = "expired", Message = "无法获取订单状态" };
+        }
+
+        public async Task<UpgradeStatusResponse> ConfirmUpgradeAsync(string orderId, CancellationToken cancellationToken = default)
+        {
+            var response = await httpClient.PostAsync(
+                $"/api/license/upgrade/confirm?orderId={Uri.EscapeDataString(orderId)}", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<UpgradeStatusResponse>(cancellationToken: cancellationToken))!;
         }
 
     }

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,9 +31,14 @@ public partial class App : System.Windows.Application
             })
             .ConfigureServices((context, services) =>
             {
+                // HttpClient & LicenseApiClient
+                services.AddSingleton<HttpClient>(_ => new HttpClient());
+                services.AddSingleton<CJ.Plug.LicenseApiClient.ILicenseApiClient, CJ.Plug.LicenseApiClient.LicenseApiClient>();
+
                 services.AddSingleton<ViewModels.MainViewModel>();
                 services.AddSingleton<ViewModels.ServiceControlViewModel>();
                 services.AddSingleton<ViewModels.DatabaseConfigViewModel>();
+                services.AddTransient<ViewModels.UpgradeViewModel>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<Services.AppHostLauncher>();
             })
@@ -47,6 +53,10 @@ public partial class App : System.Windows.Application
 
         _mainWindow = _host.Services.GetRequiredService<MainWindow>();
         _mainWindow.Show();
+
+        // 启动后异步检查 License 状态
+        var mainVm = _host.Services.GetRequiredService<ViewModels.MainViewModel>();
+        _ = mainVm.CheckLicenseStatusAsync();
 
         // 窗口显示后再异步启动 AppHost，避免阻塞 UI
         var launcher = _host.Services.GetRequiredService<Services.AppHostLauncher>();

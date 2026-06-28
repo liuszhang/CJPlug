@@ -1,6 +1,7 @@
 ﻿using CJ.Plug.LicenseApi.Contracts;
 using CJ.Plug.LicenseModels;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace CJ.Plug.LicenseApi.Apis
 {
@@ -83,6 +84,64 @@ namespace CJ.Plug.LicenseApi.Apis
                     LicenseKey = licenseKey,
                     License = validation.License!
                 });
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // 升级 / 支付
+            // ═══════════════════════════════════════════════════════
+
+            // POST /api/license/upgrade/create — 创建升级订单
+            api.MapPost("/upgrade/create", (ILicenseService service) =>
+            {
+                var response = service.CreateUpgradeOrder();
+                return Results.Ok(response);
+            });
+
+            // GET /api/license/upgrade/status — 查询订单状态
+            api.MapGet("/upgrade/status", (string orderId, ILicenseService service) =>
+            {
+                if (string.IsNullOrWhiteSpace(orderId))
+                    return Results.BadRequest(new { error = "订单号不能为空" });
+
+                var response = service.GetUpgradeOrderStatus(orderId);
+                return Results.Ok(response);
+            });
+
+            // POST /api/license/upgrade/confirm — 确认支付（模拟回调）
+            api.MapPost("/upgrade/confirm", (string orderId, ILicenseService service) =>
+            {
+                if (string.IsNullOrWhiteSpace(orderId))
+                    return Results.BadRequest(new { error = "订单号不能为空" });
+
+                var response = service.ConfirmUpgradePayment(orderId);
+                return Results.Ok(response);
+            });
+
+            // POST /api/license/upgrade/pay-callback — 码支付异步回调
+            api.MapPost("/upgrade/pay-callback", async (HttpRequest request, ILicenseService service) =>
+            {
+                var form = await request.ReadFormAsync();
+                var orderId = form["out_trade_no"].FirstOrDefault();
+                var money = form["money"].FirstOrDefault();
+                var type = form["type"].FirstOrDefault();
+                var sign = form["sign"].FirstOrDefault();
+                var tradeNo = form["trade_no"].FirstOrDefault();
+
+                if (string.IsNullOrEmpty(orderId) || string.IsNullOrEmpty(sign))
+                {
+                    Log.Warning("码支付回调参数不完整：orderId={OrderId}, sign={Sign}", orderId, sign);
+                    return Results.Text("fail");
+                }
+
+                var result = service.VerifyPaymentCallback(orderId, money ?? "", type ?? "", sign, tradeNo);
+                if (result == null)
+                {
+                    Log.Warning("码支付回调验签失败：orderId={OrderId}", orderId);
+                    return Results.Text("fail");
+                }
+
+                Log.Information("码支付回调处理成功：orderId={OrderId}, status={Status}", orderId, result.Status);
+                return Results.Text("success");
             });
 
             return app;
