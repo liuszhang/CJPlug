@@ -55,3 +55,51 @@ textarea {
         background-color: #f0f0f0;
         color: black;
     }
+
+.input-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.hidden-input {
+    display: none;
+}
+
+.attached-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+}
+
+.file-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    color: #374151;
+}
+
+    .file-tag .file-name {
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .file-tag .remove-file {
+        cursor: pointer;
+        color: #9ca3af;
+        font-weight: bold;
+        font-size: 0.85rem;
+        line-height: 1;
+    }
+
+        .file-tag .remove-file:hover {
+            color: #ef4444;
+        }

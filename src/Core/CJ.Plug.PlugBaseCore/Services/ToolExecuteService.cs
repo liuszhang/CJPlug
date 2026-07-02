@@ -30,7 +30,7 @@ namespace CJ.Plug.PlugBaseCore.Services
             if (plugExecutionRequest.ResolvedTool != null)
             {
                 Tool = plugExecutionRequest.ResolvedTool;
-                CLog.Information($"[TRACE-TOOL] 使用预解析工具: {Tool.ToolName}({Tool.ToolVersion})");
+                //CLog.Information($"[TRACE-TOOL] 使用预解析工具: {Tool.ToolName}({Tool.ToolVersion})");
             }
             else
             {
@@ -50,7 +50,7 @@ namespace CJ.Plug.PlugBaseCore.Services
             if (plugExecutionRequest.ResolvedStation != null)
             {
                 StationToUse = plugExecutionRequest.ResolvedStation;
-                CLog.Information($"[TRACE-TOOL] 使用预解析图站: {StationToUse.StationIp}");
+                //CLog.Information($"[TRACE-TOOL] 使用预解析图站: {StationToUse.StationIp}");
             }
             else
             {
@@ -301,12 +301,12 @@ namespace CJ.Plug.PlugBaseCore.Services
             }
             // === 检查并下载工具到图站 结束 ===
             //2.2 将命令行中的变量替换为参数的实际值
-            CLog.Information($"[TRACE-TOOL] ToolName={plugExecutionRequest.ToolName}, ToolVersion={plugExecutionRequest.ToolVersion}");
-            CLog.Information($"[TRACE-TOOL] RequestCommand={plugExecutionRequest.RequestCommand}, CommandParameter={Tool?.CommandParameter}");
+            //CLog.Information($"[TRACE-TOOL] ToolName={plugExecutionRequest.ToolName}, ToolVersion={plugExecutionRequest.ToolVersion}");
+            //CLog.Information($"[TRACE-TOOL] RequestCommand={plugExecutionRequest.RequestCommand}, CommandParameter={Tool?.CommandParameter}");
             foreach (var v in plugExecutionRequest.InputVariables ?? new())
-                CLog.Information($"[TRACE-TOOL] InputVariable: {v.Name}={v.Value}");
+                //CLog.Information($"[TRACE-TOOL] InputVariable: {v.Name}={v.Value}");
             plugExecutionRequest.RequestCommand = ParameterGenerator.EvalCommandLine(Command, plugExecutionRequest.InputVariables);
-            CLog.Information($"[TRACE-TOOL] EvalCommandLine后 — RequestCommand={plugExecutionRequest.RequestCommand}");
+            //CLog.Information($"[TRACE-TOOL] EvalCommandLine后 — RequestCommand={plugExecutionRequest.RequestCommand}");
 
             if (plugExecutionRequest.RequestCommand.Contains("[ToolPath]"))
             {

@@ -18,7 +18,7 @@
 </ChatMessageList>
 
 <div class="chat-container">
-    <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
+    <ChatSuggestions OnSelected="@AddSuggestedMessageAsync" @ref="@chatSuggestions" />
     <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
     @* <SurveyPrompt /> *@
 </div>
@@ -60,10 +60,29 @@
         ];
     }
 
-    private async Task AddUserMessageAsync(ChatMessage userMessage)
+    private async Task AddSuggestedMessageAsync(ChatMessage message)
+    {
+        await SendUserMessageAsync(message);
+    }
+
+    private async Task AddUserMessageAsync(ChatMessageWithFiles input)
     {
         CancelAnyCurrentResponse();
 
+        var userMessage = input.Message;
+
+        // If files attached, insert a System message with file info before the user message
+        if (input.Files.Count > 0)
+        {
+            var fileInfo = string.Join("; ", input.Files.Select(f => $"{f.FileName}:{f.FileId}"));
+            messages.Add(new ChatMessage(ChatRole.System, $"[UserAttachedFiles] {fileInfo}"));
+        }
+
+        await SendUserMessageAsync(userMessage);
+    }
+
+    private async Task SendUserMessageAsync(ChatMessage userMessage)
+    {
         // Add the user message to the conversation
         messages.Add(userMessage);
         chatSuggestions?.Clear();

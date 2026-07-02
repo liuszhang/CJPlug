@@ -46,11 +46,11 @@ else
                                            Size="Size.Small" DisableRipple="true" />
                         </CardHeaderAvatar>
                         <CardHeaderContent>
-                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.body2" Style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100px;">
+                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width:100%;">
+                                <MudText Typo="Typo.body2" Class="tool-card-title">
                                     @(tool.ToolName ?? "未命名")
                                 </MudText>
-                                <MudStack Row Spacing="1">
+                                <MudStack Row Spacing="1" Style="flex-shrink:0;">
                                     @if (tool.SupportsRemoteVisualization)
                                     {
                                         <MudTooltip Text="支持远程可视化">
@@ -102,7 +102,7 @@ else
 
                     @* 卡片操作区 *@
                     <MudCardActions Class="card-actions">
-                        <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                        <MudStack Row Spacing="1" Wrap="Wrap.NoWrap" Style="overflow:hidden;">
                             @* <MudTooltip Text="启动工具并打开远程可视化窗口">
                                 <MudButton OnClick="@(() => LaunchToolWithVisualization(tool))"
                                            Variant="Variant.Filled" Size="Size.Small" Color="Color.Info"
@@ -147,35 +147,72 @@ else
         flex-wrap: wrap;
         gap: 8px;
     }
+
     .tool-card-wrapper {
         flex: 0 0 160px;
         height: 210px;
+        /* 建立 flex column 容器，确保 MudTooltip 的包裹层也被拉伸 */
+        display: flex;
+        flex-direction: column;
     }
+
+    /* MudTooltip 渲染的包裹 div 必须填满 wrapper 高度 */
+    .tool-card-wrapper > .mud-tooltip-root {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+    }
+
     .tool-card {
         display: flex;
         flex-direction: column;
-        height: 100%;
+        /* flex:1 填满 MudTooltip 包裹层，替代不可靠的 height:100% */
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
         transition: all 0.25s ease;
         border-radius: 12px;
         border: 1px solid var(--mud-palette-divider);
     }
+
     .tool-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }
+
+    .tool-card .mud-card-header {
+        flex-shrink: 0;
+    }
+
     .tool-card .mud-card-content {
         flex: 1;
+        min-height: 0;
         overflow: hidden;
     }
+
     .card-actions {
+        flex-shrink: 0;
+        height: 38px;
+        overflow: hidden;
         background: var(--mud-palette-background-grey);
         padding: 2px 6px;
         border-top: 1px solid var(--mud-palette-divider);
     }
+
+    .tool-card-title {
+        font-weight: 600;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .text-muted {
         color: var(--mud-palette-text-secondary);
     }
+
     .text-truncate {
         white-space: nowrap;
         overflow: hidden;

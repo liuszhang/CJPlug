@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
     <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <ProjectReference Include="..\..\LicenseModule\CJ.Plug.LicenseApiClient\CJ.Plug.LicenseApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.GUIDesigner\CJ.Plug.GUIDesigner.csproj" />
     <ProjectReference Include="..\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.ToolActionSettingApi\CJ.Plug.ToolActionSettingApi.csproj" />

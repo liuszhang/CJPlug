@@ -2,10 +2,70 @@
   <!--
     自动将 Utf8ConsoleInit.cs 注入所有 Exe 项目（AppHost、ApiServer、DispatchServer 等）
     [ModuleInitializer] 在 Main() 之前执行，确保 Console.Out 创建时已经是 UTF-8 编码
-    
+
     <ItemGroup Condition="'$(OutputType)' == 'Exe' AND '$(MSBuildProjectExtension)' == '.csproj'">
     <Compile Include="$(MSBuildThisFileDirectory)01.Scripts\Utf8ConsoleInit.cs" Link="Utf8ConsoleInit.cs" />
   </ItemGroup>
   -->
-  
+
+  <!--
+    共享输出目录 - 程序集解析兜底：
+    当多个服务输出到同一目录时，各自的 .deps.json 会互相覆盖，
+    导致未被最后构建的服务的 NuGet 依赖无法定位。
+    此文件注册 AppDomain.AssemblyResolve 事件，从共享目录直接加载 DLL。
+    对所有共享输出目录的服务项目生效（Services）。
+  -->
+  <ItemGroup Condition="'$(BaseOutputPath)' != '' And $(BaseOutputPath.Contains('Services'))">
+    <Compile Include="$(MSBuildThisFileDirectory)SharedAssemblyResolve.cs"
+             Link="SharedAssemblyResolve.cs" />
+  </ItemGroup>
+
+  <!--
+    共享输出目录配置复制：
+    当多个服务输出到同一目录时，各自的 appsettings.json 会互相覆盖。
+    此 Target 将每个项目的 appsettings.json 额外复制一份为 appsettings.{项目名}.json，
+    供 AppHost 通过 ASPNETCORE_CONFIG_PATH 环境变量为每个服务指定独立的配置文件。
+  -->
+  <Target Name="CopyAppSettingsWithProjectName"
+          AfterTargets="Build"
+          Condition="Exists('$(MSBuildProjectDirectory)\appsettings.json')">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
+          DestinationFiles="$(OutputPath)appsettings.$(MSBuildProjectName).json"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    共享输出目录 - NuGet DLL 版本冲突防护：
+    OllamaSharp.ModelContextProtocol 传递依赖 ModelContextProtocol.Core 0.2.0.0，
+    而 McpServer 的 ModelContextProtocol.AspNetCore 1.4.0 需要 Core 1.4.0.0。
+    多服务共享同一输出目录时，后构建的项目可能用旧版覆盖新版。
+    此 Target 阻止非 McpServer 项目复制 ModelContextProtocol.* DLL，
+    由 McpServer 独占复制正确版本到共享目录。
+  -->
+  <Target Name="ExcludeModelContextProtocolFromCopy"
+          AfterTargets="ResolveReferences"
+          Condition="'$(MSBuildProjectName)' != 'CJ.Plug.McpServer'">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+                               Condition="$([System.String]::Copy('%(Filename)').StartsWith('ModelContextProtocol'))" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    IL Trimming 保护（当前未启用，配合 Directory.Build.props 中 trimming 设置使用）：
+    以下库不兼容 trimming（大量使用反射/动态加载），
+    未来启用 trimming 时取消注释以强制保留全部代码。
+
+    <ItemGroup Condition="'$(Configuration)' == 'Release' And '$(OutputType)' == 'Exe'">
+      <TrimmerRootAssembly Include="Aspose.Words" />
+      <TrimmerRootAssembly Include="Aspose.Slides" />
+      <TrimmerRootAssembly Include="Aspose.Cells" />
+      <TrimmerRootAssembly Include="DocumentFormat.OpenXml" />
+      <TrimmerRootAssembly Include="BouncyCastle.Cryptography" />
+      <TrimmerRootAssembly Include="Newtonsoft.Json" />
+      <TrimmerRootAssembly Include="MudBlazor" />
+      <TrimmerRootAssembly Include="Radzen.Blazor" />
+    </ItemGroup>
+  -->
+
 </Project>

@@ -4,9 +4,9 @@ namespace CJ.Plug.LlmConfigApiClient;
 
 public record DefaultModelInfoResponse(
     int ProviderId, string ProviderName, string ProviderDisplayName,
-    string ApiBaseUrl, string? ApiKey, bool ProviderIsEnabled,
+    string ApiBaseUrl, string? ApiKey,
     int ModelId, string ModelName, string ModelDisplayName,
-    string ModelType, int? MaxTokens, double? Temperature, bool ModelIsEnabled);
+    string ModelType, int? MaxTokens, double? Temperature);
 
 /// <summary>通用 API 响应包装，与服务端 ApiResult&lt;T&gt; 结构一致。</summary>
 public record ApiResult<T>(int Code, T? Data, string? Message = null);

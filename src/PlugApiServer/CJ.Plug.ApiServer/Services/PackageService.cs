@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace CJ.Plug.ApiServer.Services;
@@ -241,35 +242,30 @@ public class PackageService
     {
         _progressTracker.AddLog(taskId, "开始复制服务部署包...");
 
-        var services = new[] { "CJ.Plug.ApiServer", "CJ.Plug.HostWebServer", "CJ.Plug.ElsaApiServer", "CJ.Plug.McpServer", "CJ.Plug.StationAgent" };
         var repoRoot = GetRepositoryRoot();
         var publishBaseDir = Path.Combine(repoRoot, "02.Publish");
         var servicesDir = Path.Combine(outputDir, "services");
         Directory.CreateDirectory(servicesDir);
 
-        var total = services.Length;
-        var current = 0;
+        // 主服务（ApiServer、HostWebServer、ElsaApiServer、McpServer、DispatchServer）共享输出目录 02.Publish/Services/
+        // 将共享目录中的构建产物整体复制到 services/（排除 uvnc-portable，该目录仅图站使用）
+        var sharedServicesDir = Path.Combine(publishBaseDir, "Services", "Release", "net10.0");
 
-        foreach (var service in services)
+        if (Directory.Exists(sharedServicesDir))
         {
-            current++;
-            var progress = 10 + (int)((double)current / total * 40);
-            _progressTracker.UpdateProgress(taskId, progress, $"正在复制 {service}...");
-
-            var sourceDir = Path.Combine(publishBaseDir, service);
-            var destDir = Path.Combine(servicesDir, service);
-
-            if (!Directory.Exists(sourceDir))
-            {
-                _progressTracker.AddLog(taskId, $"发布目录不存在: {sourceDir}，跳过", "Warning");
-                _logger.LogWarning("发布目录不存在: {SourceDir}", sourceDir);
-                continue;
-            }
-
-            _progressTracker.AddLog(taskId, $"复制服务: {service}");
-            CopyDirectory(sourceDir, destDir);
-            _progressTracker.AddLog(taskId, $"{service} 复制完成");
+            _progressTracker.UpdateProgress(taskId, 20, "正在复制服务共享目录...");
+            _progressTracker.AddLog(taskId, $"复制服务共享目录: {sharedServicesDir}");
+            CopyDirectory(sharedServicesDir, servicesDir, IsPackagingFileIncluded,
+                dirFilter: dirName => !dirName.Equals("uvnc-portable", StringComparison.OrdinalIgnoreCase));
+            _progressTracker.AddLog(taskId, "服务共享目录复制完成");
         }
+        else
+        {
+            _progressTracker.AddLog(taskId, $"共享服务目录不存在: {sharedServicesDir}，跳过", "Warning");
+            _logger.LogWarning("共享服务目录不存在: {SourceDir}", sharedServicesDir);
+        }
+
+        _progressTracker.UpdateProgress(taskId, 45, "服务部署包复制完成");
     }
 
     /// <summary>
@@ -296,41 +292,214 @@ public class PackageService
     {
         onLog?.Invoke("开始复制图站服务...", "Info");
 
-        var services = new[] { "CJ.Plug.StationAgent", "CJ.Plug.StationApiServer", "StationSettingUI" };
         var repoRoot = GetRepositoryRoot();
         var publishBaseDir = Path.Combine(repoRoot, "02.Publish");
+        var sharedServicesDir = Path.Combine(publishBaseDir, "Services", "Release", "net10.0");
         var servicesDir = Path.Combine(outputDir, "services");
         Directory.CreateDirectory(servicesDir);
 
-        // StationSettingUI 是桌面管理工具，放到 tools 目录而非 services
+        // StationSettingUI 是桌面管理工具，放到 tools 目录
         var toolsDir = Path.Combine(outputDir, "tools");
         Directory.CreateDirectory(toolsDir);
 
-        var total = services.Length;
-        var current = 0;
-
-        foreach (var service in services)
+        if (!Directory.Exists(sharedServicesDir))
         {
-            current++;
-            var progress = 10 + (int)((double)current / total * 40);
-            onProgress?.Invoke(progress, $"正在复制 {service}...");
-
-            var sourceDir = Path.Combine(publishBaseDir, service);
-            var destDir = service == "StationSettingUI"
-                ? Path.Combine(toolsDir, service)
-                : Path.Combine(servicesDir, service);
-
-            if (!Directory.Exists(sourceDir))
-            {
-                onLog?.Invoke($"发布目录不存在: {sourceDir}，跳过", "Warning");
-                _logger.LogWarning("发布目录不存在: {SourceDir}", sourceDir);
-                continue;
-            }
-
-            onLog?.Invoke($"复制图站{(service == "StationSettingUI" ? "工具" : "服务")}: {service}", "Info");
-            CopyDirectory(sourceDir, destDir);
-            onLog?.Invoke($"{service} 复制完成", "Info");
+            onLog?.Invoke($"共享服务目录不存在: {sharedServicesDir}，跳过图站服务复制", "Warning");
+            _logger.LogWarning("共享服务目录不存在: {SourceDir}", sharedServicesDir);
+            return;
         }
+
+        // 从 deps.json 解析图站服务所需的全部依赖文件
+        var requiredFlatFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var requiredRelativeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var stationServices = new[] { "CJ.Plug.StationAgent", "CJ.Plug.StationApiServer" };
+
+        foreach (var service in stationServices)
+        {
+            var depsJsonPath = Path.Combine(sharedServicesDir, $"{service}.deps.json");
+            if (File.Exists(depsJsonPath))
+            {
+                onLog?.Invoke($"解析依赖清单: {service}.deps.json", "Info");
+                var (flatFiles, relativeFiles) = ExtractRequiredFilesFromDeps(depsJsonPath);
+                requiredFlatFiles.UnionWith(flatFiles);
+                requiredRelativeFiles.UnionWith(relativeFiles);
+                onLog?.Invoke($"  {service} 需要 {flatFiles.Count + relativeFiles.Count} 个依赖文件（托管 {flatFiles.Count}，原生 {relativeFiles.Count}）", "Info");
+            }
+            else
+            {
+                onLog?.Invoke($"未找到 {service}.deps.json，跳过", "Warning");
+            }
+        }
+
+        var totalRequired = requiredFlatFiles.Count + requiredRelativeFiles.Count;
+        onProgress?.Invoke(15, $"正在复制图站依赖文件（共 {totalRequired} 个）...");
+
+        // 按依赖清单从共享目录精确复制
+        var copiedCount = 0;
+
+        // 需跳过的文件扩展名（生产环境不需要）
+        var skipExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdb",   // 调试符号
+            ".map",   // JS source map
+        };
+
+        // 复制托管 DLL（扁平结构，在发布根目录）
+        foreach (var fileName in requiredFlatFiles)
+        {
+            if (skipExtensions.Contains(Path.GetExtension(fileName)))
+                continue;
+
+            var sourceFile = Path.Combine(sharedServicesDir, fileName);
+            if (File.Exists(sourceFile))
+            {
+                var destFile = Path.Combine(servicesDir, fileName);
+                File.Copy(sourceFile, destFile, true);
+                copiedCount++;
+            }
+        }
+
+        // 复制原生库（保留 runtimes/ 子目录结构）
+        foreach (var relativePath in requiredRelativeFiles)
+        {
+            if (skipExtensions.Contains(Path.GetExtension(relativePath)))
+                continue;
+
+            var sourceFile = Path.Combine(sharedServicesDir, relativePath);
+            if (File.Exists(sourceFile))
+            {
+                var destFile = Path.Combine(servicesDir, relativePath);
+                var destDir = Path.GetDirectoryName(destFile);
+                if (destDir != null)
+                    Directory.CreateDirectory(destDir);
+                File.Copy(sourceFile, destFile, true);
+                copiedCount++;
+            }
+        }
+
+        // 复制服务自身的可执行文件和配置文件
+        foreach (var service in stationServices)
+        {
+            foreach (var ext in new[] { ".exe", ".runtimeconfig.json", ".deps.json" })
+            {
+                var sourceFile = Path.Combine(sharedServicesDir, service + ext);
+                if (File.Exists(sourceFile))
+                {
+                    File.Copy(sourceFile, Path.Combine(servicesDir, service + ext), true);
+                    copiedCount++;
+                }
+            }
+        }
+
+        // 复制 appsettings 配置文件
+        foreach (var service in stationServices)
+        {
+            var configSource = Path.Combine(sharedServicesDir, $"appsettings.{service}.json");
+            if (File.Exists(configSource))
+            {
+                File.Copy(configSource, Path.Combine(servicesDir, $"appsettings.{service}.json"), true);
+                copiedCount++;
+            }
+        }
+
+        // 复制 uvnc-portable 目录（VNC 远程桌面）
+        var uvncSource = Path.Combine(sharedServicesDir, "uvnc-portable");
+        if (Directory.Exists(uvncSource))
+        {
+            CopyDirectory(uvncSource, Path.Combine(servicesDir, "uvnc-portable"), IsPackagingFileIncluded);
+            onLog?.Invoke("复制 uvnc-portable 目录", "Info");
+        }
+
+        onLog?.Invoke($"图站服务文件复制完成，共复制 {copiedCount} 个文件", "Info");
+
+        // StationSettingUI 有独立的输出目录
+        onProgress?.Invoke(35, "正在复制 StationSettingUI...");
+        var stationSettingSource = Path.Combine(publishBaseDir, "StationSettingUI");
+        var stationSettingDest = Path.Combine(toolsDir, "StationSettingUI");
+
+        if (Directory.Exists(stationSettingSource))
+        {
+            onLog?.Invoke("复制图站工具: StationSettingUI", "Info");
+            CopyDirectory(stationSettingSource, stationSettingDest, IsPackagingFileIncluded);
+            onLog?.Invoke("StationSettingUI 复制完成", "Info");
+        }
+        else
+        {
+            onLog?.Invoke($"发布目录不存在: {stationSettingSource}，跳过", "Warning");
+            _logger.LogWarning("发布目录不存在: {SourceDir}", stationSettingSource);
+        }
+
+        onProgress?.Invoke(45, "图站服务复制完成");
+    }
+
+    /// <summary>
+    /// 从 deps.json 解析运行时所需的全部文件名
+    /// 返回 (flatFiles, relativeFiles)：
+    ///   flatFiles     - 托管 DLL，发布后在根目录（如 SQLitePCLRaw.core.dll）
+    ///   relativeFiles - 原生库，发布后保留 runtimes/{rid}/native/ 子目录结构（如 runtimes/win-x64/native/e_sqlite3.dll）
+    /// </summary>
+    private (HashSet<string> flatFiles, HashSet<string> relativeFiles) ExtractRequiredFilesFromDeps(string depsJsonPath)
+    {
+        var flatFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var relativeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var json = File.ReadAllText(depsJsonPath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("targets", out var targets))
+                return (flatFiles, relativeFiles);
+
+            // .NET SDK publish 行为：
+            //   runtime 条目（如 lib/netstandard2.0/Foo.dll）→ 发布后扁平化到输出根目录
+            //   runtimeTargets / native 条目（如 runtimes/win-x64/native/bar.dll）→ 发布后保留子目录结构
+            foreach (var target in targets.EnumerateObject())
+            {
+                foreach (var package in target.Value.EnumerateObject())
+                {
+                    // runtime 条目 → 托管 DLL，扁平化到根目录
+                    if (package.Value.TryGetProperty("runtime", out var runtime))
+                    {
+                        foreach (var entry in runtime.EnumerateObject())
+                        {
+                            var fileName = Path.GetFileName(entry.Name);
+                            if (!string.IsNullOrEmpty(fileName))
+                                flatFiles.Add(fileName);
+                        }
+                    }
+
+                    // native 条目 → 原生库，仅保留 win-x64 平台
+                    if (package.Value.TryGetProperty("native", out var native))
+                    {
+                        foreach (var entry in native.EnumerateObject())
+                        {
+                            var relativePath = entry.Name; // 如 runtimes/win-x64/native/e_sqlite3.dll
+                            if (!string.IsNullOrEmpty(relativePath) && relativePath.StartsWith("runtimes/win-x64/"))
+                                relativeFiles.Add(relativePath);
+                        }
+                    }
+
+                    // runtimeTargets 条目 → RID 特定原生库，仅保留 win-x64 平台
+                    if (package.Value.TryGetProperty("runtimeTargets", out var runtimeTargets))
+                    {
+                        foreach (var entry in runtimeTargets.EnumerateObject())
+                        {
+                            var relativePath = entry.Name; // 如 runtimes/win-x64/native/e_sqlite3.dll
+                            if (!string.IsNullOrEmpty(relativePath) && relativePath.StartsWith("runtimes/win-x64/"))
+                                relativeFiles.Add(relativePath);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析 deps.json 失败: {Path}", depsJsonPath);
+        }
+
+        return (flatFiles, relativeFiles);
     }
 
     private void CreateStartupScripts(string outputDir, string platform, string taskId)
@@ -356,11 +525,11 @@ if errorlevel 1 (
 echo [信息] 正在启动CJPlug服务...
 echo.
 
-:: 启动服务
-start ""CJPlug API Server"" /min services\ApiServer\CJ.Plug.ApiServer.exe
-start ""CJPlug Web Server"" /min services\HostWebServer\CJ.Plug.HostWebServer.exe
-start ""CJPlug Elsa Server"" /min services\ElsaApiServer\CJ.Plug.ElsaApiServer.exe
-start ""CJPlug MCP Server"" /min services\McpServer\CJ.Plug.McpServer.exe
+:: 启动服务（所有 DLL 在 services 共享目录下）
+start ""CJPlug API Server"" /min services\CJ.Plug.ApiServer.exe
+start ""CJPlug Web Server"" /min services\CJ.Plug.HostWebServer.exe
+start ""CJPlug Elsa Server"" /min services\CJ.Plug.ElsaApiServer.exe
+start ""CJPlug MCP Server"" /min services\CJ.Plug.McpServer.exe
 
 echo [成功] CJPlug服务已启动！
 echo.
@@ -400,11 +569,11 @@ fi
 echo ""[信息] 正在启动CJPlug服务...""
 echo """"
 
-# 启动服务
-./services/ApiServer/CJ.Plug.ApiServer &
-./services/HostWebServer/CJ.Plug.HostWebServer &
-./services/ElsaApiServer/CJ.Plug.ElsaApiServer &
-./services/McpServer/CJ.Plug.McpServer &
+# 启动服务（所有 DLL 在 services 共享目录下）
+./services/CJ.Plug.ApiServer &
+./services/CJ.Plug.HostWebServer &
+./services/CJ.Plug.ElsaApiServer &
+./services/CJ.Plug.McpServer &
 
 echo ""[成功] CJPlug服务已启动！""
 echo """"
@@ -697,12 +866,12 @@ CJPlug-Local/
 ├── data/                  # 数据目录
 │   ├── main.db            # 主数据库
 │   └── plug.db            # 插件数据库
-└── services/              # 服务程序目录
-    ├── ApiServer/         # API服务器
-    ├── HostWebServer/     # Web服务器
-    ├── ElsaApiServer/     # Elsa工作流引擎
-    ├── McpServer/         # MCP服务器
-    └── StationAgent/      # 工作站代理
+└── services/              # 服务程序目录（共享DLL）
+    ├── CJ.Plug.ApiServer.exe          # API服务器
+    ├── CJ.Plug.HostWebServer.exe      # Web服务器
+    ├── CJ.Plug.ElsaApiServer.exe      # Elsa工作流引擎
+    ├── CJ.Plug.McpServer.exe          # MCP服务器
+    └── ...                            # 共享依赖
 ```
 
 ## 配置说明
@@ -764,7 +933,13 @@ http://localhost:8690/mcp
     /// <summary>
     /// 复制目录
     /// </summary>
-    private void CopyDirectory(string sourceDir, string destDir)
+    /// <param name="sourceDir">源目录</param>
+    /// <param name="destDir">目标目录</param>
+    /// <param name="fileFilter">可选的文件过滤器，返回 false 则跳过该文件</param>
+    /// <param name="dirFilter">可选的目录过滤器，返回 false 则跳过该目录</param>
+    private void CopyDirectory(string sourceDir, string destDir,
+        Func<string, bool>? fileFilter = null,
+        Func<string, bool>? dirFilter = null)
     {
         // 创建目标目录
         Directory.CreateDirectory(destDir);
@@ -772,6 +947,9 @@ http://localhost:8690/mcp
         // 复制文件
         foreach (var file in Directory.GetFiles(sourceDir))
         {
+            if (fileFilter != null && !fileFilter(file))
+                continue;
+
             var destFile = Path.Combine(destDir, Path.GetFileName(file));
             File.Copy(file, destFile, true);
         }
@@ -779,9 +957,38 @@ http://localhost:8690/mcp
         // 递归复制子目录
         foreach (var subDir in Directory.GetDirectories(sourceDir))
         {
-            var destSubDir = Path.Combine(destDir, Path.GetFileName(subDir));
-            CopyDirectory(subDir, destSubDir);
+            // 跳过 BlazorDebugProxy 目录（仅开发调试用，~11MB）
+            var dirName = Path.GetFileName(subDir);
+            if (dirName.Equals("BlazorDebugProxy", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (dirFilter != null && !dirFilter(dirName))
+                continue;
+
+            var destSubDir = Path.Combine(destDir, dirName);
+            CopyDirectory(subDir, destSubDir, fileFilter, dirFilter);
         }
+    }
+
+    /// <summary>
+    /// 部署包文件过滤器：排除仅用于开发的文件，减少发布包体积
+    /// 排除项：
+    /// - staticwebassets.endpoints.json / staticwebassets.runtime.json（~50MB，开发时 Blazor 静态资源映射）
+    /// - PDB 调试符号文件（~6MB）
+    /// </summary>
+    private static bool IsPackagingFileIncluded(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+
+        // 排除 staticwebassets 文件（开发时 Blazor 静态资源映射，生产部署不需要）
+        if (fileName.Contains(".staticwebassets.", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // 排除 PDB 调试符号文件
+        if (fileName.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return true;
     }
 
     private string GetRepositoryRoot()
@@ -843,9 +1050,9 @@ echo.
 echo [信息] 正在启动图站服务...
 echo.
 
-:: 启动图站服务
-start ""CJPlug Station Agent"" /min services\CJ.Plug.StationAgent\CJ.Plug.StationAgent.exe
-start ""CJPlug Station ApiServer"" /min services\CJ.Plug.StationApiServer\CJ.Plug.StationApiServer.exe
+:: 启动图站服务（所有 DLL 在 services 共享目录下）
+start ""CJPlug Station Agent"" /min services\CJ.Plug.StationAgent.exe
+start ""CJPlug Station ApiServer"" /min services\CJ.Plug.StationApiServer.exe
 
 echo [成功] 图站服务已启动！
 echo.
@@ -875,9 +1082,9 @@ echo """"
 echo ""[信息] 正在启动图站服务...""
 echo """"
 
-# 启动图站服务
-./services/CJ.Plug.StationAgent/CJ.Plug.StationAgent &
-./services/CJ.Plug.StationApiServer/CJ.Plug.StationApiServer &
+# 启动图站服务（所有 DLL 在 services 共享目录下）
+./services/CJ.Plug.StationAgent &
+./services/CJ.Plug.StationApiServer &
 
 echo ""[成功] 图站服务已启动！""
 echo """"
@@ -1015,9 +1222,10 @@ CJPlug-Station/
 ├── start.sh               # Linux/macOS启动脚本
 ├── config/                # 配置文件目录
 │   └── appsettings.json   # 图站配置文件
-├── services/              # 服务程序目录
-│   ├── CJ.Plug.StationAgent/     # 图站代理服务
-│   └── CJ.Plug.StationApiServer/ # 图站API服务
+├── services/              # 服务程序目录（共享DLL）
+│   ├── CJ.Plug.StationAgent.exe       # 图站代理服务
+│   ├── CJ.Plug.StationApiServer.exe   # 图站API服务
+│   └── ...                            # 共享依赖
 └── tools/                 # 管理工具目录
     └── StationSettingUI/         # 图站桌面管理工具
 ```

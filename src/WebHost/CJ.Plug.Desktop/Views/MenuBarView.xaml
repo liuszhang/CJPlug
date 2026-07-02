@@ -8,6 +8,7 @@
              d:DesignHeight="800" d:DesignWidth="220">
     <UserControl.Resources>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
     <Grid Background="#2D2D3F">
         <Grid.RowDefinitions>
@@ -50,7 +51,7 @@
                                         BorderThickness="3,0,0,0"
                                         Padding="{TemplateBinding Padding}">
                                     <ContentPresenter VerticalAlignment="Center"
-                                                      HorizontalAlignment="Left"/>
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsSelected" Value="True">
@@ -94,32 +95,43 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <!-- 底部折叠/展开按钮 -->
+        <!-- 底部折叠/展开按钮 + 升级按钮 -->
         <Border Grid.Row="2"
                 Padding="0,8"
                 BorderBrush="#3D3D5F" BorderThickness="0,1,0,0">
-            <Button Width="32" Height="32"
-                    Background="#3D3D5F"
-                    BorderThickness="1"
-                    BorderBrush="#5C5C8F"
-                    Cursor="Hand"
-                    ToolTip="收起/展开菜单"
-                    HorizontalAlignment="Center"
-                    Command="{Binding DataContext.ToggleMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="4"/>
-                    </Style>
-                </Button.Resources>
-                <Button.Content>
-                    <TextBlock Text="&#x2630;"
-                               FontSize="18"
-                               FontFamily="Segoe UI"
-                               Foreground="#E0E0F0"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Button.Content>
-            </Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- 折叠按钮 -->
+                <Button Width="36" Height="36"
+                        FontSize="18"
+                        Foreground="#E0E0F0"
+                        Background="#3D3D5F"
+                        BorderThickness="1"
+                        BorderBrush="#5C5C8F"
+                        Cursor="Hand"
+                        ToolTip="收起/展开菜单"
+                        Padding="0"
+                        Command="{Binding DataContext.ToggleMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <TextBlock Text="≡" FontFamily="Segoe UI" FontSize="18"
+                               Foreground="#E0E0F0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+
+                <!-- 升级按钮（仅未激活时可见） -->
+                <Button Width="36" Height="36"
+                        Margin="8,0,0,0"
+                        FontSize="18"
+                        Foreground="#FFD700"
+                        Background="#4A3D5F"
+                        BorderThickness="1"
+                        BorderBrush="#7C5C8F"
+                        Cursor="Hand"
+                        ToolTip="升级授权"
+                        Padding="0"
+                        Visibility="{Binding DataContext.IsUpgradeVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding DataContext.UpgradeCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <TextBlock Text="★" FontFamily="Segoe UI" FontSize="18"
+                               Foreground="#FFD700" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

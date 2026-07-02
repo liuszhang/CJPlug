@@ -1,0 +1,271 @@
+@page "/LicenseManage"
+
+@using CJ.Plug.LicenseModels
+@using CJ.Plug.LicenseApiClient
+@using MudBlazor
+
+@inject ILicenseApiClient LicenseApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>许可证管理</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">许可证管理</MudText>
+
+    <MudGrid>
+        @* 左侧：当前许可证状态 *@
+        <MudItem xs="12" md="7">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">当前许可证状态</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (_isActivated && !_isExpired)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">已激活</MudChip>
+                        }
+                        else if (_isActivated && _isExpired)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">已过期</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">未激活</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_isActivated)
+                    {
+                        <MudGrid Spacing="2">
+                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">被许可人</MudText></MudItem>
+                            <MudItem xs="8"><MudText Typo="Typo.body1">@_licensee</MudText></MudItem>
+
+                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">签发时间</MudText></MudItem>
+                            <MudItem xs="8"><MudText Typo="Typo.body1">@_issuedAt.ToString("yyyy-MM-dd HH:mm")</MudText></MudItem>
+
+                            <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">授权码过期</MudText></MudItem>
+                            <MudItem xs="8">
+                                @if (_codeExpiresAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.body1">@_codeExpiresAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Info" Size="Size.Small">不限</MudChip>
+                                }
+                            </MudItem>
+
+                        </MudGrid>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mb-0">
+                            当前未激活许可证。请在右侧输入 License Key 激活，或联系管理员生成许可证。
+                        </MudAlert>
+                    }
+                </MudCardContent>
+                <MudCardActions>
+                    @if (_isActivated)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                                   OnClick="RevokeLicense" Disabled="_isRevoking">
+                            @(_isRevoking ? "撤销中..." : "撤销许可证")
+                        </MudButton>
+                    }
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" OnClick="RefreshStatus">
+                        刷新状态
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* 右侧：激活 & 生成 *@
+        <MudItem xs="12" md="5">
+            @* 激活区 *@
+            <MudCard Elevation="2" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">激活许可证</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTextField T="string" @bind-Value="_activateKey" Label="License Key"
+                                  Lines="3" Variant="Variant.Outlined"
+                                  Placeholder="粘贴许可证密钥..."
+                                  Disabled="_isActivating" />
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="ActivateLicense" Disabled="@(_isActivating || string.IsNullOrWhiteSpace(_activateKey))">
+                        @(_isActivating ? "激活中..." : "激活")
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+
+            @* 生成区（管理员功能） *@
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">生成许可证</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudChip T="string" Color="Color.Secondary" Size="Size.Small">管理员</MudChip>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="_genLicensee"
+                                          Label="被许可人 / 公司"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudSelect T="int" @bind-Value="_validDays" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Label="有效期限" AnchorOrigin="Origin.BottomCenter"
+                               Style="min-width:130px;" Disabled="_isGenerating">
+                        <MudSelectItem T="int" Value="1">1天</MudSelectItem>
+                        <MudSelectItem T="int" Value="7">1周</MudSelectItem>
+                        <MudSelectItem T="int" Value="90">3个月</MudSelectItem>
+                        <MudSelectItem T="int" Value="-1">永久</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Tertiary"
+                               OnClick="GenerateLicense" Disabled="_isGenerating">
+                        @(_isGenerating ? "生成中..." : "生成 License Key")
+                    </MudButton>
+                </MudCardActions>
+                @if (!string.IsNullOrEmpty(_generatedKey))
+                {
+                    <MudCardContent>
+                        <MudAlert Severity="Severity.Success" Class="mb-2">许可证已生成，请复制保存：</MudAlert>
+                        <MudTextField T="string" Text="@_generatedKey" Lines="4" Variant="Variant.Outlined"
+                                      ReadOnly="true" Class="font-monospace" />
+                    </MudCardContent>
+                }
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private bool _isActivated;
+    private bool _isExpired;
+    private string _licensee = string.Empty;
+    private DateTime _issuedAt;
+    private DateTime? _codeExpiresAt;
+
+    private string _activateKey = string.Empty;
+    private bool _isActivating;
+    private bool _isRevoking;
+
+    private string _genLicensee = string.Empty;
+    private string _generatedKey = string.Empty;
+    private bool _isGenerating;
+    private int _validDays = 90;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatus();
+    }
+
+    private async Task RefreshStatus()
+    {
+        try
+        {
+            var status = await LicenseApiClient.GetStatusAsync();
+            _isActivated = status.IsActivated;
+            _isExpired = status.IsExpired;
+            _licensee = status.Licensee;
+            _issuedAt = status.IssuedAt;
+            _codeExpiresAt = status.CodeExpiresAt;
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"获取状态失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ActivateLicense()
+    {
+        _isActivating = true;
+        try
+        {
+            var result = await LicenseApiClient.ActivateAsync(_activateKey.Trim());
+            Snackbar.Add("许可证激活成功！", Severity.Success);
+            _activateKey = string.Empty;
+            await RefreshStatus();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            Snackbar.Add($"激活失败：{ex.Message}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"激活失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isActivating = false;
+        }
+    }
+
+    private async Task RevokeLicense()
+    {
+        _isRevoking = true;
+        try
+        {
+            var success = await LicenseApiClient.RevokeAsync();
+            if (success)
+            {
+                Snackbar.Add("许可证已撤销", Severity.Success);
+                await RefreshStatus();
+            }
+            else
+            {
+                Snackbar.Add("撤销失败", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"撤销失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isRevoking = false;
+        }
+    }
+
+    private async Task GenerateLicense()
+    {
+        _isGenerating = true;
+        _generatedKey = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var request = new GenerateLicenseRequest
+            {
+                Licensee = _genLicensee.Trim(),
+                ValidDays = _validDays
+            };
+
+            var response = await LicenseApiClient.GenerateAsync(request);
+            _generatedKey = response.LicenseKey;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"生成失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+}

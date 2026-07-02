@@ -27,14 +27,12 @@ namespace CJ.Plug_Aspire.StationApiService.Services.ToolActionExecute
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
             //Log.Information("BaseDirectory:" + baseDirectory);
 
-            string combinedPath = Path.Combine(baseDirectory, @"..\..\..\CJ.Plug.StationAgent\Debug\net10.0\CJ.Plug.StationAgent.exe");
-            string targetExePath = Path.GetFullPath(combinedPath);
+            // StationAgent 与 StationApiServer 共享同一 BaseOutputPath (02.Publish\Services)，同目录引用即可
+            string targetExePath = Path.Combine(baseDirectory, "CJ.Plug.StationAgent.exe");
             //Log.Information("TargetExePath:" + targetExePath);
             // 创建 ProcessStartInfo 对象
             var startInfo = new ProcessStartInfo
             {
-                //FileName = @"D:\Pro\CJ.Plug-Aspire\PlugStation\CJ.Plug.StationAgent\bin\Debug\net9.0\\CJ.Plug.StationAgent.exe",
-                //FileName = @"D:\99_Pro\CJ.Plug-Aspire\PlugStation\CJ.Plug.StationAgent\bin\Debug\net9.0\CJ.Plug.StationAgent.exe",
                 FileName = targetExePath,
                 Arguments = base64Json, // 工具的命令行参数                                                                          
                 //WorkingDirectory = workDirectory, // 设置工作目录，可根据实际情况修改
@@ -72,8 +70,8 @@ namespace CJ.Plug_Aspire.StationApiService.Services.ToolActionExecute
             string base64Json = Convert.ToBase64String(Encoding.UTF8.GetBytes(args));
 
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            string combinedPath = Path.Combine(baseDirectory, @"..\..\..\CJ.Plug.StationAgent\Debug\net10.0\CJ.Plug.StationAgent.exe");
-            string targetExePath = Path.GetFullPath(combinedPath);
+            // StationAgent 与 StationApiServer 共享同一 BaseOutputPath (02.Publish\Services)，同目录引用即可
+            string targetExePath = Path.Combine(baseDirectory, "CJ.Plug.StationAgent.exe");
             // 创建 ProcessStartInfo 对象
             var startInfo = new ProcessStartInfo
             {

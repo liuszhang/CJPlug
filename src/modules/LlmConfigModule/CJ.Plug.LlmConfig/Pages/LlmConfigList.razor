@@ -64,7 +64,7 @@
                                   Style="@(provider.Id == _selectedProviderId ? "border-left: 4px solid var(--mud-palette-primary);" : "")"
                                   @onclick="() => SelectProvider(provider.Id)">
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Cloud" Color="@(provider.IsEnabled ? Color.Primary : Color.Default)" />
+                                <MudIcon Icon="@Icons.Material.Filled.Cloud" Color="Color.Primary" />
                                 <div style="flex:1;">
                                     <MudText Typo="Typo.subtitle1">@provider.DisplayName</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@provider.ApiBaseUrl</MudText>
@@ -130,16 +130,6 @@
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" />
                                     }
-                                </CellTemplate>
-                            </TemplateColumn>
-                            <TemplateColumn Title="状态">
-                                <CellTemplate>
-                                    <MudSwitch T="bool" Value="@context.Item.IsEnabled" Disabled="true" Color="Color.Primary" Size="Size.Small" />
-                                </CellTemplate>
-                            </TemplateColumn>
-                            <TemplateColumn Title="温度">
-                                <CellTemplate>
-                                    @(context.Item.Temperature?.ToString("F1") ?? "-")
                                 </CellTemplate>
                             </TemplateColumn>
                             <TemplateColumn Style="text-align:right">
@@ -264,33 +254,33 @@
 
         foreach (var p in _providers)
         {
-            Console.WriteLine($"[UpdateActiveConfig] Provider={p.Name}, IsEnabled={p.IsEnabled}, ModelConfigs={p.ModelConfigs?.Count ?? 0}");
+            Console.WriteLine($"[UpdateActiveConfig] Provider={p.Name}, ModelConfigs={p.ModelConfigs?.Count ?? 0}");
         }
 
-        // 优先查找 IsDefault 模型（不限供应商启用状态 — 即使供应商禁用，IsDefault 模型仍应被识别）
+        // 优先查找 IsDefault 模型
         foreach (var p in _providers)
         {
-            var defaultModel = p.ModelConfigs?.FirstOrDefault(m => m.IsDefault && m.IsEnabled);
+            var defaultModel = p.ModelConfigs?.FirstOrDefault(m => m.IsDefault);
             if (defaultModel != null)
             {
                 _activeConfig = (p.DisplayName, defaultModel.DisplayName);
-                Console.WriteLine($"[UpdateActiveConfig] 默认模型: {p.DisplayName}(IsEnabled={p.IsEnabled}) / {defaultModel.DisplayName}");
+                Console.WriteLine($"[UpdateActiveConfig] 默认模型: {p.DisplayName} / {defaultModel.DisplayName}");
                 InvokeAsync(StateHasChanged);
                 return;
             }
         }
 
-        // 没有 IsDefault 模型，取第一个启用的供应商+模型
-        var firstProvider = _providers.FirstOrDefault(p => p.IsEnabled && p.ModelConfigs?.Any(m => m.IsEnabled) == true);
+        // 没有 IsDefault 模型，取第一个供应商+模型
+        var firstProvider = _providers.FirstOrDefault(p => p.ModelConfigs?.Any() == true);
         if (firstProvider != null)
         {
-            var firstModel = firstProvider.ModelConfigs!.First(m => m.IsEnabled);
+            var firstModel = firstProvider.ModelConfigs!.First();
             _activeConfig = (firstProvider.DisplayName, firstModel.DisplayName);
             Console.WriteLine($"[UpdateActiveConfig] 兜底: {firstProvider.DisplayName} / {firstModel.DisplayName}");
         }
         else
         {
-            Console.WriteLine("[UpdateActiveConfig] 兜底也失败: 没有启用的供应商或没有启用的模型");
+            Console.WriteLine("[UpdateActiveConfig] 兜底也失败: 没有供应商或没有模型");
         }
 
         InvokeAsync(StateHasChanged);

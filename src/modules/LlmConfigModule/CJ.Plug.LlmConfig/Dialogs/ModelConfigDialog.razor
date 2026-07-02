@@ -26,15 +26,9 @@
                                      Variant="Variant.Outlined" Min="1" Max="1000000"
                                      Placeholder="如 4096" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudNumericField @bind-Value="ModelConfig.Temperature" Label="温度 (Temperature)"
-                                     Variant="Variant.Outlined" Min="0.0" Max="2.0" Step="0.1"
-                                     Placeholder="0.7" />
-                </MudItem>
                 <MudItem xs="6" Class="d-flex align-center">
                     <MudStack Row Spacing="4">
                         <MudSwitch @bind-Value="ModelConfig.IsDefault" Label="默认模型" Color="Color.Primary" />
-                        <MudSwitch @bind-Value="ModelConfig.IsEnabled" Label="启用" Color="Color.Primary" />
                     </MudStack>
                 </MudItem>
                 <MudItem xs="12">

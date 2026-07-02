@@ -65,7 +65,7 @@ public class AppHostLauncher : IDisposable
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"\"{dllPath}\"",
+            Arguments = $"\"{dllPath}\" --no-elevate",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -115,15 +115,26 @@ public class AppHostLauncher : IDisposable
         using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         var sw = Stopwatch.StartNew();
         var timeout = TimeSpan.FromSeconds(ReadyTimeoutSeconds);
+        bool processExitedClean = false;
 
         while (sw.Elapsed < timeout)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (_process?.HasExited == true)
+            if (!processExitedClean && _process?.HasExited == true)
             {
-                _logger.LogError("AppHost 进程已退出，退出码: {ExitCode}", _process.ExitCode);
-                throw new InvalidOperationException($"AppHost 进程意外退出，退出码: {_process.ExitCode}");
+                if (_process.ExitCode == 0)
+                {
+                    // 进程以退出码 0 退出，可能是 UAC 提权后启动了新进程。
+                    // 不立即报错，继续轮询 Dashboard 看新进程是否启动成功。
+                    _logger.LogWarning("AppHost 进程以退出码 0 退出（可能是 UAC 提权），继续等待 Dashboard...");
+                    processExitedClean = true;
+                }
+                else
+                {
+                    _logger.LogError("AppHost 进程已退出，退出码: {ExitCode}", _process.ExitCode);
+                    throw new InvalidOperationException($"AppHost 进程意外退出，退出码: {_process.ExitCode}");
+                }
             }
 
             try
@@ -132,6 +143,13 @@ public class AppHostLauncher : IDisposable
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("AppHost Dashboard 已就绪 (耗时 {Elapsed}ms)", sw.ElapsedMilliseconds);
+                    if (processExitedClean)
+                    {
+                        // UAC 提权场景：原进程已退出，Dashboard 由新进程提供，标记为外部实例
+                        _externalInstanceDetected = true;
+                        _ownsProcess = false;
+                        OutputReceived?.Invoke("[INFO] AppHost 已通过 UAC 提权启动，复用提权后的实例。");
+                    }
                     return;
                 }
             }
@@ -141,6 +159,12 @@ public class AppHostLauncher : IDisposable
             }
 
             await Task.Delay(500, cancellationToken);
+        }
+
+        if (processExitedClean)
+        {
+            throw new InvalidOperationException(
+                "AppHost 进程退出后 Dashboard 未能启动。请以管理员身份运行本程序，或确认 AppHost 能正常启动。");
         }
 
         throw new TimeoutException($"等待 AppHost Dashboard 就绪超时 ({ReadyTimeoutSeconds} 秒)。");

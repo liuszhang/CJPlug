@@ -28,9 +28,6 @@ public class LlmModelConfig
     /// <summary>是否为默认模型（每种类型最多一个默认）</summary>
     public bool IsDefault { get; set; }
 
-    /// <summary>是否启用</summary>
-    public bool IsEnabled { get; set; } = true;
-
     /// <summary>模型描述/备注</summary>
     public string? Description { get; set; }
 

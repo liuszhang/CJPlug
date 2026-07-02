@@ -5,8 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CJ.Plug_Aspire.ElsaApi</RootNamespace>
-    <BaseOutputPath>..\..\..\02.Publish\$(MSBuildProjectName)</BaseOutputPath>
-    <SkipBuild>true</SkipBuild>
+    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    <!--<SkipBuild>true</SkipBuild>-->
   </PropertyGroup>
 
   <ItemGroup>

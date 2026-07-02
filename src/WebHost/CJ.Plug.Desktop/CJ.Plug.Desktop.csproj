@@ -33,4 +33,8 @@
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\modules\LicenseModule\CJ.Plug.LicenseApiClient\CJ.Plug.LicenseApiClient.csproj" />
+  </ItemGroup>
+
 </Project>

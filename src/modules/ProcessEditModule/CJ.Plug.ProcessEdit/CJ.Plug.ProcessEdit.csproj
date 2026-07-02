@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <ProjectReference Include="..\..\LicenseModule\CJ.Plug.LicenseApiClient\CJ.Plug.LicenseApiClient.csproj" />
   </ItemGroup>
 
 </Project>

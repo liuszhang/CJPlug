@@ -1,8 +1,31 @@
 @inject IJSRuntime JS
+@using System.IO
 
 <EditForm Model="@this" OnValidSubmit="@SendMessageAsync">
     <label class="input-box page-width">
-        <textarea @ref="@textArea" @bind="@messageText" placeholder="Type your message..." rows="1"></textarea>
+        <div class="input-row">
+            <label class="attach" for="file-upload-input" title="Attach file">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="tool-icon">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </label>
+            <InputFile id="file-upload-input" OnChange="@HandleFileSelectedAsync" class="hidden-input" />
+
+            <textarea @ref="@textArea" @bind="@messageText" placeholder="Type your message..." rows="1"></textarea>
+        </div>
+
+        @if (attachedFiles.Count > 0)
+        {
+            <div class="attached-files">
+                @foreach (var file in attachedFiles)
+                {
+                    <span class="file-tag">
+                        <span class="file-name">@file.FileName</span>
+                        <span class="remove-file" @onclick="() => RemoveFile(file)" title="Remove">x</span>
+                    </span>
+                }
+            </div>
+        }
 
         <div class="tools">
             <button type="submit" title="Send" class="send-button">
@@ -17,19 +40,40 @@
 @code {
     private ElementReference textArea;
     private string? messageText;
+    private readonly List<FileAttachmentInfo> attachedFiles = new();
 
     [Parameter]
-    public EventCallback<ChatMessage> OnSend { get; set; }
+    public EventCallback<ChatMessageWithFiles> OnSend { get; set; }
 
     public ValueTask FocusAsync()
         => textArea.FocusAsync();
+
+    private async Task HandleFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+
+        var fileId = Guid.NewGuid().ToString("N");
+        var fileName = file.Name;
+
+        attachedFiles.Add(new FileAttachmentInfo(fileId, fileName));
+    }
+
+    private void RemoveFile(FileAttachmentInfo file)
+        => attachedFiles.Remove(file);
 
     private async Task SendMessageAsync()
     {
         if (messageText is { Length: > 0 } text)
         {
+            var filesSnapshot = attachedFiles.ToList();
+            var files = filesSnapshot.AsReadOnly();
+
+            attachedFiles.Clear();
             messageText = null;
-            await OnSend.InvokeAsync(new ChatMessage(ChatRole.User, text));
+
+            var userMessage = new ChatMessage(ChatRole.User, text);
+            await OnSend.InvokeAsync(new ChatMessageWithFiles(userMessage, files));
         }
     }
 

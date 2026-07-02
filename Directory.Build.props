@@ -1,5 +1,28 @@
 <Project>
   <!--
+    限制原生库输出到 Windows x64 平台，
+    避免 macOS/Linux/browser/arm64/x86 等平台的原生库被复制到输出目录。
+  -->
+  <PropertyGroup>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    IL Trimming 说明（当前未启用）：
+    Trimming 仅在 dotnet publish 时生效，当前工作流使用 dotnet build + 共享输出目录，
+    因此未启用。未来如果改用 publish 工作流，可取消以下注释：
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+      <IsTrimmable>true</IsTrimmable>
+      <PublishTrimmed>true</PublishTrimmed>
+      <TrimMode>partial</TrimMode>
+      <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+      <TrimmerSingleWarn>true</TrimmerSingleWarn>
+    </PropertyGroup>
+  -->
+
+  <!--
     中文乱码根因修复：嵌入 Windows Application Manifest 到所有 Exe 项目
     
     <activeCodePage>UTF-8</activeCodePage> 使 Encoding.Default 返回 UTF-8，

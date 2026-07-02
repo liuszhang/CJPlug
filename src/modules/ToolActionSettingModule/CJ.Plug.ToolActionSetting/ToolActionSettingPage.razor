@@ -34,6 +34,7 @@
 @using DialogOptions=MudBlazor.DialogOptions
 @using CJ.Plug.SharedPages.Contracts
 @using Microsoft.JSInterop
+@using CJ.Plug.LicenseApiClient
 
 
 @inject NavigationManager NavigationManager
@@ -45,6 +46,7 @@
 @inject IDomInteropService DomInteropService
 @inject IJSRuntime JSRuntime
 @inject HubConnectionManagerService HubConnectionManagerService
+@inject ILicenseApiClient LicenseApiClient
 
 <PageTitle>工具动作配置</PageTitle>
 
@@ -57,6 +59,8 @@
     </div>
     <MudStack Row AlignItems="AlignItems.Center">
         <MudButton OnClick="CreateToolItem" StartIcon="@Icons.Material.Filled.Create" Variant="Variant.Outlined" Color="Color.Primary">创建插头</MudButton>
+        <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary">一键插入</MudButton>
+        <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary">一键拔出</MudButton>
        
         @if (IsSelectedPlugPublished())
         {
@@ -105,8 +109,6 @@
                                 </MudSelect> *@
                                 @if (_plugListTabIndex == 0)
                                 {
-                                    <MudButton OnClick="PlugInAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键插入</MudButton>
-                                    <MudButton OnClick="PlugOutAll" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Style="min-width:75px">一键拔出</MudButton>
                                     <MudCheckBox T="bool" Dense Value="IsShowSystemTool" ValueChanged="OnShowSystemToolChanged" Label="显示系统插头" Color="Color.Primary"></MudCheckBox>
                                 }
                             </MudStack>
@@ -466,6 +468,9 @@
                     if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
                     InvokeAsync(async () =>
                     {
+                        var status = await LicenseApiClient.GetStatusAsync();
+                        if (!status.IsActivated || status.IsExpired) return;
+
                         var host = stationIp;
                         try { host = new Uri(stationIp).Host; } catch { }
                         Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({protocol})...", Severity.Info);

@@ -12,7 +12,7 @@ namespace CJ.Plug.McpServer.Tools
         public static async Task<string> ListAdapter()
         {
             var httpClient = new HttpClient();
-            var json = await httpClient.ReadJsonDocumentAsync($"{GlobalData.MainApiServer}/api/mcptools/getActiveTools");
+            var json = await httpClient.ReadJsonDocumentAsync($"{GlobalData.MainApiServer}/api/mcp/getActiveTools");
 
             return $"获取到的工具适配器数据：{JsonSerializer.Serialize(json)}";
         }

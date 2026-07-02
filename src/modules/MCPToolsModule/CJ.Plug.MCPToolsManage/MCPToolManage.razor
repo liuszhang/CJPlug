@@ -1,5 +1,6 @@
 ﻿@page "/MCPToolManage"
 
+@using CJ.Plug.MCPToolsManage.Dialogs
 @using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug
 @using CJ.Plug.Models.PlugProcess
@@ -33,6 +34,11 @@
         <MudSpacer />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Refresh">刷新</MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenDeployGuide" Class="ms-2">配置指南</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" OnClick="ConfigureTrae" Class="ms-2" StartIcon="@Icons.Material.Filled.CloudUpload">配置 Trae</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ConfigureClaude" Class="ms-2">配置 Claude Code</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="ConfigureWorkBuddy" Class="ms-2">配置 WorkBuddy</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="ConfigureCodex" Class="ms-2">配置 Codex</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Dark" OnClick="ConfigureHermes" Class="ms-2">配置 Hermes</MudButton>
         @* <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenDeployGuide" Class="ms-2">发布为Skill</MudButton> *@
     </ToolBarContent>
     <Columns>
@@ -139,6 +145,122 @@
         var parameters = new DialogParameters { { "Tool", tool } };
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
         await DialogService.ShowAsync<MCPToolDetailDialog>($"MCPTool 详情 — {tool.Name}", parameters, options);
+    }
+
+    private async Task ConfigureTrae()
+    {
+        try
+        {
+            var (config, filePath) = await MainApiClient.GetTraePreviewAsync();
+            await OpenMcpConfigDialog("配置 Trae MCP Server", null, filePath, config,
+                (editedJson, _) => MainApiClient.ConfigureTraeMcpAsync(editedJson),
+                "Trae");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 Trae 失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfigureClaude()
+    {
+        try
+        {
+            var (config, filePath) = await MainApiClient.GetClaudePreviewAsync();
+            await OpenMcpConfigDialog("配置 Claude Code MCP Server", null, filePath, config,
+                (editedJson, _) => MainApiClient.ConfigureClaudeMcpAsync(editedJson),
+                "Claude Code");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 Claude Code 失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfigureWorkBuddy()
+    {
+        await OpenMcpConfigDialogPersisted("WorkBuddy", "配置 WorkBuddy MCP Server");
+    }
+
+    private async Task ConfigureCodex()
+    {
+        await OpenMcpConfigDialogPersisted("Codex", "配置 Codex MCP Server");
+    }
+
+    private async Task ConfigureHermes()
+    {
+        await OpenMcpConfigDialogPersisted("Hermes", "配置 Hermes MCP Server");
+    }
+
+    private async Task OpenMcpConfigDialogPersisted(string key, string title)
+    {
+        try
+        {
+            var savedPath = await MainApiClient.GetConfigPathAsync(key);
+
+            string config = "{}";
+            string filePath = savedPath ?? "";
+
+            if (!string.IsNullOrWhiteSpace(savedPath))
+            {
+                try
+                {
+                    (config, filePath) = await MainApiClient.GetPreviewAsync(savedPath);
+                }
+                catch
+                {
+                    config = "{}";
+                }
+            }
+
+            await OpenMcpConfigDialog(title, key, filePath, config,
+                (editedJson, fp) => MainApiClient.ConfigureMcpAsync(fp, editedJson),
+                key);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 {key} 失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenMcpConfigDialog(string title, string? configKey,
+        string configFilePath, string configContent,
+        Func<string, string, Task<string>> saveFunc, string errorLabel)
+    {
+        try
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", title },
+                { "ConfigFilePath", configFilePath },
+                { "ConfigContent", configContent },
+            };
+            if (!string.IsNullOrWhiteSpace(configKey))
+            {
+                parameters.Add("ConfigKey", configKey);
+            }
+
+            var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<McpConfigDialog>(title, parameters, options);
+            var dialogResult = await dialog.Result;
+
+            if (dialogResult == null || dialogResult.Canceled)
+                return;
+
+            var (editedJson, filePath) = ((string, string))dialogResult.Data!;
+            var message = await saveFunc(editedJson, filePath);
+            Snackbar.Add(message, Severity.Success);
+
+            // 持久化路径（WorkBuddy/Codex/Hermes）
+            if (!string.IsNullOrWhiteSpace(configKey) && !string.IsNullOrWhiteSpace(filePath))
+            {
+                await MainApiClient.SaveConfigPathAsync(configKey, filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"配置 {errorLabel} 失败: {ex.Message}", Severity.Error);
+        }
     }
 
     // private class MCPToolDto
