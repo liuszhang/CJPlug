@@ -4,7 +4,7 @@
         xmlns:views="clr-namespace:CJ.Plug.Desktop.Views"
         xmlns:converters="clr-namespace:CJ.Plug.Desktop.Converters"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        Title="CJ.Plug 桌面启动器"
+        Title="智能插件管理工具"
         Height="800" Width="1200"
         Background="#1E1E2E"
         WindowStartupLocation="CenterScreen"
