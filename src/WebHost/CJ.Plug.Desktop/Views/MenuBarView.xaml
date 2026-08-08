@@ -20,7 +20,7 @@
         <!-- 应用标题 -->
         <Border Grid.Row="0" Padding="20,22,20,16"
                 BorderBrush="#3D3D5F" BorderThickness="0,0,0,1">
-            <TextBlock Text="一寸光阴一寸金"
+            <TextBlock Text="灵犀平台"
                        FontSize="22" FontWeight="SemiBold"
                        Foreground="#E0E0F0"
                        FontFamily="Segoe UI"

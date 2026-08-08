@@ -27,17 +27,6 @@ public class LlmConfigService : ILlmConfigService
     {
         Id = p.Id, Name = p.Name, DisplayName = p.DisplayName,
         ApiBaseUrl = p.ApiBaseUrl,
-        ApiKey = MaskApiKey(p.ApiKey),
-        Description = p.Description,
-        SortOrder = p.SortOrder, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
-        ModelConfigs = p.ModelConfigs?.Select(MapModelConfigToDto).ToList() ?? new()
-    };
-
-    /// <summary>映射 Provider 用于内部调用（不脱敏 ApiKey），供 GetDefaultModelInfoAsync 等内部链路使用。</summary>
-    private static LlmProvider MapProviderWithRawApiKey(LlmProvider p) => new()
-    {
-        Id = p.Id, Name = p.Name, DisplayName = p.DisplayName,
-        ApiBaseUrl = p.ApiBaseUrl,
         ApiKey = p.ApiKey,
         Description = p.Description,
         SortOrder = p.SortOrder, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
@@ -53,13 +42,6 @@ public class LlmConfigService : ILlmConfigService
         Description = m.Description, ExtraParams = m.ExtraParams,
         CreatedAt = m.CreatedAt, UpdatedAt = m.UpdatedAt
     };
-
-    private static string? MaskApiKey(string? apiKey)
-    {
-        if (string.IsNullOrEmpty(apiKey)) return null;
-        if (apiKey.Length <= 8) return "****";
-        return apiKey[..4] + "****" + apiKey[^4..];
-    }
 
     // ---- Service Methods ----
 
@@ -106,9 +88,8 @@ public class LlmConfigService : ILlmConfigService
         existing.Name = provider.Name;
         existing.DisplayName = provider.DisplayName;
         existing.ApiBaseUrl = provider.ApiBaseUrl;
-        // 只有当传入的 ApiKey 非空且不是掩码值时才更新
-        if (!string.IsNullOrEmpty(provider.ApiKey) && !provider.ApiKey.Contains("****"))
-            existing.ApiKey = provider.ApiKey;
+        // 原样写入 Key：空白即表示清空该供应商 Key
+        existing.ApiKey = provider.ApiKey;
         existing.Description = provider.Description;
         existing.SortOrder = provider.SortOrder;
         existing.UpdatedAt = DateTime.UtcNow.ToLocalTime();
@@ -228,8 +209,8 @@ public class LlmConfigService : ILlmConfigService
             return (null, null);
         }
 
-        // 不脱敏 ApiKey — AskAI 等内部调用链路需要完整凭据来发起 LLM 请求
-        var dto = MapProviderWithRawApiKey(provider);
+        // 原样返回 ApiKey（不再脱敏）；密码框配合可见性切换查看
+        var dto = MapToDto(provider);
         _logger.LogInformation("GetDefaultModelInfo: Provider={Name}, ApiKeyLen={KeyLen}, ApiBaseUrl={Url}, Model={Model}",
             dto.Name, dto.ApiKey?.Length ?? 0, dto.ApiBaseUrl, defaultModel.ModelName);
         return (dto, MapModelConfigToDto(defaultModel));
