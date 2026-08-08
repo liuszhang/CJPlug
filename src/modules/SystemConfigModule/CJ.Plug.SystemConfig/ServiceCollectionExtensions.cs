@@ -2,6 +2,7 @@ using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.SystemConfig.Menus;
+using CJ.Plug.SystemConfigApiClient;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CJ.Plug.SystemConfig;
@@ -20,6 +21,9 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
             client.Timeout = TimeSpan.FromSeconds(30);
         });
+
+        // SystemConfig API 客户端（配置页读写）
+        services.AddSystemConfigApiClient();
 
         return services;
     }

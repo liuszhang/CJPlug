@@ -223,16 +223,18 @@ public class SignalRLogSink : ILogEventSink
         var rendered = logEvent.RenderMessage().ToString();
         string StationIp = "";
         string Protocol = "vnc";
+        string? ProcessName = null;
         try
         {
             var info = System.Text.Json.JsonSerializer.Deserialize<StationExecutingData>(rendered);
             StationIp = info?.StationIp ?? "";
             Protocol = info?.Protocol ?? "vnc";
+            ProcessName = info?.ProcessName;
         }
         catch { StationIp = rendered; }
 
-        Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp} protocol:{Protocol}");
-        await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol);
+        Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp} protocol:{Protocol} processName:{ProcessName}");
+        await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol, ProcessName);
     }
 
     private class StationExecutingData
@@ -240,6 +242,7 @@ public class SignalRLogSink : ILogEventSink
         public string? PlugDefinitionId { get; set; }
         public string? StationIp { get; set; }
         public string? Protocol { get; set; }
+        public string? ProcessName { get; set; }
     }
 
 }

@@ -6,6 +6,7 @@ using CJ.Plug.ModuleConfig;
 using CJ.Plug.StationApiServer.Apis;
 using CJ.Plug.StationApiServer.Contracts;
 using CJ.Plug.StationApiServer.Services;
+using CJ.Plug.StationApiServer.Services.Rfb;
 using CJ.Plug.StationApiService.Contracts;
 using CJ.Plug.StationApiService.Services;
 using CJ.Plug_Aspire.StationApiService.Models;
@@ -161,6 +162,13 @@ builder.Services.AddHostedService<VncAutoStartService>();
 
 // 窗口捕获服务
 builder.Services.AddSingleton<WindowCaptureService>();
+
+// === RFB 单窗口 VNC（子方案1：单窗口RFB VNC投射）===
+builder.Services.Configure<RfbWindowVncOptions>(builder.Configuration.GetSection("RemoteDesktop:RfbWindow"));
+builder.Services.AddSingleton<WindowCompositor>();
+builder.Services.AddSingleton<InputInjector>();
+builder.Services.AddSingleton<WindowBindRegistry>();
+builder.Services.AddHostedService<RfbWindowVncServer>();
 
 builder.Services.ConfigModuleApiServices();
 

@@ -10,6 +10,7 @@
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
 
 <PageTitle>@($"远程捕获 - {StationIp}")</PageTitle>
 
@@ -178,6 +179,13 @@
             var baseUri = NavigationManager.BaseUri;
             var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
             var wsUrl = $"{wsBase}/api/remote/capture?host={StationIp}&processName={Uri.EscapeDataString(_selectedWindow)}&fps={_fps}";
+
+            // 部署级访问令牌（D6）
+            var accessToken = Config?["RemoteDesktop:AccessToken"];
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                wsUrl += $"&token={Uri.EscapeDataString(accessToken)}";
+            }
 
             var success = await JSRuntime.InvokeAsync<bool>("captureInterop.connect", "capture-image", wsUrl);
 

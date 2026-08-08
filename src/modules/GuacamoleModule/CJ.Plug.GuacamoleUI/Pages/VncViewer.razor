@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
 @using Microsoft.JSInterop
+@using Microsoft.Extensions.Configuration
 @using CJ.Plug.SharedPages.Layout
 
 @layout BasicLayout
@@ -25,8 +26,8 @@
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
             <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
                 <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-                <MudText Typo="Typo.h6" Style="color: white;">正在连接 VNC...</MudText>
-                <MudText Typo="Typo.body2" Style="color: #aaa;">@StationIp:@_port</MudText>
+                <MudText Typo="Typo.h6" Style="color: white;">@(IsWindowMode ? "正在连接程序窗口..." : "正在连接 VNC...")</MudText>
+                <MudText Typo="Typo.body2" Style="color: #aaa;">@StationIp:@_port@(IsWindowMode ? "（单窗口模式，等待程序启动）" : "")</MudText>
             </MudStack>
         </div>
     }
@@ -79,6 +80,18 @@
     [SupplyParameterFromQuery]
     public int? Port { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Window { get; set; }
+
+    /// <summary>单窗口模式（兼容 ?window=1 与 ?window=true）</summary>
+    private bool IsWindowMode =>
+        !string.IsNullOrEmpty(Window) &&
+        (Window == "1" || Window.Equals("true", StringComparison.OrdinalIgnoreCase));
+
+    [Inject]
+    private IConfiguration? _config { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private int _port = 5900;
@@ -99,13 +112,21 @@
         _loading = true;
         _error = null;
         StateHasChanged();
-
         try
         {
             // WebSocket 连接到当前服务器 (与页面同源)
             var baseUri = NavigationManager.BaseUri; // e.g. http://localhost:5066/
             var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
-            var wsUrl = $"{wsBase}/api/remote/vnc?host={StationIp}&port={_port}";
+            // 防御：StationIp 可能是完整地址/带端口，统一提取纯主机名
+            var pureHost = ExtractHost(StationIp);
+            var wsUrl = $"{wsBase}/api/remote/vnc?host={pureHost}&port={_port}";
+
+            // 若配置了部署级访问令牌，则随 WS 连接携带（D6 Token 校验）
+            var accessToken = _config?["RemoteDesktop:AccessToken"];
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                wsUrl += $"&token={Uri.EscapeDataString(accessToken)}";
+            }
 
             // RFB 需要容器 div (不是 canvas)，它会自己创建 canvas
             var success = await JSRuntime.InvokeAsync<bool>("noVncInterop.connect", "noVNC-screen", wsUrl);
@@ -145,5 +166,29 @@
     public async ValueTask DisposeAsync()
     {
         await JSRuntime.InvokeVoidAsync("noVncInterop.disconnect");
+    }
+
+    /// <summary>
+    /// 从可能的完整 URL 中提取纯 IP/主机名（与 RemoteViewer/PlugExecuteStandalone 一致）。
+    /// </summary>
+    private static string ExtractHost(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return "localhost";
+
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        var stripped = raw;
+        if (stripped.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[7..];
+        else if (stripped.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[8..];
+
+        var colonIdx = stripped.IndexOf(':');
+        if (colonIdx > 0)
+            stripped = stripped[..colonIdx];
+
+        return stripped;
     }
 }

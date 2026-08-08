@@ -34,6 +34,7 @@
     <ProjectReference Include="..\..\modules\UserManageModule\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj" />
     <ProjectReference Include="..\..\modules\SkillsManageModule\CJ.Plug.SkillApiClient\CJ.Plug.SkillApiClient.csproj" />
+    <ProjectReference Include="..\..\modules\SystemConfigModule\CJ.Plug.SystemConfigApiClient\CJ.Plug.SystemConfigApiClient.csproj" />
   </ItemGroup>
 
 </Project>

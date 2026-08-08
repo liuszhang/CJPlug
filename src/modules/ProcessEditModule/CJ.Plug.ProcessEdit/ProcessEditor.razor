@@ -392,9 +392,9 @@
            });
 
         // 图站开始执行时，自动打开远程桌面页签
-        HubConnectionManagerService._hubConnection.On<string, string, string, string>(
+        HubConnectionManagerService._hubConnection.On<string, string, string, string, string>(
             LogTypeEnum.StationExecuting.ToString(),
-            (pdzId, plugDefinitionId, stationIp, protocol) =>
+            (pdzId, plugDefinitionId, stationIp, protocol, processName) =>
             {
                 if (string.IsNullOrEmpty(stationIp)) return;
                 InvokeAsync(async () =>
@@ -406,8 +406,12 @@
                     var host = stationIp;
                     try { host = new Uri(stationIp).Host; } catch { }
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
+                    // 单窗口 RFB VNC：protocol=window → noVNC 连图站 5901（单窗口 VNC 服务）
+                    var url = resolvedProtocol == "window"
+                        ? $"/remote/vnc/{host}?port=5901&window=1&processName={Uri.EscapeDataString(processName ?? "")}"
+                        : $"/remote/{host}/{resolvedProtocol}";
                     Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({resolvedProtocol})...", Severity.Info);
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{host}/{resolvedProtocol}", "_blank");
+                    await JSRuntime.InvokeVoidAsync("open", url, "_blank");
                 });
             });
     }

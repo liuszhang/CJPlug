@@ -59,6 +59,13 @@ window.noVncInterop = {
                     if (!settled) {
                         settled = true;
                         console.error('[noVNC] Connection timeout after 10s');
+                        // 诊断：输出 RFB 内部状态，定位握手卡点（noVNC 1.x 字段为 camelCase）
+                        try {
+                            console.error('[noVNC] RFB state:', rfb._rfbConnectionState,
+                                '| fbName:[' + rfb._fbName + ']',
+                                '| fbSize:', (rfb._fb_width || rfb._fbWidth) + 'x' + (rfb._fb_height || rfb._fbHeight),
+                                '| encodings:', rfb._encodings ? rfb._encodings.join(',') : 'n/a');
+                        } catch(e) { console.error('[noVNC] state dump failed', e); }
                         try { rfb.disconnect(); } catch(e) {}
                         resolve(false);
                     }

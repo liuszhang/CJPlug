@@ -1,5 +1,7 @@
 using System.Net.WebSockets;
 using CJ.Plug.StationApiServer.Services;
+using CJ.Plug.StationApiServer.Services.Rfb;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CJ.Plug.StationApiServer.Apis
 {
@@ -49,8 +51,56 @@ namespace CJ.Plug.StationApiServer.Apis
             // 窗口捕获：WebSocket 端点
             api.Map("/capture", HandleCaptureWebSocket);
 
+            // === RFB 单窗口 VNC 绑定（子方案1）===
+            // 绑定：StationAgent 上报工具 PID / 主服务按进程名绑定
+            api.MapPost("/vnc-window/bind", BindWindowTarget);
+
+            // 解绑
+            api.MapDelete("/vnc-window/bind", UnbindWindowTarget);
+
+            // 绑定状态
+            api.MapGet("/vnc-window/status", GetWindowBindStatus);
+
             return app;
         }
+
+        #region RFB 单窗口 VNC 绑定端点
+
+        private static IResult BindWindowTarget(WindowBindRegistry registry, [FromBody] WindowBindRequest? request)
+        {
+            if (request == null || (request.ProcessId is null or <= 0) && string.IsNullOrEmpty(request.ProcessName))
+                return TypedResults.BadRequest(new { Message = "缺少 ProcessId 或 ProcessName" });
+
+            registry.SetTarget(new WindowTarget(request.ProcessId, request.ProcessName), request.SessionKey);
+            return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定" });
+        }
+
+        private static IResult UnbindWindowTarget(WindowBindRegistry registry, string? sessionKey = null)
+        {
+            registry.Clear(sessionKey);
+            return TypedResults.Ok(new { Message = "VNC 窗口目标已解绑" });
+        }
+
+        private static IResult GetWindowBindStatus(WindowBindRegistry registry)
+        {
+            var target = registry.Current;
+            return TypedResults.Ok(new
+            {
+                bound = target != null,
+                processId = target?.ProcessId,
+                processName = target?.ProcessName,
+                sessionKey = registry.SessionKey
+            });
+        }
+
+        public class WindowBindRequest
+        {
+            public int? ProcessId { get; set; }
+            public string? ProcessName { get; set; }
+            public string? SessionKey { get; set; }
+        }
+
+        #endregion
 
         #region 窗口捕获端点
 

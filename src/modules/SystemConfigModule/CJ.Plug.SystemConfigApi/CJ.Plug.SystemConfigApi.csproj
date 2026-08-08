@@ -1,18 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Library</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <SupportedPlatform Include="browser" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
-    <PackageReference Include="MudBlazor" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
     <ProjectReference Include="..\CJ.Plug.SystemConfigApiClient\CJ.Plug.SystemConfigApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.SystemConfigModel\CJ.Plug.SystemConfigModel.csproj" />
   </ItemGroup>

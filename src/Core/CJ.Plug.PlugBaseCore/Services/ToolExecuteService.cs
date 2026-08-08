@@ -322,6 +322,9 @@ namespace CJ.Plug.PlugBaseCore.Services
             //3.1 提前通知前端打开 VNC 远程桌面（必须在 SubmitNewToolExecute 之前发送，
             //    因为 Standalone 模式下该方法是同步等待进程结束的，事后发送就晚了）
             CLog.Information($"准备启动远程桌面");
+            // 远程查看模式：读取系统配置 RemoteViewMode（默认 fullscreen 整桌面 VNC，向后兼容）
+            // window=单窗口 RFB VNC（协议 window，端口 5901）
+            string remoteViewMode = "fullscreen";
             var vncPlugDefId = plugExecutionRequest.ExecuteResultData?.Ids?.PlugDefinitionId;
             var pdzForVnc = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
             var plugDataForVnc = pdzForVnc?.GetPlugData(vncPlugDefId);
@@ -335,11 +338,29 @@ namespace CJ.Plug.PlugBaseCore.Services
                 var plugSetting = plugForVnc.GetPlugSetting(PlugSettingKey.SupportRemoteView.ToString());
                 if (plugSetting == "true")
                 {
-                    var protocol = StationToUse.GuacamoleProtocol ?? "vnc";
-                    CLog.Information($"插头{plugForVnc.Name}已启用 SupportRemoteView，发送 StationExecuting 通知 (protocol={protocol})");
-                    StatusReporter.ReportStationExecuting(vncPlugDefId, StationToUse.StationIp, plugExecutionRequest.PDZId, protocol);
+                    // 远程查看模式：读取系统配置 RemoteViewMode（默认 fullscreen 整桌面 VNC，向后兼容）
+                    // window=单窗口 RFB VNC（协议 window，端口 5901）
+                    string protocol;
+                    string? processName = null;
+                    var configuredMode = await MainApiClient.SystemConfigApiClient.Value.GetValueAsync("RemoteViewMode");
+                    if (!string.IsNullOrEmpty(configuredMode)) remoteViewMode = configuredMode;
+                    if (remoteViewMode == "window")
+                    {
+                        protocol = "window";
+                        processName = Tool.RemoteViewProcessName;
+                    }
+                    else
+                    {
+                        protocol = StationToUse.GuacamoleProtocol ?? "vnc";
+                    }
+                    CLog.Information($"插头{plugForVnc.Name}已启用 SupportRemoteView，发送 StationExecuting 通知 (protocol={protocol}, processName={processName})");
+                    StatusReporter.ReportStationExecuting(vncPlugDefId, StationToUse.StationIp, plugExecutionRequest.PDZId, protocol, processName);
                 }
             }
+
+            //3.1.5 透传远程查看模式到图站（StationAgent 据此决定是否上报 PID 绑定）
+            plugExecutionRequest.RemoteViewMode = remoteViewMode;
+            plugExecutionRequest.RemoteViewProcessName = Tool.RemoteViewProcessName;
 
             //3.2 执行工具，获取执行结果
             var result = await MainApiClient.SubmitNewToolExecute(StationToUse.StationIp, plugExecutionRequest);

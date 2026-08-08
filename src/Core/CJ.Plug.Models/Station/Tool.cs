@@ -52,6 +52,12 @@ namespace CJ.Plug.Models.Station
         /// </summary>
         public bool SupportsRemoteVisualization { get; set; } = false;
 
+        /// <summary>
+        /// 远程查看进程名（辅 B 兜底，仅 RemoteViewMode=window 时使用）。
+        /// 为空时依赖 StationAgent 启动后上报实际 PID（主 A）。
+        /// </summary>
+        public string? RemoteViewProcessName { get; set; }
+
         public List<BaseVariable> GetVariablesFromToolCommand()
         {
             if (CommandParameter == null ||

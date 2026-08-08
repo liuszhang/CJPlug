@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
+    <ProjectReference Include="..\CJ.Plug.SystemConfigModel\CJ.Plug.SystemConfigModel.csproj" />
+  </ItemGroup>
+</Project>

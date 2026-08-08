@@ -17,8 +17,15 @@ namespace CJ.Plug.GuacamoleApi.Apis
 
             // VNC WebSocket 代理端点
             // ws://host/api/remote/vnc?host=192.168.1.100&port=5900
-            api.Map("/vnc", async (HttpContext context, VncWebSocketProxy proxy) =>
+            api.Map("/vnc", async (HttpContext context, VncWebSocketProxy proxy, IConfiguration config) =>
             {
+                if (!RemoteDesktopAuth.IsAuthorized(context, config))
+                {
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsync("未授权访问");
+                    return;
+                }
+
                 if (!context.WebSockets.IsWebSocketRequest)
                 {
                     context.Response.StatusCode = 400;
@@ -38,8 +45,15 @@ namespace CJ.Plug.GuacamoleApi.Apis
 
             // SSH WebSocket 代理端点
             // ws://host/api/remote/ssh?host=192.168.1.100&port=22&username=root&password=xxx
-            api.Map("/ssh", async (HttpContext context, SshWebSocketProxy proxy) =>
+            api.Map("/ssh", async (HttpContext context, SshWebSocketProxy proxy, IConfiguration config) =>
             {
+                if (!RemoteDesktopAuth.IsAuthorized(context, config))
+                {
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsync("未授权访问");
+                    return;
+                }
+
                 if (!context.WebSockets.IsWebSocketRequest)
                 {
                     context.Response.StatusCode = 400;
@@ -61,8 +75,15 @@ namespace CJ.Plug.GuacamoleApi.Apis
 
             // Capture WebSocket 代理端点 (WS-to-WS)
             // ws://host/api/remote/capture?host=192.168.1.100&processName=MyApp&fps=5
-            api.Map("/capture", async (HttpContext context, CaptureWebSocketProxy proxy) =>
+            api.Map("/capture", async (HttpContext context, CaptureWebSocketProxy proxy, IConfiguration config) =>
             {
+                if (!RemoteDesktopAuth.IsAuthorized(context, config))
+                {
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsync("未授权访问");
+                    return;
+                }
+
                 if (!context.WebSockets.IsWebSocketRequest)
                 {
                     context.Response.StatusCode = 400;

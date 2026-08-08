@@ -349,11 +349,11 @@
 
         // 监听图站执行事件 (用于打开远程桌面)
         HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
-        HubConnectionManagerService._hubConnection.On<string, string, string, string>(
+        HubConnectionManagerService._hubConnection.On<string, string, string, string, string>(
             LogTypeEnum.StationExecuting.ToString(),
-            (pdzId, plugDefinitionId, stationIp, protocol) =>
+            (pdzId, plugDefinitionId, stationIp, protocol, processName) =>
             {
-                Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp} protocol={protocol}");
+                Console.WriteLine($"StationExecuting: {plugDefinitionId} on {stationIp} protocol={protocol} processName={processName}");
                 InvokeAsync(async () =>
                 {
                     var status = await LicenseApiClient.GetStatusAsync();
@@ -362,8 +362,12 @@
                     // 从完整 URL 中提取纯 IP（stationIp 可能是 "http://192.168.161.237:7660"）
                     var pureIp = ExtractHost(stationIp);
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
+                    // 单窗口 RFB VNC：protocol=window → noVNC 连图站 5901（单窗口 VNC 服务）
+                    var url = resolvedProtocol == "window"
+                        ? $"/remote/vnc/{pureIp}?port=5901&window=1&processName={Uri.EscapeDataString(processName ?? "")}"
+                        : $"/remote/{pureIp}/{resolvedProtocol}";
                     // 打开新的浏览器页签显示远程桌面
-                    await JSRuntime.InvokeVoidAsync("open", $"/remote/{pureIp}/{resolvedProtocol}", "_blank");
+                    await JSRuntime.InvokeVoidAsync("open", url, "_blank");
                     Snackbar.Add($"正在打开远程桌面: {pureIp} ({resolvedProtocol})", Severity.Info);
                 });
             });

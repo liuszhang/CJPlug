@@ -458,13 +458,14 @@
             HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.StationExecuting.ToString());
             HubConnectionManagerService._hubConnection.On(
                 LogTypeEnum.StationExecuting.ToString(),
-                new[] { typeof(string), typeof(string), typeof(string), typeof(string) },
+                new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) },
                 (args, _) =>
                 {
                     var pdzId = (string?)args[0];
                     var plugDefinitionId = (string?)args[1];
                     var stationIp = (string?)args[2];
                     var protocol = (string?)args[3] ?? "vnc";
+                    var processName = (string?)args[4];
                     if (string.IsNullOrEmpty(stationIp)) return Task.CompletedTask;
                     InvokeAsync(async () =>
                     {
@@ -473,8 +474,12 @@
 
                         var host = stationIp;
                         try { host = new Uri(stationIp).Host; } catch { }
+                        // 单窗口 RFB VNC：protocol=window → noVNC 连图站 5901（单窗口 VNC 服务）
+                        var url = protocol == "window"
+                            ? $"/remote/vnc/{host}?port=5901&window=1&processName={Uri.EscapeDataString(processName ?? "")}"
+                            : $"/remote/{host}/{protocol}";
                         Snackbar.Add($"图站 {host} 开始执行，正在打开远程桌面 ({protocol})...", Severity.Info);
-                        await JSRuntime.InvokeVoidAsync("open", $"/remote/{host}/{protocol}", "_blank");
+                        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
                     });
                     return Task.CompletedTask;
                 },

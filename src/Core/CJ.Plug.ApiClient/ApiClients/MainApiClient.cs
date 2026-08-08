@@ -17,6 +17,7 @@ using CJ.Plug.PlugDataZoneApiClient;
 using CJ.Plug.ProcessManageApiClient;
 using CJ.Plug.SkillApiClient;
 using CJ.Plug.StationManageApiClient;
+using CJ.Plug.SystemConfigApiClient;
 using CJ.Plug.ToolResourceApiClient;
 using CJ.Plug.TASApiClient;
 using CJ.Plug.UserManageApiClient;
@@ -53,6 +54,7 @@ public partial class MainApiClient
     public readonly Lazy<IRolePermissionApiClient> RolePermissionApiClient;
     public readonly Lazy<IGroupManageApiClient> GroupManageApiClient;
     public readonly Lazy<ISkillApiClient> SkillApiClient;
+    public readonly Lazy<ISystemConfigApiClient> SystemConfigApiClient;
     //public readonly Lazy<IDeepSeekService> DeepSeekApiClient;
 
     /// <summary>
@@ -87,6 +89,7 @@ public partial class MainApiClient
         RolePermissionApiClient = new Lazy<IRolePermissionApiClient>(() => serviceProvider.GetRequiredService<IRolePermissionApiClient>());
         GroupManageApiClient = new Lazy<IGroupManageApiClient>(() => serviceProvider.GetRequiredService<IGroupManageApiClient>());
         SkillApiClient = new Lazy<ISkillApiClient>(() => serviceProvider.GetRequiredService<ISkillApiClient>());
+        SystemConfigApiClient = new Lazy<ISystemConfigApiClient>(() => serviceProvider.GetRequiredService<ISystemConfigApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
 
         // 初始化审计日志辅助类
