@@ -72,6 +72,14 @@ public class SignalRLogSink : ILogEventSink
                 case nameof(LogTypeEnum.StationExecuting):
                     await SendStationExecuting(logEvent);
                     break;
+
+                case nameof(LogTypeEnum.VncWindowClosed):
+                    await SendVncWindowClosed(logEvent);
+                    break;
+
+                case nameof(LogTypeEnum.VncPidReady):
+                    await SendVncPidReady(logEvent);
+                    break;
                 case nameof(LogTypeEnum.CommonLog):
                     await _hubConnection.InvokeAsync(logType, receiverId, JsonSerializer.Serialize(logModel));
                     break;
@@ -235,6 +243,62 @@ public class SignalRLogSink : ILogEventSink
 
         Console.WriteLine($"prepare to log StationExecuting:{PlugDefinitionId} on {StationIp} protocol:{Protocol} processName:{ProcessName}");
         await _hubConnection.InvokeAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol, ProcessName);
+    }
+
+    private async Task SendVncWindowClosed(LogEvent logEvent)
+    {
+        // 单窗口 VNC 目标进程已退出：通知前端自动关闭可视化窗口
+        // 消息体为 JSON：{ StationIp, ProcessId, ProcessName, SessionKey }
+        var rendered = logEvent.RenderMessage().ToString();
+        string StationIp = "";
+        string? SessionKey = null;
+        try
+        {
+            var info = System.Text.Json.JsonSerializer.Deserialize<VncWindowClosedData>(rendered);
+            StationIp = info?.StationIp ?? "";
+            SessionKey = info?.SessionKey;
+        }
+        catch { StationIp = rendered; }
+
+        Console.WriteLine($"prepare to log VncWindowClosed: station={StationIp} sessionKey={SessionKey}");
+        await _hubConnection.InvokeAsync(LogTypeEnum.VncWindowClosed.ToString(), StationIp, SessionKey);
+    }
+
+    private async Task SendVncPidReady(LogEvent logEvent)
+    {
+        // 单窗口 VNC 目标 PID 已就绪：通知前端此时再打开可视化页面（URL 带 pid）
+        // 消息体为 JSON：{ StationIp, Pid, ProcessName, SessionKey }
+        var rendered = logEvent.RenderMessage().ToString();
+        string StationIp = "";
+        int? Pid = null;
+        string? ProcessName = null;
+        string? SessionKey = null;
+        try
+        {
+            var info = System.Text.Json.JsonSerializer.Deserialize<VncPidReadyData>(rendered);
+            StationIp = info?.StationIp ?? "";
+            Pid = info?.Pid;
+            ProcessName = info?.ProcessName;
+            SessionKey = info?.SessionKey;
+        }
+        catch { StationIp = rendered; }
+
+        Console.WriteLine($"prepare to log VncPidReady: station={StationIp} pid={Pid} processName={ProcessName}");
+        await _hubConnection.InvokeAsync(LogTypeEnum.VncPidReady.ToString(), StationIp, Pid, ProcessName, SessionKey);
+    }
+
+    private class VncPidReadyData
+    {
+        public string? StationIp { get; set; }
+        public int? Pid { get; set; }
+        public string? ProcessName { get; set; }
+        public string? SessionKey { get; set; }
+    }
+
+    private class VncWindowClosedData
+    {
+        public string? StationIp { get; set; }
+        public string? SessionKey { get; set; }
     }
 
     private class StationExecutingData

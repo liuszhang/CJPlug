@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using CJ.Plug.Models.LogModels;
 using Microsoft.Extensions.Options;
 using Serilog;
 
@@ -38,6 +39,10 @@ namespace CJ.Plug.StationApiServer.Services.Rfb
         private TcpListener? _listener;
         private readonly object _sync = new();
         private volatile bool _frameRequestReceived;
+        private DateTime _noWindowSince = DateTime.MinValue;
+        private bool _closeNotified;
+        private bool _hadFrame;
+        private readonly string _stationIp;
 
         public int Port => _options.Port;
 
@@ -51,6 +56,22 @@ namespace CJ.Plug.StationApiServer.Services.Rfb
             _inputInjector = inputInjector;
             _registry = registry;
             _options = options.Value;
+            _stationIp = ResolveLocalIp();
+        }
+
+        /// <summary>解析本机 IP（VncWindowClosed 通知用，前端按 IP 匹配才关窗口）。</summary>
+        private static string ResolveLocalIp()
+        {
+            try
+            {
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                var ip = host.AddressList.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+                return ip?.ToString() ?? "127.0.0.1";
+            }
+            catch
+            {
+                return "127.0.0.1";
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -234,9 +255,17 @@ namespace CJ.Plug.StationApiServer.Services.Rfb
                     {
                         _compositor.SetTarget(target);
                         lastTarget = target;
+                        // 新目标：重置画面历史与关闭通知状态
+                        _hadFrame = false;
+                        _noWindowSince = DateTime.MinValue;
+                        _closeNotified = false;
                     }
 
                     bool hasFrame = _compositor.CaptureFrame();
+                    if (hasFrame)
+                    {
+                        _hadFrame = true; // 出现过画面（目标窗口真实存在过）
+                    }
                     if (!hasFrame)
                     {
                         // 无画面：目标可能尚未出窗。绑定等待超时后解绑。
@@ -245,9 +274,39 @@ namespace CJ.Plug.StationApiServer.Services.Rfb
                             Log.Information("等待目标窗口超时，清除绑定");
                             _registry.Clear();
                         }
+                        // 仅当"曾经出现过画面"后窗口再消失（≥3 秒）才判定进程退出：
+                        // notepad 启动等待期（从未出画面）不触发，避免可视化窗口刚打开就被关
+                        else if (_hadFrame && _noWindowSince == DateTime.MinValue)
+                        {
+                            _noWindowSince = DateTime.Now;
+                        }
+                        // 目标窗口消失 ≥ 3 秒（进程已退出）→ 通知前端自动关闭可视化窗口
+                        else if (_hadFrame && !_closeNotified
+                                 && _noWindowSince != DateTime.MinValue
+                                 && DateTime.Now - _noWindowSince > TimeSpan.FromSeconds(3))
+                        {
+                            _closeNotified = true;
+                            try
+                            {
+                                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                                {
+                                    StationIp = _stationIp,
+                                    SessionKey = _registry.SessionKey
+                                });
+                                CLog.Information(payload, null, null, null, null, LogTypeEnum.VncWindowClosed);
+                                Log.Information("目标窗口消失超过 3 秒，已通知前端关闭可视化窗口");
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Warning(ex, "发送 VncWindowClosed 通知失败");
+                            }
+                        }
                         await Task.Delay(interval, ct);
                         continue;
                     }
+                    // 有画面：重置无窗口计时
+                    _noWindowSince = DateTime.MinValue;
+                    _closeNotified = false;
 
                     // 画布尺寸变化 → XResize 伪编码
                     int newW = _compositor.Width, newH = _compositor.Height;

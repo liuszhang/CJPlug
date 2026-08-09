@@ -362,16 +362,47 @@
                     // 从完整 URL 中提取纯 IP（stationIp 可能是 "http://192.168.161.237:7660"）
                     var pureIp = ExtractHost(stationIp);
                     var resolvedProtocol = string.IsNullOrEmpty(protocol) ? "vnc" : protocol;
-                    // 单窗口 RFB VNC：protocol=window → noVNC 连图站 5901（单窗口 VNC 服务）
-                    var url = resolvedProtocol == "window"
-                        ? $"/remote/vnc/{pureIp}?port=5901&window=1&processName={Uri.EscapeDataString(processName ?? "")}"
-                        : $"/remote/{pureIp}/{resolvedProtocol}";
+                    if (resolvedProtocol == "window")
+                    {
+                        // 单窗口 RFB VNC：等 VncPidReady（PID 就绪）后再打开页面（URL 带 pid），
+                        // 彻底消除"窗口未出现"竞态
+                        Console.WriteLine($"StationExecuting: window 模式，等待 VncPidReady 后打开可视化页面");
+                        return;
+                    }
+                    // 整桌面 VNC/RDP：立即打开
+                    var url = $"/remote/{pureIp}/{resolvedProtocol}";
                     // 打开新的浏览器页签显示远程桌面
                     await JSRuntime.InvokeVoidAsync("open", url, "_blank");
                     Snackbar.Add($"正在打开远程桌面: {pureIp} ({resolvedProtocol})", Severity.Info);
                 });
             });
+
+        // 监听单窗口 VNC PID 就绪事件：此时再打开可视化页面（URL 带 pid）
+        HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.VncPidReady.ToString());
+        HubConnectionManagerService._hubConnection.On<string, int?, string?, string?>(
+            LogTypeEnum.VncPidReady.ToString(),
+            (stationIp, pid, processName, sessionKey) =>
+            {
+                Console.WriteLine($"VncPidReady: station={stationIp} pid={pid} processName={processName}");
+                InvokeAsync(async () =>
+                {
+                    if (pid == null || pid <= 0) return;
+                    // 防重入：同一执行（sessionKey 唯一）只打开一次；不按 PID 去重，PID 会被 OS 复用导致二次执行漏开
+                    var dedupKey = sessionKey ?? $"{stationIp}|{pid}|{processName}";
+                    if (!_openedVncKeys.TryAdd(dedupKey, 0)) return;
+                    var status = await LicenseApiClient.GetStatusAsync();
+                    if (!status.IsActivated || status.IsExpired) return;
+
+                    var pureIp = ExtractHost(stationIp);
+                    var url = $"/remote/vnc/{pureIp}?port=5901&window=1&pid={pid}&processName={Uri.EscapeDataString(processName ?? "")}";
+                    await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+                    Snackbar.Add($"正在打开单窗口远程桌面: {pureIp} (PID={pid})", Severity.Info);
+                });
+            });
     }
+
+    /// <summary>已打开过可视化窗口的执行标识集合（按 sessionKey，防弹窗循环；不按 PID 去重避免 PID 复用漏开）。</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _openedVncKeys = new();
 
 
     public Task OnEditClicked()

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -75,38 +76,49 @@ namespace CJ.Plug.StationAgent.ToolAgents
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
 
-                    // 单窗口 RFB VNC（子方案1，主A）：启动后轮询工具窗口出现，上报真实 PID 绑定
+                    // 单窗口 RFB VNC（子方案1，主A改版）：启动后立即枚举 cmd 子进程拿真实 PID 绑定。
+                    // 不依赖窗口出现（VNC 界面先开/程序先开都能稳定连接）：
+                    //   CaptureFrame 每帧枚举目标 PID 的窗口，窗口一出现立即渲染。
                     if (stationExecutionRequest.RemoteViewMode == "window")
                     {
                         _ = Task.Run(async () =>
                         {
                             try
                             {
-                                // 工具进程可能秒退（CMD 类）：访问 StartTime 需防 Win32 异常。
-                                // 兜底基准必须早于所有候选窗口（cmd 秒退时 notepad 已启动，用 Now 会误过滤）。
-                                // 轮询窗口 10×500ms=5 秒，用 Now-5s 保证任何工具启动的窗口都晚于该基准。
-                                DateTime cmdStart;
-                                try { cmdStart = process.StartTime; }
-                                catch { cmdStart = DateTime.Now.AddSeconds(-5); }
-                                int? boundPid = null;
-                                for (int i = 0; i < 10; i++)
+                                // 1) 主 A：ToolHelp32 立即枚举 cmd 的子进程（工具真实 PID），0.2s×15=3s
+                                //    进程创建早于窗口出现，VNC 先开也能立即拿到目标。
+                                var bound = await BindByChildProcessAsync(
+                                    StationApiClient,
+                                    toolPid,
+                                    stationExecutionRequest.RemoteViewProcessName,
+                                    stationExecutionRequest.ExecuteResultData?.Ids?.ToolJobCorrelationId);
+
+                                // 2) 兜底：子进程枚举失败（工具是脚本/内联命令等）→ 窗口轮询
+                                if (!bound)
                                 {
-                                    await Task.Delay(500);
-                                    var target = FindNewToolWindow(cmdStart, toolPid);
-                                    if (target != null)
+                                    DateTime cmdStart;
+                                    try { cmdStart = process.StartTime; }
+                                    catch { cmdStart = DateTime.Now.AddSeconds(-5); }
+                                    for (int i = 0; i < 10; i++)
                                     {
-                                        boundPid = target.Value.Id;
-                                        await StationApiClient.BindWindowAsync(
-                                            target.Value.Id,
-                                            stationExecutionRequest.RemoteViewProcessName,
-                                            stationExecutionRequest.ExecuteResultData?.Ids?.ToolJobCorrelationId);
-                                        await StationApiClient.SendLog($"已绑定单窗口VNC目标: {target.Value.Name}(PID={target.Value.Id})");
-                                        break;
+                                        await Task.Delay(500);
+                                        var target = FindNewToolWindow(cmdStart, toolPid);
+                                        if (target != null)
+                                        {
+                                            await StationApiClient.BindWindowAsync(
+                                                target.Value.Id,
+                                                stationExecutionRequest.RemoteViewProcessName,
+                                                stationExecutionRequest.ExecuteResultData?.Ids?.ToolJobCorrelationId);
+                                            await StationApiClient.SendLog($"已绑定单窗口VNC目标: {target.Value.Name}(PID={target.Value.Id})");
+                                            bound = true;
+                                            break;
+                                        }
                                     }
                                 }
-                                if (boundPid == null && !string.IsNullOrEmpty(stationExecutionRequest.RemoteViewProcessName))
+
+                                // 3) 辅 B 兜底：按配置进程名绑定（无 PID 时由服务端按名枚举）
+                                if (!bound && !string.IsNullOrEmpty(stationExecutionRequest.RemoteViewProcessName))
                                 {
-                                    // 辅B兜底：窗口轮询失败时按配置进程名绑定
                                     await StationApiClient.BindWindowAsync(
                                         null,
                                         stationExecutionRequest.RemoteViewProcessName,
@@ -200,6 +212,157 @@ namespace CJ.Plug.StationAgent.ToolAgents
                 return null;
             }
         }
+
+        /// <summary>
+        /// 主 A：用 ToolHelp32 枚举 cmd 的**全部后代进程**（含孙子，覆盖 Store 版 stub 架构：
+        /// notepad.exe 是 stub 无窗口，实际窗口在它 spawn 的子进程），
+        /// **优先选有 MainWindowHandle 的进程**（窗口真实所有者），找到即立即绑定。
+        /// 进程创建远早于窗口出现，因此无论 VNC 界面先开还是程序先开都能稳定连接。
+        /// </summary>
+        private static async Task<bool> BindByChildProcessAsync(
+            StationApiClient StationApiClient,
+            int cmdPid,
+            string? processName,
+            string? sessionKey)
+        {
+            for (int i = 0; i < 15; i++) // 0.2s×15 = 3 秒
+            {
+                var target = FindDescendantWindowProcess(cmdPid);
+                if (target != null)
+                {
+                    await StationApiClient.BindWindowAsync(
+                        target.Value.Id,
+                        processName,
+                        sessionKey);
+                    await StationApiClient.SendLog($"已绑定单窗口VNC目标: {target.Value.Name}(PID={target.Value.Id})");
+                    Console.WriteLine($"[BindDiag] ToolHelp32 后代窗口进程绑定成功: {target.Value.Name}(PID={target.Value.Id})");
+                    return true;
+                }
+                await Task.Delay(200);
+            }
+            Console.WriteLine("[BindDiag] ToolHelp32 未找到带窗口的后代进程（3 秒超时），转入窗口轮询兜底");
+            return false;
+        }
+
+        /// <summary>
+        /// ToolHelp32 快照：查找 cmd 全部后代进程中**有 MainWindowHandle 的**（窗口真实所有者）。
+        /// 优先窗口进程（排除忽略名单）；若全部无窗口，退回第一个非忽略后代（等窗口出现）。
+        /// </summary>
+        private static (int Id, string Name)? FindDescendantWindowProcess(int rootPid)
+        {
+            var descendants = GetDescendantPids(rootPid);
+            if (descendants.Count == 0)
+                return null;
+
+            // 第一轮：优先找有主窗口的后代（窗口真实所有者，覆盖 stub 架构）
+            foreach (var pid in descendants)
+            {
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    if (p.MainWindowHandle != IntPtr.Zero && !IsIgnoredProcessName(p.ProcessName))
+                        return (pid, p.ProcessName);
+                }
+                catch { /* 进程已退出 */ }
+            }
+
+            // 第二轮：全部无窗口 → 取第一个非忽略后代（stub 或启动中的进程，等窗口出现）
+            foreach (var pid in descendants)
+            {
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    if (!IsIgnoredProcessName(p.ProcessName))
+                        return (pid, p.ProcessName);
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        /// <summary>ToolHelp32 快照：获取指定进程的全部后代 PID（BFS，含孙子）。</summary>
+        private static List<int> GetDescendantPids(int rootPid)
+        {
+            var result = new List<int>();
+            var parentMap = new Dictionary<int, List<int>>();
+            try
+            {
+                IntPtr snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+                if (snapshot == IntPtr.Zero || snapshot == (IntPtr)INVALID_HANDLE_VALUE)
+                    return result;
+                try
+                {
+                    var entry = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
+                    if (Process32First(snapshot, ref entry))
+                    {
+                        do
+                        {
+                            if (!parentMap.TryGetValue((int)entry.th32ParentProcessID, out var list))
+                            {
+                                list = new List<int>();
+                                parentMap[(int)entry.th32ParentProcessID] = list;
+                            }
+                            list.Add((int)entry.th32ProcessID);
+                        } while (Process32Next(snapshot, ref entry));
+                    }
+                }
+                finally
+                {
+                    CloseHandle(snapshot);
+                }
+
+                // BFS：root → 直接子 → 孙子...
+                var queue = new Queue<int>();
+                queue.Enqueue(rootPid);
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    if (parentMap.TryGetValue(current, out var children))
+                    {
+                        foreach (var child in children)
+                        {
+                            if (child == rootPid) continue;
+                            result.Add(child);
+                            queue.Enqueue(child);
+                        }
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        // ToolHelp32 P/Invoke
+        private const uint TH32CS_SNAPPROCESS = 0x00000002;
+        private const uint INVALID_HANDLE_VALUE = 0xFFFFFFFF;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct PROCESSENTRY32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "Process32FirstW")]
+        private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "Process32NextW")]
+        private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
 
         private static bool _diagPrinted;
 

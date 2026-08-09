@@ -7,12 +7,15 @@
 @using Microsoft.JSInterop
 @using Microsoft.Extensions.Configuration
 @using CJ.Plug.SharedPages.Layout
+@using CJ.Plug.Models.LogModels
+@using Microsoft.AspNetCore.SignalR.Client
 
 @layout BasicLayout
 
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject HubConnectionManagerService HubConnectionManagerService
 
 <PageTitle>@($"VNC 远程桌面 - {StationIp}")</PageTitle>
 
@@ -84,6 +87,14 @@
     [SupplyParameterFromQuery]
     public string? Window { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Pid { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? ProcessName { get; set; }
+
     /// <summary>单窗口模式（兼容 ?window=1 与 ?window=true）</summary>
     private bool IsWindowMode =>
         !string.IsNullOrEmpty(Window) &&
@@ -103,7 +114,80 @@
             if (Port.HasValue)
                 _port = Port.Value;
             
+            if (Pid.HasValue)
+                Console.WriteLine($"[VncViewer] 单窗口目标 PID={Pid.Value}（来自 URL）");
+
+            // 单窗口模式：用 URL 的 pid 主动向图站 bind API 绑定（地址栏 pid 驱动，零竞态）。
+            // 无论 StationAgent 绑定是否成功/时序如何，页面打开时强制绑定正确目标。
+            if (IsWindowMode && Pid.HasValue && Pid.Value > 0)
+            {
+                await BindWindowOnStationAsync(Pid.Value);
+            }
+
             await ConnectAsync();
+            await SubscribeVncWindowClosedAsync();
+        }
+    }
+
+    /// <summary>
+    /// 用 URL 携带的 PID 调用图站 bind API，强制绑定单窗口 VNC 目标。
+    /// </summary>
+    private async Task BindWindowOnStationAsync(int pid)
+    {
+        try
+        {
+            var pureHost = ExtractHost(StationIp);
+            // 图站 API 端口：默认 7660（StationApiPort），URL 可带 stationPort 覆盖
+            var stationPort = 7660;
+            var bindUrl = $"http://{pureHost}:{stationPort}/api/station/remote/vnc-window/bind";
+            var payload = new { processId = pid, processName = ProcessName, sessionKey = (string?)null };
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var json = System.Text.Json.JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var resp = await http.PostAsync(bindUrl, content);
+            if (resp.IsSuccessStatusCode)
+                Console.WriteLine($"[VncViewer] 已向图站绑定 PID={pid} ({bindUrl})");
+            else
+                Console.WriteLine($"[VncViewer] 图站绑定失败: HTTP {(int)resp.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[VncViewer] 图站绑定异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 订阅 VncWindowClosed 通知：单窗口目标进程退出后，自动关闭本可视化窗口。
+    /// 前端页面订阅 8686 MainHub（HubConnectionManagerService 已有连接）。
+    /// </summary>
+    private async Task SubscribeVncWindowClosedAsync()
+    {
+        try
+        {
+            if (HubConnectionManagerService._hubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected)
+            {
+                await HubConnectionManagerService.ConnectAsync();
+            }
+            HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.VncWindowClosed.ToString());
+            HubConnectionManagerService._hubConnection.On<string, string?>(
+                LogTypeEnum.VncWindowClosed.ToString(),
+                (stationIp, sessionKey) =>
+                {
+                    // 单窗口模式才自动关闭（整桌面 VNC 不受影响）
+                    if (!IsWindowMode) return;
+                    // 匹配本机/目标图站 IP，避免误关其他窗口
+                    var pureHost = ExtractHost(StationIp);
+                    if (!string.IsNullOrEmpty(stationIp) && !stationIp.Contains(pureHost)) return;
+                    Console.WriteLine($"收到 VncWindowClosed (station={stationIp})，自动关闭可视化窗口");
+                    InvokeAsync(async () =>
+                    {
+                        await JSRuntime.InvokeVoidAsync("closeWindow");
+                    });
+                });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"订阅 VncWindowClosed 失败: {ex.Message}");
         }
     }
 

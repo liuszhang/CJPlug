@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using CJ.Plug.Models.LogModels;
 using CJ.Plug.StationApiServer.Services;
 using CJ.Plug.StationApiServer.Services.Rfb;
 using Microsoft.AspNetCore.Mvc;
@@ -71,8 +72,64 @@ namespace CJ.Plug.StationApiServer.Apis
             if (request == null || (request.ProcessId is null or <= 0) && string.IsNullOrEmpty(request.ProcessName))
                 return TypedResults.BadRequest(new { Message = "缺少 ProcessId 或 ProcessName" });
 
+            // 幂等：相同目标重复绑定不重复发 VncPidReady（否则 VncViewer 打开→绑定→通知→再打开 无限循环）。
+            // 关键：判定"冗余绑定"必须带上 sessionKey（执行关联 ID = ToolJobCorrelationId）。
+            //   - VncViewer 页面加载时用自己的 bind 回绑（sessionKey 为 null）→ 视为冗余，跳过；
+            //   - 新的执行（sessionKey 与上一次不同）→ 视为新目标，必须重新通知。
+            // 否则第二次执行若复用了同一 PID（Windows 回收 PID / 图站工具为常驻进程），会被误判为"相同目标"
+            // 而漏发 VncPidReady，导致可视化弹窗第二次打不开（缺陷）。
+            var current = registry.Current;
+            var currentSession = registry.SessionKey;
+            bool isRedundantBind = current != null
+                && current.ProcessId == request.ProcessId
+                && string.Equals(current.ProcessName, request.ProcessName, StringComparison.OrdinalIgnoreCase)
+                && (request.SessionKey == null
+                    || string.Equals(request.SessionKey, currentSession, StringComparison.OrdinalIgnoreCase));
+
             registry.SetTarget(new WindowTarget(request.ProcessId, request.ProcessName), request.SessionKey);
+
+            if (isRedundantBind)
+            {
+                Console.WriteLine($"[VncPidReady] 目标未变化(PID={request.ProcessId})，跳过重复通知");
+                return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定（重复绑定，未变化）" });
+            }
+
+            // 单窗口 VNC 目标 PID 已就绪：通知前端此时再打开可视化页面（URL 带 pid）
+            // 前端收到 VncPidReady 后才 window.open(...&pid=XXX)，彻底消除"窗口未出现"竞态
+            try
+            {
+                var stationIp = ResolveLocalIp();
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    StationIp = stationIp,
+                    Pid = request.ProcessId,
+                    ProcessName = request.ProcessName,
+                    SessionKey = request.SessionKey
+                });
+                CLog.Information(payload, null, null, null, null, LogTypeEnum.VncPidReady);
+                Console.WriteLine($"[VncPidReady] 已通知前端打开可视化页面: pid={request.ProcessId} station={stationIp}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VncPidReady] 通知失败: {ex.Message}");
+            }
+
             return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定" });
+        }
+
+        /// <summary>解析本机 IP（VncPidReady 通知用，前端按 IP 匹配图站）。</summary>
+        private static string ResolveLocalIp()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                var ip = host.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                return ip?.ToString() ?? "127.0.0.1";
+            }
+            catch
+            {
+                return "127.0.0.1";
+            }
         }
 
         private static IResult UnbindWindowTarget(WindowBindRegistry registry, string? sessionKey = null)
