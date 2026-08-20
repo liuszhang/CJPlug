@@ -1,12 +1,7 @@
 ﻿using Crane.MethodHook;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml;
-using Utils = Crane.MethodHook.Utils;
+//using Utils = Crane.MethodHook.Utils;
 
 namespace CJ.Plug.Models.Services
 {
@@ -179,25 +174,25 @@ namespace CJ.Plug.Models.Services
                 {
                     returns = ret?.ToString();
                 }
-                Utils.LogWriteLine($"INVOKE method {method.DeclaringType?.Name}.{method.Name}({paras}) RETURN=> {returns}", isImportant ? ConsoleColor.Blue : ConsoleColor.DarkGray);
+                //Utils.LogWriteLine($"INVOKE method {method.DeclaringType?.Name}.{method.Name}({paras}) RETURN=> {returns}", isImportant ? ConsoleColor.Blue : ConsoleColor.DarkGray);
             }
             catch (Exception e)
             {
-                Utils.LogWrite("Error:" + e.Message);
+                //Utils.LogWrite("Error:" + e.Message);
             }
         }
         public static int NewCompare(string s1, string s2)
         {
             if (Assembly.GetCallingAssembly() != null && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.") && s2 == "20200827")
             {
-                Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} String.Compare({s1},{s2}) return -1;", ConsoleColor.Green);
+                //Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} String.Compare({s1},{s2}) return -1;", ConsoleColor.Green);
                 return -1;
             }
             else
             {
                 var hook = MethodHookManager.Instance.GetHook(MethodBase.GetCurrentMethod());
                 var ret = hook.InvokeOriginal<int>(null, s1, s2);
-                Utils.LogWriteLine($"NOT Aspose Call: From {Assembly.GetCallingAssembly().GetName().Name} String.Compare({s1},{s2}) return {ret};", ConsoleColor.DarkRed);
+                //Utils.LogWriteLine($"NOT Aspose Call: From {Assembly.GetCallingAssembly().GetName().Name} String.Compare({s1},{s2}) return {ret};", ConsoleColor.DarkRed);
                 return ret;
             }
         }
@@ -205,7 +200,7 @@ namespace CJ.Plug.Models.Services
         {
             if (Assembly.GetCallingAssembly() != null && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.") && t2.ToString("yyyyMMdd") == "20200827")
             {
-                Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} DateTime ({t1}>{t2}) return false;", ConsoleColor.Green);
+                //Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} DateTime ({t1}>{t2}) return false;", ConsoleColor.Green);
                 return false;
             }
             else
@@ -219,7 +214,7 @@ namespace CJ.Plug.Models.Services
         {
             if (Assembly.GetCallingAssembly() != null && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.") && s == "20200827")
             {
-                Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} DateTime.ParseExact({s},{format},{provider}) return {DATE_CHANGED_TO};", ConsoleColor.Green);
+                //Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} DateTime.ParseExact({s},{format},{provider}) return {DATE_CHANGED_TO};", ConsoleColor.Green);
                 var hook = MethodHookManager.Instance.GetHook(System.Reflection.MethodBase.GetCurrentMethod());
                 return hook.InvokeOriginal<DateTime>(null, DATE_CHANGED_TO, format, provider);
             }
@@ -233,7 +228,7 @@ namespace CJ.Plug.Models.Services
         {
             if (Assembly.GetCallingAssembly() != null && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.") && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.Words") == false && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.Hook") == false && element.Name == "SubscriptionExpiry")
             {
-                Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} XmlElement.InnerText ({element.Name},{element.InnerXml}) return {DATE_CHANGED_TO};", ConsoleColor.Green);
+                //Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} XmlElement.InnerText ({element.Name},{element.InnerXml}) return {DATE_CHANGED_TO};", ConsoleColor.Green);
                 return DATE_CHANGED_TO;
             }
             else
@@ -246,7 +241,7 @@ namespace CJ.Plug.Models.Services
         {
             if (Assembly.GetCallingAssembly() != null && Assembly.GetCallingAssembly().FullName.StartsWith("Aspose.") && v2 == DATE_CHANGED_TO)
             {
-                Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} {v1.ToString().Substring(0, 9) + "..."}.IndexOf({v2}) return 580;", ConsoleColor.Green);
+                //Utils.LogWriteLine($"HOOK SUCCESS: From {Assembly.GetCallingAssembly().GetName().Name} {v1.ToString().Substring(0, 9) + "..."}.IndexOf({v2}) return 580;", ConsoleColor.Green);
                 return 580;
             }
             else
@@ -397,11 +392,11 @@ namespace CJ.Plug.Models.Services
         {
             if (show)
             {
-                Utils.EnableLog();
+                //Utils.EnableLog();
             }
             else
             {
-                Utils.DisableLog();
+                //Utils.DisableLog();
             }
         }
         /// <summary>
@@ -438,10 +433,10 @@ namespace CJ.Plug.Models.Services
                             }
                             if (type != null)
                             {
-                                Utils.LogWriteLine($"\nSETTING...{type.FullName}", ConsoleColor.Yellow);
+                                //Utils.LogWriteLine($"\nSETTING...{type.FullName}", ConsoleColor.Yellow);
                                 var instance = Activator.CreateInstance(type);
                                 type.GetMethod("SetLicense", new[] { typeof(Stream) }).Invoke(instance, BindingFlags.Public | BindingFlags.Instance, null, new[] { new MemoryStream(Convert.FromBase64String(LICENSE_STRING)) }, null);
-                                Utils.LogWriteLine($"{type.FullName} SET SUCCESSFULLY.", ConsoleColor.Yellow);
+                                //Utils.LogWriteLine($"{type.FullName} SET SUCCESSFULLY.", ConsoleColor.Yellow);
                                 mAssembliesLicenseSetted.Add(assembly.FullName);
                             }
                         }
@@ -455,7 +450,7 @@ namespace CJ.Plug.Models.Services
                 {
                     exception = exception.InnerException;
                 }
-                Utils.LogWriteLine($"start hook failed because of {exception.Message}.", ConsoleColor.Red);
+                //Utils.LogWriteLine($"start hook failed because of {exception.Message}.", ConsoleColor.Red);
             }
             mHookStarted = true;
         }
