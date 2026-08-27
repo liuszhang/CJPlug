@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using Serilog;
@@ -56,16 +58,17 @@ public class UltraVncService
         status.IsDeployed = File.Exists(WinVncExe);
         status.ExePath = status.IsDeployed ? WinVncExe : FindInstalledUvnc();
 
-        // 检查是否运行中
+        // 检查是否运行中：必须以“进程存在且确实在监听 5900”为准，
+        // 不能仅凭进程存在判断（排除僵死进程）。
         var proc = FindRunningUvncProcess();
-        if (proc != null)
+        if (proc != null && IsPortListenedByUvnc(5900, proc.Id))
         {
             status.IsRunning = true;
             status.ProcessId = proc.Id;
         }
         else
         {
-            status.IsRunning = IsPortInUse(5900);
+            status.IsRunning = false;
         }
 
         // 读取配置
@@ -151,10 +154,21 @@ public class UltraVncService
             if (File.Exists(WinVncExe))
                 EnsureLoopbackEnabled();
 
-            // 如果已经在运行，先停止
+            // 如果已经在运行，先彻底停止（清掉可能存在的僵死进程）
             var existing = FindRunningUvncProcess();
             if (existing != null)
-                return (true, "UltraVNC 已在运行中");
+                Stop();
+
+            // 启动前检查目标端口是否被【其他进程】占用（含 LISTENING 与 BOUND 状态，
+            // 后者用于捕获 Foxmail 这类端口泄漏场景——它只 bind 不进入 LISTENING）。
+            var occupier = GetPortOccupier(5900);
+            if (occupier != null)
+            {
+                var occupierName = GetProcessName(occupier.Value);
+                var msg = $"UltraVNC 启动失败：端口 5900 已被进程 [{occupierName}] (PID={occupier.Value}) 占用，请先释放该端口";
+                Log.Error(msg);
+                return (false, msg);
+            }
 
             // 启动进程
             var startInfo = new ProcessStartInfo
@@ -173,15 +187,25 @@ public class UltraVncService
             // 等待启动
             await Task.Delay(2000);
 
-            // 验证
-            var running = FindRunningUvncProcess();
-            if (running != null || IsPortInUse(5900))
+            // 验证：优先用真实 TCP 连接确认 5900 可被连接（比单纯判断进程存在更可靠，
+            // 可排除“进程在但没监听/僵死”的假成功）。
+            if (await IsPortConnectableAsync("127.0.0.1", 5900))
             {
-                Log.Information("UltraVNC 已启动, PID: {Pid}", process.Id);
+                Log.Information("UltraVNC 已启动并监听端口 5900, PID: {Pid}", process.Id);
                 return (true, "UltraVNC 已启动");
             }
 
-            return (false, "UltraVNC 启动后未检测到运行进程，请检查日志");
+            // 连接失败：进一步区分是被别的进程占了，还是本进程自己僵死
+            var blocker = GetPortOccupier(5900);
+            if (blocker != null && blocker != process.Id)
+            {
+                var blockerName = GetProcessName(blocker.Value);
+                var msg = $"UltraVNC 启动失败：端口 5900 被进程 [{blockerName}] (PID={blocker.Value}) 抢占，请先释放该端口";
+                Log.Error(msg);
+                return (false, msg);
+            }
+
+            return (false, "UltraVNC 启动后未在端口 5900 监听，可能进程僵死或启动异常，请检查 winvnc 日志");
         }
         catch (Exception ex)
         {
@@ -375,6 +399,191 @@ public class UltraVncService
             return false;
         }
     }
+
+    /// <summary>
+    /// 判断指定端口是否正被给定的 winvnc 进程监听（排除“进程在但无监听”的僵死态）。
+    /// </summary>
+    private static bool IsPortListenedByUvnc(int port, int processId)
+    {
+        try
+        {
+            return IPGlobalProperties.GetIPGlobalProperties()
+                .GetActiveTcpListeners()
+                .Any(ep => ep.Port == port && GetTcpListenerOwner(ep) == processId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 返回占用目标端口的【非本机 winvnc】进程 PID，覆盖 LISTENING 与 BOUND 两种状态。
+    /// BOUND 用于捕获端口泄漏场景（如 Foxmail 仅 bind 不监听），常规 LISTENING 查询无法发现。
+    /// </summary>
+    private static int? GetPortOccupier(int port)
+    {
+        try
+        {
+            var listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+            foreach (var listener in listeners)
+            {
+                if (listener.Port == port)
+                {
+                    var owner = GetTcpListenerOwner(listener);
+                    if (owner.HasValue) return owner.Value;
+                }
+            }
+
+            // 回退：用 GetExtendedTcpTable 查询 BOUND 状态（listen 查询漏掉的泄漏端口）
+            foreach (var bound in GetBoundTcpPorts())
+            {
+                if (bound.Port == port) return bound.ProcessId;
+            }
+        }
+        catch
+        {
+            // 忽略异常，交由调用方决定
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 尝试真实连接目标端口，确认服务确有监听并能接受连接。
+    /// </summary>
+    private static async Task<bool> IsPortConnectableAsync(string host, int port)
+    {
+        try
+        {
+            using var tcpClient = new TcpClient();
+            var connectTask = tcpClient.ConnectAsync(host, port);
+            if (await Task.WhenAny(connectTask, Task.Delay(2000)) != connectTask)
+                return false; // 超时
+            await connectTask;
+            return tcpClient.Connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string? GetProcessName(int processId)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(processId);
+            return p.ProcessName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #region P/Invoke (TCP 监听/连接所有者与 BOUND 端口查询)
+
+    private const int AF_INET = 2;
+    private const int TCP_TABLE_OWNER_PID_LISTENER = 3;
+    private const int TCP_TABLE_OWNER_PID_ALL = 5;
+    private const int ERROR_INSUFFICIENT_BUFFER = 122;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MibTcpRowOwnerPid
+    {
+        public uint State;
+        public uint LocalAddr;
+        public uint LocalPort;  // 网络字节序，低 16 位为端口
+        public uint RemoteAddr;
+        public uint RemotePort; // 网络字节序，低 16 位为端口
+        public uint OwningPid;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MibTcpTableOwnerPid
+    {
+        public uint DwNumEntries;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
+        public MibTcpRowOwnerPid[] Table;
+    }
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint GetExtendedTcpTable(
+        IntPtr pTcpTable, ref int dwOutBufLen, bool sort, int ipVersion,
+        int tblEnumType, int reserved = 0);
+
+    /// <summary>
+    /// 将 native MIB_TCPROW_OWNER_PID 中以网络字节序存储的端口字段（低 16 位）转为主机序端口号。
+    /// </summary>
+    private static int NtoHSPort(uint rawPort)
+    {
+        var bytes = BitConverter.GetBytes(rawPort);
+        // 端口只占低 16 位，且为网络字节序（big-endian），需翻转
+        return (bytes[1] << 8) | bytes[0];
+    }
+
+    private static int? GetTcpListenerOwner(IPEndPoint listener)
+    {
+        var rows = GetAllTcpRows(TCP_TABLE_OWNER_PID_LISTENER);
+        var listenerPort = listener.Port;
+        var listenerAddr = listener.Address;
+        foreach (var row in rows)
+        {
+            if (NtoHSPort(row.LocalPort) != listenerPort) continue;
+            var localAddr = new IPAddress(row.LocalAddr);
+            if (localAddr.Equals(listenerAddr) ||
+                (listenerAddr.Equals(IPAddress.Any) && (localAddr.Equals(IPAddress.Any) || localAddr.Equals(IPAddress.Loopback))) ||
+                (localAddr.Equals(IPAddress.Any) && (listenerAddr.Equals(IPAddress.Any) || listenerAddr.Equals(IPAddress.Loopback))))
+            {
+                return (int)row.OwningPid;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<(int Port, int ProcessId)> GetBoundTcpPorts()
+    {
+        // TCP_TABLE_OWNER_PID_ALL 包含全部状态（含 BOUND），按本地端口聚合，
+        // 仅返回处于“已绑定但未监听”的端口（State=2 即 MIB_TCP_STATE_BOUND）。
+        var rows = GetAllTcpRows(TCP_TABLE_OWNER_PID_ALL);
+        foreach (var row in rows)
+        {
+            if (row.State == 2) // MIB_TCP_STATE_BOUND
+                yield return (NtoHSPort(row.LocalPort), (int)row.OwningPid);
+        }
+    }
+
+    private static IEnumerable<MibTcpRowOwnerPid> GetAllTcpRows(int tableType)
+    {
+        var rows = new List<MibTcpRowOwnerPid>();
+        int bufSize = 0;
+        var result = GetExtendedTcpTable(IntPtr.Zero, ref bufSize, true, AF_INET, tableType);
+        if (result != ERROR_INSUFFICIENT_BUFFER) yield break;
+
+        var buffer = Marshal.AllocHGlobal(bufSize);
+        try
+        {
+            result = GetExtendedTcpTable(buffer, ref bufSize, true, AF_INET, tableType);
+            if (result != 0) yield break;
+
+            var table = Marshal.PtrToStructure<MibTcpTableOwnerPid>(buffer);
+            var tableSize = Math.Min((int)table.DwNumEntries, table.Table.Length);
+            for (var i = 0; i < tableSize; i++)
+            {
+                rows.Add(table.Table[i]);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        foreach (var row in rows) yield return row;
+    }
+
+    #endregion
 
     #endregion
 }
