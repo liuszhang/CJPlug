@@ -128,6 +128,55 @@ public class ToolSeedDataProvider : ISeedDataProvider
             CommandParameter = "[ToolPath] --codefile [CodeFilePath] --dlls [DllPaths]",
             ToolType = ToolTypeEnum.桌面类_商业.ToString(),
             ToolDescription = ".NET Framework 桥接程序，用于在 .NET Framework 4.8 环境中执行 C# 代码，支持 DLL 引用和环境变量。\n参数说明：--codefile 代码文件路径，--dlls 分号分隔的 DLL 文件路径列表。\n系统内置工具，由 CSharpPlug 通过工具调度系统自动调用。"
+        },
+        new()
+        {
+            ToolName = "获取Catia模型参数",
+            ToolVersion = "1.0",
+            ToolCompany = "CJ",
+            ToolPath = @"Tools\0System\CatiaGetParameters.exe",
+            CommandParameter = "[ToolPath] [ModelFilePath]",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = "获取Catia模型参数"
+        },
+        new()
+        {
+            ToolName = "设置Catia模型参数",
+            ToolVersion = "1.0",
+            ToolCompany = "CJ",
+            ToolPath = @"Tools\0System\CatiaSetParameters.exe",
+            CommandParameter = "[ToolPath] [ModelFilePath] [NewParameterString]",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = "设置Catia模型参数"
+        },
+        new()
+        {
+            ToolName = "Catia模型转STP",
+            ToolVersion = "1.0",
+            ToolCompany = "CJ",
+            ToolPath = @"Tools\0System\CatiaExportStp.exe",
+            CommandParameter = "[ToolPath] [ModelFilePath] [StpOutputPath]",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = "Catia模型转STP"
+        },
+        new()
+        {
+            ToolName = "Catia模型转STL",
+            ToolVersion = "1.0",
+            ToolCompany = "CJ",
+            ToolPath = @"Tools\0System\CatiaExportStl.exe",
+            CommandParameter = "[ToolPath] [ModelFilePath] [StlOutputPath] [Sag]",
+            ToolType = ToolTypeEnum.桌面类_商业.ToString(),
+            ToolDescription = "Catia模型转STL"
+        },
+        new()
+        {
+            ToolName = "Catia",
+            ToolVersion = "1.0",
+            ToolCompany = "Dassault Systemes",
+            SkipDownloadToStation = true,
+            ToolPath = @"C:\Program Files\Dassault Systemes\...\CATIA.exe",
+            ToolDescription = "CATIA（图站本地已装，SkipDownloadToStation）"
         }
     ];
 

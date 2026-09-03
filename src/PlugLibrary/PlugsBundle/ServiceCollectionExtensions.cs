@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NXPlug.Extensions;
 using NXPlug_AIModel.Extensions;
+using CatiaPlug.Extensions;
 using PlugsBundle.Models;
 using PlugsBundle.SystemInitTools;
 using PlugsBundle.SystemInitTools.NXGetParameters;
@@ -59,6 +60,7 @@ namespace PlugsBundle
 
             services.AddPatran();
             services.AddNX();
+            services.AddCatia();
             services.AddPython();
             services.AddCMD();
             services.AddREST();
@@ -115,6 +117,7 @@ namespace PlugsBundle
 
             services.AddPatranExecute();
             services.AddNXExecute();
+            services.AddCatiaExecute();
             services.AddPythonExecute();
             services.AddCMDExecute();
             services.AddSendHttpRequestExecute();
