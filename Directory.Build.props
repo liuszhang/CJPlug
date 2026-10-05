@@ -1,5 +1,13 @@
 <Project>
   <!--
+    NuGet 中央版本管理（CPM）说明（2026-10-05）：
+    本方案的 CPM 已并入仓库根 D:\Pro\CJ.Plug.Github\Directory.Packages.props，
+    原 CJPlug\Directory.Packages.props 已删除——版本统一在根文件维护（同名包取更新的版本，
+    与 CJCore/CJOntology/CJWork/Liuvis 等方案共用一个真源），并统一 CentralPackageTransitivePinningEnabled=true。
+    个别需要保持历史钉版的工程在自身 csproj 内单独声明，见
+    src\PlugToolIntegrations\ElsaConsole\ElsaConsole.csproj（net8.0，关闭传递依赖钉版）。
+  -->
+  <!--
     限制原生库输出到 Windows x64 平台，
     避免 macOS/Linux/browser/arm64/x86 等平台的原生库被复制到输出目录。
   -->

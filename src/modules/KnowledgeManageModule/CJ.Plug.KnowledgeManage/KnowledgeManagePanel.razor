@@ -168,8 +168,9 @@ else
                                            ValueChanged="(e) => ToggleItemEnabled(context.Item, e)" />
                             </CellTemplate>
                         </TemplateColumn>
-                        <PropertyColumn Property="x => x.UpdatedAt" Title="更新时间" Sortable="true"
-                                        Format="yyyy-MM-dd HH:mm" Style="width: 140px;" />
+                        <PropertyColumn Property="x => x.UpdatedAt" Title="更新时间" Sortable="true" Style="width: 140px;">
+                            <CellTemplate>@DisplayTime.Utc(context.Item.UpdatedAt, "yyyy-MM-dd HH:mm")</CellTemplate>
+                        </PropertyColumn>
                         <TemplateColumn Title="操作" Style="width: 120px;">
                             <CellTemplate>
                                 <MudTooltip Text="编辑">

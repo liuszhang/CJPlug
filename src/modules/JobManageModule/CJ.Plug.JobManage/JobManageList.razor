@@ -171,17 +171,17 @@
             </TemplateColumn>
             <TemplateColumn Title="创建于" Sortable="true">
                 <CellTemplate>
-                    @context.Item.CreatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    @DisplayTime.Utc(context.Item.CreatedAt, "yyyy-MM-dd HH:mm:ss.fff")
                 </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="更新于">
                 <CellTemplate>
-                    @context.Item.UpdatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    @DisplayTime.Utc(context.Item.UpdatedAt, "yyyy-MM-dd HH:mm:ss.fff")
                 </CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="完成于">
                 <CellTemplate>
-                    @context.Item.FinishedAt?.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    @DisplayTime.UtcOrNull(context.Item.FinishedAt, "yyyy-MM-dd HH:mm:ss.fff")
                 </CellTemplate>
             </TemplateColumn>
 

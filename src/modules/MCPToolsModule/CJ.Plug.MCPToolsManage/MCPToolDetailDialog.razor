@@ -46,11 +46,11 @@
                     </MudItem>
                     <MudItem xs="12" sm="4">
                         <MudTextField T="string" Label="发布时间" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                      Text="@Tool.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
+                                      Text="@DisplayTime.Utc(Tool.CreatedAt, "yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
                     </MudItem>
                     <MudItem xs="12" sm="4">
                         <MudTextField T="string" Label="更新时间" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                      Text="@Tool.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
+                                      Text="@DisplayTime.Utc(Tool.UpdatedAt, "yyyy-MM-dd HH:mm:ss")" ReadOnly="true" />
                     </MudItem>
                 </MudGrid>
             </MudPaper>

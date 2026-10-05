@@ -7,7 +7,7 @@
             <MudText><b>操作类型：</b>@Request.OperationTypeName</MudText>
             <MudText><b>操作目标：</b>@Request.TargetDescription</MudText>
             <MudText><b>请求人：</b>@Request.RequestedBy</MudText>
-            <MudText><b>请求时间：</b>@Request.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+            <MudText><b>请求时间：</b>@DisplayTime.Utc(Request.RequestedAt, "yyyy-MM-dd HH:mm:ss")</MudText>
             
             <MudTextField @bind-Value="_remark"
                           Label="备注（可选）"

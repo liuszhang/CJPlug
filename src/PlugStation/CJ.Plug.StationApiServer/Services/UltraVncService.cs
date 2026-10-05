@@ -457,10 +457,16 @@ public class UltraVncService
         try
         {
             using var tcpClient = new TcpClient();
-            var connectTask = tcpClient.ConnectAsync(host, port);
-            if (await Task.WhenAny(connectTask, Task.Delay(2000)) != connectTask)
-                return false; // 超时
-            await connectTask;
+
+            // ⚠ 超时必须让「连接本身」可取消，再 await 那个连接操作——两种"省事"写法都会漏未观察异常：
+            //   · Task.WhenAny + 丢弃任务：超时分支把 ConnectAsync 扔掉；
+            //   · WaitAsync：同样不行。它的 CancellationPromise 在超时/取消胜出时执行 Cleanup()，
+            //     内含 `_task.RemoveContinuation(this)`，即主动摘掉观察者，源任务此后 fault 无人看到。
+            //   两者下场一致：被抛下的 ConnectAsync 在 using 退出 Dispose 时以
+            //   SocketException 995（操作已中止）fault，只等到 GC 时才由 finalizer 线程重抛。
+            // 传令牌让超时中断这个连接：异常落在被 await 的同一个操作上，必然被观察。
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await tcpClient.ConnectAsync(host, port, cts.Token);
             return tcpClient.Connected;
         }
         catch

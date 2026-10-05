@@ -1,10 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!--
+      2026-10-05 CJPlug 并入根 Directory.Packages.props 后，根级 CentralPackageTransitivePinningEnabled=true
+      会把根里 net10.0-only 的钉子（如 Microsoft.AspNetCore.Authentication.JwtBearer 10.0.12）下推到本项目，
+      而本项目是 net8.0（Elsa 3.7.1 的控制台宿主），会出现 NU1202 不兼容。
+      故本工程单独关闭传递依赖钉版，回到并入前的还原行为。
+    -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>

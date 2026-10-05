@@ -20,6 +20,8 @@
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     <ProjectReference Include="..\CJ.Plug.AuthApiClient\CJ.Plug.AuthApiClient.csproj" />
     <ProjectReference Include="..\CJ.Plug.AuthModels\CJ.Plug.AuthModels.csproj" />
+    <!-- 展示时刻门面 DisplayTime（2026-10-05《CJCore 统一时刻口径与展示时区方案》D1/D2） -->
+    <ProjectReference Include="..\..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

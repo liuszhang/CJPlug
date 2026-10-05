@@ -1,4 +1,4 @@
-﻿@page "/SkillsManage"
+@page "/SkillsManage"
 
 @using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug
@@ -101,7 +101,7 @@
                                 <div class="meta">
                                     <span class="star"><MudIcon Icon="@Icons.Material.Filled.Star" /></span>
                                     <span class="meta-text">@tool?.Id</span>
-                                    <span class="date ms-3"><MudIcon Icon="@Icons.Material.Filled.CalendarToday" /> @tool.CreatedAt.ToString("yyyy-MM-dd")</span>
+                                    <span class="date ms-3"><MudIcon Icon="@Icons.Material.Filled.CalendarToday" /> @DisplayTime.Utc(tool.CreatedAt, "yyyy-MM-dd")</span>
                                 </div>
                                 <div class="actions">
                                     <MudIconButton Icon="@Icons.Material.Filled.Download" Edge="Edge.End" />

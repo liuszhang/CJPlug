@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Hosting.Internal;
-using Microsoft.OpenApi.Models;
 using ToolMng;
 using ToolMng.Contracts;
 using ToolMng.Models;
