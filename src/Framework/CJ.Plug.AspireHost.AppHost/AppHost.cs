@@ -110,6 +110,16 @@ var configure = new ConfigurationBuilder()
     .Build()
     .GetSection("ResourceStrings");
 
+// 客户形态开关（方案枝 12，默认关）：MCP 调试台 mcpInspector 走 npx，
+// 客户机通常既没有 Node 又没有外网，而发布根不携带 Node ⇒ 默认不挂载该资源。
+// 开发机在 appsettings.json 里把 EnableMcpInspector 置 true（或用同名环境变量）即可恢复。
+var appConfig = new ConfigurationBuilder()
+    .SetBasePath(appHostDir)
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables()
+    .Build();
+var enableMcpInspector = appConfig.GetValue("EnableMcpInspector", false);
+
 // 动态计算服务目录：AppHost -> 02.Publish/ -> Services/{Configuration}/net10.0/
 // 自动适配 Debug/Release 构建配置，无需手动修改路径
 var publishDir = Path.GetFullPath(Path.Combine(appHostDir, "..", "..", ".."));
@@ -131,6 +141,53 @@ var mcpServerDllName = ServiceDll("McpServer", "CJ.Plug.McpServer.dll");
 
 var builder = DistributedApplication.CreateBuilder(
     args.Where(a => !a.Equals("--no-elevate", StringComparison.OrdinalIgnoreCase)).ToArray());
+
+// ============ 自带 Aspire 编排件（DCP / Dashboard）解析（方案枝 1/2/8） ============
+// 背景：Aspire 把 DCP 与 Dashboard 的**绝对路径**在构建期烘焙进本程序集（AssemblyMetadata
+// "dcpclipath" / "dcpextensionpaths" / "aspiredashboardpath"），指向构建机的 NuGet 全局缓存。
+// 缓存一旦被清理（dotnet nuget locals all --clear / 磁盘清理 / 换用户 / 换机器），AppHost
+// 启动即抛 FileNotFoundException(dcp.exe) 并以 0xE0434352 退出。
+// 这里改为**优先使用随发布根携带的副本**（aspire\dcp、aspire\dashboard）：CreateBuilder 之后
+// 追加内存配置源（后添加的源优先级更高）即可压过烘焙值；自带缺失时才回落烘焙路径并告警。
+const string DcpCliPathKey = "DcpPublisher:CliPath";
+const string DcpDashboardPathKey = "DcpPublisher:DashboardPath";
+const string DcpExtensionsPathKey = "DcpPublisher:ExtensionsPath";
+
+var shippedDcpDir = Path.Combine(appHostDir, "aspire", "dcp");
+var shippedDcpExe = Path.Combine(shippedDcpDir, "dcp.exe");
+var shippedExtensionsDir = Path.Combine(shippedDcpDir, "ext");
+var shippedDashboardExe = Path.Combine(appHostDir, "aspire", "dashboard", "Aspire.Dashboard.exe");
+
+var shippedOverrides = new Dictionary<string, string?>();
+if (File.Exists(shippedDcpExe))
+{
+    shippedOverrides[DcpCliPathKey] = shippedDcpExe;
+}
+if (Directory.Exists(shippedExtensionsDir))
+{
+    shippedOverrides[DcpExtensionsPathKey] = shippedExtensionsDir;
+}
+if (File.Exists(shippedDashboardExe))
+{
+    shippedOverrides[DcpDashboardPathKey] = shippedDashboardExe;
+}
+
+if (shippedOverrides.Count > 0)
+{
+    builder.Configuration.AddInMemoryCollection(shippedOverrides);
+    Console.WriteLine(shippedOverrides.ContainsKey(DcpCliPathKey)
+        ? $"[Aspire] 使用随包携带的 DCP: {shippedDcpExe}"
+        : $"[Aspire] ⚠ 未找到随包 DCP（{shippedDcpExe}），将回落构建期烘焙路径（依赖 NuGet 缓存）");
+    Console.WriteLine(shippedOverrides.ContainsKey(DcpDashboardPathKey)
+        ? $"[Aspire] 使用随包携带的 Dashboard: {shippedDashboardExe}"
+        : $"[Aspire] ⚠ 未找到随包 Dashboard（{shippedDashboardExe}），将回落构建期烘焙路径（依赖 NuGet 缓存）");
+}
+else
+{
+    Console.WriteLine("[Aspire] ⚠ 未找到随包携带的编排组件（aspire\\dcp\\dcp.exe、aspire\\dashboard\\Aspire.Dashboard.exe），");
+    Console.WriteLine("[Aspire]   将回落构建期烘焙路径 —— 该路径指向 NuGet 全局缓存，缓存被清理后 AppHost 将无法启动。");
+    Console.WriteLine("[Aspire]   请重跑 CJPlug\\05.Build\\assemble-release.ps1 生成完整发布根。");
+}
 
 // 重新设置 Console.OutputEncoding — CreateBuilder 内部可能重置了编码
 Console.OutputEncoding = Encoding.UTF8;
@@ -187,11 +244,19 @@ builder.AddExecutable("mcpserver", "dotnet", servicesDir, mcpServerDllName).With
 
 
 //MCP TOOL测试工具：mcp inspector，基于 @modelcontextprotocol/inspector 实现的 MCP 协议调试工具，提供可视化界面查看 MCP 消息交互
-builder.AddExecutable("mcpInspector", "npx", servicesDir, "@modelcontextprotocol/inspector", "--server-port", "6277")
-    .WithEnvironment(Utf8EnvKey, Utf8EnvVal)
-    .WithEnvironment("HOST", "localhost")
-    .WithEnvironment("NODE_OPTIONS", "--dns-result-order=ipv4first")
-    .WithUrl("http://localhost:6274");
+// ⚠ 客户形态默认不挂载（方案枝 12）：它依赖目标机的 npx(Node) 与首次运行的外网下载，而发布根不携带 Node。
+if (enableMcpInspector)
+{
+    builder.AddExecutable("mcpInspector", "npx", servicesDir, "@modelcontextprotocol/inspector", "--server-port", "6277")
+        .WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+        .WithEnvironment("HOST", "localhost")
+        .WithEnvironment("NODE_OPTIONS", "--dns-result-order=ipv4first")
+        .WithUrl("http://localhost:6274");
+}
+else
+{
+    Console.WriteLine("[Aspire] 已跳过 mcpInspector（EnableMcpInspector=false；该调试台需 npx/Node 与外网）");
+}
 
 //打开浏览器
 try

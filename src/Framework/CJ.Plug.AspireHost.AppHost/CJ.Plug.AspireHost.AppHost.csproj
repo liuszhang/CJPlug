@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <Sdk Name="Aspire.AppHost.Sdk" Version="9.5.0" />
 
@@ -34,5 +34,43 @@
   <ItemGroup>
     <Compile Remove="D:\Pro\CJ.Plug-Aspire\01.Scripts\Utf8ConsoleInit.cs" />
   </ItemGroup>
+
+  <!--
+    ============ Aspire 编排件（DCP / Dashboard）随包自带（方案 §4.2，枝 2/8/D1） ============
+    背景：Aspire 会把 DCP 与 Dashboard 的**绝对路径**在构建期烘焙进本程序集（AssemblyMetadata
+    "dcpclipath"/"dcpextensionpaths"/"aspiredashboardpath"），指向构建机的 NuGet 全局缓存；
+    缓存被清理后，已编译好的 AppHost 启动即抛 FileNotFoundException(dcp.exe) 并以 0xE0434352 退出。
+    这里把副本拷进本项目输出目录（aspire\dcp、aspire\dashboard），运行期由 AppHost.cs 按
+    AppContext.BaseDirectory 解析并覆盖烘焙值（自带优先，缺失才回落并告警）。
+
+    · 来源属性（均由对应包的 targets 在评估期给出，可覆盖）：
+        $(DcpDir)              ← Aspire.Hosting.Orchestration.win-x64 包的 build\*.targets
+        $(AspireDashboardDir)  ← Aspire.Dashboard.Sdk.win-x64 包的 build\*.targets
+    · 精简口径（枝 2）：DCP 侧只带 dcp.exe / LICENSE / NOTICE（**去掉 dcptun_c 53MB 与 _manifest**，
+      若将来启用容器隧道 EnableAspireContainerTunnel，需把 dcptun_c 加回）；Dashboard 侧整份 tools。
+  -->
+  <Target Name="CopyShippedAspireOrchestration"
+          AfterTargets="Build"
+          DependsOnTargets="SetOrchestrationDiscoveryAttributes;SetDashboardDiscoveryAttributes"
+          Condition="'$(DcpDir)' != '' and '$(AspireDashboardDir)' != ''">
+    <Error Condition="!Exists('$(DcpDir)dcp.exe')"
+           Text="未找到 Aspire 编排组件：$(DcpDir)dcp.exe。请确认已 restore Aspire.Hosting.Orchestration.win-x64 包（版本见仓库根 Directory.Packages.props 的 Aspire.Hosting.AppHost）。" />
+    <Error Condition="!Exists('$(AspireDashboardDir)Aspire.Dashboard.exe')"
+           Text="未找到 Aspire Dashboard：$(AspireDashboardDir)Aspire.Dashboard.exe。请确认已 restore Aspire.Dashboard.Sdk.win-x64 包。" />
+    <ItemGroup>
+      <_ShippedDcpFiles Include="$(DcpDir)dcp.exe" />
+      <_ShippedDcpFiles Include="$(DcpDir)LICENSE" Condition="Exists('$(DcpDir)LICENSE')" />
+      <_ShippedDcpFiles Include="$(DcpDir)NOTICE" Condition="Exists('$(DcpDir)NOTICE')" />
+      <_ShippedDashboardFiles Include="$(AspireDashboardDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ShippedDcpFiles)"
+          DestinationFolder="$(OutDir)aspire\dcp\"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_ShippedDashboardFiles)"
+          DestinationFolder="$(OutDir)aspire\dashboard\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high"
+             Text="[Aspire] 自带编排件已就绪：$(OutDir)aspire\dcp\dcp.exe 、$(OutDir)aspire\dashboard\Aspire.Dashboard.exe" />
+  </Target>
 
 </Project>

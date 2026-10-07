@@ -114,10 +114,14 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="TxtVersion" Text="0.2.0" 
                            VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,15,0"/>
+                <!-- ⚠ 已退役（《CJPlug 发布纳入 CJSuite 与 AppHost 自带 DCP 方案》枝 18/D10，2026-10-07）：
+                     图站部署包改由 CJSuite 的 station-settingui 组件分发；服务端 download-station-direct 已返回 410。
+                     入口整体隐藏，控件与事件保留以最小化改动面。 -->
                 <Button x:Name="BtnCheckUpdate" Content="检查更新" Width="80"
+                        Visibility="Collapsed"
                         Click="BtnCheckUpdate_Click"/>
                 <Button x:Name="BtnDownloadUpdate" Content="下载包" Width="80"
-                        Visibility="Visible" Margin="5,0,0,0"
+                        Visibility="Collapsed" Margin="5,0,0,0"
                         Click="BtnDownloadUpdate_Click"/>
                 <TextBlock x:Name="TxtUpdateStatus" Text="" 
                            VerticalAlignment="Center" Margin="10,0,0,0" Foreground="RoyalBlue"/>

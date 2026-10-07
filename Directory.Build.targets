@@ -15,7 +15,7 @@
     此文件注册 AppDomain.AssemblyResolve 事件，从共享目录直接加载 DLL。
     对所有共享输出目录的服务项目生效（Services）。
   -->
-  <ItemGroup Condition="'$(BaseOutputPath)' != '' And $(BaseOutputPath.Contains('Services'))">
+  <ItemGroup Condition="'$(BaseOutputPath)' != '' And $(BaseOutputPath.Contains('Services')) And Exists('$(MSBuildThisFileDirectory)SharedAssemblyResolve.cs')">
     <Compile Include="$(MSBuildThisFileDirectory)SharedAssemblyResolve.cs"
              Link="SharedAssemblyResolve.cs" />
   </ItemGroup>

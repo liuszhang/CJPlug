@@ -320,14 +320,25 @@ public class AppHostLauncher : IDisposable
 
     /// <summary>
     /// 按优先级自动探测 AppHost DLL 路径。
-    /// 项目设置了 BaseOutputPath → 02.Publish 目录，优先探测该路径。
+    /// ① <b>安装形态</b>（方案 §4.3 / 枝 17）：桌面端与 AppHost 装在同一根下，各自位于
+    ///    <c>&lt;根&gt;\{CJ.Plug.Desktop|CJ.Plug.AspireHost.AppHost}\Release\&lt;tfm&gt;\</c>。
+    ///    本方法原先只认开发仓布局（<see cref="FindProjectRoot"/> 要求同时存在 src 与 02.Publish），
+    ///    装到 <c>%ProgramFiles%\CJ\CJPlug</c> 后必然找不到 AppHost，直接抛「找不到 dll，请先编译」。
+    /// ② 开发仓布局（BaseOutputPath → 02.Publish / 标准 bin）作为回退。
     /// </summary>
     private string? FindAppHostDll()
     {
-        var projectRoot = FindProjectRoot(AppDomain.CurrentDomain.BaseDirectory);
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var projectRoot = FindProjectRoot(baseDir);
+
+        // 安装形态：...\<根>\CJ.Plug.Desktop\Release\net10.0-windows\ → 上溯三级即 <根>
+        // （在开发仓里上溯三级正好是 02.Publish，与下面的开发仓候选指向同一份 Release 产物）
+        var installRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", ".."));
 
         var candidates = new List<string>
         {
+            // 优先级 0: 安装形态（发布根为 Release 单配置）
+            Path.Combine(installRoot, "CJ.Plug.AspireHost.AppHost", "Release", "net10.0", DllName),
             // 优先级 1: BaseOutputPath → 02.Publish (Debug)
             Path.Combine(projectRoot, "02.Publish", "CJ.Plug.AspireHost.AppHost", "Debug", "net10.0", DllName),
             // 优先级 2: BaseOutputPath → 02.Publish (Release)

@@ -390,3 +390,4 @@ FodyWeavers.xsd
 /02.Publish/Services/main.db
 /02.Publish/Services/main.db-shm
 /02.Publish/Services/main.db-wal
+/05.Release
