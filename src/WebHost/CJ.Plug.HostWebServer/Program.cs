@@ -40,9 +40,11 @@ Log.Logger = new LoggerConfiguration()
 
 var configuration = builder.Configuration;
 //builder.WebHost.UseStaticWebAssets();
-Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", configuration.GetValue<string>("env"));
-Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", configuration.GetValue<string>("env"));
-Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+// 2026-10-07 删除：原先这里把配置键 env 覆盖到 ASPNETCORE_ENVIRONMENT / DOTNET_ENVIRONMENT。
+//   它发生在 CreateBuilder 之后（host 环境已定型）⇒ 对 host 环境无效，却让"配置里写着 Development"
+//   看着能控制环境，并会污染子进程环境。环境名一律交给标准来源（launchSettings / 环境变量；缺省 Production）。
+//   背景与修复见《CJPlug 发布纳入 CJSuite 与 AppHost 自带 DCP 方案》§9.7。
+Console.WriteLine($"当前环境: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production（默认）"}");
 
 // 显式加载静态 Web 资产清单（Build 模式而非 Publish 时需要）
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);

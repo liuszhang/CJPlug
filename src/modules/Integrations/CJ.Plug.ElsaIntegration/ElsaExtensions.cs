@@ -71,7 +71,10 @@ public static class ElsaExtensions
             // Default Identity features for authentication/authorization.
             elsa.UseIdentity(identity =>
             {
-                identity.TokenOptions = options => options.SigningKey = "sufficiently-large-secret-signing-key"; // This key needs to be at least 256 bits long.
+                // ⚠ 勿改回硬编码默认值：Elsa.Identity 的 TokenOptions 校验要求「已知公开默认值只在 Development/Demo 允许」，
+                //    硬编码会让安装态/非 VS 启动直接以 OptionsValidationException: SigningKey uses a known public
+                //    default value 起不来（2026-10-07 实机踩到）。详见方案 §9.7 与 ElsaSigningKeyResolver。
+                identity.TokenOptions = options => options.SigningKey = ElsaSigningKeyResolver.Resolve(configuration);
                 identity.UseAdminUserProvider();
             });
 
@@ -245,7 +248,7 @@ public static class ElsaExtensions
             // Default Identity features for authentication/authorization.
             elsa.UseIdentity(identity =>
             {
-                identity.TokenOptions = options => options.SigningKey = "sufficiently-large-secret-signing-key"; // This key needs to be at least 256 bits long.
+                identity.TokenOptions = options => options.SigningKey = ElsaSigningKeyResolver.Resolve();
                 identity.UseAdminUserProvider();
             });
 

@@ -73,9 +73,11 @@ if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必�
 # ⚠ 两类要区分开（2026-10-07 实测教训）：
 #   ①「运行期残留」出现即**中止出包**（*_db/_log 是污染：曾实测把开发机的 station_tasks.db 与
 #     StationLogs\log2026*.txt 打进载荷，装到客户机就是拿开发数据覆盖人家数据）；
+#     `elsa-signing.key*` 同属此类：它是服务**首次启动自愈生成**的 JWT 签名密钥（方案 §9.7），
+#     开发机跑过一次就会落在服务目录里 —— 若随包分发，等于把同一把密钥发给所有客户（可互相伪造 token）。
 #   ②「调试符号 *pdb」是 publish 的正常副产物，**静默剔除**即可（PackageService 既有做法也是排除 pdb）——
 #     若一并当断言失败，图站三件套 publish 会因 161 个 .pdb 直接打不出包。
-$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log')
+$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*')
 $excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin')
 $stripFilePatterns = @('*.pdb')
 
