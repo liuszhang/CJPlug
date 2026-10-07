@@ -24,13 +24,19 @@
                 另按 PackageService 既有做法排除 *.pdb。
       · 枝 18 ：图站三件套必须**独立 publish**（8 个服务共享同一输出目录，切不出小载荷）。
       · D8    ：图站载荷保持 <根>\{Agent,ApiServer,SettingUI} 形状（与旧 CJ.Plug.StationSetup 期望一致）。
-      · Target 语义（2026-10-07 修正，原 D9 见方案 §9.6）：
-                -Target main    → **只**组装 main（cjplug 组件的命令）
-                -Target desktop → **只**组装 desktop（cjplug-desktop 组件的命令）
-                -Target station → 只组装 station
-                -Target all     → 三者全组装（本地一键）
-                为什么要把 main/desktop 拆开：两个组件各声明自己那条最小命令，避免"打 cjplug 与打
-                cjplug-desktop 各付一次全量组装（≈1.25GB 拷贝 + pdb 扫描，实测重复一遍约 56s）"。
+      · Target 语义（2026-10-07 一次修正，原 D9 见方案 §9.6；**构建粒度**二次修正见 §9.8）：
+                -Target main    → 构建整解（铺满共享 Services 目录）+ **只**组装 main（cjplug 组件的命令）
+                -Target desktop → **只**构建 CJ.Plug.Desktop 的闭包 + **只**组装 desktop（cjplug-desktop 组件的命令）
+                -Target station → 只组装 station（三件套各自 publish，本就不需要整解构建）
+                -Target all     → 构建整解一次 + 三者全组装（本地一键）
+                为什么要把 main/desktop 拆开：
+                  ① 组装（§9.6）：避免"打 cjplug 与打 cjplug-desktop 各付一次全量组装
+                     （≈1.25GB 拷贝 + pdb 扫描，实测重复一遍约 56s）"；
+                  ② 构建（§9.8）：desktop 载荷只含 CJ.Plug.Desktop\Release\net10.0-windows，
+                     该工程唯一 ProjectReference 是 CJ.Plug.LicenseApiClient（闭包 4 个工程，实测）；
+                     而 AppHost 是用 AddExecutable("dotnet", servicesDir, xxx.dll) 拉起服务的，
+                     所以"整解构建"对**共享 Services 目录**是必需的、但对 desktop 是纯浪费
+                     （实测：整解构建空转一次 ≈47s，紧接别的构建活动时还会连带重编一批工程）。
 
 .NOTES
     退出码：0 = 成功；非 0 = 失败（CJSuite.Pack 的「前置构建」按非 0 中止出包）。
@@ -66,6 +72,9 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $publishDir = Join-Path $repoRoot '02.Publish'
 $releaseRoot = Join-Path $repoRoot '05.Release'
 $sln = Join-Path $repoRoot 'CJ.Plug-Aspire.sln'
+# desktop 载荷的**唯一**来源工程（2026-10-07 §9.8）：desktop 组件的前置构建只 build 这一条闭包，
+# 不再拉整解（CJ.Plug.Desktop 唯一 ProjectReference = CJ.Plug.LicenseApiClient）。
+$desktopProj = Join-Path $repoRoot 'src\WebHost\CJ.Plug.Desktop\CJ.Plug.Desktop.csproj'
 
 if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必须位于 <CJPlug>\05.Build\ 下）" }
 
@@ -77,8 +86,12 @@ if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必�
 #     开发机跑过一次就会落在服务目录里 —— 若随包分发，等于把同一把密钥发给所有客户（可互相伪造 token）。
 #   ②「调试符号 *pdb」是 publish 的正常副产物，**静默剔除**即可（PackageService 既有做法也是排除 pdb）——
 #     若一并当断言失败，图站三件套 publish 会因 161 个 .pdb 直接打不出包。
-$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*')
-$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin')
+$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*', 'window-state.json')
+# 2026-10-07 追加两类运行期残留（实测证据见方案 §9.8）：
+#   · window-state.json       —— 桌面端**窗口位置/大小**持久化文件，开发机跑过一次就会落在输出目录里；
+#   · *.exe.WebView2\         —— WebView2 的用户数据/缓存目录，实测 1073 文件 / 383MB（desktop 载荷 407MB 的大头），
+#                                装到客户机就是把开发机的浏览缓存与 Cookie 发出去（同 *.db / StationLogs 一类污染）。
+$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin', 'CJ.Plug.Desktop.exe.WebView2')
 $stripFilePatterns = @('*.pdb')
 
 function Write-Step([string]$msg) {
@@ -107,7 +120,10 @@ function Copy-Tree([string]$src, [string]$dst) {
     if (-not (Test-Path $src)) { throw "源目录不存在：$src（请确认已构建对应项目）" }
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
     # robocopy 退出码 0..7 均为成功（位标志），>=8 才是失败
-    $rcArgs = @($src, $dst, '/E', '/R:1', '/W:1', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/XF') + $excludeFilePatterns
+    # 2026-10-07：黑名单目录改用 robocopy /XD **源头排除**（此前只在拷完后 Remove-ExcludedDirs 删），
+    #   净效果等价（都是"任何层级的同名目录都不要"），但省掉整份拷贝 —— 实测 desktop 载荷里
+    #   383MB 的 CJ.Plug.Desktop.exe.WebView2 不必先拷 407MB 再删。
+    $rcArgs = @($src, $dst, '/E', '/R:1', '/W:1', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/XD') + $excludeDirNames + @('/XF') + $excludeFilePatterns
     & robocopy @rcArgs | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy 失败（exit=$LASTEXITCODE）：$src → $dst" }
     $global:LASTEXITCODE = 0
@@ -173,10 +189,19 @@ Write-Host "  CJPlug 根   : $repoRoot"
 Write-Host "  配置        : $Configuration"
 Write-Host "  目标        : $Target"
 
-# ── ⓪ 构建（main 与 desktop 都要用 02.Publish 的 Release 产物；两个组件各跑一次，第二次是增量、秒级） ──
-if ($Target -in @('main', 'desktop', 'all') -and -not $SkipBuild) {
+# ── ⓪ 构建（**按 Target 拆**，2026-10-07 二次修正见方案 §9.8） ────────────────────────────
+# main：**必须**整解构建。AppHost 用 AddExecutable("dotnet", servicesDir, xxx.dll) 拉起服务，而
+#       DispatchServer / HostWebServer / ElsaStudio 都**不是** AppHost 的 ProjectReference ⇒
+#       共享目录 02.Publish\Services 靠"整解全量构建"铺满，收窄会打不出完整载荷。
+# desktop：载荷只有 CJ.Plug.Desktop\Release\net10.0-windows（闭包 4 个工程）⇒ 只 build 该工程，
+#       与整解 165 个 src 工程彻底解耦（原实现让 desktop 也跑整解：实测空转一次 ≈47s）。
+# station：三件套走独立 publish（见 ③），不需要整解构建。
+# -Target all：整解只构建一次（desktop 块不再重复 build）。
+$slnBuilt = $false
+if ($Target -in @('main', 'all') -and -not $SkipBuild) {
     Write-Step "构建解决方案（$Configuration）"
     Invoke-Dotnet 'build solution' @('build', $sln, '-c', $Configuration, '-v:m', '-nologo')
+    $slnBuilt = $true
 }
 
 # ── ① main staging（cjplug：服务器形态；枝 7 = 只收 Release 单配置） ────────────────────
@@ -216,6 +241,12 @@ if ($Target -in @('main', 'all')) {
 # ── ② desktop staging（cjplug-desktop：个人形态，仅桌面端） ────────────────────────────
 if ($Target -in @('desktop', 'all')) {
     Write-Step "组装 desktop（个人形态：仅 CJ.Plug.Desktop）"
+
+    # 构建粒度（§9.8）：只 build desktop 自己的闭包。`-Target all` 时整解已构建（$slnBuilt），此处跳过。
+    if (-not $SkipBuild -and -not $slnBuilt) {
+        if (-not (Test-Path $desktopProj)) { throw "未找到桌面前端工程：$desktopProj" }
+        Invoke-Dotnet 'build desktop' @('build', $desktopProj, '-c', $Configuration, '-v:m', '-nologo')
+    }
 
     $desktopStaging = Join-Path $releaseRoot 'desktop'
     Reset-Staging $desktopStaging | Out-Null
