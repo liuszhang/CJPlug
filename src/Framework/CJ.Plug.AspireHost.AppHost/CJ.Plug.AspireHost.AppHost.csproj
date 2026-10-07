@@ -18,7 +18,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
     <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ApiServer\CJ.Plug.ApiServer.csproj" />
-    <ProjectReference Include="..\..\PlugWebHost\CJ.Plug.HostWebServer\CJ.Plug.HostWebServer.csproj" />
     <!-- 以下为构建依赖，确保其 NuGet 包复制到共享输出目录 -->
     <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.McpServer\CJ.Plug.McpServer.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ElsaApiServer\CJ.Plug.ElsaApiServer.csproj" ReferenceOutputAssembly="false" />
