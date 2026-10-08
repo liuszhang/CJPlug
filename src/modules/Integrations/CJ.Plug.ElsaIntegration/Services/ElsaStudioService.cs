@@ -23,6 +23,7 @@ using CJ.Plug.ElsaIntegration.Contracts;
 using Elsa.Workflows.Runtime.Filters;
 using Elsa.Api.Client.Resources.ActivityExecutions.Models;
 using CJ.Plug.Models.Job;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.PlugDataZoneApiClient;
@@ -47,6 +48,7 @@ namespace CJ.Plug.ElsaIntegration.Services
         private IWorkflowInstanceService WorkflowInstanceService { get; set; }
         private IActivityExecutionService ActivityExecutionService { get; set; }
         private MainApiClient MainApiClient { get; set; }
+        private IConfiguration Configuration { get; set; }
         public ElsaStudioService(
             IWorkflowDefinitionEditorService workflowDefinitionEditorService,
             IWorkflowDefinitionService workflowDefinitionService,
@@ -57,7 +59,8 @@ namespace CJ.Plug.ElsaIntegration.Services
             IBackendApiClientProvider _backendApiClientProvider,
             IWorkflowInstanceService workflowInstanceService,
             IActivityExecutionService activityExecutionService,
-            MainApiClient mainApiClient
+            MainApiClient mainApiClient,
+            IConfiguration configuration
             )
         {
             WorkflowDefinitionEditorService = workflowDefinitionEditorService;
@@ -70,6 +73,7 @@ namespace CJ.Plug.ElsaIntegration.Services
             WorkflowInstanceService = workflowInstanceService;
             ActivityExecutionService = activityExecutionService;
             MainApiClient = mainApiClient;
+            Configuration = configuration;
 
 
             //在构造函数中登录到引擎，无需每次调用时都登录
@@ -268,7 +272,11 @@ namespace CJ.Plug.ElsaIntegration.Services
                 return;
             }
 
-            var result = await CredentialsValidator.ValidateCredentialsAsync("admin", "password");
+            // 凭据必须与 Elsa 引擎侧的引导凭据同源（环境变量 → 配置键 → 由每机签名密钥派生）。
+            // 切勿再写死 ("admin","password")：Elsa 3.9 起内置 admin 用户默认关闭，写死必然登录失败。
+            var result = await CredentialsValidator.ValidateCredentialsAsync(
+                ElsaAdminCredentialResolver.ResolveUserName(Configuration),
+                ElsaAdminCredentialResolver.ResolvePassword(Configuration));
             if (!result.IsAuthenticated)
                 return;
 

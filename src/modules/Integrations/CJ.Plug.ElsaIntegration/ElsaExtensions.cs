@@ -12,6 +12,7 @@ using Elsa.Studio.Core.BlazorServer.Extensions;
 using Elsa.Studio.Extensions;
 using Elsa.Studio.Login.BlazorServer.Extensions;
 using Elsa.Studio.Login.Extensions;
+using Elsa.Studio.Login.Contracts;
 using Elsa.Studio.Login.HttpMessageHandlers;
 using Elsa.Studio.Models;
 using Elsa.Studio.Workflows.Designer.Components;
@@ -24,6 +25,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using CJ.Plug.ElsaIntegration.Contracts;
+using Elsa.Identity.Options;
 using Elsa.Persistence.EFCore.Modules.Management;
 using Elsa.Persistence.EFCore.Extensions;
 using Elsa.Persistence.EFCore.Modules.Runtime;
@@ -75,7 +77,40 @@ public static class ElsaExtensions
                 //    硬编码会让安装态/非 VS 启动直接以 OptionsValidationException: SigningKey uses a known public
                 //    default value 起不来（2026-10-07 实机踩到）。详见方案 §9.7 与 ElsaSigningKeyResolver。
                 identity.TokenOptions = options => options.SigningKey = ElsaSigningKeyResolver.Resolve(configuration);
-                identity.UseAdminUserProvider();
+
+                // ⚠ Elsa 3.9 起「内置管理员用户 / 内置管理员 API Key / localhost 自动放行」三条引导路径全部改为
+                //    「未显式配置 = 全拒」，未引导的实例每个管理端点都回 401/403。实机症状：流程编辑器「组件库」
+                //    空白，日志刷出 RemoteActivityRegistryProvider 的 Refit 401 堆栈。
+                //
+                // 这里刻意**不用** identity.UseDefaultAdmin(...)（虽然它才是 Elsa 自检推荐的第一选项）：它挂上的
+                //    AdminUserInitializer 会与下面 AdminUserProvider 自带的 AdminRoleProvider 抢同一个 'admin' 角色，
+                //    启动时必抛（2026-10-08 实测）：
+                //      "Background task AdminUserInitializer failed with an error
+                //       System.InvalidOperationException: A role with ID 'admin' already exists."
+                //    两者叠加的净效果只有一条错误日志 + 一个永远用不到的 store 用户。
+                //
+                // 因此只把 DefaultAdminUserOptions 的值填上（不安装 DefaultAdminUserFeature ⇒ 没有 initializer ⇒
+                //    不会抢角色）：Elsa 的 IdentityBootstrapDiagnostic 据此认定"本实例已引导"，不再每次启动刷
+                //      "No users exist and no identity bootstrap is configured … answer 403" 的红字。
+                services.Configure<DefaultAdminUserOptions>(options =>
+                {
+                    options.AdminUserName = ElsaAdminCredentialResolver.ResolveUserName(configuration);
+                    options.AdminPassword = ElsaAdminCredentialResolver.ResolvePassword(configuration);
+                    options.AdminRoleName = ElsaAdminCredentialResolver.AdminRoleName;
+                    options.AdminRolePermissions = ElsaAdminCredentialResolver.AdminRolePermissions;
+                });
+
+                // 真正的凭据通道：AdminUserProvider 在**请求时**校验，不依赖任何启动任务，因此把身份引导从
+                //    "Elsa tenant 启动任务链"上彻底解耦（2026-10-08 冷启动实测洞 F4：链上前序任务抛异常会让
+                //    后续的 AdminUserInitializer 不再执行 ⇒ 用户种不上 ⇒ 登录恒 false 且不自愈）。
+                //    它同时把 RoleProvider 换成 AdminRoleProvider（无条件给 '*'），所以即便 store 里没有任何
+                //    角色/用户，令牌权限也是满的。两处凭据同源（同一个 ElsaAdminCredentialResolver），不可能不一致。
+                //    代价：IUserProvider 变为 AdminUserProvider ⇒ MemoryUserStore 里的其它 Elsa 用户不可见（当前无其它用户）。
+                identity.UseAdminUserProvider(options =>
+                {
+                    options.UserName = ElsaAdminCredentialResolver.ResolveUserName(configuration);
+                    options.Password = ElsaAdminCredentialResolver.ResolvePassword(configuration);
+                });
             });
 
             // Configure ASP.NET authentication/authorization.
@@ -307,6 +342,18 @@ public static class ElsaExtensions
         builder.Services.AddAuthorizationCore();
         builder.Services.AddLoginModuleCore();
         builder.Services.AddLoginModule();
+
+        // Studio 的 HTTP / SignalR / 登录态三处统一从 IJwtAccessor 取令牌，而 CJ 的流程编辑器内嵌在自己的
+        // 页面里、从不显示 Studio 登录页 ⇒ 默认实现（读写浏览器 localStorage）里永远没有令牌 ⇒ 401。
+        // 替换为「内存缓存 + 惰性自动登录」实现：令牌由服务端直连 ElsaApiServer 的 /identity/login 取回。
+        // ⚠ 必须在 AddLoginModule()（注册 BlazorServerJwtAccessor）之后，否则会被后注册者覆盖回去。
+        // 用「同程序集工厂注册」而不是 ServiceDescriptor.Scoped<TService,TImpl>()：后者要让 DI 反射构造
+        // internal 实现类型，跨程序集可见性上是隐患；工厂 lambda 在本程序集内 new，零歧义。
+        builder.Services.Replace(ServiceDescriptor.Scoped<IJwtAccessor>(sp => new CjElsaAutoLoginJwtAccessor(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            sp.GetRequiredService<IRemoteBackendAccessor>(),
+            sp.GetRequiredService<IConfiguration>())));
+
         builder.Services.UseElsaIdentity();
         builder.Services.AddWorkflowsModule();
         builder.Services.AddAgentsModule(backendApiConfig);
