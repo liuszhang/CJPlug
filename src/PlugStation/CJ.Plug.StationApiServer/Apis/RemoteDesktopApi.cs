@@ -78,11 +78,17 @@ namespace CJ.Plug.StationApiServer.Apis
             //   - 新的执行（sessionKey 与上一次不同）→ 视为新目标，必须重新通知。
             // 否则第二次执行若复用了同一 PID（Windows 回收 PID / 图站工具为常驻进程），会被误判为"相同目标"
             // 而漏发 VncPidReady，导致可视化弹窗第二次打不开（缺陷）。
+            // ⚠ 2026-10-08：进程名必须按「null 与空串等价」比较。StationAgent 上报的是 null（工具未配置进程名），
+            //   而 VncViewer 从地址栏拿到的是空串 ""，原先直接 string.Equals 比 ⇒ null ≠ "" ⇒ 回绑被误判成
+            //   "新目标" ⇒ 又广播一次 VncPidReady（这次 sessionKey=null）⇒ 前端去重键从 sessionKey 变成
+            //   ip|pid|name，两次键不同 ⇒ window.open 两次 ⇒ 弹出两个可视化窗口。
+            //   实测证据：StationLogs/log20261008.txt 10:11:05.939(进程名=null,会话=fc56) 紧接着
+            //             10:11:07.211(进程名=,会话=null) 两条 VncPidReady 载荷。
             var current = registry.Current;
             var currentSession = registry.SessionKey;
             bool isRedundantBind = current != null
                 && current.ProcessId == request.ProcessId
-                && string.Equals(current.ProcessName, request.ProcessName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(current.ProcessName ?? string.Empty, request.ProcessName ?? string.Empty, StringComparison.OrdinalIgnoreCase)
                 && (request.SessionKey == null
                     || string.Equals(request.SessionKey, currentSession, StringComparison.OrdinalIgnoreCase));
 
@@ -92,6 +98,15 @@ namespace CJ.Plug.StationApiServer.Apis
             {
                 Console.WriteLine($"[VncPidReady] 目标未变化(PID={request.ProcessId})，跳过重复通知");
                 return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定（重复绑定，未变化）" });
+            }
+
+            // 显式声明"只绑定、不通知"的请求（VncViewer 回绑走这条）：它只是给 RFB 服务端重新断言目标，
+            // 不是新的可视化需求，绝不能再次通知前端开窗 —— 否则前端按 ip|pid|name 组成的另一个去重键
+            // 又会命中，再弹一个窗口。这条是上面那条"空串归一"之外的独立护栏（双保险）。
+            if (!request.Notify)
+            {
+                Console.WriteLine($"[VncPidReady] 按要求仅绑定不通知(PID={request.ProcessId})");
+                return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定（未通知前端）" });
             }
 
             // 单窗口 VNC 目标 PID 已就绪：通知前端此时再打开可视化页面（URL 带 pid）
@@ -155,6 +170,13 @@ namespace CJ.Plug.StationApiServer.Apis
             public int? ProcessId { get; set; }
             public string? ProcessName { get; set; }
             public string? SessionKey { get; set; }
+
+            /// <summary>
+            /// 本次绑定是否允许广播 VncPidReady 去通知前端开窗（默认 true，StationAgent 主 A/兜底路径都用默认值）。
+            /// VncViewer 页面按地址栏 pid 回绑时传 false：回绑只是给 RFB 服务端重新断言目标，
+            /// 不是新的可视化需求，绝不能再次触发开窗。
+            /// </summary>
+            public bool Notify { get; set; } = true;
         }
 
         #endregion

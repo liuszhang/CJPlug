@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Job;
+using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Plug;
 using Elsa.Api.Client.Extensions;
 using Elsa.Api.Client.Resources.ActivityExecutions.Models;
@@ -100,6 +100,14 @@ public partial class ElsaApiClient
 
     public async Task<PagedListResponse<WorkflowExecutionLogRecord>> GetJournalAsync(string workflowInstanceId, JournalFilter? filter = default, int? skip = default, int? take = default, CancellationToken cancellationToken = default)
     {
+        // ⚠ 空实例 ID 直接返回空：否则会拼出 /elsa/api/workflow-instances//journal（空段路由匹配不上）→ 404
+        //   → EnsureSuccessStatusCode 抛 HttpRequestException，把上游真正的失败（如身份 401）掩盖成一个假的 404。
+        if (string.IsNullOrWhiteSpace(workflowInstanceId))
+        {
+            Log.Warning("[Elsa] 获取流程历程被跳过：工作流实例 ID 为空（避免拼出 /workflow-instances//journal 造成假 404）");
+            return new PagedListResponse<WorkflowExecutionLogRecord>();
+        }
+
         var url = new Uri($"/elsa/api/workflow-instances/{workflowInstanceId}/journal", UriKind.Relative);
         var request = new GetFilteredJournalRequest
         {

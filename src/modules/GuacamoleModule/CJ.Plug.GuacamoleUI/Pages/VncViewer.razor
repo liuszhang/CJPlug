@@ -131,6 +131,13 @@
 
     /// <summary>
     /// 用 URL 携带的 PID 调用图站 bind API，强制绑定单窗口 VNC 目标。
+    ///
+    /// <para>
+    /// ⚠ <c>notify=false</c> 是必须的：本调用只是"给 RFB 服务端重新断言目标"，并不是新的可视化需求。
+    /// 若不关掉通知，图站会再广播一次 <c>VncPidReady</c>（sessionKey=null），而前端去重键是
+    /// <c>sessionKey ?? "ip|pid|name"</c> ⇒ 与首次（sessionKey 非空）不同 ⇒ 又 <c>window.open</c> 一个窗口，
+    /// 实机表现就是"执行单个节点弹出两个可视化窗口"（2026-10-08 修复，日志证据见图站 StationLogs）。
+    /// </para>
     /// </summary>
     private async Task BindWindowOnStationAsync(int pid)
     {
@@ -140,7 +147,7 @@
             // 图站 API 端口：默认 7660（StationApiPort），URL 可带 stationPort 覆盖
             var stationPort = 7660;
             var bindUrl = $"http://{pureHost}:{stationPort}/api/station/remote/vnc-window/bind";
-            var payload = new { processId = pid, processName = ProcessName, sessionKey = (string?)null };
+            var payload = new { processId = pid, processName = ProcessName, sessionKey = (string?)null, notify = false };
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             var json = System.Text.Json.JsonSerializer.Serialize(payload);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
