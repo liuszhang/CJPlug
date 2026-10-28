@@ -45,13 +45,42 @@
 
         var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
 
+        // 统一提取纯主机名（stationIp 可能是 "http://192.168.161.237:7660" 完整地址）
+        var pureHost = ExtractHost(StationIp);
+
         var targetUrl = protocol switch
         {
-            "vnc" or "rdp" => $"/remote/vnc/{StationIp}{queryString}",
-            "ssh" => $"/remote/ssh/{StationIp}{queryString}",
-            _ => $"/remote/vnc/{StationIp}{queryString}"
+            // 单窗口 RFB VNC：连图站 5901（RfbWindowVncServer）
+            "window" => $"/remote/vnc/{pureHost}?port=5901&window=1",
+            "vnc" or "rdp" => $"/remote/vnc/{pureHost}{queryString}",
+            "ssh" => $"/remote/ssh/{pureHost}{queryString}",
+            _ => $"/remote/vnc/{pureHost}{queryString}"
         };
 
         NavigationManager.NavigateTo(targetUrl, replace: true);
+    }
+
+    /// <summary>
+    /// 从可能的完整 URL 中提取纯 IP/主机名（与 PlugExecuteStandalone.ExtractHost 一致）。
+    /// </summary>
+    private static string ExtractHost(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return "localhost";
+
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        var stripped = raw;
+        if (stripped.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[7..];
+        else if (stripped.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[8..];
+
+        var colonIdx = stripped.IndexOf(':');
+        if (colonIdx > 0)
+            stripped = stripped[..colonIdx];
+
+        return stripped;
     }
 }

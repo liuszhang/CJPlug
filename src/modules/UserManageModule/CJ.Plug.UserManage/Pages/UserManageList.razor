@@ -98,7 +98,7 @@
 
             <TemplateColumn Title="创建时间" Sortable="true">
                 <CellTemplate>
-                    @context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                    @DisplayTime.Utc(context.Item.CreatedAt, "yyyy-MM-dd HH:mm:ss")
                 </CellTemplate>
             </TemplateColumn>
 

@@ -11,14 +11,14 @@
             <MudTextField T="string" Label="名称 *" @bind-Value="model.Name" Required="true" RequiredError="名称不能为空" />
             <MudTextField T="string" Label="代码 *" @bind-Value="model.Code" Required="true" RequiredError="代码不能为空" />
             <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />
-            <MudSelect T="int?" Label="关联对象" @bind-Value="model.OntologyId" Clearable="true">
+            <MudSelect Label="关联对象" @bind-Value="model.OntologyId" Clearable="true">
                 @foreach (var o in ontologies)
                 {
-                    <MudSelectItem T="int?" Value="@o.Id">@o.DisplayName</MudSelectItem>
+                    <MudSelectItem Value="@((int?)o.Id)">@o.DisplayName</MudSelectItem>
                 }
             </MudSelect>
             <MudTextField T="string" Label="Steps (JSON)" @bind-Value="model.Steps" Lines="4" />
-            <MudSwitch T="bool" Label="激活" @bind-Checked="model.IsActive" />
+            <MudSwitch T="bool" Label="激活" @bind-Value="model.IsActive" />
         </MudStack>
     </DialogContent>
     <DialogActions>

@@ -98,10 +98,10 @@ public class MainHub(IStationService stationService):Hub
         /// <summary>
         /// 图站开始执行通知 (用于触发 Guacamole 远程桌面)
         /// </summary>
-        public async Task StationExecuting(string PDZId, string PlugDefinitionId, string StationIp, string Protocol = "vnc")
+        public async Task StationExecuting(string PDZId, string PlugDefinitionId, string StationIp, string Protocol = "vnc", string? ProcessName = null)
         {
-            Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp} protocol={Protocol}");
-            await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol);
+            Console.WriteLine($"StationExecuting: {PlugDefinitionId} on {StationIp} protocol={Protocol} processName={ProcessName}");
+            await Clients.All.SendAsync(LogTypeEnum.StationExecuting.ToString(), PDZId, PlugDefinitionId, StationIp, Protocol, ProcessName);
         }
 
         /// <summary>
@@ -111,6 +111,24 @@ public class MainHub(IStationService stationService):Hub
         {
             Console.WriteLine($"MCP Tool {action}: {toolId}");
             await Clients.All.SendAsync("MCPToolUpdated", toolId, action);
+        }
+
+        /// <summary>
+        /// 单窗口 VNC 目标进程已退出：广播通知前端自动关闭可视化窗口
+        /// </summary>
+        public async Task VncWindowClosed(string stationIp, string? sessionKey = null)
+        {
+            Console.WriteLine($"VncWindowClosed: station={stationIp} sessionKey={sessionKey}");
+            await Clients.All.SendAsync(LogTypeEnum.VncWindowClosed.ToString(), stationIp, sessionKey);
+        }
+
+        /// <summary>
+        /// 单窗口 VNC 目标 PID 已就绪：广播通知前端此时再打开可视化页面（URL 带 pid）
+        /// </summary>
+        public async Task VncPidReady(string stationIp, int? pid, string? processName = null, string? sessionKey = null)
+        {
+            Console.WriteLine($"VncPidReady: station={stationIp} pid={pid} processName={processName}");
+            await Clients.All.SendAsync(LogTypeEnum.VncPidReady.ToString(), stationIp, pid, processName, sessionKey);
         }
     }
 

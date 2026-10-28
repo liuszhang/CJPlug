@@ -7,6 +7,7 @@
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
 
 <PageTitle>@($"SSH 终端 - {StationIp}")</PageTitle>
 
@@ -112,6 +113,13 @@
             var baseUri = NavigationManager.BaseUri; // e.g. http://localhost:5066/
             var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
             var wsUrl = $"{wsBase}/api/remote/ssh?host={_host}&port={_port}&username={Uri.EscapeDataString(_username)}&password={Uri.EscapeDataString(_password)}";
+
+            // 部署级访问令牌（D6）
+            var accessToken = Config?["RemoteDesktop:AccessToken"];
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                wsUrl += $"&token={Uri.EscapeDataString(accessToken)}";
+            }
 
             // 初始化 xterm.js 终端
             var success = await JSRuntime.InvokeAsync<bool>("xtermInterop.connect", "terminal", wsUrl);

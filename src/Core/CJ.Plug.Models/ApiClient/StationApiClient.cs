@@ -217,5 +217,43 @@ public class StationApiClient(HttpClient httpClient)
         var response = await httpClient.PostAsync("/api/station/downloadTool", content);
         return response.IsSuccessStatusCode;
     }
+
+    /// <summary>
+    /// 绑定单窗口 RFB VNC 目标（子方案1：PID 主 / 进程名辅）。
+    /// </summary>
+    public async Task<bool> BindWindowAsync(int? processId, string? processName, string? sessionKey = null)
+    {
+        try
+        {
+            var payload = new { processId, processName, sessionKey };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync("/api/station/remote/vnc-window/bind", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error binding VNC window: " + ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 解绑单窗口 RFB VNC 目标。
+    /// </summary>
+    public async Task<bool> UnbindWindowAsync(string? sessionKey = null)
+    {
+        try
+        {
+            var url = "/api/station/remote/vnc-window/bind";
+            if (!string.IsNullOrEmpty(sessionKey))
+                url += $"?sessionKey={Uri.EscapeDataString(sessionKey)}";
+            var response = await httpClient.DeleteAsync(url);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
 

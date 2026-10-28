@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,10 +9,10 @@
   <ItemGroup>
     <PackageReference Include="Elsa" />
     <PackageReference Include="Elsa.Api.Client" />
-    <PackageReference Include="Elsa.CSharp" />
+    <PackageReference Include="Elsa.Expressions.CSharp" />
     <PackageReference Include="Elsa.Identity" />
-    <PackageReference Include="Elsa.JavaScript" />
-    <PackageReference Include="Elsa.Liquid" />
+    <PackageReference Include="Elsa.Expressions.JavaScript" />
+    <PackageReference Include="Elsa.Expressions.Liquid" />
     <PackageReference Include="Elsa.Persistence.EFCore" />
     <PackageReference Include="Elsa.Persistence.EFCore.PostgreSql" />
     <PackageReference Include="Elsa.Persistence.EFCore.SqlServer" />
@@ -24,7 +24,7 @@
     <PackageReference Include="Elsa.Studio.Core.BlazorServer" />
     <PackageReference Include="Elsa.Studio.Login" />
     <PackageReference Include="Elsa.Studio.Login.BlazorServer" />
-    <PackageReference Include="Elsa.Webhooks" />
+    <PackageReference Include="Elsa.Http.Webhooks" />
     <PackageReference Include="Elsa.Workflows.Api" />
     <PackageReference Include="Elsa.Workflows.Runtime" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />

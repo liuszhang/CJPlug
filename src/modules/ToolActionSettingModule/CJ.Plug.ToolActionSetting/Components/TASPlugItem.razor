@@ -72,13 +72,13 @@
 
             <MudIconButton OnClick="RunPlug" Size="Size.Small"
                 Icon="@(_isRunning ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.PlayArrow)"
-                Color="Color.Success" Disabled="@_isRunning" Title="执行测试" />
+                Color="Color.Success" Disabled="@_isRunning" title="执行测试" />
 
-            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" Title="配置" />
+            <MudIconButton OnClick="ShowDetails" Size="Size.Small" Icon="@Icons.Material.Filled.Settings" title="配置" />
 
             @if (!(Plug.CreateType == PlugCreateTypeEnum.SystemInitPlug.ToString()))
             {
-                <MudIconButton Disabled="@_processing" OnClick="DeleteToolItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Title="删除" />
+                <MudIconButton Disabled="@_processing" OnClick="DeleteToolItem" Size="Size.Small" Icon="@Icons.Material.Filled.Delete" Color="Color.Error" title="删除" />
             }
         </MudStack>
     </MudStack>

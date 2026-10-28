@@ -23,7 +23,7 @@
                 <tr>
                     <td style="width: 200px;">@item.Label</td>
                     <td style="width: 50px;">
-                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" Title="Copy" OnClick="@(() => OnCopyClicked(item.Text!))" Disabled="@(string.IsNullOrWhiteSpace(item.Text))"/>
+                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" title="Copy" OnClick="@(() => OnCopyClicked(item.Text!))" Disabled="@(string.IsNullOrWhiteSpace(item.Text))"/>
                     </td>
                     <td>
                         @if (!string.IsNullOrWhiteSpace(item.Link))

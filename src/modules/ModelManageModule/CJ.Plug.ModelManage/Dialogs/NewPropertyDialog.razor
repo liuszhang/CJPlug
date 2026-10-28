@@ -22,12 +22,12 @@
             <MudTextField T="string" Label="描述" @bind-Value="prop.Description" />
             <MudTextField T="string" Label="默认值" @bind-Value="prop.Value" />
             <MudStack Row Spacing="4">
-                <MudCheckBox T="bool" Label="必填" @bind-Checked="prop.IsRequired" />
-                <MudCheckBox T="bool" Label="可浏览" @bind-Checked="prop.IsBrowsable" />
+                <MudCheckBox T="bool" Label="必填" @bind-Value="prop.IsRequired" />
+                <MudCheckBox T="bool" Label="可浏览" @bind-Value="prop.IsBrowsable" />
             </MudStack>
             <MudNumericField T="int" Label="排序" @bind-Value="prop.SortOrder" />
             <MudTextField T="string" Label="UI提示" @bind-Value="prop.UIHint" />
-            <MudNumericField T="int?" Label="最大长度" @bind-Value="prop.Length" />
+            <MudNumericField Label="最大长度" @bind-Value="prop.Length" />
             <MudTextField T="string" Label="字典编码" @bind-Value="prop.DictCode" />
             <MudTextField T="string" Label="校验规则" @bind-Value="prop.ValidationRule" />
 

@@ -24,10 +24,10 @@ else
                     <MudTextField T="string" Label="编码" @bind-Value="ActiveOntology.Code" />
                     <MudTextField T="string" Label="名称" @bind-Value="ActiveOntology.Name" />
                     <MudTextField T="string" Label="显示名称" @bind-Value="ActiveOntology.DisplayName" />
-                    <MudSelect T="MetaModelDimension?" Label="元模型维度" @bind-Value="ActiveOntology.Dimension" Clearable="true">
+                    <MudSelect Label="元模型维度" @bind-Value="ActiveOntology.Dimension" Clearable="true">
                         @foreach (var dim in Enum.GetValues<MetaModelDimension>())
                         {
-                            <MudSelectItem T="MetaModelDimension?" Value="@dim">@GetDimensionLabel(dim)</MudSelectItem>
+                            <MudSelectItem Value="@((MetaModelDimension?)dim)">@GetDimensionLabel(dim)</MudSelectItem>
                         }
                     </MudSelect>
                     <MudTextField T="string" Label="分类" @bind-Value="ActiveOntology.Category" />
@@ -172,19 +172,19 @@ else
                         @if (lifecycleStates.Count >= 2)
                         {
                             <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
-                                <MudSelect T="int?" Label="源状态" @bind-Value="transitionSourceId" Variant="Variant.Outlined"
+                                <MudSelect Label="源状态" @bind-Value="transitionSourceId" Variant="Variant.Outlined"
                                            Style="width:180px" AnchorOrigin="Origin.BottomCenter">
                                     @foreach (var s in lifecycleStates)
                                     {
-                                        <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                                        <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
                                     }
                                 </MudSelect>
                                 <MudText Typo="Typo.body1" Class="mx-1">→</MudText>
-                                <MudSelect T="int?" Label="目标状态" @bind-Value="transitionTargetId" Variant="Variant.Outlined"
+                                <MudSelect Label="目标状态" @bind-Value="transitionTargetId" Variant="Variant.Outlined"
                                            Style="width:180px" AnchorOrigin="Origin.BottomCenter">
                                     @foreach (var s in lifecycleStates)
                                     {
-                                        <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                                        <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
                                     }
                                 </MudSelect>
                                 <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddTransition"

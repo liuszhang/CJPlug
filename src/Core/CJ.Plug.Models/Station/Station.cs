@@ -37,6 +37,11 @@ namespace CJ.Plug.Models.Station
         public string? GuacamoleProtocol { get; set; } = "rdp";
 
         /// <summary>
+        /// 远程查看模式: fullscreen=整桌面 VNC（默认）, window=单窗口 RFB VNC 投射
+        /// </summary>
+        public string? RemoteViewMode { get; set; } = "fullscreen";
+
+        /// <summary>
         /// 远程桌面端口 (RDP默认3389, VNC默认5900, SSH默认22)
         /// </summary>
         public int? GuacamolePort { get; set; }

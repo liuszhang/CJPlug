@@ -1,13 +1,4 @@
-﻿
-using CJ.Plug.Models.Plug;
-using CJ.Plug.Models.Shared;
-using Microsoft.AspNetCore.Components;
-using Radzen.Blazor.Markdown;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using CJ.Plug.Models.Shared;
 
 namespace CJ.Plug.VariableUIHandler.Models
 {

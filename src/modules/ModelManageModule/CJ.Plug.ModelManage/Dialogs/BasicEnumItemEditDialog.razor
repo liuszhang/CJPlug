@@ -13,7 +13,7 @@
             <MudTextField T="string" Label="编码 *" @bind-Value="model.Code" Required="true" />
             <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="2" />
             <MudNumericField T="int" Label="排序号" @bind-Value="model.SortOrder" />
-            <MudCheckBox T="bool" Label="启用" @bind-Checked="model.IsEnabled" />
+            <MudCheckBox T="bool" Label="启用" @bind-Value="model.IsEnabled" />
         </MudStack>
     </DialogContent>
     <DialogActions>

@@ -19,25 +19,25 @@
             <MudTextField @bind-Value="_query.UserName" Label="操作人" Variant="Variant.Outlined" Margin="Margin.Dense" />
         </MudItem>
         <MudItem xs="3">
-            <MudSelect T="AuditModule?" @bind-Value="_query.Module" Label="操作模块" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            <MudSelect @bind-Value="_query.Module" Label="操作模块" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
                 @foreach (var module in Enum.GetValues<AuditModule>())
                 {
-                    <MudSelectItem T="AuditModule?" Value="@((AuditModule?)module)">@GetModuleName(module)</MudSelectItem>
+                    <MudSelectItem Value="@((AuditModule?)module)">@GetModuleName(module)</MudSelectItem>
                 }
             </MudSelect>
         </MudItem>
         <MudItem xs="3">
-            <MudSelect T="AuditOperationType?" @bind-Value="_query.OperationType" Label="操作类型" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            <MudSelect @bind-Value="_query.OperationType" Label="操作类型" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
                 @foreach (var type in Enum.GetValues<AuditOperationType>())
                 {
-                    <MudSelectItem T="AuditOperationType?" Value="@((AuditOperationType?)type)">@GetOperationTypeName(type)</MudSelectItem>
+                    <MudSelectItem Value="@((AuditOperationType?)type)">@GetOperationTypeName(type)</MudSelectItem>
                 }
             </MudSelect>
         </MudItem>
         <MudItem xs="3">
-            <MudSelect T="bool?" @bind-Value="_query.IsSuccess" Label="操作结果" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                <MudSelectItem T="bool?" Value="@(true)">成功</MudSelectItem>
-                <MudSelectItem T="bool?" Value="@(false)">失败</MudSelectItem>
+            <MudSelect @bind-Value="_query.IsSuccess" Label="操作结果" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem Value="@((bool?)true)">成功</MudSelectItem>
+                <MudSelectItem Value="@((bool?)false)">失败</MudSelectItem>
             </MudSelect>
         </MudItem>
         <MudItem xs="3">

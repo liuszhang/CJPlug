@@ -44,13 +44,13 @@
                             <MudItem xs="8"><MudText Typo="Typo.body1">@_licensee</MudText></MudItem>
 
                             <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">签发时间</MudText></MudItem>
-                            <MudItem xs="8"><MudText Typo="Typo.body1">@_issuedAt.ToString("yyyy-MM-dd HH:mm")</MudText></MudItem>
+                            <MudItem xs="8"><MudText Typo="Typo.body1">@DisplayTime.Utc(_issuedAt, "yyyy-MM-dd HH:mm")</MudText></MudItem>
 
                             <MudItem xs="4"><MudText Typo="Typo.body2" Class="mud-text-secondary">授权码过期</MudText></MudItem>
                             <MudItem xs="8">
                                 @if (_codeExpiresAt.HasValue)
                                 {
-                                    <MudText Typo="Typo.body1">@_codeExpiresAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                    <MudText Typo="Typo.body1">@DisplayTime.Utc(_codeExpiresAt.Value, "yyyy-MM-dd HH:mm")</MudText>
                                 }
                                 else
                                 {

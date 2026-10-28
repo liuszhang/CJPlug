@@ -1,5 +1,8 @@
 using System.Net.WebSockets;
+using CJ.Plug.Models.LogModels;
 using CJ.Plug.StationApiServer.Services;
+using CJ.Plug.StationApiServer.Services.Rfb;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CJ.Plug.StationApiServer.Apis
 {
@@ -49,8 +52,134 @@ namespace CJ.Plug.StationApiServer.Apis
             // 窗口捕获：WebSocket 端点
             api.Map("/capture", HandleCaptureWebSocket);
 
+            // === RFB 单窗口 VNC 绑定（子方案1）===
+            // 绑定：StationAgent 上报工具 PID / 主服务按进程名绑定
+            api.MapPost("/vnc-window/bind", BindWindowTarget);
+
+            // 解绑
+            api.MapDelete("/vnc-window/bind", UnbindWindowTarget);
+
+            // 绑定状态
+            api.MapGet("/vnc-window/status", GetWindowBindStatus);
+
             return app;
         }
+
+        #region RFB 单窗口 VNC 绑定端点
+
+        private static IResult BindWindowTarget(WindowBindRegistry registry, [FromBody] WindowBindRequest? request)
+        {
+            if (request == null || (request.ProcessId is null or <= 0) && string.IsNullOrEmpty(request.ProcessName))
+                return TypedResults.BadRequest(new { Message = "缺少 ProcessId 或 ProcessName" });
+
+            // 幂等：相同目标重复绑定不重复发 VncPidReady（否则 VncViewer 打开→绑定→通知→再打开 无限循环）。
+            // 关键：判定"冗余绑定"必须带上 sessionKey（执行关联 ID = ToolJobCorrelationId）。
+            //   - VncViewer 页面加载时用自己的 bind 回绑（sessionKey 为 null）→ 视为冗余，跳过；
+            //   - 新的执行（sessionKey 与上一次不同）→ 视为新目标，必须重新通知。
+            // 否则第二次执行若复用了同一 PID（Windows 回收 PID / 图站工具为常驻进程），会被误判为"相同目标"
+            // 而漏发 VncPidReady，导致可视化弹窗第二次打不开（缺陷）。
+            // ⚠ 2026-10-08：进程名必须按「null 与空串等价」比较。StationAgent 上报的是 null（工具未配置进程名），
+            //   而 VncViewer 从地址栏拿到的是空串 ""，原先直接 string.Equals 比 ⇒ null ≠ "" ⇒ 回绑被误判成
+            //   "新目标" ⇒ 又广播一次 VncPidReady（这次 sessionKey=null）⇒ 前端去重键从 sessionKey 变成
+            //   ip|pid|name，两次键不同 ⇒ window.open 两次 ⇒ 弹出两个可视化窗口。
+            //   实测证据：StationLogs/log20261008.txt 10:11:05.939(进程名=null,会话=fc56) 紧接着
+            //             10:11:07.211(进程名=,会话=null) 两条 VncPidReady 载荷。
+            var current = registry.Current;
+            var currentSession = registry.SessionKey;
+            bool isRedundantBind = current != null
+                && current.ProcessId == request.ProcessId
+                && string.Equals(current.ProcessName ?? string.Empty, request.ProcessName ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && (request.SessionKey == null
+                    || string.Equals(request.SessionKey, currentSession, StringComparison.OrdinalIgnoreCase));
+
+            registry.SetTarget(new WindowTarget(request.ProcessId, request.ProcessName), request.SessionKey);
+
+            if (isRedundantBind)
+            {
+                Console.WriteLine($"[VncPidReady] 目标未变化(PID={request.ProcessId})，跳过重复通知");
+                return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定（重复绑定，未变化）" });
+            }
+
+            // 显式声明"只绑定、不通知"的请求（VncViewer 回绑走这条）：它只是给 RFB 服务端重新断言目标，
+            // 不是新的可视化需求，绝不能再次通知前端开窗 —— 否则前端按 ip|pid|name 组成的另一个去重键
+            // 又会命中，再弹一个窗口。这条是上面那条"空串归一"之外的独立护栏（双保险）。
+            if (!request.Notify)
+            {
+                Console.WriteLine($"[VncPidReady] 按要求仅绑定不通知(PID={request.ProcessId})");
+                return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定（未通知前端）" });
+            }
+
+            // 单窗口 VNC 目标 PID 已就绪：通知前端此时再打开可视化页面（URL 带 pid）
+            // 前端收到 VncPidReady 后才 window.open(...&pid=XXX)，彻底消除"窗口未出现"竞态
+            try
+            {
+                var stationIp = ResolveLocalIp();
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    StationIp = stationIp,
+                    Pid = request.ProcessId,
+                    ProcessName = request.ProcessName,
+                    SessionKey = request.SessionKey
+                });
+                CLog.Information(payload, null, null, null, null, LogTypeEnum.VncPidReady);
+                Console.WriteLine($"[VncPidReady] 已通知前端打开可视化页面: pid={request.ProcessId} station={stationIp}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VncPidReady] 通知失败: {ex.Message}");
+            }
+
+            return TypedResults.Ok(new { Message = "VNC 窗口目标已绑定" });
+        }
+
+        /// <summary>解析本机 IP（VncPidReady 通知用，前端按 IP 匹配图站）。</summary>
+        private static string ResolveLocalIp()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                var ip = host.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                return ip?.ToString() ?? "127.0.0.1";
+            }
+            catch
+            {
+                return "127.0.0.1";
+            }
+        }
+
+        private static IResult UnbindWindowTarget(WindowBindRegistry registry, string? sessionKey = null)
+        {
+            registry.Clear(sessionKey);
+            return TypedResults.Ok(new { Message = "VNC 窗口目标已解绑" });
+        }
+
+        private static IResult GetWindowBindStatus(WindowBindRegistry registry)
+        {
+            var target = registry.Current;
+            return TypedResults.Ok(new
+            {
+                bound = target != null,
+                processId = target?.ProcessId,
+                processName = target?.ProcessName,
+                sessionKey = registry.SessionKey
+            });
+        }
+
+        public class WindowBindRequest
+        {
+            public int? ProcessId { get; set; }
+            public string? ProcessName { get; set; }
+            public string? SessionKey { get; set; }
+
+            /// <summary>
+            /// 本次绑定是否允许广播 VncPidReady 去通知前端开窗（默认 true，StationAgent 主 A/兜底路径都用默认值）。
+            /// VncViewer 页面按地址栏 pid 回绑时传 false：回绑只是给 RFB 服务端重新断言目标，
+            /// 不是新的可视化需求，绝不能再次触发开窗。
+            /// </summary>
+            public bool Notify { get; set; } = true;
+        }
+
+        #endregion
 
         #region 窗口捕获端点
 

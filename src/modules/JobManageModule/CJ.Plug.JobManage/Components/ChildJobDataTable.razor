@@ -1,4 +1,4 @@
-﻿@using CJ.Plug.JobManageApiClient
+@using CJ.Plug.JobManageApiClient
 @using CJ.Plug.Models.Job
 @using CJ.Plug.Models.PlugProcess
 @using MudBlazor
@@ -71,9 +71,9 @@ else
                     @context.JobSubStatus
                 </MudChip>
             </MudTd>
-            <MudTd DataLabel="CreatedAt">@context.CreatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
-            <MudTd DataLabel="UpdatedAt">@context.UpdatedAt.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
-            <MudTd DataLabel="FinishedAt">@context.FinishedAt?.DateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="CreatedAt">@DisplayTime.Utc(context.CreatedAt, "yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="UpdatedAt">@DisplayTime.Utc(context.UpdatedAt, "yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+            <MudTd DataLabel="FinishedAt">@DisplayTime.UtcOrNull(context.FinishedAt, "yyyy-MM-dd HH:mm:ss.fff")</MudTd>
             <MudTd DataLabel="" Style="text-align:right">
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
                     <MudMenuItem OnClick="JobDetails" Icon="@Icons.Material.Outlined.ZoomIn">详情</MudMenuItem>

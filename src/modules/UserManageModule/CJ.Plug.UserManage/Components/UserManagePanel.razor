@@ -101,7 +101,7 @@
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="创建时间" Sortable="true">
-            <CellTemplate>@context.Item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+            <CellTemplate>@DisplayTime.Utc(context.Item.CreatedAt, "yyyy-MM-dd HH:mm:ss")</CellTemplate>
         </TemplateColumn>
         <TemplateColumn Style="text-align:right" Title="操作">
             <CellTemplate>

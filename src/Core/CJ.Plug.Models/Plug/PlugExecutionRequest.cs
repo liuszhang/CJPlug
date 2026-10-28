@@ -35,6 +35,12 @@ using System.Threading.Tasks;
     /// <summary>StationApiServer 端口号，StationAgent 执行完成后回传结果使用。默认 7660</summary>
     public int StationApiPort { get; set; } = 7660;
 
+    /// <summary>远程查看模式：fullscreen=整桌面 VNC（默认，向后兼容）；window=单窗口 RFB VNC 投射</summary>
+    public string? RemoteViewMode { get; set; }
+
+    /// <summary>单窗口模式的兜底进程名（辅 B：工具配置"远程查看进程名"）</summary>
+    public string? RemoteViewProcessName { get; set; }
+
         /// <summary>MCP 调用时的工具类型: "Workflow" 或 "Plugin"，用于 StartExecutePlug 内部路由</summary>
         public string? McpToolType { get; set; }
 

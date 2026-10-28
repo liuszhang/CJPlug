@@ -80,7 +80,7 @@
                                     <MudChip T="string" Size="Size.Small" Color="Color.Error">已锁定</MudChip>
                                 </MudTd>
                                 <MudTd>
-                                    <MudIconButton Size="Size.Small" OnClick="@(() => UnlockUser(user.UserName))" Icon="@Icons.Material.Filled.LockOpen" Color="Color.Primary" Title="解锁账号" />
+                                    <MudIconButton Size="Size.Small" OnClick="@(() => UnlockUser(user.UserName))" Icon="@Icons.Material.Filled.LockOpen" Color="Color.Primary" title="解锁账号" />
                                 </MudTd>
                             </RowTemplate>
                             <NoRecordsContent>
@@ -117,7 +117,7 @@
                                 <CellTemplate>@context.Item.RequestedBy</CellTemplate>
                             </TemplateColumn>
                             <TemplateColumn Title="请求时间">
-                                <CellTemplate>@context.Item.RequestedAt.ToString("yyyy-MM-dd HH:mm:ss")</CellTemplate>
+                                <CellTemplate>@DisplayTime.Utc(context.Item.RequestedAt, "yyyy-MM-dd HH:mm:ss")</CellTemplate>
                             </TemplateColumn>
                             <TemplateColumn Title="状态">
                                 <CellTemplate>
@@ -128,7 +128,7 @@
                                 <CellTemplate>@(context.Item.ApprovedBy ?? "-")</CellTemplate>
                             </TemplateColumn>
                             <TemplateColumn Title="审批时间">
-                                <CellTemplate>@(context.Item.ApprovedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</CellTemplate>
+                                <CellTemplate>@(DisplayTime.UtcOrNull(context.Item.ApprovedAt, "yyyy-MM-dd HH:mm:ss") ?? "-")</CellTemplate>
                             </TemplateColumn>
                             <TemplateColumn Title="备注">
                                 <CellTemplate>@(context.Item.Remark ?? "-")</CellTemplate>

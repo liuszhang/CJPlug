@@ -6,6 +6,29 @@ window.noVncInterop = {
     connected: false,
 
     /**
+     * 关闭当前可视化窗口（单窗口 VNC 目标进程退出后自动调用）。
+     * window.close() 对脚本打开的新页签有效。
+     */
+    closeWindow: function () {
+        try {
+            if (this.rfb) {
+                try { this.rfb.disconnect(); } catch (e) {}
+                this.rfb = null;
+                this.connected = false;
+            }
+            window.close();
+            // 部分浏览器禁止脚本关闭窗口时兜底跳转空白页
+            setTimeout(function () {
+                if (!window.closed) {
+                    window.location.href = 'about:blank';
+                }
+            }, 200);
+        } catch (e) {
+            console.error('[noVNC] closeWindow error:', e);
+        }
+    },
+
+    /**
      * 连接到 VNC 服务器
      * @param {string} containerId - 容器 div 元素 ID (不是 canvas)
      * @param {string} wsUrl - WebSocket URL
@@ -59,6 +82,13 @@ window.noVncInterop = {
                     if (!settled) {
                         settled = true;
                         console.error('[noVNC] Connection timeout after 10s');
+                        // 诊断：输出 RFB 内部状态，定位握手卡点（noVNC 1.x 字段为 camelCase）
+                        try {
+                            console.error('[noVNC] RFB state:', rfb._rfbConnectionState,
+                                '| fbName:[' + rfb._fbName + ']',
+                                '| fbSize:', (rfb._fb_width || rfb._fbWidth) + 'x' + (rfb._fb_height || rfb._fbHeight),
+                                '| encodings:', rfb._encodings ? rfb._encodings.join(',') : 'n/a');
+                        } catch(e) { console.error('[noVNC] state dump failed', e); }
                         try { rfb.disconnect(); } catch(e) {}
                         resolve(false);
                     }

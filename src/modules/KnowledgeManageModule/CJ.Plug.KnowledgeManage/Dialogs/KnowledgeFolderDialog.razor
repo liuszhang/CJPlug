@@ -10,12 +10,12 @@
                                   RequiredError="文件夹名称为必填项" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudSelect T="int?" Label="父文件夹" @bind-Value="_model.ParentId"
+                    <MudSelect Label="父文件夹" @bind-Value="_model.ParentId"
                                Placeholder="无（根级文件夹）">
-                        <MudSelectItem T="int?" Value="@((int?)null)">无（根级文件夹）</MudSelectItem>
+                        <MudSelectItem Value="@((int?)null)">无（根级文件夹）</MudSelectItem>
                         @foreach (var folder in Folders)
                         {
-                            <MudSelectItem T="int?" Value="@((int?)folder.Id)">
+                            <MudSelectItem Value="@((int?)folder.Id)">
                                 @GetFolderDisplayName(folder)
                             </MudSelectItem>
                         }

@@ -1,11 +1,37 @@
 <Project>
   <!--
+    NuGet 中央版本管理（CPM）说明（2026-10-05）：
+    本方案的 CPM 已并入仓库根 D:\Pro\CJ.Plug.Github\Directory.Packages.props，
+    原 CJPlug\Directory.Packages.props 已删除——版本统一在根文件维护（同名包取更新的版本，
+    与 CJCore/CJOntology/CJWork/Liuvis 等方案共用一个真源），并统一 CentralPackageTransitivePinningEnabled=true。
+    个别需要保持历史钉版的工程在自身 csproj 内单独声明，见
+    src\PlugToolIntegrations\ElsaConsole\ElsaConsole.csproj（net8.0，关闭传递依赖钉版）。
+  -->
+  <!--
     限制原生库输出到 Windows x64 平台，
     避免 macOS/Linux/browser/arm64/x86 等平台的原生库被复制到输出目录。
   -->
   <PropertyGroup>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+
+    <!--
+      程序集绑定版本（2026-10-22《CJSuite程序集版本与发布版本解耦方案》枝1=A）：
+      固定 1.0.0.0，与发布版本彻底解耦。发布版本仍由打包链 -p:Version=<ver> 注入，
+      但它从此只影响 FileVersion / InformationalVersion —— SDK 的 GenerateAssemblyInfo.targets 里：
+        <GetAssemblyVersion Condition="'$(AssemblyVersion)' == ''" NuGetVersion="$(Version)">
+      只在未显式声明时才从 $(Version) 派生，故下面这行一旦写上，-p:Version 就覆盖不了它。
+      CJPlug 的组件（cjplug / cjplug-desktop / station-settingui）与 CJCore 共用程序集，
+      版本跟着发布号走会让引用方与提供方错位（见 BUG-20261022-014/015/016）。
+    -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!--
+      ⚠ 必须显式钉住 FileVersion：SDK 的 GenerateAssemblyInfo.targets 里 FileVersion 的默认派生源是
+      **AssemblyVersion** 而非 Version（<FileVersion Condition="'$(FileVersion)' == ''">$(AssemblyVersion)</FileVersion>）
+      ⇒ 只固定 AssemblyVersion 会让文件属性也显示 1.0.0.0。
+    -->
+    <FileVersion Condition="'$(Version)' != ''">$(Version)</FileVersion>
   </PropertyGroup>
 
   <!--

@@ -380,104 +380,32 @@ public partial class ServiceSetting : UserControl
         await RefreshServiceStatusAsync();
     }
 
+    /// <summary>
+    /// 退役提示（《CJPlug 发布纳入 CJSuite 与 AppHost 自带 DCP 方案》枝 18 / D10，2026-10-07）。
+    /// 「生成/下载图站部署包」由主服务器现场从仓库 02.Publish 取件，装到 %ProgramFiles% 后必然失败
+    /// （服务端 API 亦已返回 410）；图站分发改由 CJSuite 的 station-settingui 组件承担。
+    /// </summary>
+    private const string RetiredUpdateMessage = "图站部署包已改由 CJSuite 安装包分发（station-settingui 组件）；此处入口已退役。";
+
     private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
-        BtnCheckUpdate.IsEnabled = false;
+        // 已退役：不再发起检查/下载（保留控件与事件以最小化改动面）
+        TxtUpdateStatus.Text = RetiredUpdateMessage;
+        TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.OrangeRed);
         BtnDownloadUpdate.Visibility = Visibility.Collapsed;
-        TxtUpdateStatus.Text = "正在检查...";
-        TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.RoyalBlue);
-
-        var (hasUpdate, latestVersion, message) = await _apiService.CheckUpdateAsync();
-
         BtnCheckUpdate.IsEnabled = true;
-        TxtUpdateStatus.Text = message;
-
-        if (hasUpdate)
-        {
-            TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.OrangeRed);
-            BtnDownloadUpdate.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.Green);
-            BtnDownloadUpdate.Visibility = Visibility.Collapsed;
-        }
+        await Task.CompletedTask;
     }
-
-    private CancellationTokenSource? _downloadCts;
 
     private async void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)
     {
-        BtnDownloadUpdate.IsEnabled = false;
-        BtnCheckUpdate.IsEnabled = false;
-        PanelDownloadProgress.Visibility = Visibility.Visible;
-        ProgressDownload.Value = 0;
-        TxtProgressPercent.Text = "0%";
-        TxtProgressLabel.Text = "正在生成部署包并下载...";
-
-        _downloadCts = new CancellationTokenSource();
-
-        try
-        {
-            var platform = Environment.Is64BitOperatingSystem ? "win-x64" : "win-x86";
-            var saveDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-
-            // 下载进度回调（服务端打包期间进度条保持为 0，响应头到达后才有 ContentLength 追踪下载进度）
-            var downloadProgress = new Progress<int>(percent =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    ProgressDownload.Value = percent;
-                    TxtProgressPercent.Text = $"{percent}%";
-                    TxtProgressLabel.Text = percent < 100
-                        ? $"正在下载... {percent}%"
-                        : "下载完成";
-                });
-            });
-
-            // 一步完成：服务端打包完成后直接返回文件流
-            var filePath = await _apiService.DownloadStationPackageDirectAsync(
-                platform, saveDir, downloadProgress, _downloadCts.Token);
-
-            if (string.IsNullOrEmpty(filePath))
-            {
-                SetStatusMessage("下载部署包失败，请确认主服务端运行正常", true);
-                ResetDownloadUi();
-                return;
-            }
-
-            ProgressDownload.Value = 100;
-            TxtProgressPercent.Text = "100%";
-            TxtProgressLabel.Text = "下载完成";
-            SetStatusMessage($"部署包已下载到: {filePath}", false);
-
-            // 询问是否打开下载目录
-            var result = System.Windows.MessageBox.Show(
-                $"图站部署包已下载完成。\n\n文件: {filePath}\n\n是否打开下载目录?",
-                "下载完成",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            SetStatusMessage("下载已取消", false);
-        }
-        catch (Exception ex)
-        {
-            SetStatusMessage($"下载失败: {ex.Message}", true);
-        }
-        finally
-        {
-            _downloadCts?.Dispose();
-            _downloadCts = null;
-            ResetDownloadUi();
-        }
+        // 已退役（枝 18/D10）：不再调用服务端 download-station-direct（该 API 已返回 410）
+        TxtUpdateStatus.Text = RetiredUpdateMessage;
+        TxtUpdateStatus.Foreground = new SolidColorBrush(Colors.OrangeRed);
+        PanelDownloadProgress.Visibility = Visibility.Collapsed;
+        BtnDownloadUpdate.IsEnabled = true;
+        BtnCheckUpdate.IsEnabled = true;
+        await Task.CompletedTask;
     }
 
     private void ResetDownloadUi()

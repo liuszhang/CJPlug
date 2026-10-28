@@ -1,4 +1,4 @@
-﻿@page "/MCPToolManage"
+@page "/MCPToolManage"
 
 @using CJ.Plug.MCPToolsManage.Dialogs
 @using CJ.Plug.Models.MCPTools
@@ -63,7 +63,9 @@
             </CellTemplate>
         </TemplateColumn>
         <PropertyColumn Property="x => x.Author" Title="发布人" />
-        <PropertyColumn Property="x=>x.CreatedAt" Title="发布时间"/>
+        <PropertyColumn Property="x=>x.CreatedAt" Title="发布时间">
+            <CellTemplate>@DisplayTime.Utc(context.Item.CreatedAt, "yyyy-MM-dd HH:mm")</CellTemplate>
+        </PropertyColumn>
         <TemplateColumn Title="是否启用">
             <CellTemplate>
                 <MudSwitch T="bool" Value="@context.Item.IsEnabled" Color="Color.Primary" ValueChanged="(e) => UpdateTool(context.Item, e)" />

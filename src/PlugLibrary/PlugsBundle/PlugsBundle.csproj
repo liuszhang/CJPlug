@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AIAgentPlug\AIAgentPlug.csproj" />
+    <ProjectReference Include="..\CAD\CatiaPlug\CatiaPlug.csproj" />
     <ProjectReference Include="..\CMDPlug\CMDPlug.csproj" />
     <ProjectReference Include="..\CommonToolExecute\CommonToolExecute.csproj" />
     <ProjectReference Include="..\ExcelPlug\ExcelPlug.csproj" />

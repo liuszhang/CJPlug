@@ -42,13 +42,13 @@
             <MudSimpleTable Hover="false" Dense="true" Class="mb-4">
                 <tbody>
                     <tr><td class="mud-text-secondary" style="width:120px">被许可人</td><td>@_activatedLicense.Licensee</td></tr>
-                    <tr><td class="mud-text-secondary">签发时间</td><td>@_activatedLicense.IssuedAt.ToString("yyyy-MM-dd HH:mm")</td></tr>
+                    <tr><td class="mud-text-secondary">签发时间</td><td>@DisplayTime.Utc(_activatedLicense.IssuedAt, "yyyy-MM-dd HH:mm")</td></tr>
                     <tr>
                         <td class="mud-text-secondary">授权码过期</td>
                         <td>
                             @if (_activatedLicense.CodeExpiresAt.HasValue)
                             {
-                                @_activatedLicense.CodeExpiresAt.Value.ToString("yyyy-MM-dd HH:mm")
+                                @DisplayTime.Utc(_activatedLicense.CodeExpiresAt.Value, "yyyy-MM-dd HH:mm")
                             }
                             else
                             {

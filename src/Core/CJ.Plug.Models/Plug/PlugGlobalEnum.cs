@@ -12,6 +12,10 @@ namespace CJ.Plug.Models.Plug
         public static NXGetParametersClass NXGetParameters => new NXGetParametersClass();
         public static NXSetParametersClass NXSetParameters => new NXSetParametersClass();
         public static NXToStlClass NXToStl => new NXToStlClass();
+        public static CatiaGetParametersClass CatiaGetParameters => new CatiaGetParametersClass();
+        public static CatiaSetParametersClass CatiaSetParameters => new CatiaSetParametersClass();
+        public static CatiaExportStpClass CatiaExportStp => new CatiaExportStpClass();
+        public static CatiaExportStlClass CatiaExportStl => new CatiaExportStlClass();
     }
 
     /// <summary>
@@ -78,6 +82,98 @@ namespace CJ.Plug.Models.Plug
 
 
         public NXToStlClass()
+        {
+            Variables = new VariablesList();
+        }
+    }
+
+    /// <summary>
+    /// 共享CatiaGetParametersClass插头的配置信息
+    /// </summary>
+    public class CatiaGetParametersClass
+    {
+
+        public string TypeName = "CatiaGetParameters";
+        public string ModelParametersKey = "ModelParameters";
+        public VariablesList Variables;
+
+        public class VariablesList
+        {
+            public string ModelFilePath = "ModelFilePath";
+            public string ModelFileId = "ModelFileId";
+        }
+
+
+        public CatiaGetParametersClass()
+        {
+            Variables = new VariablesList();
+        }
+    }
+
+    /// <summary>
+    /// 更新Catia模型参数工具类配置信息
+    /// </summary>
+    public class CatiaSetParametersClass
+    {
+        public string ToolName = "CatiaSetParameters";
+        public string ToolVersion = "1.0";
+        public string TypeName = "CatiaSetParameters";
+        public string ModelParametersKey = "ModelParameters";
+        public VariablesList Variables;
+
+        public class VariablesList
+        {
+            public string ModelFilePath = "ModelFilePath";
+            public string NewParameterString = "NewParameterString";
+        }
+
+
+        public CatiaSetParametersClass()
+        {
+            Variables = new VariablesList();
+        }
+    }
+
+    /// <summary>
+    /// Catia导出STP工具类配置信息
+    /// </summary>
+    public class CatiaExportStpClass
+    {
+
+        public string TypeName = "CatiaExportStp";
+        public VariablesList Variables;
+
+        public class VariablesList
+        {
+            public string ModelFilePath = "ModelFilePath";
+            public string StpOutputPath = "StpOutputPath";
+        }
+
+
+        public CatiaExportStpClass()
+        {
+            Variables = new VariablesList();
+        }
+    }
+
+    /// <summary>
+    /// Catia导出STL工具类配置信息
+    /// </summary>
+    public class CatiaExportStlClass
+    {
+
+        public string TypeName = "CatiaExportStl";
+        public VariablesList Variables;
+
+        public class VariablesList
+        {
+            public string ModelFilePath = "ModelFilePath";
+            public string StlOutputPath = "StlOutputPath";
+            public string Sag = "Sag";
+        }
+
+
+        public CatiaExportStlClass()
         {
             Variables = new VariablesList();
         }

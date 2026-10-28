@@ -30,10 +30,10 @@
                     <MudText Typo="Typo.caption" Color="Color.Secondary">创建者：@Item.CreatedBy</MudText>
                 </MudItem>
                 <MudItem xs="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">创建时间：@Item.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">创建时间：@DisplayTime.Utc(Item.CreatedAt, "yyyy-MM-dd HH:mm")</MudText>
                 </MudItem>
                 <MudItem xs="6">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">更新时间：@Item.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">更新时间：@DisplayTime.Utc(Item.UpdatedAt, "yyyy-MM-dd HH:mm")</MudText>
                 </MudItem>
                 <MudItem xs="6">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">状态：@(Item.IsEnabled ? "已启用" : "已禁用")</MudText>

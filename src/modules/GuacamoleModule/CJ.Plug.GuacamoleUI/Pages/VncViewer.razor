@@ -5,13 +5,17 @@
 @using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
 @using Microsoft.JSInterop
+@using Microsoft.Extensions.Configuration
 @using CJ.Plug.SharedPages.Layout
+@using CJ.Plug.Models.LogModels
+@using Microsoft.AspNetCore.SignalR.Client
 
 @layout BasicLayout
 
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject HubConnectionManagerService HubConnectionManagerService
 
 <PageTitle>@($"VNC 远程桌面 - {StationIp}")</PageTitle>
 
@@ -25,8 +29,8 @@
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
             <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
                 <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-                <MudText Typo="Typo.h6" Style="color: white;">正在连接 VNC...</MudText>
-                <MudText Typo="Typo.body2" Style="color: #aaa;">@StationIp:@_port</MudText>
+                <MudText Typo="Typo.h6" Style="color: white;">@(IsWindowMode ? "正在连接程序窗口..." : "正在连接 VNC...")</MudText>
+                <MudText Typo="Typo.body2" Style="color: #aaa;">@StationIp:@_port@(IsWindowMode ? "（单窗口模式，等待程序启动）" : "")</MudText>
             </MudStack>
         </div>
     }
@@ -55,17 +59,17 @@
                                OnClick="FitToScreen" 
                                Size="Size.Small" 
                                Color="Color.Primary"
-                               Title="适应屏幕" />
+                               title="适应屏幕" />
                 <MudIconButton Icon="@Icons.Material.Filled.Fullscreen" 
                                OnClick="ToggleFullscreen" 
                                Size="Size.Small" 
                                Color="Color.Primary"
-                               Title="全屏" />
+                               title="全屏" />
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
                                OnClick="ConnectAsync" 
                                Size="Size.Small" 
                                Color="Color.Primary"
-                               Title="重新连接" />
+                               title="重新连接" />
             </MudStack>
         </MudPaper>
     }
@@ -79,6 +83,26 @@
     [SupplyParameterFromQuery]
     public int? Port { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Window { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int? Pid { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? ProcessName { get; set; }
+
+    /// <summary>单窗口模式（兼容 ?window=1 与 ?window=true）</summary>
+    private bool IsWindowMode =>
+        !string.IsNullOrEmpty(Window) &&
+        (Window == "1" || Window.Equals("true", StringComparison.OrdinalIgnoreCase));
+
+    [Inject]
+    private IConfiguration? _config { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private int _port = 5900;
@@ -90,7 +114,87 @@
             if (Port.HasValue)
                 _port = Port.Value;
             
+            if (Pid.HasValue)
+                Console.WriteLine($"[VncViewer] 单窗口目标 PID={Pid.Value}（来自 URL）");
+
+            // 单窗口模式：用 URL 的 pid 主动向图站 bind API 绑定（地址栏 pid 驱动，零竞态）。
+            // 无论 StationAgent 绑定是否成功/时序如何，页面打开时强制绑定正确目标。
+            if (IsWindowMode && Pid.HasValue && Pid.Value > 0)
+            {
+                await BindWindowOnStationAsync(Pid.Value);
+            }
+
             await ConnectAsync();
+            await SubscribeVncWindowClosedAsync();
+        }
+    }
+
+    /// <summary>
+    /// 用 URL 携带的 PID 调用图站 bind API，强制绑定单窗口 VNC 目标。
+    ///
+    /// <para>
+    /// ⚠ <c>notify=false</c> 是必须的：本调用只是"给 RFB 服务端重新断言目标"，并不是新的可视化需求。
+    /// 若不关掉通知，图站会再广播一次 <c>VncPidReady</c>（sessionKey=null），而前端去重键是
+    /// <c>sessionKey ?? "ip|pid|name"</c> ⇒ 与首次（sessionKey 非空）不同 ⇒ 又 <c>window.open</c> 一个窗口，
+    /// 实机表现就是"执行单个节点弹出两个可视化窗口"（2026-10-08 修复，日志证据见图站 StationLogs）。
+    /// </para>
+    /// </summary>
+    private async Task BindWindowOnStationAsync(int pid)
+    {
+        try
+        {
+            var pureHost = ExtractHost(StationIp);
+            // 图站 API 端口：默认 7660（StationApiPort），URL 可带 stationPort 覆盖
+            var stationPort = 7660;
+            var bindUrl = $"http://{pureHost}:{stationPort}/api/station/remote/vnc-window/bind";
+            var payload = new { processId = pid, processName = ProcessName, sessionKey = (string?)null, notify = false };
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var json = System.Text.Json.JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var resp = await http.PostAsync(bindUrl, content);
+            if (resp.IsSuccessStatusCode)
+                Console.WriteLine($"[VncViewer] 已向图站绑定 PID={pid} ({bindUrl})");
+            else
+                Console.WriteLine($"[VncViewer] 图站绑定失败: HTTP {(int)resp.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[VncViewer] 图站绑定异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 订阅 VncWindowClosed 通知：单窗口目标进程退出后，自动关闭本可视化窗口。
+    /// 前端页面订阅 8686 MainHub（HubConnectionManagerService 已有连接）。
+    /// </summary>
+    private async Task SubscribeVncWindowClosedAsync()
+    {
+        try
+        {
+            if (HubConnectionManagerService._hubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected)
+            {
+                await HubConnectionManagerService.ConnectAsync();
+            }
+            HubConnectionManagerService._hubConnection.Remove(LogTypeEnum.VncWindowClosed.ToString());
+            HubConnectionManagerService._hubConnection.On<string, string?>(
+                LogTypeEnum.VncWindowClosed.ToString(),
+                (stationIp, sessionKey) =>
+                {
+                    // 单窗口模式才自动关闭（整桌面 VNC 不受影响）
+                    if (!IsWindowMode) return;
+                    // 匹配本机/目标图站 IP，避免误关其他窗口
+                    var pureHost = ExtractHost(StationIp);
+                    if (!string.IsNullOrEmpty(stationIp) && !stationIp.Contains(pureHost)) return;
+                    Console.WriteLine($"收到 VncWindowClosed (station={stationIp})，自动关闭可视化窗口");
+                    InvokeAsync(async () =>
+                    {
+                        await JSRuntime.InvokeVoidAsync("closeWindow");
+                    });
+                });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"订阅 VncWindowClosed 失败: {ex.Message}");
         }
     }
 
@@ -99,13 +203,21 @@
         _loading = true;
         _error = null;
         StateHasChanged();
-
         try
         {
             // WebSocket 连接到当前服务器 (与页面同源)
             var baseUri = NavigationManager.BaseUri; // e.g. http://localhost:5066/
             var wsBase = baseUri.Replace("http://", "ws://").Replace("https://", "wss://").TrimEnd('/');
-            var wsUrl = $"{wsBase}/api/remote/vnc?host={StationIp}&port={_port}";
+            // 防御：StationIp 可能是完整地址/带端口，统一提取纯主机名
+            var pureHost = ExtractHost(StationIp);
+            var wsUrl = $"{wsBase}/api/remote/vnc?host={pureHost}&port={_port}";
+
+            // 若配置了部署级访问令牌，则随 WS 连接携带（D6 Token 校验）
+            var accessToken = _config?["RemoteDesktop:AccessToken"];
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                wsUrl += $"&token={Uri.EscapeDataString(accessToken)}";
+            }
 
             // RFB 需要容器 div (不是 canvas)，它会自己创建 canvas
             var success = await JSRuntime.InvokeAsync<bool>("noVncInterop.connect", "noVNC-screen", wsUrl);
@@ -145,5 +257,29 @@
     public async ValueTask DisposeAsync()
     {
         await JSRuntime.InvokeVoidAsync("noVncInterop.disconnect");
+    }
+
+    /// <summary>
+    /// 从可能的完整 URL 中提取纯 IP/主机名（与 RemoteViewer/PlugExecuteStandalone 一致）。
+    /// </summary>
+    private static string ExtractHost(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return "localhost";
+
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        var stripped = raw;
+        if (stripped.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[7..];
+        else if (stripped.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            stripped = stripped[8..];
+
+        var colonIdx = stripped.IndexOf(':');
+        if (colonIdx > 0)
+            stripped = stripped[..colonIdx];
+
+        return stripped;
     }
 }

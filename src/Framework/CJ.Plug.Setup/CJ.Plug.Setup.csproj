@@ -15,7 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ApiServer\CJ.Plug.ApiServer.csproj" />
-    <ProjectReference Include="..\..\PlugWebHost\CJ.Plug.HostWebServer\CJ.Plug.HostWebServer.csproj" />
     <ProjectReference Include="..\..\PlugStation\CJ.Plug.StationAgent\CJ.Plug.StationAgent.csproj" />
   </ItemGroup>
 

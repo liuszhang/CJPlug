@@ -18,6 +18,7 @@ using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using CJ.Plug.SystemConfigApi;
 
 namespace CJ.Plug.ModuleConfig
 {
@@ -66,7 +67,6 @@ namespace CJ.Plug.ModuleConfig
 
             // 系统配置模块
             services.AddSystemConfigPageModuleServices();
-
             //许可证管理模块
             services.AddLicenseModulePageServices();
 
@@ -112,6 +112,9 @@ namespace CJ.Plug.ModuleConfig
             // 模型管理模块API
             services.AddOntologyManageModuleApiServices();
 
+            // 系统配置模块API
+            services.AddSystemConfigModuleApiServices();
+
             // 许可证模块API
             services.AddLicenseModuleApiServices();
 
@@ -152,6 +155,9 @@ namespace CJ.Plug.ModuleConfig
 
             // 模型管理模块API
             app.AddOntologyManageModuleApi();
+
+            // 系统配置模块API
+            app.AddSystemConfigModuleApi();
 
             // 许可证模块API
             app.AddLicenseModuleApi();
