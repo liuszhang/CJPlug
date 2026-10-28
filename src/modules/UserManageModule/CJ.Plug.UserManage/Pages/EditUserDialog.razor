@@ -29,7 +29,7 @@
                           Variant="Variant.Outlined"
                           InputType="InputType.Telephone" />
 
-            <MudSelect T="int?"
+            <MudSelect
                        @bind-Value="Model.DepartmentId"
                        Label="部门"
                        Variant="Variant.Outlined"
@@ -37,7 +37,7 @@
                        Placeholder="请选择部门">
                 @foreach (var dept in Departments)
                 {
-                    <MudSelectItem T="int?" Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
+                    <MudSelectItem Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
                 }
             </MudSelect>
 

@@ -14,7 +14,7 @@
                           Label="部门编码"
                           Variant="Variant.Outlined" />
 
-            <MudSelect T="int?"
+            <MudSelect
                        @bind-Value="Model.ParentId"
                        Label="上级部门"
                        Variant="Variant.Outlined"
@@ -22,7 +22,7 @@
                        Placeholder="无">
                 @foreach (var dept in Departments.Where(d => d.Id != Model.Id))
                 {
-                    <MudSelectItem T="int?" Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
+                    <MudSelectItem Value="@((int?)dept.Id)">@dept.Name</MudSelectItem>
                 }
             </MudSelect>
 

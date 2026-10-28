@@ -29,7 +29,7 @@
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudRadioGroup T="string" @bind-SelectedOption="_selectedPlatform">
+                    <MudRadioGroup T="string" @bind-Value="_selectedPlatform">
                         <MudRadio T="string" Option="@("win-x64")" Color="Color.Primary">
                             <MudText>Windows x64</MudText>
                             <MudText Typo="Typo.caption">适用于Windows 64位系统</MudText>
@@ -67,7 +67,7 @@
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudSwitch T="bool" @bind-Checked="_includeDocker" 
+                    <MudSwitch T="bool" @bind-Value="_includeDocker" 
                                Label="包含Docker配置" 
                                Color="Color.Primary" />
                     <MudText Typo="Typo.caption" Class="mt-2">

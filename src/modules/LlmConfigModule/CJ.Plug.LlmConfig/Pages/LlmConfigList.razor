@@ -42,9 +42,9 @@
                     <MudText Typo="Typo.h6">供应商</MudText>
                     <MudSpacer />
                     <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Small"
-                                   OnClick="CreateProvider" Title="添加供应商" />
+                                   OnClick="CreateProvider" title="添加供应商" />
                     <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                                   OnClick="LoadProviders" Title="刷新" />
+                                   OnClick="LoadProviders" title="刷新" />
                 </MudStack>
 
                 @if (_providers == null)
@@ -139,14 +139,14 @@
                                                        Size="Size.Small"
                                                        Color="@(context.Item.IsDefault ? Color.Warning : Color.Default)"
                                                        OnClick="@(() => SetDefaultModel(context.Item))"
-                                                       Title="使用此模型" />
+                                                       title="使用此模型" />
                                         <MudIconButton Icon="@Icons.Material.Filled.NetworkCheck" Size="Size.Small"
                                                        Color="Color.Info" OnClick="@(() => TestConnection(context.Item))"
-                                                       Title="测试连接" />
+                                                       title="测试连接" />
                                         <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
-                                                       OnClick="@(() => EditModelConfig(context.Item))" Title="编辑" />
+                                                       OnClick="@(() => EditModelConfig(context.Item))" title="编辑" />
                                         <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
-                                                       Color="Color.Error" OnClick="@(() => DeleteModelConfig(context.Item))" Title="删除" />
+                                                       Color="Color.Error" OnClick="@(() => DeleteModelConfig(context.Item))" title="删除" />
                                     </MudStack>
                                 </CellTemplate>
                             </TemplateColumn>
@@ -209,9 +209,9 @@
                         <CellTemplate>
                             <MudStack Row Spacing="1" Justify="Justify.FlexEnd">
                                 <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small"
-                                               OnClick="@(() => EditMcpServerConfig(context.Item))" Title="编辑" />
+                                               OnClick="@(() => EditMcpServerConfig(context.Item))" title="编辑" />
                                 <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
-                                               Color="Color.Error" OnClick="@(() => DeleteMcpServerConfig(context.Item))" Title="删除" />
+                                               Color="Color.Error" OnClick="@(() => DeleteMcpServerConfig(context.Item))" title="删除" />
                             </MudStack>
                         </CellTemplate>
                     </TemplateColumn>

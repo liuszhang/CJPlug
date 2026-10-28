@@ -14,6 +14,24 @@
   <PropertyGroup>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+
+    <!--
+      程序集绑定版本（2026-10-22《CJSuite程序集版本与发布版本解耦方案》枝1=A）：
+      固定 1.0.0.0，与发布版本彻底解耦。发布版本仍由打包链 -p:Version=<ver> 注入，
+      但它从此只影响 FileVersion / InformationalVersion —— SDK 的 GenerateAssemblyInfo.targets 里：
+        <GetAssemblyVersion Condition="'$(AssemblyVersion)' == ''" NuGetVersion="$(Version)">
+      只在未显式声明时才从 $(Version) 派生，故下面这行一旦写上，-p:Version 就覆盖不了它。
+      CJPlug 的组件（cjplug / cjplug-desktop / station-settingui）与 CJCore 共用程序集，
+      版本跟着发布号走会让引用方与提供方错位（见 BUG-20261022-014/015/016）。
+    -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!--
+      ⚠ 必须显式钉住 FileVersion：SDK 的 GenerateAssemblyInfo.targets 里 FileVersion 的默认派生源是
+      **AssemblyVersion** 而非 Version（<FileVersion Condition="'$(FileVersion)' == ''">$(AssemblyVersion)</FileVersion>）
+      ⇒ 只固定 AssemblyVersion 会让文件属性也显示 1.0.0.0。
+    -->
+    <FileVersion Condition="'$(Version)' != ''">$(Version)</FileVersion>
   </PropertyGroup>
 
   <!--

@@ -38,7 +38,7 @@
                 <MudStack Style="height:100%;" AlignItems="AlignItems.Center" Justify="Justify.Center">
                     <MudIconButton OnClick="OpenDeletedFiles"
                         Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                        Title="查看已删除文件" />
+                        title="查看已删除文件" />
                 </MudStack>
             </MudPaper>
         </MudStack>
@@ -51,11 +51,11 @@
                     <MudToolBar Gutters="false" Dense="true">
                         <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                             OnClick="RefreshCurrentFolder"
-                            Title="刷新" />
+                            title="刷新" />
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
                             OnClick="NavigateToParent"
                             Disabled="@(_currentFolderDepth <= 1)"
-                            Title="返回上级目录" />
+                            title="返回上级目录" />
                         <MudSpacer />
                         <MudTextField @bind-Value="_fileFilter"
                                       Placeholder="筛选文件名..."
@@ -119,12 +119,12 @@
                                                        Color="Color.Primary"
                                                        Size="Size.Small"
                                                        OnClick="@(() => DownloadFile(context.Item))"
-                                                       Title="下载文件" />
+                                                       title="下载文件" />
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                        Color="Color.Error"
                                                        Size="Size.Small"
                                                        OnClick="@(() => DeleteFile(context.Item))"
-                                                       Title="删除文件" />
+                                                       title="删除文件" />
                                     </CellTemplate>
                                 </TemplateColumn>
                             </Columns>

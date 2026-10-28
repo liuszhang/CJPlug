@@ -15,10 +15,10 @@
                 <MudSelectItem Value="@("Department")">部门(Department)</MudSelectItem>
                 <MudSelectItem Value="@("Role")">角色(Role)</MudSelectItem>
             </MudSelect>
-            <MudSelect T="int?" Label="父级主体" @bind-Value="model.ParentId" Clearable="true">
+            <MudSelect Label="父级主体" @bind-Value="model.ParentId" Clearable="true">
                 @foreach (var s in subjects.Where(x => x.Id != model.Id))
                 {
-                    <MudSelectItem T="int?" Value="@s.Id">@s.Name</MudSelectItem>
+                    <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
                 }
             </MudSelect>
             <MudTextField T="string" Label="描述" @bind-Value="model.Description" Lines="3" />

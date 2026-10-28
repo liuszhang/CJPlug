@@ -8,21 +8,21 @@
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
-            <MudSelect T="int?" Label="关联对象（可选）" @bind-Value="associatedOntologyId" Clearable="true">
+            <MudSelect Label="关联对象（可选）" @bind-Value="associatedOntologyId" Clearable="true">
                 @foreach (var o in ontologies)
                 {
-                    <MudSelectItem T="int?" Value="o.Id">@o.DisplayName</MudSelectItem>
+                    <MudSelectItem Value="@((int?)o.Id)">@o.DisplayName</MudSelectItem>
                 }
             </MudSelect>
-            <MudSelect T="int?" Label="关联行为（可选）" @bind-Value="associatedBehaviorId" Clearable="true">
+            <MudSelect Label="关联行为（可选）" @bind-Value="associatedBehaviorId" Clearable="true">
                 @foreach (var b in behaviors)
                 {
-                    <MudSelectItem T="int?" Value="b.Id">@(b.Description ?? $"行为 #{b.Id}")</MudSelectItem>
+                    <MudSelectItem Value="@((int?)b.Id)">@(b.Description ?? $"行为 #{b.Id}")</MudSelectItem>
                 }
             </MudSelect>
             <MudTextField T="string" Label="规则名称" @bind-Value="rule.Name" />
             <MudTextField T="string" Label="规则描述" @bind-Value="rule.Description" Lines="3" />
-            <MudDateRangePicker T="DateTime?" Label="生效日期范围" @bind-DateRange="dateRange" Clearable="true" />
+            <MudDateRangePicker Label="生效日期范围" @bind-DateRange="dateRange" Clearable="true" />
             <MudTextField T="string" Label="规则表达式" @bind-Value="rule.RuleExpression" Lines="3" />
             <MudTextField T="string" Label="规则条件(JSON)" @bind-Value="rule.RuleCondition" Lines="3" Placeholder='{"field":"status","op":"eq","value":"active"}' />
         </MudStack>
