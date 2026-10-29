@@ -1,6 +1,6 @@
 using CJ.Plug.GuacamoleApi.Apis;
 using CJ.Plug.HostWebServer.Shell;
-using CJ.Plug.Login;
+using CJ.Plug.KnowledgeManage;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
@@ -325,6 +325,10 @@ public static class WebHostStartup
                               CJ.Plug.HostWebServer.Agent.PlugAgentModule>();
         services.AddSingleton<CJCore.Framework.Abstractions.IMenuService,
                               CJ.Plug.HostWebServer.Agent.PlugAgentMenuService>();
+        // ③ P5.5 第二批：权限键声明 —— 权限矩阵页靠它扫到 plug-agent 键
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration(
+                "plug-agent", ["system_admin"], "工作流 Agent（调试）"));
 
         // ── P2：宿主壳模块（替代原 App_All / Routes / MainLayout / MyNavMenu / EmbeddedLayout）──
         // 注册顺序 = FrameworkApp 中 head 资源的渲染顺序（顺序敏感项见 PlugHeadModule 注释）。
@@ -373,22 +377,14 @@ public static class WebHostStartup
             options.DetailedErrors = true;
         });
 
-        // ── P5 过渡：把默认认证 scheme 抢回三员体系 ────────────────────────
-        // 问题：LoginModule 的 AddLoginModuleApiServices 里 services.AddIdentity<User, UserRole>()
-        //   会调 AddAuthentication 把 DefaultScheme 设成 "Identity.Application"，
-        //   而模块注册发生在 AddCJCoreThreeRoleAdmin() **之后** ⇒ 顺序上它赢，
-        //   结果是所有请求都按 Identity 判定 ⇒ 恒「未登录」⇒ 受保护页一律 302 回登录页
-        //   （实测日志：AuthenticationScheme: Identity.Application was not authenticated）。
-        // 这里用 Options.Configure 重新声明，注册在最后 ⇒ 最后执行、最终生效。
-        // ⚠ 根治：LoginModule 下线（P5.6）+ MainDbContext 删除（P5.7）时移除 AddIdentity，本段随之删除。
-        services.AddOptions<Microsoft.AspNetCore.Authentication.AuthenticationOptions>()
-            .Configure<CJCore.Framework.Api.Auth.CJCoreAuthOptions>((auth, cj) =>
-            {
-                auth.DefaultScheme = cj.SchemeName;
-                auth.DefaultAuthenticateScheme = cj.SchemeName;
-                auth.DefaultChallengeScheme = cj.CookieSchemeName;
-                auth.DefaultSignInScheme = cj.CookieSchemeName;
-            });
+        // ── P5.6 已删除本段「抢回默认认证 scheme」的过渡修法 ──────────────────
+        // 原问题：LoginModule 的 AddLoginModuleApiServices() 里的 services.AddIdentity<User, UserRole>()
+        //   调 AddAuthentication 把 DefaultScheme 设成 "Identity.Application"，且注册在
+        //   AddCJCoreThreeRoleAdmin() 之后 ⇒ 顺序上它赢 ⇒ 所有请求恒「未登录」。
+        // 现状：LoginModule 四项目 + UserManageModule + AuthModule 已物理删除，
+        //   AddIdentity 调用链整体消失（唯一残留入口在 ApiServer/Program.cs，已同步移除）
+        //   ⇒ 默认 scheme 由 AddCJCoreAuth 的 CJCoreAuthOptions 唯一决定，无需再抢。
+        // 若将来又出现「恒未登录」，先查是否有模块重新引入 AddIdentity/AddAuthentication。
 
         return builder;
     }

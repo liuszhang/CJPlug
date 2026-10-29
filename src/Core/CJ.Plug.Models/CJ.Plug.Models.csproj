@@ -15,12 +15,9 @@
     <PackageReference Include="Crane.MethodHook" />
     <PackageReference Include="EventAggregator.Blazor" />
     <PackageReference Include="MediatR" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
     <PackageReference Include="Serilog" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />

@@ -1,4 +1,4 @@
-using CJ.Plug.ApiClient.Contracts;
+﻿using CJ.Plug.ApiClient.Contracts;
 using CJ.Plug.MCPToolApiClient;
 using CJ.Plug.MCPToolsManage.Menus;
 using CJ.Plug.MCPToolsManageApi.Apis;
@@ -9,7 +9,6 @@ using CJ.Plug.Models.Abstractions;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.MCPTools;
 using CJ.Plug.Models.Shared;
-using CJ.Plug.UserManageApiClient;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;

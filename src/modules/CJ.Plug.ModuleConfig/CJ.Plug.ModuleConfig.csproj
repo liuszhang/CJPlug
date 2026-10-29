@@ -12,15 +12,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AIModule\CJ.Plug.AI\CJ.Plug.AI.csproj" />
-    <ProjectReference Include="..\AuthModule\CJ.Plug.AuthApi\CJ.Plug.AuthApi.csproj" />
-    <ProjectReference Include="..\AuthModule\CJ.Plug.AuthUI\CJ.Plug.AuthUI.csproj" />
     <ProjectReference Include="..\AuditModule\CJ.Plug.AuditApi\CJ.Plug.AuditApi.csproj" />
-    <ProjectReference Include="..\AuditModule\CJ.Plug.AuditUI\CJ.Plug.AuditUI.csproj" />
     <ProjectReference Include="..\FileManageModule\CJ.Plug.FileManage\CJ.Plug.FileManage.csproj" />
     <ProjectReference Include="..\FMDModule\CJ.Plug.FMD\CJ.Plug.FMD.csproj" />
     <ProjectReference Include="..\HomeModule\CJ.Plug.HomePage\CJ.Plug.HomePage.csproj" />
     <ProjectReference Include="..\JobManageModule\CJ.Plug.JobManage\CJ.Plug.JobManage.csproj" />
-    <ProjectReference Include="..\LoginModule\CJ.Plug.Login\CJ.Plug.Login.csproj" />
     <ProjectReference Include="..\MCPToolsModule\CJ.Plug.MCPToolsManage\CJ.Plug.MCPToolsManage.csproj" />
     <ProjectReference Include="..\PDZManageModule\CJ.Plug.PlugDataZone\CJ.Plug.PlugDataZone.csproj" />
     <ProjectReference Include="..\PlugExecuteModule\CJ.Plug.Execute\CJ.Plug.Execute.csproj" />
@@ -37,7 +33,6 @@
     <ProjectReference Include="..\ToolResourceModule\CJ.Plug.ToolResource\CJ.Plug.ToolResource.csproj" />
     <ProjectReference Include="..\ToolActionSettingModule\CJ.Plug.ToolActionSetting\CJ.Plug.ToolActionSetting.csproj" />
     <ProjectReference Include="..\UnitTestModule\CJ.Plug.UnitTest\CJ.Plug.UnitTest.csproj" />
-    <ProjectReference Include="..\UserManageModule\CJ.Plug.UserManage\CJ.Plug.UserManage.csproj" />
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleApi\CJ.Plug.GuacamoleApi.csproj" />
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
     <ProjectReference Include="..\KnowledgeManageModule\CJ.Plug.KnowledgeManage\CJ.Plug.KnowledgeManage.csproj" />

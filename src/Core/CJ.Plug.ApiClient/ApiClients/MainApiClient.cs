@@ -1,12 +1,10 @@
 //using Microsoft.AspNetCore.Http;
 //using Microsoft.AspNetCore.Mvc;
 using CJ.Plug.ApiClient.Contracts;
-using CJ.Plug.AuthApiClient;
 using CJ.Plug.DeekSeekIn;
 using CJ.Plug.FileManageApiClient;
 using CJ.Plug.GuacamoleApiClient;
 using CJ.Plug.JobManageApiClient;
-using CJ.Plug.LoginApiClient.ApiClients;
 using CJ.Plug.MCPToolApiClient;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Plug;
@@ -20,8 +18,6 @@ using CJ.Plug.StationManageApiClient;
 using CJ.Plug.SystemConfigApiClient;
 using CJ.Plug.ToolResourceApiClient;
 using CJ.Plug.TASApiClient;
-using CJ.Plug.UserManageApiClient;
-using CJ.Plug.UserManageModels;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +32,6 @@ public partial class MainApiClient
 
     public readonly Lazy<IRelationApiClient> RelationApiClient;
     public readonly Lazy<IPDZApiClient> PDZApiClient;
-    public readonly Lazy<ILoginApiClient> LoginApiClient;
     public readonly Lazy<IExecuteApiClient> ExecuteApiClient;
     public readonly Lazy<ITASApiClient> TASApiClient;
     public readonly Lazy<IFileManageApiClient> FileManageApiClient;
@@ -45,17 +40,15 @@ public partial class MainApiClient
     public readonly Lazy<IToolResourceApiClient> ToolResourceApiClient;
     public readonly Lazy<IPlugMarketApiClient> PlugMarketApiClient;
     public readonly Lazy<IProcessManageApiClient> ProcessManageApiClient;
-    public readonly Lazy<IUserManageApiClient> UserManageApiClient;
-    public readonly Lazy<IRoleManageApiClient> RoleManageApiClient;
     public readonly Lazy<IMCPToolApiClient> MCPToolApiClient;
-    public readonly Lazy<IDepartmentManageApiClient> DepartmentManageApiClient;
-    public readonly Lazy<IAuthApiClient> AuthApiClient;
     public readonly Lazy<IGuacamoleApiClient> GuacamoleApiClient;
-    public readonly Lazy<IRolePermissionApiClient> RolePermissionApiClient;
-    public readonly Lazy<IGroupManageApiClient> GroupManageApiClient;
     public readonly Lazy<ISkillApiClient> SkillApiClient;
     public readonly Lazy<ISystemConfigApiClient> SystemConfigApiClient;
     //public readonly Lazy<IDeepSeekService> DeepSeekApiClient;
+
+    // P5.6+：旧身份体系（登录/用户/角色/部门/用户组/授权请求/角色权限）已整体下线，
+    // 对应 7 个 ApiClient 属性一并移除 —— 三员模块（CJCore.Modules.ThreeRoleAdmin）接管。
+    // 若将来需要旧体系，从 git 历史恢复本文件对应行 + 恢复 src/modules/{Login,UserManage,Auth}Module。
 
     /// <summary>
     /// 审计日志辅助类
@@ -71,7 +64,6 @@ public partial class MainApiClient
 
         RelationApiClient = new Lazy<IRelationApiClient>(() => serviceProvider.GetRequiredService<IRelationApiClient>());
         PDZApiClient = new Lazy<IPDZApiClient>(() => serviceProvider.GetRequiredService<IPDZApiClient>());
-        LoginApiClient = new Lazy<ILoginApiClient>(() => serviceProvider.GetRequiredService<ILoginApiClient>());
         ExecuteApiClient = new Lazy<IExecuteApiClient>(() => serviceProvider.GetRequiredService<IExecuteApiClient>());
         TASApiClient = new Lazy<ITASApiClient>(() => serviceProvider.GetRequiredService<ITASApiClient>());
         FileManageApiClient = new Lazy<IFileManageApiClient>(() => serviceProvider.GetRequiredService<IFileManageApiClient>());
@@ -80,15 +72,10 @@ public partial class MainApiClient
         ToolResourceApiClient = new Lazy<IToolResourceApiClient>(() => serviceProvider.GetRequiredService<IToolResourceApiClient>());
         PlugMarketApiClient = new Lazy<IPlugMarketApiClient>(() => serviceProvider.GetRequiredService<IPlugMarketApiClient>());
         ProcessManageApiClient = new Lazy<IProcessManageApiClient>(() => serviceProvider.GetRequiredService<IProcessManageApiClient>());
-        UserManageApiClient = new Lazy<IUserManageApiClient>(() => serviceProvider.GetRequiredService<IUserManageApiClient>());
-        RoleManageApiClient = new Lazy<IRoleManageApiClient>(() => serviceProvider.GetRequiredService<IRoleManageApiClient>());
         MCPToolApiClient = new Lazy<IMCPToolApiClient>(() => serviceProvider.GetRequiredService<IMCPToolApiClient>());
-        DepartmentManageApiClient = new Lazy<IDepartmentManageApiClient>(() => serviceProvider.GetRequiredService<IDepartmentManageApiClient>());
-        AuthApiClient = new Lazy<IAuthApiClient>(() => serviceProvider.GetRequiredService<IAuthApiClient>());
         GuacamoleApiClient = new Lazy<IGuacamoleApiClient>(() => serviceProvider.GetRequiredService<IGuacamoleApiClient>());
-        RolePermissionApiClient = new Lazy<IRolePermissionApiClient>(() => serviceProvider.GetRequiredService<IRolePermissionApiClient>());
-        GroupManageApiClient = new Lazy<IGroupManageApiClient>(() => serviceProvider.GetRequiredService<IGroupManageApiClient>());
         SkillApiClient = new Lazy<ISkillApiClient>(() => serviceProvider.GetRequiredService<ISkillApiClient>());
+        SystemConfigApiClient = new Lazy<ISystemConfigApiClient>(() => serviceProvider.GetRequiredService<ISystemConfigApiClient>());
         SystemConfigApiClient = new Lazy<ISystemConfigApiClient>(() => serviceProvider.GetRequiredService<ISystemConfigApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
 

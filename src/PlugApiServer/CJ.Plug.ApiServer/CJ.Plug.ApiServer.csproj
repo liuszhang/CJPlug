@@ -68,7 +68,6 @@
     <PackageReference Include="Aspire.Npgsql" />
     <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Elsa.Api.Client" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />

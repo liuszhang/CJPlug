@@ -1,11 +1,7 @@
-using CJ.Plug.AuthApi;
-using CJ.Plug.AuthUI;
 using CJ.Plug.AuditApi;
-using CJ.Plug.AuditUI;
 using CJ.Plug.GuacamoleApi;
 using CJ.Plug.GuacamoleUI;
 using CJ.Plug.HomePage;
-using CJ.Plug.Login;
 using CJ.Plug.KnowledgeManage;
 using CJ.Plug.LlmConfig;
 using CJ.Plug.LicenseApi;
@@ -46,31 +42,20 @@ namespace CJ.Plug.ModuleConfig
 
             services.AddFMDModuleServices();
 
-            // ── P5.6（D-P5-3=B 保留代码、摘除入口）：四模块 UI 注册下线 ──────────
-            // 只摘「UI 侧」注册；②DI 侧（ConfigModuleApiServices）与 ③端点侧
-            // （ConfigModuleApis）**保留不动**，源文件/csproj 一个不删。
-            //
-            // 机制：FrameworkRoutes 的 AdditionalAssemblies 由 IEnumerable<IModule> 反推
-            //   ⇒ 不注册 IModule，该模块的 @page 路由、菜单项、AppBar 项**同时消失**，
-            //     无需逐页处理，也无需改任何业务代码。
-            //
-            // 摘除收益（P5.4 实测登记项一并消掉）：
-            //   ① 旧「系统管理/授权管理/审计管理」菜单与新三员同名菜单并存的口径双轨 → 消除；
-            //   ② AppBar 的「欢迎：⎋」假登出按钮（LoginModule 经 AddAppBarItem<LoginState> 挂载，
-            //      点击只清旧 localStorage + 跳 /login，不清三员 cookie、不撤销会话）→ 消失；
-            //   ③ 「欢迎：」后用户名恒空（取旧 localStorage key，三员不写）→ 消失。
-            //
-            // ⚠ 回滚成本 = 取消下面 4 行注释 + 重编译。保留期一个版本周期。
-            //services.AddUserManagePageModuleServices();
+            // ── P5.6 终态：旧身份四模块（Login / UserManage / Auth / Audit UI）已物理删除 ──
+            // 删除范围（13 个项目，git 可恢复）：
+            //   LoginModule/{CJ.Plug.Login, LoginApis, LoginPages, LoginApiClient}
+            //   UserManageModule/{CJ.Plug.UserManage, UserManageApi, UserManageApiClient, UserManageModels}
+            //   AuthModule/{AuthApi, AuthUI, AuthApiClient, AuthModels}
+            //   AuditModule/CJ.Plug.AuditUI
+            // 保留：AuditApi（/api/audit/log 写入端点）+ AuditModels（AuditOperationType/AuditModule 枚举
+            //       + CreateAuditLogRequest 契约）—— 业务侧 299 处 AuditLogHelper 调用依赖它，
+            //       删掉会让每条业务操作打一条"审计日志记录失败"告警，成为新的日志刷屏源。
+            //       审计数据迁移到三员审计库（main_audit.db）单独立项。
+            // 接管方：CJCore.Modules.ThreeRoleAdmin（三员分权）+ PersonalCenter。
             services.AddMCPToolsModuleServices();
             services.AddSkillsModuleServices();
             services.AddKnowledgeModuleServices();
-
-            // 授权管理模块 —— P5.6 摘除 UI 入口（三员 /three-role/auth 接管）
-            //services.AddAuthModulePageServices();
-
-            // 审计管理模块 —— P5.6 摘除 UI 入口（三员 /three-role/audit 接管）
-            //services.AddAuditModulePageServices();
 
             // Guacamole 远程桌面模块
             services.AddGuacamoleUIPageServices();
@@ -86,9 +71,6 @@ namespace CJ.Plug.ModuleConfig
             //许可证管理模块
             services.AddLicenseModulePageServices();
 
-            // 登录模块 —— P5.6 摘除 UI 入口（三员 /three-role/login 接管）
-            //services.AddLoginModulePageServices();
-
             return services;
         }
 
@@ -98,8 +80,6 @@ namespace CJ.Plug.ModuleConfig
             // 注册基础服务（泛型服务）
             services.AddScoped(typeof(IBaseRepositoryService<,>), typeof(BaseRepositoryService<,>));
 
-
-            //services.AddLoginModuleApiServices();
             services.AddProcessManageModuleApiServices();
             services.AddJobManageModuleApiServices();
             services.AddStationManageApiServices();
@@ -111,15 +91,11 @@ namespace CJ.Plug.ModuleConfig
             services.AddRelationManageModuleApiServices();
             services.AddPlugMarketModuleApiServices();
             services.AddToExternalModuleApiServices();
-            services.AddUserManageModuleApiServices();
             services.AddMCPToolsApiServices();
             services.AddSkillsApiServices();
             services.AddKnowledgeApiServices();
 
-            // 授权管理模块API
-            services.AddAuthModuleApiServices();
-
-            // 审计管理模块API
+            // 审计管理模块API（端点保留：业务侧 299 处 AuditLogHelper 调用写 /api/audit/log）
             services.AddAuditModuleApiServices();
 
             // Guacamole 远程桌面模块API
@@ -143,7 +119,6 @@ namespace CJ.Plug.ModuleConfig
         //配置各模块Api注入
         public static IApplicationBuilder ConfigModuleApis(this IApplicationBuilder app)
         {
-            app.AddLoginModuleApi();
             app.AddProcessManageModuleApi();
             app.AddJobManageModuleApi();
             app.AddStationManageApi();
@@ -155,15 +130,11 @@ namespace CJ.Plug.ModuleConfig
             app.AddRelationManageModuleApi();
             app.AddPlugMarketModuleApi();
             app.AddToExternalModuleApi();
-            app.AddUserManageModuleApi();
             app.AddMCPToolsApi();
             app.AddSkillsApi();
             app.AddKnowledgeApi();
 
-            // 授权管理模块API
-            app.AddAuthModuleApi();
-
-            // 审计管理模块API
+            // 审计管理模块API（端点保留，见 ConfigModuleApiServices 注释）
             app.AddAuditModuleApi();
 
             // Guacamole 远程桌面模块API

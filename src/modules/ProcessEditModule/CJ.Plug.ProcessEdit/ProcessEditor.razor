@@ -1,4 +1,6 @@
 @page "/ProcessEdit/{ProcessDefinitionId?}"
+@* P5.5 第二批：业务页面「仅登录」底线 *@
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 <PageTitle>@($"流程编辑({MainProcess.Name})")</PageTitle>
 @using System.Text.Json
 @using System.Text.Json.Nodes

@@ -1,4 +1,4 @@
-using CJ.Plug.ApiServer;
+﻿using CJ.Plug.ApiServer;
 using CJ.Plug.ApiServer.Infrastructure;
 using CJ.Plug.DispatchServer;
 using CJ.Plug.HostWebServer;
@@ -7,7 +7,6 @@ using CJ.Plug.McpServer.Services;
 using CJ.Plug.ElsaIntegration.ApiClient;
 using CJ.Plug.ElsaIntegration.Contracts;
 using CJ.Plug.ElsaIntegration.Services;
-using CJ.Plug.Login;
 using CJ.Plug.Models.DbContexts;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
@@ -199,30 +198,15 @@ builder.Services.AddMcpServer(options =>
 // ⚠ 必须显式指定程序集：无参重载扫描的是**调用方**（本 API 程序集），会漏掉 McpServer 里的 [McpServerTool]。
 .WithToolsFromAssembly(typeof(DynamicToolRegistry).Assembly);
 
-// ★方案② 备选：基准目录 = 自定义输出目录（和运行时一致）
-var apiRootDir = AppContext.BaseDirectory;
-
-// ========== 读取连接字符串 + 数据库类型，按类型动态注册 ==========
-var connStr = DbConnectionString.ConnectionString;
-var dbType = DbConnectionString.DbType;
-// 仅 SQLite 需要将相对路径 Data Source= 拼接为绝对路径
-var absoluteConnStr = connStr.Replace("Data Source=", $"Data Source={Path.Combine(apiRootDir, "")}");
-
-builder.Services.AddDbContextPool<MainDbContext>(options =>
-{
-    switch (dbType)
-    {
-        case "PostgreSQL":
-            options.UseNpgsql(connStr);
-            break;
-        case "SqlServer":
-            options.UseSqlServer(connStr);
-            break;
-        default:
-            options.UseSqlite(absoluteConnStr);
-            break;
-    }
-}, poolSize: 128);
+// ========== 数据访问层 ==========
+// ⚠ P5.7（2026-10-29）：原先这里注册 AddDbContextPool<MainDbContext>（IdentityDbContext，
+//   承载 User/UserRole/UserGroup/AspNet* 共 7 张身份表 + IModuleDbConfig 动态拼装）。
+//   旧身份体系（Login/UserManage/Auth 四模块）已物理删除，业务表改由 CJCore Data 引擎
+//   （DataDbContext + 快照记账）负责 ⇒ MainDbContext 连同 User/UserRole/UserGroup/
+//   UserGroupMember 实体、Migrations/MainDb 迁移快照一并移除。
+//   数据库文件里的 Users/AspNet* 等旧表**不做自动清理**（只停止映射），需人工评估后再删，
+//   避免误删现场数据。
+//   认证与用户/角色/部门改由 CJCore.Modules.ThreeRoleAdmin（TRA_* 表）接管。
 
 //自定义插头的执行注册
 builder.Services.AddPlugsExecutebundle();
@@ -252,8 +236,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddPackageModuleServices();
 
 builder.Services.ConfigModuleApiServices();
-//单独添加用户认证相关服务
-builder.Services.AddLoginModuleApiServices();
+// 独立认证服务由 CJCore 三员模块提供（P5.6：旧 AddLoginModuleApiServices 已随 LoginModule 删除）
 
 builder.Services.AddSingleton<MainApiClient>();
 //builder.Services.AddHttpClient<MainApiClient>(client =>
@@ -417,26 +400,11 @@ catch (Exception ex)
     Console.WriteLine($"[Startup] 插件能力注册异常: {ex.Message}");
 }
 
-// 先确保**身份侧**库结构就绪（P4 之后 MainDbContext 只剩 Identity + 用户/权限 7 张表）
-try
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<MainDbContext>();
-    // 2026-10-29《CJPlug 接入 CJCore》P3 → P4：
-    //   ⚠ 这里刻意**没有**换成 MigrateAsync：MainDbContext 的模型由 IModuleDbConfig 运行时拼装，
-    //     EF 设计时拿不到完整模型 ⇒ 任何迁移快照都必然缺表，改走 Migrate 只会让缺表更隐蔽。
-    //   P4 之后的分工：业务表交给 CJCore Data 引擎（DataDbContext + 快照记账），
-    //     MainDbContext 只剩 UserModuleDbConfig 的 7 张身份/权限表，EnsureCreated 是安全且幂等的。
-    //   ⚠ **顺序不可颠倒**：必须在本进程 Run() 之前跑完，再让 Data 引擎的 HostedService 建业务表。
-    //     若 Data 引擎先建了表，EnsureCreated 会因"库里已有表"整体 no-op ⇒ 身份表永久缺失、登录全挂。
-    CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(db);
-    Console.WriteLine("[SeedData] 身份库结构就绪检查完成（业务表由 CJCore Data 引擎建）");
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"[SeedData] 数据库迁移异常：{ex.Message}");
-    Log.Error(ex, "数据库迁移异常");
-}
+// ⚠ P5.7（2026-10-29）：原先这里在 Run() 之前对 MainDbContext 做 EnsureCreatedOnce
+//   （目的是先建好 Identity 的 7 张身份表，再让 Data 引擎建业务表）。
+//   旧身份四模块已删除、MainDbContext/User/UserRole 已移除 ⇒ 本段整体去掉。
+//   身份/权限表的建表与播种完全交给 CJCore 三员模块（TRA_* + main_audit.db）。
+//   业务表的建表 + 播种仍由 CJCore Data 引擎（AddCJCoreDataApi 的 InitAction）保证顺序。
 
 // 种子数据**已移出**此处（P4 / 2026-10-29）：
 //   原来在这里直接 SeedDataRunner.RunAllAsync(app.Services) —— 有两个问题：

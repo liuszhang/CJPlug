@@ -16,6 +16,8 @@
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     <!-- CJCore 模块契约（IModule / ModuleBase / IMenuService / MenuItem）：2026-10-29 接入 P1 -->
     <ProjectReference Include="..\..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
+    <!-- P5.6：首页统计的用户数改读三员体系（旧 UserManageApiClient.GetAllUsersAsync 已随模块删除） -->
+    <ProjectReference Include="..\..\..\..\..\CJCore\src\Modules\ThreeRoleAdmin\CJCore.Modules.ThreeRoleAdmin.ApiClient\CJCore.Modules.ThreeRoleAdmin.ApiClient.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,6 @@
 @page "/debug/plug-agent"
+@* P5.5 第二批：调试入口，仅 system_admin 可见（原无任何访问约束） *@
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-agent", "system_admin")]
 @using CJ.Plug.HostWebServer.Agent
 @using CJCore.Agent.Abstractions
 @using CJCore.LLM.Abstractions

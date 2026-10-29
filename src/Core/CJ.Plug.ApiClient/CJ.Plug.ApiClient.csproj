@@ -18,10 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\modules\AIModule\CJ.Plug.DeepSeekIn\CJ.Plug.DeepSeekIn.csproj" />
     <ProjectReference Include="..\..\modules\AuditModule\CJ.Plug.AuditModels\CJ.Plug.AuditModels.csproj" />
-    <ProjectReference Include="..\..\modules\AuthModule\CJ.Plug.AuthApiClient\CJ.Plug.AuthApiClient.csproj" />
     <ProjectReference Include="..\..\modules\FileManageModule\CJ.Plug.FileManageApiClient\CJ.Plug.FileManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\JobManageModule\CJ.Plug.JobManageApiClient\CJ.Plug.JobManageApiClient.csproj" />
-    <ProjectReference Include="..\..\modules\LoginModule\CJ.Plug.LoginApiClient\CJ.Plug.LoginApiClient.csproj" />
     <ProjectReference Include="..\..\modules\MCPToolsModule\CJ.Plug.MCPToolApiClient\CJ.Plug.MCPToolApiClient.csproj" />
     <ProjectReference Include="..\..\modules\PDZManageModule\CJ.Plug.PlugDataZoneApiClient\CJ.Plug.PlugDataZoneApiClient.csproj" />
     <ProjectReference Include="..\..\modules\PlugExecuteModule\CJ.Plug.ExecuteApiClient\CJ.Plug.ExecuteApiClient.csproj" />
@@ -31,7 +29,6 @@
     <ProjectReference Include="..\..\modules\StationManageModule\CJ.Plug.StationManageApiClient\CJ.Plug.StationManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\ToolResourceModule\CJ.Plug.ToolResourceApiClient\CJ.Plug.ToolResourceApiClient.csproj" />
     <ProjectReference Include="..\..\modules\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
-    <ProjectReference Include="..\..\modules\UserManageModule\CJ.Plug.UserManageApiClient\CJ.Plug.UserManageApiClient.csproj" />
     <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj" />
     <ProjectReference Include="..\..\modules\SkillsManageModule\CJ.Plug.SkillApiClient\CJ.Plug.SkillApiClient.csproj" />
     <ProjectReference Include="..\..\modules\SystemConfigModule\CJ.Plug.SystemConfigApiClient\CJ.Plug.SystemConfigApiClient.csproj" />
