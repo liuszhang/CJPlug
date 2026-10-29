@@ -18,6 +18,8 @@ namespace CJ.Plug.MCPToolsManage.Menus
                     Icon = Icons.Material.Filled.Task,
                     Href = "/MCPToolManage",
                     Text = "MCPTool管理",
+                    // P5.5：与页面 [ModuleAccess] 同键
+                    AccessKey = "plug-mcptools",
                     //GroupName = MenuItemGroups.General.Name,
                 }
             };

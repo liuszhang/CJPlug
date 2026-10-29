@@ -12,6 +12,12 @@ public static class ServiceCollectionExtensions
         //   框架根组件 FrameworkApp 用「进程级静态标志」保证模块 InitializeAsync 只执行一次；
         //   注册成 Scoped 会让每个电路新建一份模块实例、重复向单例 IAppBarService 注册 AppBar 项。
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, AIModule>();
+
+        // P5.5：仅给「API Keys 管理页」（/AIAgent）声明子键 ——
+        //   模块键 plug-ai 已被 AppBar 的 AskAI 入口占用（AI 助手可见性），不能混用。
+        services.AddSingleton<IModuleAccessDeclaration>(
+            new ModuleAccessDeclaration("plug-ai:keys", ["system_admin"], "AI 助手"));
+
         services.AddScoped<IDeepSeekService, DeepSeekService>();
         services.AddAIChatServices();
 

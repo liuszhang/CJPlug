@@ -1,4 +1,7 @@
 @page "/LlmConfig"
+@* P5.5（D-P5-2=B 第一批）：LLM 配置含供应商 API Key 与模型端点，按模块键收口；
+   键复用 ModuleId（Q8 定案）⇒ 与菜单 AccessKey、P6 模块启停同一口径。 *@
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-llm-config", "system_admin")]
 @using CJ.Plug.LlmConfigApiClient
 @using CJ.Plug.LlmConfigModel.Models
 @using MudBlazor

@@ -38,7 +38,8 @@ public sealed class PlugShellMenu : IMenuService
                 GroupName  = "调试",
                 Match      = "Prefix",
                 Order      = 910,
-                AccessKey  = "plug-shell",
+                // P5.5：与远程桌面页面 [ModuleAccess("plug-guacamole")] 同键（原 plug-shell 会与页面口径漂移）
+                AccessKey  = "plug-guacamole",
             },
             new()
             {
@@ -48,7 +49,7 @@ public sealed class PlugShellMenu : IMenuService
                 GroupName  = "调试",
                 Match      = "Prefix",
                 Order      = 920,
-                AccessKey  = "plug-shell",
+                AccessKey  = "plug-guacamole",
             },
         });
 }

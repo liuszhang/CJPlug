@@ -15,6 +15,8 @@ namespace CJ.Plug.LicenseUI
                     Href = "/LicenseManage",
                     Text = "许可证管理",
                     GroupName = "管理",
+                    // P5.5：与页面 [ModuleAccess] 同键
+                    AccessKey = "plug-license",
                 }
             };
 

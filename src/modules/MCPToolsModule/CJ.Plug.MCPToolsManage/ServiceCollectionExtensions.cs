@@ -36,6 +36,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService, MCPToolsManageMenu>();
 
+        // P5.5：模块权限声明（矩阵页可见性）
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-mcptools", ["system_admin"], "MCP 工具管理"));
+
         services.AddHttpClient<IMCPToolApiClient, MCPToolApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);

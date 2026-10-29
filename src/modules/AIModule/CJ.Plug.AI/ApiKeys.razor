@@ -1,4 +1,7 @@
 ﻿@page "/AIAgent"
+@* P5.5：平台对外 API 凭据管理。用子键 plug-ai:keys —— 不与 AppBar 的 plug-ai（AskAI 入口可见性）共用，
+   否则锁密钥页会把普通用户的 AI 助手入口一起锁掉。 *@
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-ai:keys", "system_admin")]
 
 @using Elsa.Agents
 @using Elsa.Studio.Agents.Client

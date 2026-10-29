@@ -27,6 +27,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService, LlmConfigMenu>();
 
+        // P5.5：模块权限声明 —— 供权限矩阵页（/admin/role-permissions）扫描出该键；
+        //   不注册则矩阵里看不到它，现场无法改角色（只能改代码重编）。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-llm-config", ["system_admin"], "LLM 配置"));
+
         services.AddHttpClient<ILlmConfigApiClient, LlmConfigApiClientImpl>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);

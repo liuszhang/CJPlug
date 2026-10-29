@@ -72,6 +72,14 @@ public static class WebHostStartup
         if (path.StartsWithSegments("/api/module-admin") || path.StartsWithSegments("/api/system-config"))
             return true;
 
+        // ①.5 P5：三员 / 个人中心端点同样带 RequireAuthorization 元数据。
+        //    ⚠ 若落到下面的 ② 分支（无授权中间件），EndpointMiddleware 会抛
+        //    "contains authorization metadata, but a middleware was not found that supports authorization"
+        //    ⇒ 登录后打开三员页面 500（2026-10-29 P5 实测）。
+        //    登录端点自身带 AllowAnonymous，经过授权中间件仍可匿名访问。
+        if (path.StartsWithSegments("/api/three-role") || path.StartsWithSegments("/api/personal-center"))
+            return true;
+
         // ② 业务 API / 调度 Hub / MCP 面：保持「无认证身份」。
         if (path.StartsWithSegments("/api")
             || path.StartsWithSegments("/mainHub")
@@ -218,6 +226,14 @@ public static class WebHostStartup
                 return SeedDataRunner.RunAllAsync(seedScope.ServiceProvider, ct);
             };
         });
+
+        // ── P5：审计独立库（AuditDbContext）──────────────────────────────
+        // 三员的 AuditService / 审计页依赖 CJCore.Modules.Data.AuditDbContext，
+        // 它与业务 DataDbContext 是**两个物理库**（SQLite 下按主库名派生 main_audit.db）；
+        // 不注册 ⇒ 打开 /three-role/audit 直接抛
+        // "Unable to resolve service for type 'CJCore.Modules.Data.AuditDbContext'"。
+        // 该扩展同时把审计表纳入自动迁移引擎（MigrationTarget.Audit）。
+        services.AddAuditDbContext(configuration);
 
         // ── P5：身份替换 —— 三员管理真认证（2026-10-29）─────────────────────
         // 一行全包：DataProtection（密钥落 DataProtectionKeys 表 ⇒ F5/重启保持登录）

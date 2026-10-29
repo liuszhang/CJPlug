@@ -26,6 +26,10 @@ namespace CJ.Plug.GuacamoleUI
         {
             services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
 
+            // P5.5：模块权限声明（5 个 /remote/*、/guacamole/{ip} 页面 + 两条 VNC 菜单共用此键）
+            services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+                new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-guacamole", ["system_admin"], "远程桌面"));
+
             // 注册 API 客户端
             services.AddGuacamoleModulePageServices();
 

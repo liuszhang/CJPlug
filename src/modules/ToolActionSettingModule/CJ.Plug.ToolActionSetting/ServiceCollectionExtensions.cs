@@ -33,6 +33,12 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService, ToolActionSettingMenu>();
+
+        // P5.5：模块权限声明（矩阵页可见性）。
+        // ⚠ 与本模块已有的 IFunctionPermissionProvider（Plug.View/Plug.Create… 细粒度键）**不是同一体系**：
+        //   后者是 P5 前遗留、当前全仓只注册无消费方；页面准入走 CJCore 的 ModuleAccess 链。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-tool-action", ["system_admin"], "插件管理"));
         services.AddHttpClient<ITASApiClient,TASApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);

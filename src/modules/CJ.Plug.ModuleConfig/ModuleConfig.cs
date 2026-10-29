@@ -45,16 +45,32 @@ namespace CJ.Plug.ModuleConfig
             services.AddRelationManagePageModuleServices();
 
             services.AddFMDModuleServices();
-            services.AddUserManagePageModuleServices();
+
+            // ── P5.6（D-P5-3=B 保留代码、摘除入口）：四模块 UI 注册下线 ──────────
+            // 只摘「UI 侧」注册；②DI 侧（ConfigModuleApiServices）与 ③端点侧
+            // （ConfigModuleApis）**保留不动**，源文件/csproj 一个不删。
+            //
+            // 机制：FrameworkRoutes 的 AdditionalAssemblies 由 IEnumerable<IModule> 反推
+            //   ⇒ 不注册 IModule，该模块的 @page 路由、菜单项、AppBar 项**同时消失**，
+            //     无需逐页处理，也无需改任何业务代码。
+            //
+            // 摘除收益（P5.4 实测登记项一并消掉）：
+            //   ① 旧「系统管理/授权管理/审计管理」菜单与新三员同名菜单并存的口径双轨 → 消除；
+            //   ② AppBar 的「欢迎：⎋」假登出按钮（LoginModule 经 AddAppBarItem<LoginState> 挂载，
+            //      点击只清旧 localStorage + 跳 /login，不清三员 cookie、不撤销会话）→ 消失；
+            //   ③ 「欢迎：」后用户名恒空（取旧 localStorage key，三员不写）→ 消失。
+            //
+            // ⚠ 回滚成本 = 取消下面 4 行注释 + 重编译。保留期一个版本周期。
+            //services.AddUserManagePageModuleServices();
             services.AddMCPToolsModuleServices();
             services.AddSkillsModuleServices();
             services.AddKnowledgeModuleServices();
 
-            // 授权管理模块
-            services.AddAuthModulePageServices();
+            // 授权管理模块 —— P5.6 摘除 UI 入口（三员 /three-role/auth 接管）
+            //services.AddAuthModulePageServices();
 
-            // 审计管理模块
-            services.AddAuditModulePageServices();
+            // 审计管理模块 —— P5.6 摘除 UI 入口（三员 /three-role/audit 接管）
+            //services.AddAuditModulePageServices();
 
             // Guacamole 远程桌面模块
             services.AddGuacamoleUIPageServices();
@@ -70,8 +86,8 @@ namespace CJ.Plug.ModuleConfig
             //许可证管理模块
             services.AddLicenseModulePageServices();
 
-            //放在最后，因为用户名需要放在最后
-            services.AddLoginModulePageServices();
+            // 登录模块 —— P5.6 摘除 UI 入口（三员 /three-role/login 接管）
+            //services.AddLoginModulePageServices();
 
             return services;
         }
