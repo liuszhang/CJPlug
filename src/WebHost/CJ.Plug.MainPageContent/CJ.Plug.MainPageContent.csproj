@@ -11,8 +11,15 @@
 		<SupportedPlatform Include="browser" />
 	</ItemGroup>
   <ItemGroup>
+    <!-- P2 壳组件（PlugRuntimeHost / PlugExecLogDrawer）用到 Radzen 与 LogsWrapper -->
+    <PackageReference Include="Radzen.Blazor" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     <ProjectReference Include="..\..\modules\AIModule\CJ.Plug.AI\CJ.Plug.AI.csproj" />
     <ProjectReference Include="..\..\modules\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <!-- CJCore 模块/菜单契约（2026-10-29 接入 P1）：Routes.razor / MyNavMenu.razor 直接用 -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
   </ItemGroup>
 
 

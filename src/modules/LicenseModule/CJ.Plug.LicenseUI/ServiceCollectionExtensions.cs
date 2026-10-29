@@ -1,4 +1,4 @@
-using CJ.Plug.LicenseApiClient;
+﻿using CJ.Plug.LicenseApiClient;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,8 +10,8 @@ namespace CJ.Plug.LicenseUI
     {
         public static IServiceCollection AddLicenseModulePageServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModule, LicenseModule>();
-            services.AddScoped<IMenuService, LicenseManageMenu>();
+            services.AddSingleton<CJCore.Framework.Abstractions.IModule, LicenseModule>();
+            services.AddScoped<CJCore.Framework.Abstractions.IMenuService, LicenseManageMenu>();
 
             services.AddHttpClient<ILicenseApiClient, global::CJ.Plug.LicenseApiClient.LicenseApiClient>(client =>
             {

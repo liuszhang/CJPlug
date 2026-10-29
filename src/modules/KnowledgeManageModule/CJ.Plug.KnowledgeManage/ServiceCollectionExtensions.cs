@@ -15,6 +15,14 @@ public static class ServiceCollectionExtensions
 {
     public class Module : ModuleBase
     {
+        /// <summary>模块显示名（P6.1：取代 D2 过渡期的「命名空间末段」取值）。</summary>
+        public override string Name => "知识管理";
+
+        /// <summary>稳定标识键（Q8 定案 <c>plug-&lt;模块&gt;</c>），模块启停状态的持久化键。</summary>
+        public override string ModuleId => "plug-knowledge";
+
+        /// <summary>模块管理页分组。</summary>
+        public override string Group => "集成";
     }
 
     /// <summary>
@@ -22,8 +30,8 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddKnowledgeModuleServices(this IServiceCollection services)
     {
-        services.AddScoped<IModule, Module>();
-        services.AddScoped<IMenuService, KnowledgeManageMenu>();
+        services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
+        services.AddScoped<CJCore.Framework.Abstractions.IMenuService, KnowledgeManageMenu>();
 
         services.AddHttpClient<IKnowledgeApiClient, KnowledgeApiClient.KnowledgeApiClient>(client =>
         {

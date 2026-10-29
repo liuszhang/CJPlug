@@ -1,5 +1,4 @@
-using CJ.Plug.Models.Contracts;
-using CJ.Plug.Models.Shared;
+﻿using CJCore.Framework.Abstractions;
 using MudBlazor;
 
 namespace CJ.Plug.KnowledgeManage.Menus;

@@ -179,7 +179,7 @@
             SetDataGridShowNotify = new SetDataGridShowNotify(EventCallback.Factory.Create<bool>(this, OnSetDataGridShow));
 
             //await GlobalEventBus.SetMenuStatus(false);
-            SetMenuNotify.Invoke(false);
+            SetMenuNotify?.Invoke(false);
             SelectedPlugDefinitionId = ProcessDefinitionId;
 
             //获取流程数据

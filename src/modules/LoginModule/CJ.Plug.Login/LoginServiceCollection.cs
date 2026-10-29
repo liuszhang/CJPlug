@@ -25,7 +25,8 @@ namespace CJ.Plug.Login
     {
         public static IServiceCollection AddLoginModulePageServices(this IServiceCollection services)
         {            
-            services.AddScoped<IModule, LoginModule>();
+            // Singleton：见 CJ.Plug.AI/ServiceCollectionExtensions.cs 同款说明（P2-2.8）
+            services.AddSingleton<CJCore.Framework.Abstractions.IModule, LoginModule>();
 
             services.AddHttpClient<ILoginApiClient, CJ.Plug.LoginApiClient.ApiClients.LoginApiClient>(client => client.BaseAddress = new(GlobalData.MainDispatcherServer));
 

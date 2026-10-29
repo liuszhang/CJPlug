@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CJ.Plug.McpServer.Bridge;
 using CJ.Plug.McpServer.Services;
 using CJ.Plug.Models.Shared;
 using ModelContextProtocol.Protocol;
@@ -106,6 +107,10 @@ WorkflowTools.Configure(apiUrl);
 
 // ★ 配置 FileTools 的 ApiServer 地址（MCP 文件上传/查询工具）
 FileTools.Configure(apiUrl);
+
+// P8：给 CJCore 侧工具桥用的薄 REST 窗（清单 + 执行），详见 PlugMcpBridgeEndpoints 类注释。
+// 必须在 app.MapMcp() 之前/之后都可以（路径不冲突）；这里放在 MapMcp 旁边便于一眼看全暴露面。
+app.MapPlugMcpBridge();
 
 app.MapMcp();
 app.Run("http://localhost:3001");

@@ -1,0 +1,42 @@
+@* 执行日志抽屉（2026-10-29《CJPlug 接入 CJCore》P2-2.6）
+   原 MainLayout / EmbeddedLayout 各内置一份「系统日志」右侧抽屉（SignalR 执行日志 LogsWrapper），
+   换用 FrameworkLayout 后改由本组件承载，经 IAppBarService.AddAppBarDrawer 挂到 MudLayout 直接子级。
+
+   ⚠ 与框架自带的「平台日志抽屉」（FrameworkOptions.EnableLogDrawer，Alt+L）是两套东西：
+     本抽屉是 CJPlug 业务执行日志（SignalRLogSink → LogsWrapper），二者并存，不合并。 *@
+
+@implements IDisposable
+
+@using CJ.Plug.MainPageContent.Shell
+@using MudBlazor
+
+@inject PlugExecLogService ExecLog
+
+<MudDrawer @bind-Open="@_open" Width="30vw" Anchor="Anchor.End" Elevation="1" Variant="@DrawerVariant.Temporary" Overlay="false">
+    <MudDrawerHeader>
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceAround">
+            <MudText Typo="Typo.h6">执行日志</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" Edge="Edge.End"
+                           OnClick="@(() => ExecLog.SetOpen(false))" />
+        </MudStack>
+    </MudDrawerHeader>
+    <CJ.Plug.SharedPages.LogsWrapper HeightPercent="100" TabName="" />
+</MudDrawer>
+
+@code {
+    private bool _open;
+
+    protected override void OnInitialized()
+    {
+        ExecLog.StateChanged += OnStateChanged;
+        _open = ExecLog.IsOpen;
+    }
+
+    private void OnStateChanged(bool open)
+    {
+        _open = open;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => ExecLog.StateChanged -= OnStateChanged;
+}

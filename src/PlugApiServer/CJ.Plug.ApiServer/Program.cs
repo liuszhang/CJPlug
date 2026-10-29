@@ -177,12 +177,13 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MainDbContext>();
-    // 使用 EnsureCreated 创建所有表（基于当前模型，包括 Identity 表）
-    // 注意：如果后续需要正式迁移，应改回 MigrateAsync 并先生成包含 Identity 表的迁移
-    if (await db.Database.EnsureCreatedAsync())
-        Console.WriteLine("[SeedData] 数据库已创建");
-    else
-        Console.WriteLine("[SeedData] 数据库已存在");
+    // 2026-10-29《CJPlug 接入 CJCore》P3：改用进程内幂等的统一入口（原为直接 EnsureCreatedAsync）。
+    //   ⚠ 这里刻意**没有**换成 MigrateAsync：MainDbContext 的模型是运行时由 IModuleDbConfig 动态拼装的，
+    //     EF 设计时拿不到完整模型 ⇒ 任何迁移快照都必然缺表，改走 Migrate 只会让缺表更隐蔽。
+    //     真正的迁移基线留到 P4（业务表交给 CJCore Data 引擎自动迁移记账，MainDbContext 只剩 Identity 后）。
+    //   见 CJ.Plug.Models/Services/DbSchemaInitializer.cs。
+    CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(db);
+    Console.WriteLine("[SeedData] 数据库结构就绪检查完成");
 }
 catch (Exception ex)
 {

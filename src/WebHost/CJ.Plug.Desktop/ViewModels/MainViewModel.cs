@@ -97,19 +97,19 @@ public partial class MainViewModel : ObservableObject
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "插头管理",
-            Url = "http://localhost:5066/TAS?hideMenu=true",
+            Url = "http://localhost:5066/TAS?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2699"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "流程管理",
-            Url = "http://localhost:5066/ProcessManageList?hideMenu=true",
+            Url = "http://localhost:5066/ProcessManageList?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2395"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "MCP Tool管理",
-            Url = "http://localhost:5066/MCPToolManage?hideMenu=true",
+            Url = "http://localhost:5066/MCPToolManage?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2328"
         });
         MenuItems.Add(new MenuItemViewModel
@@ -121,19 +121,19 @@ public partial class MainViewModel : ObservableObject
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "工具资源",
-            Url = "http://localhost:5066/ToolResource?hideMenu=true",
+            Url = "http://localhost:5066/ToolResource?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2692"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "AI对话",
-            Url = "http://localhost:5066/AskAI?hideMenu=true",
+            Url = "http://localhost:5066/AskAI?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2601"
         });
         MenuItems.Add(new MenuItemViewModel
         {
             Name = "LLM配置",
-            Url = "http://localhost:5066/LlmConfig?hideMenu=true",
+            Url = "http://localhost:5066/LlmConfig?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
             Icon = "\u2693"
         });
 
@@ -227,7 +227,7 @@ public partial class MainViewModel : ObservableObject
             MenuItems.Insert(index, new MenuItemViewModel
             {
                 Name = "图站管理",
-                Url = "http://localhost:5066/StationManage?hideMenu=true",
+                Url = "http://localhost:5066/StationManage?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
                 Icon = "\u2606"
             });
         }
@@ -251,7 +251,7 @@ public partial class MainViewModel : ObservableObject
             BreadcrumbItems.Add(new BreadcrumbItem
             {
                 Text = "流程管理",
-                NavigateUrl = "http://localhost:5066/ProcessManageList?hideMenu=true",
+                NavigateUrl = "http://localhost:5066/ProcessManageList?hideMenu=true&title=%E5%B7%A5%E5%85%B7%E6%B5%81%E7%A8%8B%E7%BC%96%E6%8E%92",
                 IsFirst = true
             });
             BreadcrumbItems.Add(new BreadcrumbItem

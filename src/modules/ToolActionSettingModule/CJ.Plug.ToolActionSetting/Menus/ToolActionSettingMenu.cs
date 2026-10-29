@@ -1,5 +1,4 @@
-﻿using CJ.Plug.Models.Contracts;
-using CJ.Plug.Models.Shared;
+﻿using CJCore.Framework.Abstractions;
 using MudBlazor;
 using System;
 using System.Collections.Generic;
@@ -20,7 +19,7 @@ namespace ProcessManageModule.Menus
                     Icon = Icons.Material.Filled.Power,
                     Href = "/TAS",
                     Text = "插头管理",
-                    GroupName = MenuGroupEnum.插头管理.ToString(),
+                    GroupName = "管理",
                 }
             };
 

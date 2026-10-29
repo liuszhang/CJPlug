@@ -1,5 +1,4 @@
-using CJ.Plug.Models.Contracts;
-using CJ.Plug.Models.Shared;
+﻿using CJCore.Framework.Abstractions;
 using MudBlazor;
 
 namespace ProcessManageModule.Menus
@@ -15,7 +14,7 @@ namespace ProcessManageModule.Menus
                     Icon = Icons.Material.Filled.Settings,
                     Href = "/SystemManage",
                     Text = "系统管理",
-                    GroupName = MenuGroupEnum.管理.ToString(),
+                    GroupName = "管理",
                 }
             };
 

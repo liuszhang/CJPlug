@@ -16,7 +16,7 @@ public class ToolManageService : IToolManageService
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
-        _dbContext.Database.EnsureCreated();
+        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
     }
 
     public async Task<IEnumerable<Tool>?> GetAllToolsAsync(CancellationToken cancellationToken = default)

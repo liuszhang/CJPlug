@@ -1,0 +1,13 @@
+@* 运行时宿主（2026-10-29《CJPlug 接入 CJCore》P2）：
+   原 MainLayout.razor / EmbeddedLayout.razor 各自渲染了一份 Radzen 主题与组件宿主，
+   换用 FrameworkLayout 后布局由框架提供，这两项改由本组件承载，
+   经 IAppBarService.AddAppBarDrawer 挂到 MudLayout 直接子级（页面 Body 之外，不参与页面布局）。
+
+   ⚠ Radzen 的对话框/通知/工具提示依赖 RadzenComponents 的 JS 互操作宿主，
+     不渲染会导致 Radzen 组件静默失效（点击无反应）；
+     RadzenTheme 负责 material 主题样式表，缺失会让表格/日期控件回到无样式状态。 *@
+
+@using Radzen.Blazor
+
+<RadzenTheme Theme="material" @rendermode="InteractiveServer" />
+<RadzenComponents @rendermode="InteractiveAuto" />

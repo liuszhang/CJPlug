@@ -17,7 +17,7 @@ namespace CJ.Plug.Models.Contracts
         /// <summary>
         /// Returns all features.
         /// </summary>
-        IEnumerable<IModule> GetModules();
+        IEnumerable<CJCore.Framework.Abstractions.IModule> GetModules();
 
         /// <summary>
         /// Initializes all features.

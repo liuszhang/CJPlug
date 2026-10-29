@@ -1,4 +1,4 @@
-using CJ.Plug.Models.Contracts;
+﻿using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,8 +8,8 @@ namespace CJ.Plug.AuthUI
     {
         public static IServiceCollection AddAuthModulePageServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModule, AuthModule>();
-            services.AddScoped<IMenuService, AuthManageMenu>();
+            services.AddSingleton<CJCore.Framework.Abstractions.IModule, AuthModule>();
+            services.AddScoped<CJCore.Framework.Abstractions.IMenuService, AuthManageMenu>();
 
             services.AddHttpClient<CJ.Plug.AuthApiClient.IAuthApiClient, CJ.Plug.AuthApiClient.AuthApiClient>(client =>
             {

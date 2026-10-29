@@ -175,7 +175,7 @@ else
     public async Task MaxGuiDesigner(bool isMax)
     {
         IsGuiDesignerMaximized = isMax;
-        SetMenuNotify.Invoke(!IsGuiDesignerMaximized);
+        SetMenuNotify?.Invoke(!IsGuiDesignerMaximized);
         SetMaxGuiDesignerNotify?.Invoke(IsGuiDesignerMaximized);
 
     }

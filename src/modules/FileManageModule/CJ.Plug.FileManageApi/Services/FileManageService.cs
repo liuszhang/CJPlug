@@ -21,7 +21,7 @@ namespace CJ.Plug.FileManageApi.Services
         public FileManageService(MainDbContext dbContext)
         {
             _dbContext = dbContext;
-            _dbContext.Database.EnsureCreated();
+            CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         }
 
         /// <summary>

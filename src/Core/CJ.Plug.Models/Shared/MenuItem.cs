@@ -7,6 +7,13 @@ using System.Threading.Tasks;
 
 namespace CJ.Plug.Models.Shared
 {
+    /// <summary>
+    /// 已废弃：2026-10-29《CJPlug 接入 CJCore》P1 起菜单项统一使用
+    /// <c>CJCore.Framework.Abstractions.MenuItem</c>（<c>Match</c> 由 <c>NavLinkMatch</c>
+    /// 改为字符串 <c>"Prefix"/"Exact"</c>，<c>GroupName</c> 默认值由 <c>"General"</c> 改为 <c>"通用"</c>）。
+    /// 本类型不再被使用，P2 删除。
+    /// </summary>
+    [Obsolete("改用 CJCore.Framework.Abstractions.MenuItem")]
     public class MenuItem
     {
         //

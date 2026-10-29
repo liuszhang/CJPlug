@@ -13,7 +13,7 @@ public partial class PlugManageService : IPlugManageService
     public PlugManageService(MainDbContext dbContext)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreated();
+        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         //MigratePlugSchema();
     }
 

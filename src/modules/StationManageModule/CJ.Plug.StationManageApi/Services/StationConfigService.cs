@@ -13,7 +13,7 @@ public class StationConfigService:IStationConfigService
     public StationConfigService(MainDbContext dbContext)
     {
         _dbContext = dbContext;
-        _dbContext.Database.EnsureCreated();
+        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
     }
 
     public async Task<IEnumerable<StationConfigTable>?> GetAllStationConfigsAsync(CancellationToken cancellationToken = default)

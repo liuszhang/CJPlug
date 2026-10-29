@@ -12,7 +12,7 @@ namespace CJ.Plug.Models.Services
         public BaseRepositoryService(MainDbContext dbContext)
         {
             _dbContext = dbContext;
-            _dbContext.Database.EnsureCreated();
+            CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         }
 
         // 通用查询（根据ID）

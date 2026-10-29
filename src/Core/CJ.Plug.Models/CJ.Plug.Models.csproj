@@ -27,4 +27,12 @@
 	  <PackageReference Include="System.Linq.Async" />
   </ItemGroup>
 
+  <!--
+    CJCore 模块契约（2026-10-29 接入 P1 / D2=A1）：
+    本项目的 IModule / ModuleBase 收敛到 CJCore，26 个模块子类因此无需逐个改动。
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

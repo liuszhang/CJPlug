@@ -22,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- CJCore 模块契约（2026-10-29 接入 P2）：LoginModule 直接依赖 IAppBarService / ModuleBase -->
+    <ProjectReference Include="..\..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     <ProjectReference Include="..\CJ.Plug.LoginApiClient\CJ.Plug.LoginApiClient.csproj" />
   </ItemGroup>

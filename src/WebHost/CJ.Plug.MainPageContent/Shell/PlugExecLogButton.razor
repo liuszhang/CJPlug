@@ -1,0 +1,26 @@
+@* 执行日志抽屉触发按钮（2026-10-29《CJPlug 接入 CJCore》P2-2.6）
+   挂在 AppBar 内，经 PlugExecLogService 打开挂在 MudLayout 子级的执行日志抽屉。
+   与框架自带的「系统日志 (Alt+L)」按钮区分：本按钮是 CJPlug 业务执行日志。 *@
+
+@implements IDisposable
+
+@using CJ.Plug.MainPageContent.Shell
+@using MudBlazor
+
+@inject PlugExecLogService ExecLog
+
+<MudTooltip Text="@("执行日志")">
+    <MudIconButton Icon="@ExecLogIcon" Color="Color.Inherit" OnClick="@ExecLog.Toggle" />
+</MudTooltip>
+
+@code {
+    private string ExecLogIcon => ExecLog.IsOpen
+        ? Icons.Material.Filled.Terminal
+        : Icons.Material.Outlined.Terminal;
+
+    protected override void OnInitialized() => ExecLog.StateChanged += OnStateChanged;
+
+    private void OnStateChanged(bool _) => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ExecLog.StateChanged -= OnStateChanged;
+}

@@ -1,5 +1,4 @@
-﻿using CJ.Plug.Models.Contracts;
-using CJ.Plug.Models.Shared;
+﻿using CJCore.Framework.Abstractions;
 using MudBlazor;
 using System;
 using System.Collections.Generic;
@@ -20,7 +19,7 @@ namespace ProcessManageModule.Menus
                     Icon = Icons.Material.Filled.Workspaces,
                     Href = "/UnitTest",
                     Text = "单元测试",
-                    GroupName = MenuGroupEnum.调试.ToString(),
+                    GroupName = "调试",
                 }
             };
 

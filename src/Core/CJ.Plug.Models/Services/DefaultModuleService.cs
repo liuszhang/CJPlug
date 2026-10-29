@@ -9,16 +9,16 @@ namespace CJ.Plug.Models.Services
 {
     public class DefaultModuleService : IModuleService
     {
-        private readonly IEnumerable<IModule> _features;
+        private readonly IEnumerable<CJCore.Framework.Abstractions.IModule> _features;
 
-        public DefaultModuleService(IEnumerable<IModule> features)
+        public DefaultModuleService(IEnumerable<CJCore.Framework.Abstractions.IModule> features)
         {
             _features = features;
         }
 
         public event Action? Initialized;
 
-        public IEnumerable<IModule> GetModules()
+        public IEnumerable<CJCore.Framework.Abstractions.IModule> GetModules()
         {
             return _features.ToList();
         }

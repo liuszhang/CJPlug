@@ -1,5 +1,4 @@
-using CJ.Plug.Models.Contracts;
-using CJ.Plug.Models.Shared;
+﻿using CJCore.Framework.Abstractions;
 using MudBlazor;
 
 namespace CJ.Plug.LlmConfig.Menus;
@@ -15,7 +14,7 @@ public class LlmConfigMenu : IMenuService
                 Icon = Icons.Material.Filled.SmartToy,
                 Href = "/LlmConfig",
                 Text = "LLM 配置",
-                GroupName = MenuGroupEnum.管理.ToString(),
+                GroupName = "管理",
             }
         };
         return new ValueTask<IEnumerable<MenuItem>>(menuItems);

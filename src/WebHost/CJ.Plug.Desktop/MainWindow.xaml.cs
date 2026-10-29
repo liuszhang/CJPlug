@@ -66,13 +66,19 @@ public partial class MainWindow : Window
                     && !url.Contains("hideMenu=true", StringComparison.OrdinalIgnoreCase))
                 {
                     var sep = url.Contains('?') ? "&" : "?";
-                    MainWebView.CoreWebView2.Navigate(url + sep + "hideMenu=true");
+                    // 2026-10-29《CJPlug 接入 CJCore》P2-2.10（D7=B）：
+                    //   嵌入形态的两个参数一起补 —— hideMenu 隐藏侧栏与菜单按钮，title 覆盖顶栏标题。
+                    //   只补一个会出现「无侧栏但标题仍是产品名」的半嵌入观感。
+                    MainWebView.CoreWebView2.Navigate(
+                        url + sep + "hideMenu=true&title=" + Uri.EscapeDataString("工具流程编排"));
                 }
             });
         };
 
         // 初始化服务管理视图（仪表盘 WebView2 + 控制面板 + 数据库配置）
-        await ServiceManagementView.InitializeAsync(_serviceControlVm, _databaseConfigVm, "http://localhost:15288", "http://localhost:5066/SystemConfig");
+        // 2026-10-29《CJPlug 接入 CJCore》P7.1：旧路由 /SystemConfig 已退役（页面与菜单一并删除），
+        //   ⇒ 改指 /system-config；并按 D7=B 补 hideMenu=true，保持原先「内嵌、无侧栏」的观感。
+        await ServiceManagementView.InitializeAsync(_serviceControlVm, _databaseConfigVm, "http://localhost:15288", "http://localhost:5066/system-config?hideMenu=true");
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

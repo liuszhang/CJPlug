@@ -1,4 +1,4 @@
-using CJ.Plug.Models.Contracts;
+﻿using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,8 +8,8 @@ namespace CJ.Plug.AuditUI
     {
         public static IServiceCollection AddAuditModulePageServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModule, AuditModule>();
-            services.AddScoped<IMenuService, AuditManageMenu>();
+            services.AddSingleton<CJCore.Framework.Abstractions.IModule, AuditModule>();
+            services.AddScoped<CJCore.Framework.Abstractions.IMenuService, AuditManageMenu>();
 
             services.AddHttpClient<CJ.Plug.AuditApiClient.IAuditApiClient, CJ.Plug.AuditApiClient.AuditApiClient>(client =>
             {
