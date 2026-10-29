@@ -13,6 +13,9 @@ public class HubConnectionManagerService: IHubConnectionManager
 
     private readonly Uri _baseAddress;
 
+    /// <summary>串行化 Start/Stop，防止「构造期重试」与「外部 ConnectAsync」并发撞状态机。</summary>
+    private readonly SemaphoreSlim _connectGate = new(1, 1);
+
     // 首次连接的重试节奏（0s、2s、5s、10s；第 0 次立即尝试）
     private static readonly TimeSpan[] RetryDelays =
     {
@@ -22,6 +25,8 @@ public class HubConnectionManagerService: IHubConnectionManager
     public HubConnectionManagerService()
     {
         _baseAddress = new Uri(GlobalData.MainDispatcherServer);
+        // 幂等；确保 SignalR 内部 HttpClient 连本机环回时不走系统代理（2026-10-29，文档 K.7）。
+        LoopbackProxyBypass.Apply();
         //_httpHostIp = httpHostIp;
         Console.WriteLine($"--------------HUB connect server ip:{_baseAddress}---------------");
         //var baseUrl = BaseAddress?.ToString();
@@ -71,6 +76,43 @@ public class HubConnectionManagerService: IHubConnectionManager
     private static string Describe(Exception? error) => error?.Message ?? "无异常信息";
 
     /// <summary>
+    /// 串行化 <c>StartAsync</c>。
+    ///
+    /// 为什么必须有这把锁（2026-10-29）：构造函数里 <see cref="ConnectWithRetryAsync"/> 是 fire-and-forget，
+    /// 外部业务随时可能再调 <see cref="ConnectAsync"/>。两个入口并发时第二个必然撞上
+    /// <c>InvalidOperationException: The HubConnection cannot be started if it is not in the Disconnected state</c>。
+    /// 且 <c>Connecting</c> 状态下重复 Start 同样非法 —— 这是原先只判 Reconnecting 漏掉的分支。
+    /// </summary>
+    private async Task<(bool Started, bool Skipped, Exception? Error)> TryStartAsyncAsync()
+    {
+        await _connectGate.WaitAsync();
+        try
+        {
+            if (_hubConnection.State == HubConnectionState.Connected)
+            {
+                return (true, false, null);
+            }
+
+            if (_hubConnection.State != HubConnectionState.Disconnected)
+            {
+                // Connecting / Reconnecting：本轮跳过（不是失败，不消耗重试次数）
+                return (false, true, null);
+            }
+
+            await _hubConnection.StartAsync();
+            return (true, false, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, false, ex);
+        }
+        finally
+        {
+            _connectGate.Release();
+        }
+    }
+
+    /// <summary>
     /// 首次连接：按 <see cref="RetryDelays"/> 有限重试，并按**真实结果**打印
     /// success / failed（失败时把异常一并打出）。本方法吞掉异常，不向外抛。
     /// </summary>
@@ -83,20 +125,25 @@ public class HubConnectionManagerService: IHubConnectionManager
                 await Task.Delay(RetryDelays[attempt]);
             }
 
-            try
+            var (started, skipped, error) = await TryStartAsyncAsync();
+
+            if (started)
             {
-                await _hubConnection.StartAsync();
                 Console.WriteLine($"====================success connected to hub server:{_baseAddress}====================");
                 return;
             }
-            catch (Exception ex)
+
+            if (skipped)
             {
-                LogHub($"第 {attempt + 1}/{RetryDelays.Length} 次连接失败：{ex.Message}");
-                if (attempt == RetryDelays.Length - 1)
-                {
-                    Console.WriteLine($"====================failed connected to hub server:{_baseAddress}====================");
-                    Console.WriteLine(ex);
-                }
+                LogHub("当前已有连接在建立中，跳过本次重复 StartAsync");
+                continue;
+            }
+
+            LogHub($"第 {attempt + 1}/{RetryDelays.Length} 次连接失败：{Describe(error)}");
+            if (attempt == RetryDelays.Length - 1)
+            {
+                Console.WriteLine($"====================failed connected to hub server:{_baseAddress}====================");
+                Console.WriteLine(error);
             }
         }
     }
@@ -105,26 +152,29 @@ public class HubConnectionManagerService: IHubConnectionManager
     {
         try
         {
-            if (_hubConnection.State == HubConnectionState.Disconnected)
+            var (started, skipped, error) = await TryStartAsyncAsync();
+
+            if (started && _hubConnection.State == HubConnectionState.Connected)
             {
-                //Console.WriteLine(1);
-                await _hubConnection.StartAsync();
-                //Console.WriteLine(2);
                 Console.WriteLine($"====================success connected to hub server:{_baseAddress}====================");
             }
-            else if (_hubConnection.State == HubConnectionState.Reconnecting)
+            else if (skipped)
             {
-                // 自动重连进行中时再调 StartAsync 会抛 InvalidOperationException，这里直接跳过
-                LogHub("当前处于自动重连中，跳过重复 StartAsync");
+                // 自动重连进行中 / 已有连接在建立：直接跳过，不再抛 InvalidOperationException
+                LogHub("当前处于连接中或自动重连中，跳过重复 StartAsync");
+            }
+            else if (error is not null)
+            {
+                // 保持原语义：不向外抛（DispatchServer 的 StationService 依赖它不抛异常）
+                Console.WriteLine($"====================failed connected to hub server:{_baseAddress}====================");
+                Console.WriteLine(error);
             }
         }
         catch (Exception ex)
         {
-            // 保持原语义：不向外抛（DispatchServer 的 StationService 依赖它不抛异常）
             Console.WriteLine($"====================failed connected to hub server:{_baseAddress}====================");
             Console.WriteLine(ex);
         }
-
     }
 
     public async Task InvokeAsync<T>(string methodName, T? arguments)
@@ -155,7 +205,18 @@ public class HubConnectionManagerService: IHubConnectionManager
 
     public async Task DisconnectAsync()
     {
-        await _hubConnection.StopAsync();
+        await _connectGate.WaitAsync();
+        try
+        {
+            if (_hubConnection.State != HubConnectionState.Disconnected)
+            {
+                await _hubConnection.StopAsync();
+            }
+        }
+        finally
+        {
+            _connectGate.Release();
+        }
     }
 }
 

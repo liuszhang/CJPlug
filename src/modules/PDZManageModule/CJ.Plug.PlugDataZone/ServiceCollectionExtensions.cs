@@ -46,7 +46,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddPDZManageModuleApiServices(this IServiceCollection services)
     {
         //services.AddDbContext<PDZDbContext>(options =>options.UseSqlite(DbConnectionString.ConnectionString));
-        services.AddSingleton<IModuleDbConfig,PDZModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig, PDZModuleDbConfig>();
 
         services.AddScoped<IPDZManageService, PDZManageService>();
         //PDZ数据列表服务

@@ -1,3 +1,4 @@
+using CJ.Plug.Models.DbContexts;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Services;
@@ -12,7 +13,13 @@ using System.Text.Json;
 
 namespace CJ.Plug.UserManageApi.Services
 {
-    public partial class UserManageService : BaseRepositoryService<User, int>, IUserManageService
+    /// <remarks>
+    /// P4（2026-10-29）：显式写三泛型形态并把上下文钉为 <c>MainDbContext</c> ——
+    /// <c>User</c> 属于身份侧实体（表 <c>Users</c> 由 <c>UserModuleDbConfig</c> 注册进 MainDbContext 模型），
+    /// 不在业务库 <c>DataDbContext</c> 里。若走两泛型兼容形态（默认 DataDbContext），
+    /// <c>Set&lt;User&gt;()</c> 会因模型无此实体直接抛 <c>InvalidOperationException</c>。
+    /// </remarks>
+    public partial class UserManageService : BaseRepositoryService<User, int, MainDbContext>, IUserManageService
     {
         private readonly UserManager<User> _userManager;
 

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.ModelManageModel.DbContext
 {
-    public class OntologyManageDbConfig : IModuleDbConfig
+    public class OntologyManageDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

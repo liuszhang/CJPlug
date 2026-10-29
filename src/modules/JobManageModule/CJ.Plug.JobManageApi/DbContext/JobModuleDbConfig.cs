@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Relation;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.JobManageApi.DbContext
 {
-    public class JobModuleDbConfig : IModuleDbConfig
+    public class JobModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

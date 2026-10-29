@@ -1,4 +1,4 @@
-﻿using CJ.Plug.JobManageApiClient;
+using CJ.Plug.JobManageApiClient;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Station;
@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
 {
@@ -190,7 +191,7 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
         };
 
         //获取PDZ
-        //PlugDataZone=await MainDbContext.PlugDataZones.FindAsync(PlugDataZone.PDZId);
+        //PlugDataZone=await DataDbContext.PlugDataZones.FindAsync(PlugDataZone.PDZId);
 
         //创建执行作业PDZ
         var JobPDZ = PlugDataZone.CopyPDZ(UserName, PDZType.ToString(), job.JobDefinitionId);

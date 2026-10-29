@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.LlmConfigModel.DbContext;
 
-public class LlmConfigDbConfig : IModuleDbConfig
+public class LlmConfigDbConfig : IModuleBusinessDbConfig
 {
     public void AddDbSets(ModelBuilder modelBuilder)
     {

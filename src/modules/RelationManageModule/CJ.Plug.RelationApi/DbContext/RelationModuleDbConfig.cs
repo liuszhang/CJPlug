@@ -1,10 +1,10 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Relation;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.RelationApi.DbContext
 {
-    public class RelationModuleDbConfig : IModuleDbConfig
+    public class RelationModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

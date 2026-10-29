@@ -1,17 +1,17 @@
-﻿using CJ.Plug.Models.Station;
+using CJ.Plug.Models.Station;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 public class StationManageService:IStationManageService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
     private HubConnectionManagerService HubConnectionManagerService { get; set; }
 
-    public StationManageService(MainDbContext dbContext, HubConnectionManagerService hubConnectionManagerService)
+    public StationManageService(DataDbContext dbContext, HubConnectionManagerService hubConnectionManagerService)
     {
         _dbContext = dbContext;
-        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         HubConnectionManagerService = hubConnectionManagerService;
         HubConnectionManagerService._hubConnection.Remove("StatusInfo");
         HubConnectionManagerService._hubConnection.On<string, string, string>("StatusInfo", (ip, status, toolsRootPath) =>

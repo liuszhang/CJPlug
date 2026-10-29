@@ -1,12 +1,13 @@
-﻿using CJ.Plug.Models.Relation;
+using CJ.Plug.Models.Relation;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Relation;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 public class RelationManageService : BaseRepositoryService<CommonRelation, int>, IRelationManageService
 {
-    public RelationManageService(MainDbContext dbContext) : base(dbContext)
+    public RelationManageService(DataDbContext dbContext) : base(dbContext)
     {
     }
 

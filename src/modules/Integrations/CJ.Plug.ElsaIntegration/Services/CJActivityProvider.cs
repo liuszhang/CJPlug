@@ -1,4 +1,5 @@
 using CJ.Plug.Models.Plug;
+using CJ.Plug.Models.Shared;
 using Elsa.Extensions;
 using Elsa.Workflows;
 using Elsa.Workflows.Models;
@@ -22,6 +23,21 @@ namespace CJ.Plug.ElsaIntegration.Services
 
         public async ValueTask<IEnumerable<ActivityDescriptor>> GetDescriptorsAsync(CancellationToken cancellationToken = default)
         {
+            // 启动期跳过自调用（2026-10-29，文档 K.8.4）：
+            //   合并成单进程/单端口后，本方法会被 Elsa 的启动任务链在 **Kestrel 开始监听之前**调用，
+            //   此时 HTTP 自调用必拿到 Connection refused —— 既拿不到插头，又会打完整 inner stack、
+            //   还白等超时（实测单次 4 秒 × 2 个地址）。
+            //   这与下面 catch 的降级结果**完全等价**（都返回空，Studio 带 Refresh=true 时会重取），
+            //   只是把"试了才知道失败"变成"明知不可能成功就不试"。
+            //   ⚠ 不要改成"等一会儿再取"：Elsa 的启动任务是一批**顺序执行**的（见下方原注释），
+            //     在这里阻塞会连带拖住 AdminUserInitializer。
+            if (!HostStartupSignal.IsStarted)
+            {
+                Console.WriteLine("[Elsa] 启动期跳过取插头（本进程尚未开始监听）：本次不提供 CJ 插头描述符，" +
+                                  "Studio 带 Refresh=true 请求时会重取");
+                return Array.Empty<ActivityDescriptor>();
+            }
+
             List<PlugEntity> AllPlugs;
             try
             {

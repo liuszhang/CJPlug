@@ -20,6 +20,9 @@ using System.Text;
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
+// 环回地址绕过系统代理（2026-10-29，文档 K.7）。工位机同样会连主服务的 localhost:5066。幂等。
+CJ.Plug.Models.Shared.LoopbackProxyBypass.Apply();
+
 // 解析命令行 --port 参数
 int? commandLinePort = null;
 var builderArgs = new List<string>();
@@ -187,6 +190,9 @@ builder.Services.AddSingleton<MainApiClient>();
 
 
 var app = builder.Build();
+
+// 标记「本进程已开始监听」，供启动期自调用判断使用（2026-10-29，文档 K.8.4）。
+app.Lifetime.ApplicationStarted.Register(CJ.Plug.Models.Shared.HostStartupSignal.MarkStarted);
 
 app.UseWebSockets();
 

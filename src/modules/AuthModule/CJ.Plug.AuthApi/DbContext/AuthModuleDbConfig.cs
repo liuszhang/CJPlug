@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.AuthApi.DbContext
 {
-    public class AuthModuleDbConfig : IModuleDbConfig
+    public class AuthModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

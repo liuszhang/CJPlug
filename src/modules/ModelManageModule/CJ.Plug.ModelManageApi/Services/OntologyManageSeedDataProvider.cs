@@ -3,6 +3,7 @@ using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.ModelManageApi.Services
 {
@@ -16,7 +17,7 @@ namespace CJ.Plug.ModelManageApi.Services
 
         public async Task SeedAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
         {
-            var dbContext = serviceProvider.GetRequiredService<MainDbContext>();
+            var dbContext = serviceProvider.GetRequiredService<DataDbContext>();
 
             await SeedOntologyDefinitionsAsync(dbContext, cancellationToken);
             await SeedObjectInstancesAsync(dbContext, cancellationToken);
@@ -36,7 +37,7 @@ namespace CJ.Plug.ModelManageApi.Services
 
         #region 本体定义
 
-        private static async Task SeedOntologyDefinitionsAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedOntologyDefinitionsAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<Ontology>()
                 .FirstOrDefaultAsync(d => d.IsSystem, cancellationToken);
@@ -183,7 +184,7 @@ namespace CJ.Plug.ModelManageApi.Services
 
         #region 对象实例
 
-        private static async Task SeedObjectInstancesAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedObjectInstancesAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<ObjectInstance>()
                 .FirstOrDefaultAsync(cancellationToken);
@@ -276,7 +277,7 @@ namespace CJ.Plug.ModelManageApi.Services
 
         #region 基础枚举
 
-        private static async Task SeedBasicEnumsAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedBasicEnumsAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var now = new DateTime(2026, 5, 26, 0, 0, 0);
 
@@ -435,7 +436,7 @@ namespace CJ.Plug.ModelManageApi.Services
         }
 
         private static async Task SeedSecurityLevelAccessAsync(
-            MainDbContext dbContext, CancellationToken ct)
+            DataDbContext dbContext, CancellationToken ct)
         {
             var dataLevelEnum = await dbContext.Set<BasicEnum>()
                 .FirstOrDefaultAsync(e => e.Code == "data_secret_level", ct);
@@ -485,7 +486,7 @@ namespace CJ.Plug.ModelManageApi.Services
         }
 
         private static async Task EnsureBasicEnumAsync(
-            MainDbContext dbContext, CancellationToken ct, DateTime now,
+            DataDbContext dbContext, CancellationToken ct, DateTime now,
             string code, string name, string displayName, string description,
             bool isSystem, int sortOrder,
             (string Name, string Code, int SortOrder)[] items)
@@ -528,7 +529,7 @@ namespace CJ.Plug.ModelManageApi.Services
         /// <summary>
         /// 确保 Relation 基础枚举中包含 SysML V2 所需的关系类型
         /// </summary>
-        private static async Task EnsureSysMLRelationTypesAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task EnsureSysMLRelationTypesAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var relEnum = await dbContext.Set<BasicEnum>()
                 .FirstOrDefaultAsync(e => e.Code == "Relation", cancellationToken);
@@ -573,7 +574,7 @@ namespace CJ.Plug.ModelManageApi.Services
         /// SysML V2 UAV 无人机系统体系设计种子数据
         /// 覆盖结构/接口/需求/行为/状态/约束/视图等 SysML V2 核心建模元素
         /// </summary>
-        private static async Task SeedSysMLV2DataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedSysMLV2DataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var sentinel = await dbContext.Set<Ontology>()
                 .FirstOrDefaultAsync(o => o.Code == "UAV_System" && o.IsSystem, cancellationToken);
@@ -1640,7 +1641,7 @@ namespace CJ.Plug.ModelManageApi.Services
 
         #region M4-M7 维度种子数据
 
-        private static async Task SeedM4ScenarioDataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedM4ScenarioDataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<Scenario>()
                 .FirstOrDefaultAsync(s => s.Code == "UAV_Takeoff", cancellationToken);
@@ -1703,7 +1704,7 @@ namespace CJ.Plug.ModelManageApi.Services
             Console.WriteLine($"[SeedData] M4 场景种子数据已创建，共 {scenarios.Count} 条");
         }
 
-        private static async Task SeedM5SubjectDataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedM5SubjectDataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<Subject>()
                 .FirstOrDefaultAsync(s => s.Code == "FlightOps", cancellationToken);
@@ -1775,7 +1776,7 @@ namespace CJ.Plug.ModelManageApi.Services
             Console.WriteLine($"[SeedData] M5 主体种子数据已创建，共 6 主体 + {permissions.Count} 权限");
         }
 
-        private static async Task SeedM55InterfaceContractDataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedM55InterfaceContractDataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<ExternalSystem>()
                 .FirstOrDefaultAsync(s => s.Code == "WeatherService", cancellationToken);
@@ -1862,7 +1863,7 @@ namespace CJ.Plug.ModelManageApi.Services
             Console.WriteLine($"[SeedData] M5.5 接口契约种子数据已创建，共 {4} 外系统 + {contracts.Count} 接口");
         }
 
-        private static async Task SeedM6ReliabilityDataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedM6ReliabilityDataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<ExceptionType>()
                 .FirstOrDefaultAsync(e => e.Code == "GPS_SIGNAL_LOSS", cancellationToken);
@@ -1947,7 +1948,7 @@ namespace CJ.Plug.ModelManageApi.Services
             Console.WriteLine($"[SeedData] M6 可靠性种子数据已创建，共 {5} 异常类型 + {actions.Count} 补偿动作");
         }
 
-        private static async Task SeedM7QualityDataAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedM7QualityDataAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var existing = await dbContext.Set<QualityMetric>()
                 .FirstOrDefaultAsync(m => m.Code == "MissionCompletionRate", cancellationToken);

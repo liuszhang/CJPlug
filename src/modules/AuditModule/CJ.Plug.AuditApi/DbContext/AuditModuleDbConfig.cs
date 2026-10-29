@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.AuditApi.DbContext
 {
-    public class AuditModuleDbConfig : IModuleDbConfig
+    public class AuditModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

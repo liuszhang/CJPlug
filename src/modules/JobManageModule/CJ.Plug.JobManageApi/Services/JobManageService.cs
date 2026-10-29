@@ -1,4 +1,4 @@
-﻿using CJ.Plug.JobManageApi.Contracts;
+using CJ.Plug.JobManageApi.Contracts;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Shared;
@@ -7,16 +7,17 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Security.Claims;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.JobManageApi.Services
 {
     public partial class JobManageService : IJobManageService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
 
         private readonly ElsaApiClient ElsaApiClient;
 
-        public JobManageService(MainDbContext dbContext, ElsaApiClient elsaApiClient)
+        public JobManageService(DataDbContext dbContext, ElsaApiClient elsaApiClient)
         {
             _dbContext = dbContext;
             ElsaApiClient = elsaApiClient;

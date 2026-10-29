@@ -40,6 +40,23 @@
          SystemConfig = 仓储/服务/内置字段；SystemConfig.UI = 页面 + 模块实例（改由宿主自己的菜单贡献，见 PlugSystemConfigMenuService）。 -->
     <ProjectReference Include="..\..\..\..\CJCore\src\Modules\SystemConfig\CJCore.Modules.SystemConfig\CJCore.Modules.SystemConfig.csproj" />
     <ProjectReference Include="..\..\..\..\CJCore\src\Modules\SystemConfig\CJCore.Modules.SystemConfig.UI\CJCore.Modules.SystemConfig.UI.csproj" />
+    <!--
+      P4（2026-10-29）：业务库接入 CJCore Data 底座。
+      ⚠ 刻意只引 **Data.Api**（含 AddCJCoreDataApi = DataDbContext + 自动迁移引擎 + 种子调度），
+        不引 CJCore.Modules.Data 伞项目 —— 后者会连带 AddCJCoreDataUI，把「数据」页面/菜单塞进
+        CJPlug 的侧栏，破坏 D3=A 的三组归一。业务持久化用不到那套 UI。
+    -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\Data\CJCore.Modules.Data.Api\CJCore.Modules.Data.Api.csproj" />
+    <!--
+      P5（2026-10-29）：身份替换 —— 三员管理（真认证 / 用户 / 角色 / 部门 / 组 / 权限矩阵 / 审计）。
+      ⚠ 这里必须引**伞项目**（要 UI 页面，与 P4 只引 Data.Api 的取舍相反）：
+        AddCJCoreThreeRoleAdmin() 一行全包 = DataProtection + TRA_* DbConfig + 认证基座
+        + Permission（策略②）+ PersonalCenter；MapCJCoreThreeRoleAdmin() 一行映射 10 组端点。
+      ✅ 已核：伞项目只引 Data.Api（不是 Data 伞项目）⇒ 不会连带 AddCJCoreDataUI 的「数据」菜单。
+      ⚠ AddCJCoreAuth 内部会改写全局 DefaultScheme 为 "ThreeRolePolicy" ⇒ 认证必须整体切换，
+        不能"先接后端、后切组件层"，否则端点层要三员 Cookie、组件层还停在临时 Admin provider。
+    -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\ThreeRoleAdmin\CJCore.Modules.ThreeRoleAdmin\CJCore.Modules.ThreeRoleAdmin.csproj" />
     <!-- P8：A2A 工具面 —— IToolExecutor / DefaultToolRegistry / McpSurface 契约。 -->
     <ProjectReference Include="..\..\..\..\CJCore\src\Modules\AgentTool\CJCore.AgentTool.MCPTools\CJCore.AgentTool.MCPTools.csproj" />
     <!-- P8.3（C 分支）：Agent 执行链 —— LLMAgentBase / IAgentConfig / AgentRequest（Agent.Abstractions），

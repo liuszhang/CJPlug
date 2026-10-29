@@ -6,6 +6,7 @@ using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.MCPToolsManageApi.Services
 {
@@ -15,7 +16,7 @@ namespace CJ.Plug.MCPToolsManageApi.Services
         private readonly CapabilityRegistry? _capabilityRegistry;
         private readonly ILogger<MCPToolsManageService>? _logger;
 
-        public MCPToolsManageService(MainDbContext dbContext,
+        public MCPToolsManageService(DataDbContext dbContext,
             IMcpToolChangeNotifier? notifier = null,
             CapabilityRegistry? capabilityRegistry = null,
             ILogger<MCPToolsManageService>? logger = null) : base(dbContext)

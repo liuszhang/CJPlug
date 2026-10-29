@@ -5,15 +5,15 @@ using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Data.Common;
+using CJCore.Modules.Data;
 
 public partial class PlugManageService : IPlugManageService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
 
-    public PlugManageService(MainDbContext dbContext)
+    public PlugManageService(DataDbContext dbContext)
     {
         _dbContext = dbContext;
-        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         //MigratePlugSchema();
     }
 

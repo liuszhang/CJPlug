@@ -57,6 +57,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // 环回地址绕过系统代理（2026-10-29，文档 K.7）。工位机同样连主服务 localhost:5066。幂等。
+        LoopbackProxyBypass.Apply();
+
         // 确保只运行一个实例
         var processName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
         var runningProcesses = System.Diagnostics.Process.GetProcessesByName(processName);

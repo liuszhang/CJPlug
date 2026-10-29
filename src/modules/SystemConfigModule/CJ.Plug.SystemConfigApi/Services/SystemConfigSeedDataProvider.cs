@@ -3,6 +3,7 @@ using CJ.Plug.Models.Shared;
 using CJ.Plug.SystemConfigModel.Models;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.SystemConfigApi.Services;
 
@@ -13,7 +14,7 @@ public class SystemConfigSeedDataProvider : ISeedDataProvider
 
     public async Task SeedAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
-        var dbContext = serviceProvider.GetRequiredService<MainDbContext>();
+        var dbContext = serviceProvider.GetRequiredService<DataDbContext>();
 
         var set = dbContext.Set<SystemConfigItem>();
         var existing = await set.FirstOrDefaultAsync(x => x.Key == RemoteViewModeKey, cancellationToken);

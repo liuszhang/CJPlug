@@ -2,10 +2,11 @@ using CJ.Plug.Models.Shared;
 using CJ.Plug.SystemConfigApi.Contracts;
 using CJ.Plug.SystemConfigModel.Models;
 using Microsoft.EntityFrameworkCore;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.SystemConfigApi.Services;
 
-public class SystemConfigService(MainDbContext dbContext) : ISystemConfigService
+public class SystemConfigService(DataDbContext dbContext) : ISystemConfigService
 {
     public async Task<List<SystemConfigItem>> GetAllAsync(CancellationToken ct = default)
     {

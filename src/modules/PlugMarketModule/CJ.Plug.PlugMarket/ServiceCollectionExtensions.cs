@@ -47,7 +47,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddPlugMarketModuleApiServices(this IServiceCollection services)
     {
         //services.AddDbContext<PlugMarketDbContext>(options => options.UseSqlite(DbConnectionString.ConnectionString));
-        services.AddSingleton<IModuleDbConfig,PlugMarketModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig, PlugMarketModuleDbConfig>();
 
         services.AddScoped<IPlugMarketService, PlugMarketService>();
 

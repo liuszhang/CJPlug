@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddLlmConfigModuleApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, LlmConfigDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  LlmConfigDbConfig>();
         services.AddScoped<ILlmConfigService, LlmConfigService>();
         services.AddSingleton<ISeedDataProvider, LlmConfigSeedDataProvider>();
         services.AddHttpClient();

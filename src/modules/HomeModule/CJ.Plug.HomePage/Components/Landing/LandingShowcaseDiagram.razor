@@ -9,14 +9,24 @@
 @using MudBlazor
 <section class="bg-white pt-24 text-black" style="user-select: none;">
     <div style="width: 100%; height: 500px; position: relative;">
-        <CascadingValue Value="_diagram">
-            <DiagramCanvas>
-                <Widgets>
-                    <GridWidget Size="20" Mode="GridMode.Point" BackgroundColor="white"/>
-                    <SelectionBoxWidget/>
-                </Widgets>
-            </DiagramCanvas>
-        </CascadingValue>
+        @* ⚠ 必须仅在交互式渲染时创建 DiagramCanvas：
+           Z.Blazor.Diagrams 3.0.4.1 的 DiagramCanvas.DisposeAsync() 没有
+           RendererInfo.IsInteractive 判断，会无条件调 JSRuntime.UnobserveResizes。
+           而本站预渲染是开着的（FrameworkRoutes 的 InteractiveServerRenderMode(prerender: true)，
+           关掉会丢登录态），预渲染请求结束时组件被 Dispose ⇒ 每次都抛
+           "JavaScript interop calls cannot be issued at this time" 并刷一整段堆栈。
+           预渲染阶段画布本来就是空壳（JS 未运行），故跳过不影响首屏视觉。 *@
+        @if (RendererInfo.IsInteractive)
+        {
+            <CascadingValue Value="_diagram">
+                <DiagramCanvas>
+                    <Widgets>
+                        <GridWidget Size="20" Mode="GridMode.Point" BackgroundColor="white"/>
+                        <SelectionBoxWidget/>
+                    </Widgets>
+                </DiagramCanvas>
+            </CascadingValue>
+        }
 
         <MudStack Class="absolute" Style="top: 40px; right: 40px;">
             <MudText Typo="Typo.h1">中午吃啥？</MudText>

@@ -1,4 +1,4 @@
-﻿using CJ.Plug.Models.Skills;
+using CJ.Plug.Models.Skills;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
@@ -7,12 +7,13 @@ using Serilog;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.SkillsManageApi;
 
 public class SkillsManageService : BaseRepositoryService<Skill, int>, ISkillsManageService
 {
-    public SkillsManageService(MainDbContext dbContext) : base(dbContext) { }
+    public SkillsManageService(DataDbContext dbContext) : base(dbContext) { }
 
     public async Task<IEnumerable<Skill>> GetActiveSkillsAsync()
     {

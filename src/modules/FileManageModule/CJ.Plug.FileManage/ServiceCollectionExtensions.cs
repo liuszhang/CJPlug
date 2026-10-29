@@ -28,7 +28,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddFileManageModuleApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, FileModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  FileModuleDbConfig>();
 
         services.AddScoped<IFileManageService, FileManageService>();
 

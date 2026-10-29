@@ -6,7 +6,7 @@ namespace CJ.Plug.LicenseApi.DbContext
     /// <summary>
     /// 许可证模块数据库配置
     /// </summary>
-    public class LicenseModuleDbConfig : IModuleDbConfig
+    public class LicenseModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

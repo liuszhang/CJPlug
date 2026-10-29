@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.PlugProcess;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.ProcessManageApi.DbContext
 {
-    public class ProcessManageModuleDbConfig : IModuleDbConfig
+    public class ProcessManageModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

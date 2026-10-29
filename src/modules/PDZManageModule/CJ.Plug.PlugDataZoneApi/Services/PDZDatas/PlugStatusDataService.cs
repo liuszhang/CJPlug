@@ -1,14 +1,15 @@
-﻿using CJ.Plug.PlugDataZoneApi.Contracts.PDZDatas;
+using CJ.Plug.PlugDataZoneApi.Contracts.PDZDatas;
 
 using CJ.Plug.Models.Services;
 using Microsoft.EntityFrameworkCore;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.ApiServer.Services.PDZDatas
 {
     public class PlugStatusDataService : BaseRepositoryService<PlugStatusData, int>, IPlugStatusDataService
     {
-        private MainDbContext PDZDbContext { get; set; }
-        public PlugStatusDataService(MainDbContext dbContext) : base(dbContext)
+        private DataDbContext PDZDbContext { get; set; }
+        public PlugStatusDataService(DataDbContext dbContext) : base(dbContext)
         {
             PDZDbContext = dbContext;
         }

@@ -53,7 +53,7 @@ public static class ServiceCollectionExtensions
         //services.AddDbContext<TASDbContext>(options =>
         //        options.UseSqlite(DbConnectionString.ConnectionString));
 
-        services.AddSingleton<IModuleDbConfig,TASModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig, TASModuleDbConfig>();
 
         services.AddScoped<IPlugManageService, PlugManageService>();
 

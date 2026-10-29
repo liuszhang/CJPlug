@@ -2,6 +2,7 @@ using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Knowledge;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.KnowledgeManageApi.Services
 {
@@ -16,14 +17,14 @@ namespace CJ.Plug.KnowledgeManageApi.Services
 
         public async Task SeedAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
         {
-            var dbContext = serviceProvider.GetRequiredService<MainDbContext>();
+            var dbContext = serviceProvider.GetRequiredService<DataDbContext>();
 
             await SeedKnowledgeBasesAsync(dbContext, cancellationToken);
         }
 
         #region 知识库与文件夹
 
-        private static async Task SeedKnowledgeBasesAsync(MainDbContext dbContext, CancellationToken cancellationToken)
+        private static async Task SeedKnowledgeBasesAsync(DataDbContext dbContext, CancellationToken cancellationToken)
         {
             var now = new DateTime(2026, 6, 1, 0, 0, 0);
 
@@ -330,7 +331,7 @@ namespace CJ.Plug.KnowledgeManageApi.Services
         }
 
         private static async Task SeedKnowledgeItemsAsync(
-            MainDbContext dbContext,
+            DataDbContext dbContext,
             KnowledgeBase designBase,
             KnowledgeBase processBase,
             KnowledgeBase maintenanceBase,

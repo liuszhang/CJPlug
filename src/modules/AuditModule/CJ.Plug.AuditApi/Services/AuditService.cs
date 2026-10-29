@@ -3,14 +3,15 @@ using CJ.Plug.AuditApi.DbContext;
 using CJ.Plug.AuditModels;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.AuditApi.Services
 {
     public class AuditService : IAuditService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
 
-        public AuditService(MainDbContext dbContext)
+        public AuditService(DataDbContext dbContext)
         {
             _dbContext = dbContext;
         }

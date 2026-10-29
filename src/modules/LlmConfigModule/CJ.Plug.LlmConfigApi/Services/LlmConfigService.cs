@@ -5,16 +5,17 @@ using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.LlmConfigApi.Services;
 
 public class LlmConfigService : ILlmConfigService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LlmConfigService> _logger;
 
-    public LlmConfigService(MainDbContext dbContext, IHttpClientFactory httpClientFactory, ILogger<LlmConfigService> logger)
+    public LlmConfigService(DataDbContext dbContext, IHttpClientFactory httpClientFactory, ILogger<LlmConfigService> logger)
     {
         _dbContext = dbContext;
         _httpClientFactory = httpClientFactory;

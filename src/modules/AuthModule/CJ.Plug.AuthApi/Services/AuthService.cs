@@ -6,19 +6,20 @@ using CJ.Plug.UserManageModels;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.AuthApi.Services
 {
     public class AuthService : IAuthService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
         private readonly IUserManageService _userManageService;
         private readonly IRoleManageService _roleManageService;
         private readonly IDepartmentManageService _departmentManageService;
         private readonly IGroupManageService _groupManageService;
 
         public AuthService(
-            MainDbContext dbContext,
+            DataDbContext dbContext,
             IUserManageService userManageService,
             IRoleManageService roleManageService,
             IDepartmentManageService departmentManageService,

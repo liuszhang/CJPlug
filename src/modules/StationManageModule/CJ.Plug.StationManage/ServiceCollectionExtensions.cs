@@ -41,7 +41,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddStationManageApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, StationManageDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  StationManageDbConfig>();
 
         services.AddScoped<IStationConfigService, StationConfigService>();
         services.AddScoped<IStationManageService, StationManageService>();

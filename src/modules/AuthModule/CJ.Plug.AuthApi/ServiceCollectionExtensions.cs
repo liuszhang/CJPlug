@@ -13,7 +13,7 @@ namespace CJ.Plug.AuthApi
     {
         public static IServiceCollection AddAuthModuleApiServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModuleDbConfig, AuthModuleDbConfig>();
+            services.AddSingleton<IModuleBusinessDbConfig,  AuthModuleDbConfig>();
             services.AddScoped<IAuthService, AuthService>();
 
             return services;

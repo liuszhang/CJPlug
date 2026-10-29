@@ -1,6 +1,7 @@
-# （设计中）CJPlug 接入 CJCore 实施计划
+# （进行中）CJPlug 接入 CJCore 实施计划
 
-> 状态：设计中（待评审）　|　日期：2026-10-29　|　作者：旺财　|　位置：`CJPlug/docs/`
+> 状态：进行中（P0–P4 / P6 / P7.1 / P8 已完成；剩 P5 身份替换、P7.2 许可证、P6.3 权限键对齐）　|　日期：2026-10-29　|　作者：旺财　|　位置：`CJPlug/docs/`
+> **最新进度看附录 K**（P4 业务表归一，2026-10-29；含 K.6 存量库处置执行、K.7 隐患登记、**K.8 代理与日志刷屏修复（已实施并实测）**、**K.9 启动期自调用时序修复（已实施并实测）**）；此前各轮记录依次见附录 D（P1）、E（P2/P3/P6）、F（P7.1/P8/P6.1）、G（实机冒烟）、H（端口归一）、J（P8.3 Agent 链路）。
 > 替代文档：`CJCore/docs/CJPlug-接入CJCore框架迁移计划.md`（v2.0 / 2026-07-07，已过期，见 §1.6）
 > 关联文档（均在 `CJCore/docs/`）：`CJOntology-接入方案-v2.md`、`（已完成）模块配置管理界面方案.md`、`（已完成）CJCore-统一根组件FrameworkApp与模块资源贡献方案.md`、`CJCore-模块角色管理配置ModuleAccess实施方案.md`、`CJCore-登录认证统一架构方案.md`
 > 本文档全部路径以**仓库根** `D:\Pro\CJ.Plug.Github` 为基准。
@@ -1864,3 +1865,278 @@ G.4 的 T6 备注把日志 `[DynamicWorkflowTool] Tool=111` 读成「111 个工�
 （`CJCore.LLM.Abstractions`，`AgentTool.MCPTools` 只是 `using` 它）⇒ 无同名冲突，无需显式限定。
 （同类提醒对 `ChatMessage` 同样不成立。）
 
+
+---
+
+## 附录 K：P4 业务表归一实施记录（2026-10-29）
+
+> **口径变更（用户指令）**：「不用管历史数据，直接迁移功能」⇒ §5-P4 的 4.5「分批 `INSERT INTO … SELECT` 数据搬迁」
+> 整条取消，本阶段只做**代码层的表归属迁移**。这同时消掉了原计划里最大的风险项（数据搬迁不可回滚）。
+
+### K.1 关键结论：同库双上下文 + 「身份先建、业务后建」的顺序契约
+
+原计划 §P4 写的是「两者都用迁移记账，同库安全」，但 P3 的 EF 基线已确认不可行（动态模型 ⇒ 设计时快照必然缺表）。
+本轮改用**不依赖 EF 迁移基线**的方案，靠顺序解决 `EnsureCreated` 的 `HasTables` 语义：
+
+| 顺序 | 动作 | 落点 |
+|---|---|---|
+| ① | `MainDbContext.EnsureCreated()` —— 只创建 **7 张身份/权限表** + Identity 的 `AspNet*` | `ApiServer/Program.cs`（`app.Run()` **之前**） |
+| ② | `AutoMigrationHostedService` 冷启动建 **全部业务表** + 写 `__CjModelSnapshot` | `AddCJCoreDataApi` 注册的 HostedService（`Run()` 时启动） |
+
+> ⚠ **顺序不可颠倒**：若业务表先建，`EnsureCreated` 见「库里已有表」整体 no-op ⇒ 身份表永久缺失、登录全挂。
+> 这条已写进 `Program.cs` 与 `WebHostStartup.cs` 的注释。
+
+### K.2 契约分层：两个派生标记，模块项目零 csproj 改动
+
+```
+CJCore.Modules.Data.IModuleDbConfig            ← CJCore 原生契约（AddDbSets / ConfigEntities / StructureRevision）
+├── CJ.Plug.Models.Contracts.IModuleDbConfig         身份侧标记 → 只注册 UserModuleDbConfig（7 张身份表）
+└── CJ.Plug.Models.Contracts.IModuleBusinessDbConfig 业务侧标记 → 18 个业务 DbConfig
+```
+
+- **18 个模块项目为什么不用加 CJCore 引用**：`BusinessModuleDbConfigAdapter`（Singleton）把 18 个业务配置
+  汇总成**一个** CJCore `IModuleDbConfig` 注册进 DI，于是 18 个业务配置类只依赖 `CJ.Plug.Models` 的标记接口。
+  只有 `CJ.Plug.Models` 新增一句 `CJCore.Modules.Data.Model` 引用。
+- **代价（已知）**：`DataDbContext` 的模型缓存键按「配置**类型**清单」拼，汇总成一个适配器后键里只有适配器类型。
+  CJPlug 恒全集注册 ⇒ 模型恒等，不构成问题；将来要按模块裁剪才需改回逐项注册。
+- **为什么不直接注册成 CJCore 接口**：MS DI 不把派生接口注册解析成基接口（P1 已踩过，28 处注册被迫逐个改）。
+
+### K.3 改动清单
+
+| # | 位置 | 改动 |
+|---|---|---|
+| 1 | `CJ.Plug.Models/Contracts/IModuleDbConfig.cs` | 拆成两个派生标记接口（原为含 `AddDbSets`/`ConfigEntities` 的独立契约） |
+| 2 | `CJ.Plug.Models/Services/BusinessModuleDbConfigAdapter.cs` | **新增**：18 业务配置 → 1 个 CJCore 配置 |
+| 3 | `CJ.Plug.Models/Services/BaseRepositoryService.cs` | 泛型化上下文（`<TEntity,TId,TContext>`）+ 保留两泛型兼容形态（默认 `DataDbContext`）；**删掉构造函数里的 `EnsureCreatedOnce`** |
+| 4 | 18 个 `*ModuleDbConfig` | `: IModuleDbConfig` → `: IModuleBusinessDbConfig`（纯标记替换，方法体零改动） |
+| 5 | 19 处注册行 | `AddSingleton<IModuleDbConfig, …>` → `<IModuleBusinessDbConfig, …>`（`UserModuleDbConfig` 保持原样） |
+| 6 | 34 个业务消费者 | `MainDbContext` → `DataDbContext` + 补 `using CJCore.Modules.Data;` |
+| 7 | **保留** `MainDbContext` 的 6 处 | `UserManageService`（改 `BaseRepositoryService<User,int,MainDbContext>`）、`UserManageSeedDataProvider`、`RolePermissionService`、`GroupManageService`、`DepartmentManageService`、`LoginServiceCollection`（`AddEntityFrameworkStores<MainDbContext>`） |
+| 8 | 7 个业务 Service 构造函数 | 删除各自的 `EnsureCreatedOnce(_dbContext)` —— 否则形成「迁移前偷偷建表」的第二条通道 |
+| 9 | `HostWebServer/WebHostStartup.cs` | 新增 `AddCJCoreDataApi`（连接串复用 `DbConnectionString`，与 MainDbContext **同一个** `main.db`）+ 注册适配器 + **`InitAction` 承接种子** |
+| 10 | `ApiServer/Program.cs` | 身份库 `EnsureCreated` 保留并改注释；**移除** `SeedDataRunner.RunAllAsync(app.Services)`（见 K.5） |
+| 11 | `HostWebServer.csproj` | 加 `CJCore.Modules.Data.Api` 引用。**刻意不引伞项目 `CJCore.Modules.Data`** —— 它会连带 `AddCJCoreDataUI()`，把「数据」页面/菜单塞进侧栏，破坏 D3=A 三组归一 |
+
+### K.4 实机冒烟（临时库，未动真实数据）
+
+为不动生产库，冒烟时临时把 `ConnectionStrings:PlugDb` 指向 `main-p4smoke.db`，跑完即还原并删库。
+
+| 判据 | 结果 |
+|---|---|
+| 编译门禁 | `dotnet build CJ.Plug-Aspire.sln` → **0 错误** |
+| 启动 | 5066 监听，全程无 DB 相关异常 |
+| **建表** | 全新库 **72 张表**：19 个业务模块表（Plugs / Jobs / KnowledgeBases / SystemConfigItems / MCPTools / Ontology* / PDZ* …）+ 7 张身份/权限表 + `AspNet*` + `MA_ModuleDefinitions` / `MA_ModuleFeatures` + `DataProtectionKeys` |
+| **迁移记账** | `__CjModelSnapshot` = **1** 行、`SchemaMigrationHistory` = 0（冷启动路径，符合预期） |
+| **种子**（P4.6） | 6 个提供者**全部成功**：admin/123456、4 个角色、开发部、专家组、**17 个默认工具**、6 种本体 + 18 实例、11 个基础枚举、SysML V2（171 条）、M4/M5/M5.5/M6/M7 全部落库 |
+| **业务读路径** | `GET /api/systemconfig/getAll` → 返回种子行 `RemoteViewMode=window`（**经 DataDbContext**）；`GET /api/mcp/getPublishedWorkflows` → `[]` |
+| 页面 | `/` `/admin/modules` `/system-config` `/api/plug-agent/tools` 均 **200** |
+| 模块启停持久化 | `MA_ModuleDefinitions` = **36** 行 ⇒ 已从「中立交换文件」升级为落库 |
+
+> **顺带修掉 A.5 第 1 项**：`SeedDataRunner` 原来吃 `app.Services`（根容器）⇒ 5 类种子 `Cannot resolve scoped service`、admin 种不上。
+> 本轮改由引擎 `InitAction` 触发并**自建 scope**，上面「admin/123456 + 4 角色」即为实证。
+
+### K.5 遗留与注意（必须知道）
+
+| # | 项 | 说明 |
+|---|---|---|
+| **1** | ⚠ **存量 `main.db` 首次启动不会补齐新表** | 引擎在「无快照 + 已有模型表」时走**基线化**（只写快照、不建表）。存量库里 `MA_*`、`DataProtectionKeys`、`__Cj*` 等新表不会被创建 ⇒ 模块启停/数据保护会报错。**处置：把 `02.Publish/Services/main.db` 移作备份，让全新库冷启动**（种子会重建 admin/123456）。这正是「不迁移历史数据」的落地动作 |
+| 2 | 身份/业务**同库双上下文** | 过渡态。P5 换 ThreeRoleAdmin 后身份表并入 Data 模型，`MainDbContext` 与 `IdentityDbContext` 引用一并删除 |
+| 3 | `SchemaMigrationHistory` 为 0 | 本仓未使用声明式迁移（`IModuleDbMigration`），记账走 `__CjModelSnapshot`，非缺陷 |
+| 4 | `P7.1` 的 `PlugSystemConfigStore` 仍走 HTTP 自调用 | 现已同进程（5066），可退化为本地调用，属合并后的收尾，未在本轮动 |
+| 5 | 未跑开发环境（Development） | Development 的容器校验会撞上既有的 `IDeepSeekService` 生命周期冲突（文档 A.5 第 2 项），与本轮无关 |
+
+### K.6 存量库处置执行记录（2026-10-29 20:00）
+
+按 K.5 第 1 项的处置路径**已实际执行**，把开发机的存量库换为全新冷启动库。
+
+**执行动作**
+
+| 步骤 | 命令/动作 | 结果 |
+|---|---|---|
+| 1 | 备份 `main.db` + `main.db-wal` + `main.db-shm` → `02.Publish\Services\_backup-p4-before\` | 2.0 MB + 3.3 MB + 32 KB，三件齐全，可原样回退 |
+| 2 | 启动 `CJ.Plug.ApiServer.exe`（cwd = `Services\Debug\net10.0`，`ASPNETCORE_CONFIG_PATH` 指同目录 `appsettings.CJ.Plug.ApiServer.json`） | 5066 监听，无 DB 异常 |
+| 3 | `PRAGMA wal_checkpoint(TRUNCATE)` | WAL 合并回主库，`main.db` 自包含（852 KB），`-wal`/`-shm` 消失 |
+
+**前后对比**
+
+| 指标 | 存量库（66 表） | 冷启动后（72 表） |
+|---|---|---|
+| 表总数 | 66 | **72** |
+| `MA_ModuleDefinitions` / `MA_ModuleFeatures` | ❌ 缺失 | ✅ 36 行 / 3 行 |
+| `DataProtectionKeys` | ❌ 缺失 | ✅ 存在 |
+| `AspNet*` | 5 张（`AspNetRoles` 不在其中，角色走业务 `RoleInfos`） | 5 张（同构） |
+| `Users` | — | 1（admin，`PasswordHash` 84 字符、`SecurityStamp` 已生成） |
+| `AspNetUserRoles` / `UserRoles` | — | 1 / 4 |
+| `Tools` | — | 17 |
+| `PRAGMA integrity_check` | — | **ok** |
+
+**种子（日志实证）**：4 个系统角色（系统管理员/授权管理员/审计管理员/普通用户）、开发部、专家组、`admin` 用户 + 管理员角色分配、17 个默认工具、6 种本体 + 18 实例、11 基础枚举、SysML V2 —— 全部成功。
+
+**端点复验**：`/` `/admin/modules` `/system-config` `/api/plug-agent/tools` `/api/systemconfig/getAll` 均 **200**。
+
+> ⚠ **注意 curl 走代理**：本机 `http_proxy=http://127.0.0.1:60819`，直接 `curl http://127.0.0.1:5066/` 会被代理拦成 **502**，看起来像服务崩了。冒烟必须加 `--noproxy '*'`（详见 K.7）。
+
+### K.7 本轮新发现的两条隐患（未修，登记）
+
+| # | 现象 | 根因 | 影响面 | 建议 |
+|---|---|---|---|---|
+| **1** | `[HUB] 第 1~3 次连接失败：502 (Bad Gateway)`，第 4 次才成功 | `HttpClient` 默认继承系统 `HTTP_PROXY`，连**本机环回** `http://localhost:5066/` 也被送进代理 | 客户现场若配了系统代理/上网行为管理，`localhost` 也会走代理 ⇒ 启动慢 3 个重试周期、日志刷错误、可能判为故障 | 给服务间自调用（Hub、`CJPlugMcpBridge`、`PlugSystemConfigStore`）的 `HttpClient` 配 `UseProxy=false`，或 `WebProxy.BypassList` 加 `localhost;127.0.0.1` |
+| **2** | `InvalidOperationException: The HubConnection cannot be started if it is not in the Disconnected state` × N | 与 #1 同源：重试逻辑在 `Connecting` 状态下再次 `StartAsync`；502 让状态机卡在中间态 | 日志刷屏（与用户此前反馈的 FirstChanceException 刷屏高度疑似同源）；最终能连上但掩盖真因 | 修 #1 后大概率自然消失；若仍复现，重试前应 `await StopAsync()` 或判 `State == Disconnected` 再 Start |
+
+> 两条都在**本机**触发（因为这台机器装了代理），客户内网若无代理不会复现；但既然一台机器能触发，就不能算"环境特例"，应修。
+
+### K.8 K.7 两条隐患的修复实施记录（2026-10-29 20:10）
+
+#### K.8.1 先修正我自己的判断：K.7 对第 2 条归因错了
+
+K.7 把 `cannot be started` 归因为「重试逻辑并发」。翻代码后**推翻**：
+
+| 现象 | K.7 的判断 | 查证后的真实根因 |
+|---|---|---|
+| `502 Bad Gateway` | 代理拦环回 | ✅ 判断正确。`HttpClient.DefaultProxy` 继承 `HTTP_PROXY`，连 `localhost:5066` 也被送进代理 |
+| `InvalidOperationException: cannot be started if it is not in the Disconnected state` ×N | 「重试逻辑在 Connecting 状态再次 StartAsync」 | ❌ **不是 Hub 重试逻辑**。真凶是 `SignalRLogSink`（日志 Sink）**自己**，见下 |
+
+**真凶链条**（`SignalRLogSink.cs` 原实现）：
+
+```
+构造函数：_hubConnection.StartAsync();          // ← 不 await、不接异常（fire-and-forget）
+                                                 //    启动期 Hub 还没监听 ⇒ 失败无人观察 ⇒ 状态卡在 Connecting
+Emit（async void）：
+    if (_hubConnection.State != HubConnectionState.Connected)   // ← Connecting 也满足这个条件！
+        await _hubConnection.StartAsync();                       // ← 必抛 InvalidOperationException
+    catch (Exception ex) => Console.WriteLine(ex.ToString());    // ← 每条日志刷一段完整堆栈
+```
+
+即：**日志 Sink 在日志发送路径上做连接管理，异常又被自己打出来。**
+和之前 AppHost Manager 的 Stack overflow（全局异常处理器自己抛异常）是**同一类错误：诊断设施成了故障源**。
+
+> 这也解释了为什么刷屏"莫名奇妙、反复出现"——只要 Hub 比 Sink 晚就绪，每条日志都会重新撞一次，且永远自愈不了（异常不改变状态机）。
+
+#### K.8.2 修复清单
+
+| # | 文件 | 改动 |
+|---|---|---|
+| 1 | **`CJ.Plug.Models/Shared/LoopbackProxyBypass.cs`**（新增） | 进程级幂等配置：把环回地址加入 `WebProxy.BypassList`，**其余地址的代理行为完全不变**。改 `HttpClient.DefaultProxy` 而非逐个改 handler —— SignalR 内部 `new HttpClient()` 也吃它，一处覆盖全部 |
+| 2 | **`CJ.Plug.Models/LogModels/SignalRLogSink.cs`**（重写） | ① `Emit`（同步）只投递到**有界队列**（2048，DropOldest），绝不等网络、绝不抛；② 单消费者后台泵串行发送；③ 连接管理收口到 `EnsureConnectedAsync`：**只有 `Disconnected` 才 Start**，失败指数退避（1/2/4/8/16/30s 封顶）；④ 告警限流 5 秒一条；⑤ 实现 `IDisposable`；⑥ 补齐 `WithAutomaticReconnect()` |
+| 3 | `CJ.Plug.Models/Services/HubConnectionManagerService.cs` | `SemaphoreSlim` 串行化 Start/Stop；抽出 `TryStartAsyncAsync` 统一状态守卫（补上原先漏掉的 `Connecting` 分支）；`ConnectWithRetryAsync` 区分「失败」与「跳过」 |
+| 4 | 5 个进程/客户端入口 | 启动最早期调一次 `LoopbackProxyBypass.Apply()`：`CJ.Plug.ApiServer` / `CJ.Plug.ElsaApiServer` / `CJ.Plug.StationApiServer` / `HostWebServer`（薄壳回退路径） / `StationSettingUI.App.OnStartup` |
+
+**刻意没做**：不给 40+ 处 `AddHttpClient` 逐个配 handler，也不设 `UseProxy=false`（那会打断只能靠代理出网的 LLM 调用）。
+
+#### K.8.3 验证
+
+| 判据 | 修复前 | 修复后 |
+|---|---|---|
+| `502` 出现次数 | 4+ | **0** |
+| `cannot be started if it is not in the Disconnected state` | 数十条 | **0** |
+| 环回请求的失败形态 | `502 Bad Gateway`（**代理答的**） | `目标计算机积极拒绝`（**直连答的**）← 决定性证据，证明 BypassList 生效 |
+| 连接期日志 | 每条日志刷一段堆栈 | 4 条 `[HUB] 第 N/4 次连接失败` + 1 条 `[LOG-SINK] 退避 1s` + 1 条 `已重新连上`，全程无堆栈 |
+| 编译 | — | `dotnet build CJ.Plug-Aspire.sln` → **0 错误** |
+| 启动/端点 | — | `/` `/admin/modules` `/api/systemconfig/getAll` 均 **200** |
+
+> 启动初期仍会看到 3 次 `[HUB] 第 N/4 次连接失败：目标计算机积极拒绝` —— 这是**正常竞态**（进程自己还没开始监听），不是缺陷：重试后成功，且日志干净可读。
+
+#### K.8.4 顺带发现（未修，登记）
+
+| 现象 | 位置 | 说明 |
+|---|---|---|
+| 启动期 `CJActivityProvider 取插头失败`（Connection refused 带堆栈） | Elsa 集成 | **已在 K.9 修复** |
+| `InvalidOperationException: JavaScript interop calls cannot be issued at this time` | `Blazor.Diagrams` 第三方库 | 见 K.9.4，非本方代码 |
+| `MarketPlug.UsersCount` nullable 标记错误 | EF 模型配置 | 「int 不能标 nullable/optional」，模型配置笔误，与本次无关 |
+
+### K.9 启动期自调用时序修复（2026-10-29 20:22）
+
+#### K.9.1 问题
+
+单进程单端口合并后，多个组件仍在**启动期通过 HTTP 自调用本进程的 API**，但 Kestrel 要等 `IHostedService.StartAsync` 链跑完才真正监听 ⇒ 必然 `Connection refused`，且 `HttpClientFactory` 会把完整 inner stack 打出来，还白等超时（实测单次 4 秒 × 2 个地址）。
+
+首例是 Elsa 的 `CJActivityProvider.GetDescriptorsAsync`：Elsa 的**启动任务是一批顺序执行**的，它排在前面，此时本进程尚未监听。
+
+#### K.9.2 修复
+
+| # | 文件 | 改动 |
+|---|---|---|
+| 1 | `CJ.Plug.Models/Shared/HostStartupSignal.cs`（新增） | 进程级 `IsStarted` 标志，由宿主 `ApplicationStarted` 回调置位。用静态标志而**不**注入 `IHostApplicationLifetime` —— 使用方（Elsa 的活动提供者）由第三方容器创建，改构造函数签名有兼容风险 |
+| 2 | `CJ.Plug.ElsaIntegration/Services/CJActivityProvider.cs` | `GetDescriptorsAsync` 开头加守卫：未 started ⇒ 直接返回空 + 一条明确日志。**不改成"等服务起来再取"** —— Elsa 启动任务顺序执行，在此阻塞会连带拖住 `AdminUserInitializer`（2026-10-08 踩过：管理员永远种不上、组件库首屏空白） |
+| 3 | 4 个宿主入口 | `app.Lifetime.ApplicationStarted.Register(HostStartupSignal.MarkStarted)`：ApiServer / ElsaApiServer / StationApiServer / HostWebServer(薄壳) |
+
+**语义等价性**：守卫分支与原有的 `catch` 降级分支**返回完全相同**（空集合，Studio 带 `Refresh=true` 时重取）。区别只是把"试了才知道失败"变成"明知不可能成功就不试"，因此不引入功能退化风险。
+
+#### K.9.3 验证（日志时序为决定性证据）
+
+```
+199: [Elsa] 启动期跳过取插头（本进程尚未开始监听）…     ← 守卫生效（IsStarted=false）
+200: [Elsa] 启动期跳过取插头（本进程尚未开始监听）…
+213: [Host] 已开始监听（ApplicationStarted）：启动期自调用守卫解除   ← 置位完成
+```
+
+| 判据 | 修复前 | 修复后 |
+|---|---|---|
+| `HTTP request failed` 堆栈段数 | 3 | **0** |
+| `Connection refused` 未处理堆栈 | 3 段 | **0** |
+| 启动期白等耗时 | ~8 秒（4s × 2 地址，两次调用） | **0** |
+| 启动日志总行数 | 311 | **246** |
+| `502` / `cannot be started` | 0（K.8 已修） | **0**（无回归） |
+| 编译 / 端点 | — | 整解 **0 错误**；`/` `/admin/modules` `/api/systemconfig/getAll` **200** |
+
+> `/elsa/api/descriptors/activities` 无凭证时返回 **302**（跳登录），说明该端点本身可达 —— 运行期取插头路径正常，只是需要 Studio 的认证态。
+
+#### K.9.4 顺带精确定位：JS interop 异常来自第三方库
+
+K.8.4 那条 `JavaScript interop calls cannot be issued at this time` 原先只记了"某 Blazor 页面"。查全栈后定位到**不是本方代码**：
+
+```
+Blazor.Diagrams.Components.DiagramCanvas.DisposeAsync()
+  → Blazor.Diagrams.Extensions.JSRuntimeExtensions.UnobserveResizes(jsRuntime, element)
+  → RemoteJSRuntime.BeginInvokeJS(...)   // 静态渲染（预渲染）期调 JS ⇒ 抛
+```
+
+**成因**：`DiagramCanvas` 在预渲染阶段被创建又销毁，`DisposeAsync` 里无条件调 `UnobserveResizes`，而那时 JS 运行时不可用。
+
+**影响**：`fail: Kestrel[13] An unhandled exception`，但页面本身仍返回 200；属噪音 + 一条被 Kestrel 记为未处理异常。
+
+**为什么不顺手改**：可选修法都是在**页面层**调整（如该页 `@rendermode` 关闭预渲染，或给 `DiagramCanvas` 外包一层"仅在 `OnAfterRenderAsync` 之后渲染"）。二者都会改变首屏行为，落在 2026-10-08《流程编辑器组件库空白修复方案》的历史雷区内。**需单独评审，不在本轮动手。**
+
+### K.10 DiagramCanvas 预渲染期 JS interop 异常修复（2026-10-29 20:40）
+
+K.9 登记的第三方库问题单独评审后落地，改动比预想小得多。
+
+#### 量化定位（无头探针实测）
+
+| 判据 | 结果 |
+|---|---|
+| 基线（服务就绪后未访问页面） | 0 条 |
+| `curl /` 每访问 1 次 | **稳定 +1 条**（连续 3 次 → 3 条） |
+| `/admin/modules`、`/system-config` | 0 增量 |
+| `/ProcessManageList` `/TAS` `/MCPToolManage` `/ToolResource` `/DataConnector`（同样引用 DiagramCanvas） | **0 增量** ⇒ 爆炸半径只有首页 |
+| 首页实际渲染 | `HomePage.razor` 只启用了 `LandingShowcaseDiagram`，其余 4 个组件被注释 ⇒ 每次恰好 1 条 |
+
+#### 关键约束（为什么不选"关预渲染"）
+
+`CJCore.Framework.UI/FrameworkRoutes.razor` 明确写着 `InteractiveServerRenderMode(prerender: true)`，注释原文：**需要 prerender: true —— SSR 阶段 HttpContext 可用，AccountAuthStateProvider 从 Cookie 恢复认证态 + token，否则 F5/电路重建后登录态与 Bearer token 全部丢失，被迫跳回登录页。** ⇒ 关预渲染不可行；"包一层 OnAfterRender 后渲染"与 IsInteractive 守卫等价但引入多余重渲染。
+
+#### 修复（5 文件，全部纯增量 @if）
+
+`@if (RendererInfo.IsInteractive) { <CascadingValue Value="_diagram"><DiagramCanvas>…</DiagramCanvas></CascadingValue> }`
+
+- `LandingShowcaseDiagram.razor`（唯一激活，含详细成因注释）
+- `Features/FeaturesExample.razor`、`Groups/GroupsExample.razor`、`SvgAndHtml/SvgAndHtmlExample.razor`、`WidgetsExample.razor`（当前被注释，防将来启用复发）
+- 不动：`Documentation/MyDiagram.razor`（无人引用）、`ProcessEdit/GUIDesigner` 的 MyDiagramDesigner（实测其页面 0 增量，天然条件渲染）
+
+原理：预渲染实例 `IsInteractive=false`（不创建 Canvas ⇒ 无 Dispose 调 JS）；circuit 实例 `IsInteractive=true`（正常渲染）。预渲染 HTML 里画布本来就是 JS 空壳，跳过不影响首屏视觉。
+
+#### 实测（curl + Playwright 无头浏览器登录后验证）
+
+| 判据 | 修复前 | 修复后 |
+|---|---|---|
+| 连续访问 `/` 5 次累计异常 | 每次 +1 | **0** |
+| 预渲染 HTML 首屏文字锚点（中午吃啥/寸金/开始） | 有 | 有（无损失） |
+| circuit 内 `.diagram-canvas` / html / svg layer | — | **1 / 1 / 1，html 层 5 个节点**（与代码建的 5 节点一致） |
+| 截图目检 | — | 流程图+连线+文字完整，无塌陷 |
+| 编译 | — | 整解 0 错误 |
+
+#### 顺带登记（无头浏览器 console 观察到，均未修）
+
+1. `InvalidCastException: PlugTempAdminAuthStateProvider → Elsa.Studio.Login.Services.AccessToken…`（登录后 circuit 内抛）—— 与 P5 身份替换直接相关，P5 时需一并处理。
+2. `Can only have one anonymous define call per script file` ×2 —— 疑似 AMD 脚本（Monaco/require）重复加载，既有噪音。
+3. 登录表单提交后 `page.url()` 停在 `/login`（cookie 已种、后续访问正常）—— 需人工确认登录后是否自动跳转，可能是脚本时机问题。

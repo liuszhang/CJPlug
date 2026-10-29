@@ -14,7 +14,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddSystemConfigModuleApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, SystemConfigDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  SystemConfigDbConfig>();
         services.AddScoped<ISystemConfigService, SystemConfigService>();
         services.AddSingleton<ISeedDataProvider, SystemConfigSeedDataProvider>();
         services.AddHttpClient();

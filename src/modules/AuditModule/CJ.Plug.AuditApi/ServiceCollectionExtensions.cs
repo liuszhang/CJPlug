@@ -13,7 +13,7 @@ namespace CJ.Plug.AuditApi
     {
         public static IServiceCollection AddAuditModuleApiServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModuleDbConfig, AuditModuleDbConfig>();
+            services.AddSingleton<IModuleBusinessDbConfig,  AuditModuleDbConfig>();
             services.AddScoped<IAuditService, AuditService>();
 
             return services;

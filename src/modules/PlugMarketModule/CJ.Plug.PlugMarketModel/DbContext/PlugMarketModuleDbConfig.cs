@@ -1,10 +1,10 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.PlugProcess;
 using Microsoft.EntityFrameworkCore;
 
 
-    public class PlugMarketModuleDbConfig : IModuleDbConfig
+    public class PlugMarketModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

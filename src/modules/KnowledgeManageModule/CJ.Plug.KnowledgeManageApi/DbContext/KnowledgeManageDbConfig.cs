@@ -7,7 +7,7 @@ namespace CJ.Plug.KnowledgeManageApi;
 /// <summary>
 /// 知识管理模块数据库配置：注册 DbSet 和实体映射
 /// </summary>
-public class KnowledgeManageDbConfig : IModuleDbConfig
+public class KnowledgeManageDbConfig : IModuleBusinessDbConfig
 {
     /// <summary>
     /// 注册 KnowledgeBases、KnowledgeFolders 和 KnowledgeItems DbSet

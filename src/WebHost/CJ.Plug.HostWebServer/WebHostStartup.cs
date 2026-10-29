@@ -6,9 +6,12 @@ using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
 using CJ.Plug.ModuleConfig;
 using CJCore.Framework.Api;
+using CJCore.Modules.Data;
 using CJCore.Modules.ModuleAdmin;
+using CJCore.Modules.PersonalCenter;
 using CJCore.Modules.SystemConfig;
 using CJCore.Modules.SystemConfig.UI;
+using CJCore.Modules.ThreeRoleAdmin;
 using Elsa.Extensions;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -97,9 +100,13 @@ public static class WebHostStartup
         services.AddMudExtensions();
 
         // ── Blazor 三件套 ──────────────────────────────────────────────────
+        // ⚠ P5（2026-10-29）：已移除 .AddInteractiveWebAssemblyComponents()。
+        //   本仓没有 Blazor WASM 项目，此前唯一用 InteractiveAuto 的 RadzenComponents
+        //   已改为 InteractiveServer。保留 WASM 渲染模式会让 Blazor 认为存在多种 rendermode，
+        //   导致 CookieAuthStateProviderBase 的 RegisterOnPersisting（未显式指定 rendermode）
+        //   无法推断 ⇒ 每个页面请求 500（详见 PlugRuntimeHost.razor 顶部注释）。
         services.AddRazorComponents()
-            .AddInteractiveServerComponents()
-            .AddInteractiveWebAssemblyComponents();
+            .AddInteractiveServerComponents();
 
         services.AddRazorPages();
         services.AddServerSideBlazor(options =>
@@ -149,9 +156,15 @@ public static class WebHostStartup
         {
             o.ProductName = "寸金插座平台";
             o.DefaultIconUrl = "/plug2.png";
-            // P2–P4 期间真拦截由 PlugGuardModule（localStorage 守卫）承担；
-            // LoginPath 供框架在未登录访问受保护页时跳转（P5 起改为 /three-role/login）。
-            o.LoginPath = "/login";
+            // ⚠ P5 必须有：框架用它给所有模块 ApiClient 装配默认 BaseAddress
+            //   （CJCoreFrameworkExtensions 里 ConfigureHttpClientDefaults → client.BaseAddress）。
+            //   不设 ⇒ 模块 ApiClient 的 HttpClient.BaseAddress 为空 ⇒ 登录时直接抛
+            //   "An invalid request URI was provided... BaseAddress must be set"，页面只显示红字、请求发不出去。
+            //   单进程合并后就是本进程自己的地址，环回已由 LoopbackProxyBypass 排除系统代理。
+            o.BaseUrl = GlobalData.MainApiServer;
+            // P5 起：真认证由 ThreeRoleAdmin 承担，未登录访问受保护页跳到三员登录页。
+            // （P2–P4 期间是 /login + PlugGuardModule 的 localStorage 守卫，两者均已移除）
+            o.LoginPath = "/three-role/login";
             o.EnableLogDrawer = true;    // 平台日志抽屉（Alt+L）
             o.EnableLogAppBarButton = true;
             o.EnableThemeSwitcher = true;
@@ -163,19 +176,77 @@ public static class WebHostStartup
             };
         });
 
-        // ── P2 认证 + P5 前临时认证占位 ────────────────────────────────────
-        // 必要性：CJCore 的端点（P6 /api/module-admin/*、P7 /api/system-config/*）都以
-        // RequireAuthorization 挂了授权元数据 —— 缺 AuthorizationMiddleware 时请求直接抛异常；
-        // 有中间件却没 scheme 时一律 401。详见 PlugTempAuthHandler 的类注释。
-        // ⚠ P5 删除：接入 ThreeRoleAdmin 后连带 PlugAnonymousAuthStateProvider 一起删。
-        services.AddAuthentication(PlugTempAuthHandler.Scheme)
-            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
-                       PlugTempAuthHandler>(PlugTempAuthHandler.Scheme, null);
+        // ── P4：业务库接入 CJCore Data 底座（2026-10-29） ─────────────────
+        // 目标（D5=C-2 的第一步）：18 个业务模块的表由 CJCore 的 DataDbContext + 自动迁移引擎接管，
+        //   MainDbContext 收缩为「身份侧专用」（只承载 UserModuleDbConfig 注册的 7 张身份/权限表）。
+        //
+        // ⚠ 三条不可动的约束：
+        //   ① 适配器必须 Singleton：SnapshotModelBuilder 是 Singleton 且注入 IEnumerable<IModuleDbConfig>，
+        //      集合里出现任一 Scoped 元素会在容器校验期直接抛。
+        //   ② 连接串与 MainDbContext 共用同一个文件（main.db）。不拆两个库，是为了不改变面向现场的路径口径。
+        //   ③ 建表顺序：MainDbContext.EnsureCreated（身份表）必须先跑，再由本引擎建业务表 ——
+        //      前者在 ApiServer/Program.cs 的 app.Run() 之前显式调用，后者是 HostedService（Run 时才启动）。
+        //      反过来则 EnsureCreated 会因"库里已有表"直接 no-op，身份表永久缺失。
+        var plugConnStr = CJ.Plug.Models.DbContexts.DbConnectionString.ConnectionString;
+        var plugDbType = CJ.Plug.Models.DbContexts.DbConnectionString.DbType;
+        // 与 MainDbContext 完全相同的绝对化处理（SQLite 的 Data Source= 相对路径按应用基目录解析）
+        var plugAbsoluteConnStr = plugConnStr.Replace("Data Source=",
+            $"Data Source={Path.Combine(AppContext.BaseDirectory, string.Empty)}");
+        var plugDataProvider = (plugDbType ?? string.Empty)
+            .Contains("postgre", StringComparison.OrdinalIgnoreCase)
+            ? CJCore.Modules.Data.DataProvider.PostgreSql
+            : CJCore.Modules.Data.DataProvider.Sqlite;
+
+        services.AddSingleton<CJCore.Modules.Data.IModuleDbConfig,
+                              CJ.Plug.Models.Services.BusinessModuleDbConfigAdapter>();
+
+        services.AddCJCoreDataApi(o =>
+        {
+            o.ConnectionString = plugAbsoluteConnStr;
+            o.Provider = plugDataProvider;
+            // EF 传统迁移不启用：表结构由 CJCore 全自动迁移引擎接管。
+            o.EnableMigrations = false;
+            o.EnableAutoMigration = true;
+            o.EnvironmentName = builder.Environment.EnvironmentName;
+            // 种子改由引擎在「结构迁移完成之后」触发：原来在 Program.cs 里 app.Run() 前直接跑，
+            // 那时业务表还没建（引擎是 HostedService，Run 才启动）⇒ 全新库首次启动必然失败。
+            o.InitAction = (sp, ct) =>
+            {
+                // 传进来的可能是根容器，而种子提供者会解析 Scoped 服务 ⇒ 必须自建 scope
+                //   （这正是原 SeedDataRunner 直接吃 app.Services 的既有缺陷）。
+                using var seedScope = sp.CreateScope();
+                return SeedDataRunner.RunAllAsync(seedScope.ServiceProvider, ct);
+            };
+        });
+
+        // ── P5：身份替换 —— 三员管理真认证（2026-10-29）─────────────────────
+        // 一行全包：DataProtection（密钥落 DataProtectionKeys 表 ⇒ F5/重启保持登录）
+        //   + TRA_* DbConfig（20 张表，走同一个 DataDbContext/迁移引擎）
+        //   + 认证基座（PolicyScheme 双通道：Bearer→JWT / 否则 Cookie；真撤销）
+        //   + Permission 统一鉴权中心（Profile=ThreeRoleAdmin ⇒ 策略② RoleDataMenu，
+        //     默认管理角色 ["system_admin"]，故此处无需传参）+ PersonalCenter + 种子。
+        //
+        // ⚠ 三个必须一起理解的点：
+        //   ① 本调用内部 AddCJCoreAuth 会改写全局 DefaultScheme 为 "ThreeRolePolicy"。
+        //      因此原 P2–P4 的临时认证（PlugTempAuthHandler + PlugTempAdminAuthStateProvider）
+        //      必须**同一次提交里**移除：只接后端不切组件层，会得到「端点层要三员 Cookie、
+        //      组件层恒 Admin」的错乱态（PlugTempAdminAuthStateProvider 类注释记载过同类症状）。
+        //   ② 种子 ThreeRoleAdminSeedDataProvider 仅在 TRA_SysUsers 为空时执行，会建
+        //      admin / sysadmin / autadmin / audadmin 四个账号，密码取配置：
+        //      ThreeRoleAdmin:AdminPassword（admin 用）/ ThreeRoleAdmin:DefaultPassword（其余，缺省 123456）。
+        //      ⇒ 本方案（D-P5-1 = A）不迁移旧 Users 表，登录凭据由此处产生。
+        //   ③ 默认密码策略 TRA_Pwd_MinLength=8 + 需大小写/数字，与缺省密码 123456 不匹配：
+        //      LoginAsync 不校验策略（能登录），但首次改密会被挡 ⇒ 部署时必须显式设置合规密码。
+        services.AddCJCoreThreeRoleAdmin();
+
+        // ⚠ 兼容兜底：TRA 注册的 IPasswordHasher 只认 PBKDF2-HMAC-SHA256；
+        //   旧 Identity 库里的哈希是 HMACSHA512（实测 PRF=2/100000 迭代）。
+        //   本方案不迁移账号 ⇒ 不需要兼容层。若将来改走 D-P5-1 的 B 方案，
+        //   在此处 AddScoped<IPasswordHasher, PlugLegacyCompatPasswordHasher>() 覆盖即可
+        //   （AddCJCoreAuth 用的是 AddScoped 而非 TryAdd，后注册生效）。
 
         services.AddAuthorization();
         services.AddCascadingAuthenticationState();
-        services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider,
-                           PlugTempAdminAuthStateProvider>();
 
         // ── P7.1：通用配置页 /system-config ───────────────────────────────
         // ① 宿主持久化 Store 必须先注册 —— AddCJCoreSystemConfig 内部是 TryAdd，不会覆盖。
@@ -185,8 +256,8 @@ public static class WebHostStartup
                               CJ.Plug.HostWebServer.SystemConfig.PlugSystemConfigFieldProvider>();
         services.AddCJCoreSystemConfig(o =>
         {
-            // CJPlug 现行最高权限角色名（P5 换 ThreeRoleAdmin 后改为 system_admin）
-            o.AccessRoles = ["Admin"];
+            // P5：三员体系的系统管理员角色码（原 P2–P4 临时体系的 "Admin" 已退役）
+            o.AccessRoles = ["system_admin"];
         });
         // ② UI 层（页面 + 模块实例）。它自带的菜单把分组写死成"系统"，
         //    与 D3=A（菜单归一「通用/管理/调试」）冲突 ⇒ 摘掉后换宿主自己的。
@@ -247,8 +318,10 @@ public static class WebHostStartup
                               CJ.Plug.MainPageContent.Shell.PlugShellModule>();
         services.AddSingleton<CJCore.Framework.Abstractions.IModule,
                               CJ.Plug.MainPageContent.Shell.PlugRuntimeModule>();
-        services.AddSingleton<CJCore.Framework.Abstractions.IModule,
-                              CJ.Plug.MainPageContent.Shell.PlugGuardModule>();
+        // ⚠ P5 已移除 PlugGuardModule：它是 P2–P4 的临时守卫（注入 5 行脚本，靠
+        //   localStorage.userid 判断并 location.replace('/login')）。真认证上线后，
+        //   未登录由 Cookie 认证的 Challenge 直接导到 /three-role/login，再保留本模块
+        //   会在登录页上空转跳转（login 页也被它拦）。
 
         // 原 MyNavMenu 里硬编码的三条入口（下载包 / VNC×2）改由菜单服务贡献
         services.AddSingleton<CJCore.Framework.Abstractions.IMenuService,
@@ -258,11 +331,14 @@ public static class WebHostStartup
         services.AddSingleton<CJ.Plug.MainPageContent.Shell.PlugExecLogService>();
 
         // ── P6：模块目录与启停（/admin/modules） ──────────────────────────
-        // ⚠ 与 P4 的关系：此刻 CJPlug 还没接 CJCore Data 底座，启停状态走「进程内存 + 中立交换文件」
-        //   （module-enablement.json）；P4 接上 Data 底座后同一行代码即升级为 MA_ 表持久化。
+        // P4 之后 Data 底座已就位（见上文 AddCJCoreDataApi），启停状态可直接落 MA_ 表；
+        //   注册顺序无所谓（ModuleAdmin 用 TryAdd / 运行时解析），但 Data 在前保证迁移引擎先建表。
+        //   注：首次切换到 Data 底座时，旧的中立交换文件 module-enablement.json 不再被读取，
+        //   启停状态回落到「模块默认值」——可接受（无历史数据口径）。
         services.AddCJCoreModuleAdmin(o =>
         {
-            o.AdminRoles = ["Admin"];
+            // P5：与 SystemConfig 同口径（原临时体系的 "Admin" 已退役）
+            o.AdminRoles = ["system_admin"];
         });
         // Ⅱ ModuleAdmin 自带的菜单把分组写死成"系统" ⇒ 摘掉后换宿主自己的。
         foreach (var d in services
@@ -280,6 +356,23 @@ public static class WebHostStartup
         {
             options.DetailedErrors = true;
         });
+
+        // ── P5 过渡：把默认认证 scheme 抢回三员体系 ────────────────────────
+        // 问题：LoginModule 的 AddLoginModuleApiServices 里 services.AddIdentity<User, UserRole>()
+        //   会调 AddAuthentication 把 DefaultScheme 设成 "Identity.Application"，
+        //   而模块注册发生在 AddCJCoreThreeRoleAdmin() **之后** ⇒ 顺序上它赢，
+        //   结果是所有请求都按 Identity 判定 ⇒ 恒「未登录」⇒ 受保护页一律 302 回登录页
+        //   （实测日志：AuthenticationScheme: Identity.Application was not authenticated）。
+        // 这里用 Options.Configure 重新声明，注册在最后 ⇒ 最后执行、最终生效。
+        // ⚠ 根治：LoginModule 下线（P5.6）+ MainDbContext 删除（P5.7）时移除 AddIdentity，本段随之删除。
+        services.AddOptions<Microsoft.AspNetCore.Authentication.AuthenticationOptions>()
+            .Configure<CJCore.Framework.Api.Auth.CJCoreAuthOptions>((auth, cj) =>
+            {
+                auth.DefaultScheme = cj.SchemeName;
+                auth.DefaultAuthenticateScheme = cj.SchemeName;
+                auth.DefaultChallengeScheme = cj.CookieSchemeName;
+                auth.DefaultSignInScheme = cj.CookieSchemeName;
+            });
 
         return builder;
     }
@@ -326,6 +419,16 @@ public static class WebHostStartup
 
         app.MapStaticAssets();
 
+        // P5：身份与权限端点 —— MapCJCoreThreeRoleAdmin() 一行映射 10 组：
+        //   认证基座（api/three-role/account: login/logout/cookie/jwt/refresh）
+        //   + me/会话/改密/重置密码 + 用户/角色/部门/用户组 + 角色权限配置
+        //   + 审批/审计/元数据 + Permission 矩阵管理 API。
+        // ⚠ 与 AddCJCoreThreeRoleAdmin 成对出现：少一边会让 /three-role/* 页面 404 或 API 401。
+        app.MapCJCoreThreeRoleAdmin();
+        // P5：个人中心端点（AddCJCoreThreeRoleAdmin 内部已注册 PersonalCenter 服务，
+        //   但端点映射要宿主自己调 —— 少了它，AppBar 头像菜单里的个人中心/改密页会 404）。
+        app.MapCJCorePersonalCenter();
+
         // P6：模块管理端点（/admin/modules）+ 管理 API
         app.MapCJCoreModuleAdmin();
         // P7.1：系统配置端点（GET/PUT/POST /api/system-config）
@@ -369,9 +472,10 @@ public static class WebHostStartup
     /// </summary>
     public static WebApplication MapPlugWebRazorComponents(this WebApplication app)
     {
-        // Radzen 组件用 InteractiveAuto ⇒ 额外追加 WebAssembly 渲染模式（框架默认只加 Server）。
-        app.MapCJCoreRazorComponents()
-            .AddInteractiveWebAssemblyRenderMode();
+        // ⚠ P5：原此处追加 .AddInteractiveWebAssemblyRenderMode()（为 Radzen 的 InteractiveAuto）。
+        //   本仓无 WASM 项目，且该追加会让 rendermode 变成多种 ⇒ 认证态持久化无法推断 rendermode
+        //   ⇒ 全站 500。已随 PlugRuntimeHost 改用 InteractiveServer 一并移除。
+        app.MapCJCoreRazorComponents();
 
         return app;
     }

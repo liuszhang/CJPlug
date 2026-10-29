@@ -11,6 +11,7 @@ using CJ.Plug.SharedPages.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 /// <summary>
 /// 插头执行引擎（拆分重构 - partial class）。
@@ -18,7 +19,7 @@ using System.Text.Json;
 /// </summary>
 internal partial class PlugExecutionEngine
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
     private readonly IPlugManageService _plugManageService;
     private readonly IEnumerable<IPlugCommonExecute> _plugCommonExecutes;
     private readonly IPlugExecuteHandlerService _plugExecuteHandlerService;
@@ -28,7 +29,7 @@ internal partial class PlugExecutionEngine
     private readonly McpWorkflowRunner _mcpWorkflowRunner;
 
     public PlugExecutionEngine(
-        MainDbContext dbContext,
+        DataDbContext dbContext,
         IPlugManageService plugManageService,
         IEnumerable<IPlugCommonExecute> plugCommonExecutes,
         IPlugExecuteHandlerService plugExecuteHandlerService,

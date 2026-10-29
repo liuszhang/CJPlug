@@ -42,7 +42,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddRelationManageModuleApiServices(this IServiceCollection services)
     {
 
-        services.AddSingleton<IModuleDbConfig, RelationModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  RelationModuleDbConfig>();
 
 
         services.AddHttpClient<IRelationApiClient, RelationApiClient>(client =>

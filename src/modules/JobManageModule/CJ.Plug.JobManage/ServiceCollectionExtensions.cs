@@ -45,7 +45,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddJobManageModuleApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, JobModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  JobModuleDbConfig>();
 
         services.AddScoped<IJobManageService, JobManageService>();
 

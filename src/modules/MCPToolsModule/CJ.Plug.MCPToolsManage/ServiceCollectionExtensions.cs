@@ -47,7 +47,7 @@ public static class ServiceCollectionExtensions
     //后端API服务包
     public static IServiceCollection AddMCPToolsApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, MCPToolsManageDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  MCPToolsManageDbConfig>();
 
         services.AddScoped<IMCPToolsManageService, MCPToolsManageService>();
 

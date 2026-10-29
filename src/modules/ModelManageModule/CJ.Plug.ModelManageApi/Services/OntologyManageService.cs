@@ -3,14 +3,15 @@ using CJ.Plug.ModelManageModel.Models;
 using CJ.Plug.Models.Relation;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.ModelManageApi.Services
 {
     public class OntologyManageService : IOntologyManageService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
 
-        public OntologyManageService(MainDbContext dbContext)
+        public OntologyManageService(DataDbContext dbContext)
         {
             _dbContext = dbContext;
         }

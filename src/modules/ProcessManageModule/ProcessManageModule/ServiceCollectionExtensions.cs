@@ -36,7 +36,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddProcessManageModuleApiServices(this IServiceCollection services)
     {
         //services.AddDbContext<ProcessDbContext>(options => options.UseSqlite(DbConnectionString.ConnectionString));
-        services.AddSingleton<IModuleDbConfig, ProcessManageModuleDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  ProcessManageModuleDbConfig>();
 
         services.AddScoped<IProcessManageService, ProcessManageService>();
 

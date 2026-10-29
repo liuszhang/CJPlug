@@ -1,4 +1,4 @@
-﻿using CJ.Plug.FileManageApi.Contracts;
+using CJ.Plug.FileManageApi.Contracts;
 
 using CJ.Plug.Models.Shared;
 using CJ.Plug.Models.Station;
@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.FileManageApi.Apis
 {
@@ -143,7 +144,7 @@ namespace CJ.Plug.FileManageApi.Apis
 
                 using var scope = app.ServiceProvider.CreateScope();
                 var fileManageService = scope.ServiceProvider.GetRequiredService<IFileManageService>();
-                var dbContext = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<DataDbContext>();
 
                 // 如果 path 为空，从工具表中查询 ToolBasePath（工具完整包目录）
                 string toolPath = path ?? "";

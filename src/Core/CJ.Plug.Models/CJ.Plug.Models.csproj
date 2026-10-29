@@ -33,6 +33,12 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
+    <!--
+      P4（2026-10-29）：业务表迁入 CJCore Data 底座。
+      只在本项目加一句引用，18 个模块项目靠 ProjectReference 的传递性拿到 DataDbContext / IModuleDbConfig，
+      从而不必逐个改 csproj。CJCore.Modules.Data.Model 已自带 Data.Shared（接口所在项目）。
+    -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\Data\CJCore.Modules.Data.Model\CJCore.Modules.Data.Model.csproj" />
   </ItemGroup>
 
 </Project>

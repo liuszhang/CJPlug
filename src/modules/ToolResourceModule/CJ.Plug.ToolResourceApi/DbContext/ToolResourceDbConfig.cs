@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Station;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.ToolResourceApi.DbContext
 {
-    public class ToolResourceDbConfig : IModuleDbConfig
+    public class ToolResourceDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

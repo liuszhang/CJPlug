@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.MCPTools;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Emit;
 
 namespace CJ.Plug.MCPToolsManageApi.DbContext
 {
-    public class MCPToolsManageDbConfig : IModuleDbConfig
+    public class MCPToolsManageDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

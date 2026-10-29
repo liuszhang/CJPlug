@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.SkillsManageApi;
 
-public class SkillsManageDbConfig : IModuleDbConfig
+public class SkillsManageDbConfig : IModuleBusinessDbConfig
 {
     public void AddDbSets(ModelBuilder modelBuilder)
     {

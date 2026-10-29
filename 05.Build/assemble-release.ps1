@@ -9,6 +9,7 @@
 
         05.Release\main\       → cjplug 组件载荷（服务器形态）
                                   CJCore.AspireHost.AppHost\<Cfg>\<tfm>\   （含 aspire\dcp、aspire\dashboard）
+                                  CJCore.AppHost.Manager\<Cfg>\net10.0-windows\（服务管理壳，与 AppHost 同根并排）
                                   Services\<Cfg>\net10.0\ 、net10.0-windows\
                                   PlugConfig\                               （运行时真源，含 UserPlugs.xml）
         05.Release\desktop\    → cjplug-desktop 组件载荷（个人形态）
@@ -76,6 +77,13 @@ $sln = Join-Path $repoRoot 'CJ.Plug-Aspire.sln'
 # 不再拉整解（CJ.Plug.Desktop 唯一 ProjectReference = CJ.Plug.LicenseApiClient）。
 $desktopProj = Join-Path $repoRoot 'src\WebHost\CJ.Plug.Desktop\CJ.Plug.Desktop.csproj'
 
+# AppHost 与服务管理壳（2026-10-29《CJCore AppHost 服务管理壳方案》）：
+#   两者源码都在**兄弟仓 CJCore**。AppHost 输出由其 csproj 的 BaseOutputPath 钉在 CJPlug\02.Publish 下；
+#   管理壳已改走默认 bin（2026-10-29 简化），发布落点由下方构建命令显式 -o。
+#   跨仓相对路径是已知代价（方案 §7 D-2 已登记）：CJPlug 目录布局调整时需同步这里。
+$appHostProj = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AspireHost.AppHost\CJCore.AspireHost.AppHost.csproj'
+$managerProj = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AppHost.Manager\CJCore.AppHost.Manager.csproj'
+
 if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必须位于 <CJPlug>\05.Build\ 下）" }
 
 # ── 黑名单（枝 13）：运行期残留 + 调试符号 ────────────────────────────────────────────
@@ -86,12 +94,21 @@ if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必�
 #     开发机跑过一次就会落在服务目录里 —— 若随包分发，等于把同一把密钥发给所有客户（可互相伪造 token）。
 #   ②「调试符号 *pdb」是 publish 的正常副产物，**静默剔除**即可（PackageService 既有做法也是排除 pdb）——
 #     若一并当断言失败，图站三件套 publish 会因 161 个 .pdb 直接打不出包。
-$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*', 'window-state.json')
+$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*', 'window-state.json',
+    # 2026-10-29《CJCore AppHost 服务管理壳方案》R5：用户覆盖配置是**本机运行期产物**，
+    #   开发机上改过一次端口就会落在 AppHost 输出目录里。若随包分发，会把开发者的
+    #   本机绝对路径（如 D:\Deploy\...）带到客户机 —— 与 *.db / elsa-signing.key 同属污染。
+    #   除 robocopy /XF 排除外，Assert-Clean 会做**反向断言**（发布包内不存在该文件）。
+    'apphost.user.json')
 # 2026-10-07 追加两类运行期残留（实测证据见方案 §9.8）：
 #   · window-state.json       —— 桌面端**窗口位置/大小**持久化文件，开发机跑过一次就会落在输出目录里；
 #   · *.exe.WebView2\         —— WebView2 的用户数据/缓存目录，实测 1073 文件 / 383MB（desktop 载荷 407MB 的大头），
 #                                装到客户机就是把开发机的浏览缓存与 Cookie 发出去（同 *.db / StationLogs 一类污染）。
-$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin', 'CJ.Plug.Desktop.exe.WebView2')
+$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin', 'CJ.Plug.Desktop.exe.WebView2',
+    # 2026-10-29：管理壳的 WebView2 用户数据目录。壳已把 UserDataFolder 指到
+    #   %LOCALAPPDATA%\CJ\AppHostManager\WebView2（不落安装目录），这里仍列进黑名单做双保险 ——
+    #   一旦将来有人改回默认位置，Assert-Clean 会当场拦下，而不是把浏览缓存发到客户机。
+    'CJCore.AppHost.Manager.exe.WebView2')
 $stripFilePatterns = @('*.pdb')
 
 function Write-Step([string]$msg) {
@@ -202,6 +219,20 @@ if ($Target -in @('main', 'all') -and -not $SkipBuild) {
     Write-Step "构建解决方案（$Configuration）"
     Invoke-Dotnet 'build solution' @('build', $sln, '-c', $Configuration, '-v:m', '-nologo')
     $slnBuilt = $true
+
+    # 2026-10-29：AppHost 与服务管理壳的**源码在 CJCore 仓**，不在 CJ.Plug-Aspire.sln 里
+    #   （《Aspire 编排壳迁移 CJCore》把它们移出 CJPlug 解决方案），所以上面的整解构建覆盖不到这两个工程。
+    #   之前一直没暴露，是因为开发机上它们已被单独构建过；换台干净机器直接 -Target main 就会
+    #   在 Copy-Tree 处以「源目录不存在」失败。
+    Write-Step "构建 CJCore 侧编排器与管理壳（$Configuration）"
+    if (-not (Test-Path $appHostProj)) { throw "未找到工程：$appHostProj" }
+    if (-not (Test-Path $managerProj)) { throw "未找到工程：$managerProj" }
+    # AppHost：输出落点仍由其 csproj 的 BaseOutputPath 钉在 02.Publish（它必须与 Services 同根并排）。
+    Invoke-Dotnet 'build CJCore.AspireHost.AppHost' @('build', $appHostProj, '-c', $Configuration, '-v:m', '-nologo')
+    # 管理壳（2026-10-29 简化）：壳 csproj 不再有 BaseOutputPath（输出走默认 bin），
+    #   发布落点改由本脚本显式 -o —— 与 AppHost 同根并排的硬要求不变（AppHostLocator 上溯三级定位）。
+    $managerOut = Join-Path $publishDir "CJCore.AppHost.Manager\$Configuration\net10.0-windows"
+    Invoke-Dotnet 'build CJCore.AppHost.Manager' @('build', $managerProj, '-c', $Configuration, '-o', $managerOut, '-v:m', '-nologo')
 }
 
 # ── ① main staging（cjplug：服务器形态；枝 7 = 只收 Release 单配置） ────────────────────
@@ -216,6 +247,10 @@ if ($Target -in @('main', 'all')) {
 
     # cjplug（服务器形态）：AppHost（含自带 DCP/Dashboard）+ Services + PlugConfig
     Copy-Tree (Join-Path $publishDir "CJCore.AspireHost.AppHost\$Configuration\net10.0") (Join-Path $mainStaging "CJCore.AspireHost.AppHost\$Configuration\net10.0")
+    # 服务管理壳（2026-10-29 新增）：与 AppHost **同根并排**是硬要求 ——
+    #   壳按「自身目录上溯三级 = 发布根」定位 AppHost（AppHostLocator），错位就找不到 dll。
+    #   体积约 4MB，故并入 main 载荷而不单开组件（服务器形态用不到 GUI 也不影响服务运行）。
+    Copy-Tree (Join-Path $publishDir "CJCore.AppHost.Manager\$Configuration\net10.0-windows") (Join-Path $mainStaging "CJCore.AppHost.Manager\$Configuration\net10.0-windows")
     Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0") (Join-Path $mainStaging "Services\$Configuration\net10.0")
     Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0-windows") (Join-Path $mainStaging "Services\$Configuration\net10.0-windows")
     Copy-Tree (Join-Path $publishDir 'PlugConfig') (Join-Path $mainStaging 'PlugConfig')
@@ -227,6 +262,7 @@ if ($Target -in @('main', 'all')) {
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.dll",
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
+        "CJCore.AppHost.Manager\$Configuration\net10.0-windows\CJCore.AppHost.Manager.exe",
         "Services\$Configuration\net10.0\CJ.Plug.ApiServer.dll",
         "Services\$Configuration\net10.0\CJ.Plug.McpServer.dll",
         "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.dll",

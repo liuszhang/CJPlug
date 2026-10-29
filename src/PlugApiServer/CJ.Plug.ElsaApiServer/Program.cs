@@ -35,6 +35,9 @@ AppContext.SetSwitch("Npgsql.EnableMultiplexing", false);
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
+// 环回地址绕过系统代理（2026-10-29，文档 K.7）。幂等，重复调用无害。
+LoopbackProxyBypass.Apply();
+
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 // 2026-10-07 删除：原先这里把配置键 env 覆盖到 ASPNETCORE_ENVIRONMENT / DOTNET_ENVIRONMENT。
@@ -219,6 +222,9 @@ HubConnectionManagerService._hubConnection.On<string>("CompleteActivityContext",
 });
 
 var app = builder.Build();
+
+// 标记「本进程已开始监听」，供启动期自调用判断使用（2026-10-29，文档 K.8.4）。
+app.Lifetime.ApplicationStarted.Register(CJ.Plug.Models.Shared.HostStartupSignal.MarkStarted);
 
 app.MapDefaultEndpoints();
 

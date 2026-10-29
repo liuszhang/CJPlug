@@ -6,17 +6,17 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.IO;
+using CJCore.Modules.Data;
 
 public class ToolManageService : IToolManageService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public ToolManageService(MainDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+    public ToolManageService(DataDbContext dbContext, IHttpContextAccessor httpContextAccessor)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
-        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
     }
 
     public async Task<IEnumerable<Tool>?> GetAllToolsAsync(CancellationToken cancellationToken = default)

@@ -1,15 +1,16 @@
-﻿
+
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Process = CJ.Plug.Models.PlugProcess.Process;
+using CJCore.Modules.Data;
 
 public class ProcessManageService : BaseRepositoryService<Process, int>, IProcessManageService
 {
-    private readonly MainDbContext _ProcessDbContext;
-    public ProcessManageService(MainDbContext dbContext) : base(dbContext)
+    private readonly DataDbContext _ProcessDbContext;
+    public ProcessManageService(DataDbContext dbContext) : base(dbContext)
     {
         _ProcessDbContext = dbContext;
     }

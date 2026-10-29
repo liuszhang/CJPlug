@@ -1,16 +1,16 @@
-﻿using CJ.Plug.Models.LogModels;
+using CJ.Plug.Models.LogModels;
 
 
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 public class PDZManageService : IPDZManageService
 {
-    private readonly MainDbContext _dbContext;
-    public PDZManageService(MainDbContext dbContext)
+    private readonly DataDbContext _dbContext;
+    public PDZManageService(DataDbContext dbContext)
     {
         _dbContext = dbContext;
-        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
     }
 
     public async Task<PlugDataZone?> CreatePDZ(PlugDataZone PDZ, CancellationToken cancellationToken = default)

@@ -3,6 +3,7 @@ using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.LlmConfigApi.Services;
 
@@ -13,7 +14,7 @@ public class LlmConfigSeedDataProvider : ISeedDataProvider
 
     public async Task SeedAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
-        var dbContext = serviceProvider.GetRequiredService<MainDbContext>();
+        var dbContext = serviceProvider.GetRequiredService<DataDbContext>();
 
         var existing = await dbContext.Set<LlmProvider>().FirstOrDefaultAsync(cancellationToken);
         if (existing != null)

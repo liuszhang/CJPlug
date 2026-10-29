@@ -1,4 +1,4 @@
-﻿using CJ.Plug.LicenseApi.Contracts;
+using CJ.Plug.LicenseApi.Contracts;
 using CJ.Plug.LicenseApi.DbContext;
 using CJ.Plug.LicenseModels;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.LicenseApi.Services
 {
@@ -190,7 +191,7 @@ namespace CJ.Plug.LicenseApi.Services
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<DataDbContext>();
                 var entity = dbContext.Set<LicenseEntity>()
                     .FirstOrDefault(l => l.IsActive);
 
@@ -212,7 +213,7 @@ namespace CJ.Plug.LicenseApi.Services
         private void PersistToDatabase(LicenseInfo license)
         {
             using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataDbContext>();
 
             // 将之前的所有许可证标记为非活跃
             var existing = dbContext.Set<LicenseEntity>().Where(l => l.IsActive);
@@ -245,7 +246,7 @@ namespace CJ.Plug.LicenseApi.Services
         private void RemoveFromDatabase()
         {
             using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<MainDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataDbContext>();
             var existing = dbContext.Set<LicenseEntity>().Where(l => l.IsActive);
             foreach (var e in existing)
                 e.IsActive = false;

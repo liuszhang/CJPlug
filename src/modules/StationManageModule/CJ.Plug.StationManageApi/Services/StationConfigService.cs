@@ -1,19 +1,19 @@
-﻿using CJ.Plug.Models.LogModels;
+using CJ.Plug.Models.LogModels;
 using CJ.Plug.Models.Relation;
 using CJ.Plug.Models.Station;
 using CJ.Plug.Models.Station;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 public class StationConfigService:IStationConfigService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
 
-    public StationConfigService(MainDbContext dbContext)
+    public StationConfigService(DataDbContext dbContext)
     {
         _dbContext = dbContext;
-        CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
     }
 
     public async Task<IEnumerable<StationConfigTable>?> GetAllStationConfigsAsync(CancellationToken cancellationToken = default)

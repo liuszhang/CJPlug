@@ -39,7 +39,7 @@ public static class ServiceCollectionExtensions
     //后端API服务包
     public static IServiceCollection AddSkillsApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, SkillsManageDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  SkillsManageDbConfig>();
 
         services.AddScoped<ISkillsManageService, SkillsManageService>();
 

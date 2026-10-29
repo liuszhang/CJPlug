@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Job;
 using CJ.Plug.Models.Shared;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.FileManageApi.DbContext
 {
-    public class FileModuleDbConfig : IModuleDbConfig
+    public class FileModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

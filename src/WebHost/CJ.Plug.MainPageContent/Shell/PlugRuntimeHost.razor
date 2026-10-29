@@ -9,5 +9,14 @@
 
 @using Radzen.Blazor
 
+@* ⚠ P5（2026-10-29）：RadzenComponents 的 rendermode 从 InteractiveAuto 改为 InteractiveServer。
+   原因：本仓没有任何 Blazor WebAssembly 项目，Auto 实际永远退化到 Server（伪需求）；
+   但「注册过 WebAssembly 渲染模式」这件事会让 Blazor 的
+   ComponentStatePersistenceManager.InferRenderModes 认为存在多种 rendermode，
+   于是 CookieAuthStateProviderBase 构造时 RegisterOnPersisting(PersistAsync)
+   （未显式指定 rendermode）无法被推断 ⇒ 每个页面请求都抛
+   InvalidOperationException: The registered callback PersistAsync must be associated with
+   a component or define an explicit render mode type during registration ⇒ 全站 500。
+   P5 接入 ThreeRoleAdmin 后该 provider 才被注册，所以这个问题在 P5 之前不显现。 *@
 <RadzenTheme Theme="material" @rendermode="InteractiveServer" />
-<RadzenComponents @rendermode="InteractiveAuto" />
+<RadzenComponents @rendermode="InteractiveServer" />

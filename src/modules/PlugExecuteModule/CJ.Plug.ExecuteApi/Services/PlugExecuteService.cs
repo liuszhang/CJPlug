@@ -10,10 +10,11 @@ using CJ.Plug.ElsaIntegration.Contracts;
 using Elsa.Api.Client.Resources.WorkflowInstances.Models;
 using Serilog;
 using System.Text.Json;
+using CJCore.Modules.Data;
 
 public class PlugExecuteService : IPlugExecuteService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
 
     private IPlugManageService PlugManageService { get; set; }
     private IPlugCommonExecute PlugCommonExecute { get; set; }
@@ -30,7 +31,7 @@ public class PlugExecuteService : IPlugExecuteService
     private readonly PlugExecutionEngine _engine;
 
     public PlugExecuteService(
-        MainDbContext dbContext,
+        DataDbContext dbContext,
         IPlugManageService plugManageService,
         IPlugCommonExecute plugCommonExecute,
         IEnumerable<IPlugCommonExecute> plugCommonExecutes,

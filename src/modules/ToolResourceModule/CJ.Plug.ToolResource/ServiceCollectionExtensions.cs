@@ -47,7 +47,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddToolResourceApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, ToolResourceDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  ToolResourceDbConfig>();
 
         // 种子数据：默认工具列表
         services.AddSingleton<ISeedDataProvider, ToolSeedDataProvider>();

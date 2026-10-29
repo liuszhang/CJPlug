@@ -11,17 +11,17 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Claims;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.FileManageApi.Services
 {
     public class FileManageService : IFileManageService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
 
-        public FileManageService(MainDbContext dbContext)
+        public FileManageService(DataDbContext dbContext)
         {
             _dbContext = dbContext;
-            CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         }
 
         /// <summary>

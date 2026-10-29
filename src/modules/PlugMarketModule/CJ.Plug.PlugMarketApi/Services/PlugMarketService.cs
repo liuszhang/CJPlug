@@ -1,16 +1,16 @@
-﻿using CJ.Plug.PlugMarketApi.Contracts;
+using CJ.Plug.PlugMarketApi.Contracts;
 using Microsoft.EntityFrameworkCore;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.PlugMarketApi.Services
 {
     public class PlugMarketService : IPlugMarketService
     {
-        private readonly MainDbContext _dbContext;
+        private readonly DataDbContext _dbContext;
 
-        public PlugMarketService(MainDbContext dbContext)
+        public PlugMarketService(DataDbContext dbContext)
         {
             _dbContext = dbContext;
-            CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(_dbContext);
         }
         public async Task<MarketPlug> CreateMarketPlugAsync(MarketPlug request, CancellationToken cancellationToken = default)
         {

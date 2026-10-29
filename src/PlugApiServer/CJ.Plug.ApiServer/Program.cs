@@ -39,6 +39,10 @@ AppContext.SetSwitch("Npgsql.EnableMultiplexing", false);
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
+// 环回地址绕过系统代理（2026-10-29，文档 K.7）：本机配了 HTTP_PROXY 时，服务连自己的
+// http://localhost:5066 也会被送进代理并拿到 502。幂等，重复调用无害。
+LoopbackProxyBypass.Apply();
+
 // 清除 VS 调试器注入的缺失程序集，避免 Hosting startup assembly exception
 var hostingAssemblies = Environment.GetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
 if (!string.IsNullOrEmpty(hostingAssemblies))
@@ -388,6 +392,10 @@ dispatchHubConnection._hubConnection.On<string>("CompleteActivityContext", async
 
 var app = builder.Build();
 
+// 标记「本进程已开始监听」，供启动期自调用判断使用（2026-10-29，文档 K.8.4）。
+// 在此之前发起的 HTTP 自调用必然 Connection refused，调用方应跳过而不是硬试。
+app.Lifetime.ApplicationStarted.Register(CJ.Plug.Models.Shared.HostStartupSignal.MarkStarted);
+
 // Phase 3：回调的 DI 延迟绑定（上面的 ResumeElsaProcess / CompleteActivityContext 在运行期才解析服务）。
 appServices = app.Services;
 
@@ -409,18 +417,20 @@ catch (Exception ex)
     Console.WriteLine($"[Startup] 插件能力注册异常: {ex.Message}");
 }
 
-// 先执行数据库迁移，确保表结构存在
+// 先确保**身份侧**库结构就绪（P4 之后 MainDbContext 只剩 Identity + 用户/权限 7 张表）
 try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MainDbContext>();
-    // 2026-10-29《CJPlug 接入 CJCore》P3：改用进程内幂等的统一入口（原为直接 EnsureCreatedAsync）。
-    //   ⚠ 这里刻意**没有**换成 MigrateAsync：MainDbContext 的模型是运行时由 IModuleDbConfig 动态拼装的，
+    // 2026-10-29《CJPlug 接入 CJCore》P3 → P4：
+    //   ⚠ 这里刻意**没有**换成 MigrateAsync：MainDbContext 的模型由 IModuleDbConfig 运行时拼装，
     //     EF 设计时拿不到完整模型 ⇒ 任何迁移快照都必然缺表，改走 Migrate 只会让缺表更隐蔽。
-    //     真正的迁移基线留到 P4（业务表交给 CJCore Data 引擎自动迁移记账，MainDbContext 只剩 Identity 后）。
-    //   见 CJ.Plug.Models/Services/DbSchemaInitializer.cs。
+    //   P4 之后的分工：业务表交给 CJCore Data 引擎（DataDbContext + 快照记账），
+    //     MainDbContext 只剩 UserModuleDbConfig 的 7 张身份/权限表，EnsureCreated 是安全且幂等的。
+    //   ⚠ **顺序不可颠倒**：必须在本进程 Run() 之前跑完，再让 Data 引擎的 HostedService 建业务表。
+    //     若 Data 引擎先建了表，EnsureCreated 会因"库里已有表"整体 no-op ⇒ 身份表永久缺失、登录全挂。
     CJ.Plug.Models.Services.DbSchemaInitializer.EnsureCreatedOnce(db);
-    Console.WriteLine("[SeedData] 数据库结构就绪检查完成");
+    Console.WriteLine("[SeedData] 身份库结构就绪检查完成（业务表由 CJCore Data 引擎建）");
 }
 catch (Exception ex)
 {
@@ -428,16 +438,12 @@ catch (Exception ex)
     Log.Error(ex, "数据库迁移异常");
 }
 
-// 执行所有注册的种子数据提供者
-try
-{
-    await SeedDataRunner.RunAllAsync(app.Services);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"[SeedData] 种子数据执行异常：{ex.Message}");
-    Log.Error(ex, "种子数据执行异常");
-}
+// 种子数据**已移出**此处（P4 / 2026-10-29）：
+//   原来在这里直接 SeedDataRunner.RunAllAsync(app.Services) —— 有两个问题：
+//   ① 时序错：此刻业务表还没建（建表是 Data 引擎的 HostedService，Run() 才启动）；
+//   ② 容器错：传的是根容器，而种子提供者会解析 Scoped 服务 ⇒ "Cannot resolve scoped service"。
+//   现改由 AddCJCoreDataApi 的 InitAction 触发（WebHostStartup），引擎保证「结构就绪 → 播种」顺序，
+//   并在内部自建 scope。
 
 app.UseOpenApi();
 app.UseSwaggerUi();

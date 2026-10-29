@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Station;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.PDZModels.DbContext
 {
-    public class PDZModuleDbConfig : IModuleDbConfig
+    public class PDZModuleDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {

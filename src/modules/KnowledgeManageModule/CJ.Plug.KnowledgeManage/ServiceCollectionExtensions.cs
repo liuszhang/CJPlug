@@ -46,7 +46,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddKnowledgeApiServices(this IServiceCollection services)
     {
-        services.AddSingleton<IModuleDbConfig, KnowledgeManageDbConfig>();
+        services.AddSingleton<IModuleBusinessDbConfig,  KnowledgeManageDbConfig>();
 
         services.AddScoped<IKnowledgeManageService, KnowledgeManageService>();
 

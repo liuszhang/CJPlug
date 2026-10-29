@@ -14,7 +14,7 @@ namespace CJ.Plug.LicenseApi
     {
         public static IServiceCollection AddLicenseModuleApiServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModuleDbConfig, LicenseModuleDbConfig>();
+            services.AddSingleton<IModuleBusinessDbConfig,  LicenseModuleDbConfig>();
             services.AddSingleton<ILicenseService, LicenseService>();
 
             // 为码支付 API 调用注册 HttpClient（如宿主已注册则跳过）

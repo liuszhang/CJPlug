@@ -13,7 +13,7 @@ namespace CJ.Plug.ModelManageApi
     {
         public static IServiceCollection AddOntologyManageModuleApiServices(this IServiceCollection services)
         {
-            services.AddSingleton<IModuleDbConfig, OntologyManageDbConfig>();
+            services.AddSingleton<IModuleBusinessDbConfig,  OntologyManageDbConfig>();
             services.AddScoped<IOntologyManageService, OntologyManageService>();
             services.AddSingleton<ISeedDataProvider, OntologyManageSeedDataProvider>();
             return services;

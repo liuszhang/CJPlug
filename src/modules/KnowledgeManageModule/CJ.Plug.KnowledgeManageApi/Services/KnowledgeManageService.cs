@@ -1,6 +1,7 @@
 using CJ.Plug.Models.Knowledge;
 using CJ.Plug.Models.Services;
 using Microsoft.EntityFrameworkCore;
+using CJCore.Modules.Data;
 
 namespace CJ.Plug.KnowledgeManageApi;
 
@@ -9,9 +10,9 @@ namespace CJ.Plug.KnowledgeManageApi;
 /// </summary>
 public class KnowledgeManageService : IKnowledgeManageService
 {
-    private readonly MainDbContext _dbContext;
+    private readonly DataDbContext _dbContext;
 
-    public KnowledgeManageService(MainDbContext dbContext)
+    public KnowledgeManageService(DataDbContext dbContext)
     {
         _dbContext = dbContext;
     }

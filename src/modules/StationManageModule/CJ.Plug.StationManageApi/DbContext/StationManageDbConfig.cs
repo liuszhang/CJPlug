@@ -1,11 +1,11 @@
-﻿using CJ.Plug.Models.Contracts;
+using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Plug;
 using CJ.Plug.Models.Station;
 using Microsoft.EntityFrameworkCore;
 
 namespace CJ.Plug.StationManageApi.DbContext
 {
-    public class StationManageDbConfig : IModuleDbConfig
+    public class StationManageDbConfig : IModuleBusinessDbConfig
     {
         public void AddDbSets(ModelBuilder modelBuilder)
         {
