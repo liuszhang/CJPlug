@@ -114,12 +114,15 @@ public partial class MainApiClient : IExecuteApiClient
         }
     }
 
-    public async Task LaunchStandaloneAppAsync(string definitionId, CancellationToken ct = default)
+    public async Task LaunchStandaloneAppAsync(string definitionId, string? accessToken = null, CancellationToken ct = default)
     {
         try
         {
-            await ExecuteApiClient.Value.LaunchStandaloneAppAsync(definitionId, ct);
-            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Execute, $"启动独立执行程序: {definitionId}");
+            await ExecuteApiClient.Value.LaunchStandaloneAppAsync(definitionId, accessToken, ct);
+            // P5.9：审计里记「是否带身份」—— 缺 token 时服务端会 401（抛异常走失败分支），
+            // 但成功分支记下这一点，事后能区分「带身份启动」与「历史无身份启动」。
+            await AuditLog.LogSuccessAsync(AuditModule.Other, AuditOperationType.Execute,
+                $"启动独立执行程序: {definitionId}（身份票据: {(string.IsNullOrEmpty(accessToken) ? "无" : "有")}）");
         }
         catch (Exception ex)
         {

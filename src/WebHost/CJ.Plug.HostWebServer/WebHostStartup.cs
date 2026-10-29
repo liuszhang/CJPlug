@@ -104,6 +104,20 @@ public static class WebHostStartup
         //   _content/ 资产只有在 Web 宿主侧才会被 StaticWebAssets 清单收录。
         StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, configuration);
 
+        // ── P5.8 方案 C2 地基：内部信任密钥（2026-10-29）────────────────────
+        // 背景：业务面 /api/* 全匿名 + 监听 http://*:5066 ⇒ 同网段任何主机可读写业务数据。
+        //   但不能直接加 RequireAuthorization：内部调用方（MainApiClient、53 个 AddHttpClient、
+        //   工位机跨进程、Elsa/MCP）全部零凭证，一加全站 401。
+        // 本段只做"出站自动带凭证"这一半：
+        //   ① Configure —— 从配置读密钥；为空则整套机制关闭（保留既有全匿名行为，零风险）；
+        //   ② Filter —— 让 AddHttpClient 创建的全部客户端统一附加 X-Internal-Key。
+        // 入站校验在 ApiServer 的 UseInternalApiKeyGate（默认 Observe 只统计不拦截）。
+        // ⚠ 顺序：必须在任何 AddHttpClient 之前执行 Configure，否则首轮创建的客户端读到空密钥。
+        //   虽然 Factory 是延迟创建的，但"先配后注册"不依赖这个时序假设。
+        CJ.Plug.Models.Shared.InternalApiKey.Configure(configuration["InternalApi:Key"]);
+        services.AddSingleton<Microsoft.Extensions.Http.IHttpMessageHandlerBuilderFilter,
+                              CJ.Plug.HostWebServer.Shell.InternalApiKeyHttpFilter>();
+
         services.AddMudServices();
         services.AddMudExtensions();
 

@@ -80,7 +80,10 @@ public partial class MainApiClient
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
 
         // 初始化审计日志辅助类
-        var auditHttpClient = new HttpClient { BaseAddress = new Uri(GlobalData.MainApiServer) };
+        // ⚠ P5.8 C2：这是**绕过 IHttpClientFactory 的裸实例**，必须用 InternalApiKey.CreateClient()
+        //   才能带上内部密钥。否则 /api/audit 一旦收口，全仓 299 处 AuditLogHelper 调用立刻 401 刷屏。
+        var auditHttpClient = InternalApiKey.CreateClient();
+        auditHttpClient.BaseAddress = new Uri(GlobalData.MainApiServer);
         AuditLog = new AuditLogHelper(auditHttpClient, GetUserNameAsync);
     }
 

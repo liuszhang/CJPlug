@@ -24,7 +24,10 @@ public class MainHub(IStationService stationService):Hub
         //将状态新增或更新到持久化存储中
         string encodedIp = Uri.EscapeDataString(ip);
         var host = await stationService.GetApiServer();
-        var httpClient = new HttpClient { BaseAddress = new Uri(host) };
+        // P5.8 C2：裸 HttpClient 不受 IHttpClientFactory 管控，必须走 CreateClient 才带内部密钥
+        // （目标端口不是 5066 时会自动不加头，故对工位机直连无影响）。
+        var httpClient = InternalApiKey.CreateClient();
+        httpClient.BaseAddress = new Uri(host);
         var exist = await httpClient.GetFromJsonAsync<Station?>($"api/Station/GetStationByIp/{encodedIp}");
         if (exist != null)
         {

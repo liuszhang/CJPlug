@@ -1,4 +1,10 @@
 @page "/process/{PlugDefinitionId}/execute/{JobDefinitionId?}"
+@* P5.9 / D-P5-7：身份传递补齐后，本页不再是匿名缺口 —— 执行界面能触发流程执行，必须要求登录。
+   三条入口全都自带身份，不会因此断链：
+     ① 浏览器内跳转（ProcessManageList / JobManageList 的 MudLink、FMD 的 NavigateTo）——带 Cookie；
+     ② 独立执行窗口 CJ.Plug.ExecuteApp —— 启动时先经 /api/three-role/account/embed-cookie 落地 Cookie 再进来；
+     ③ 手工命令行启动且无票据 —— 落到登录页，人工登录后仍可用。 *@
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
 
 <PageTitle>@($"流程执行")</PageTitle>

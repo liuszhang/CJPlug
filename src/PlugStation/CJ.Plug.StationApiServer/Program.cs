@@ -178,6 +178,12 @@ builder.Services.AddHostedService<RfbWindowVncServer>();
 
 builder.Services.ConfigModuleApiServices();
 
+// P5.8 C2：内部信任密钥（工位机 → 主服务方向的**出站**附加）。
+//   密钥由部署方通过 `InternalApi__Key` 环境变量（或本机 appsettings 的 InternalApi:Key）下发，
+//   与主服务侧同一把。为空 ⇒ 机制整体关闭（出站不加头），保持"零配置即可用"的默认交付态。
+//   ⚠ 工位机没有 AddHttpClient 注册点（MainApiClient 走 BaseApiClient 的裸实例），
+//     因此不需要 InternalApiKeyHttpFilter；裸客户端逐个用 CreateClient() 接入。
+CJ.Plug.Models.Shared.InternalApiKey.Configure(builder.Configuration["InternalApi:Key"]);
 
 builder.Services.AddSingleton<MainApiClient>();
 //builder.Services.AddHttpClient<MainApiClient>(client =>

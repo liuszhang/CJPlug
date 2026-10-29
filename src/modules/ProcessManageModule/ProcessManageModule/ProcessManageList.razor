@@ -376,12 +376,42 @@
     {
         try
         {
-            await MainApiClient.LaunchStandaloneAppAsync(process.DefinitionId);
+            // P5.9 / D-P5-7：独立执行窗口是**另一个进程**的 WebView2，不带浏览器 Cookie。
+            // 这里读出当前电路的 AT 交给服务端换一次性票据，Action 内再据此落地 Cookie。
+            var accessToken = await ReadAccessTokenCookieAsync();
+
+            await MainApiClient.LaunchStandaloneAppAsync(process.DefinitionId, accessToken);
             Snackbar.Add($"已在独立窗口中启动流程执行: {process.Name}", Severity.Success);
         }
         catch (Exception ex)
         {
             Snackbar.Add($"启动独立执行窗口失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    /// <summary>
+    /// 从浏览器 cookie 读取三员访问令牌（<c>.ThreeRole.Token</c>，**非 HttpOnly** —— CJCore D3 决策：
+    /// 电路恢复时 JS 必须能读，故本方法在交互式电路里可用）。
+    /// <para>⚠ cookie 名必须与 <c>CJCore.Modules.ThreeRoleAdmin.ThreeRoleAdminModuleExtensions</c> 里的
+    /// <c>o.TokenCookieName = ".ThreeRole.Token"</c> 一致；改名要两边同步。</para>
+    /// <para>⚠ <c>InvokeAsync</c> 必须用**显式参数数组**重载：三参形式会按 <c>(string, object?, object?)</c>
+    /// 解析，把 CancellationToken 当第二个 JS 实参序列化后必抛（内核 CookieAuthStateProviderBase 同款踩坑）。</para>
+    /// </summary>
+    private async Task<string?> ReadAccessTokenCookieAsync()
+    {
+        try
+        {
+            const string script =
+                "(() => { const m = document.cookie.match(/(?:^|; )\\.ThreeRole\\.Token=([^;]*)/); " +
+                "return m ? decodeURIComponent(m[1]) : ''; })()";
+
+            var token = await JSRuntime.InvokeAsync<string>("eval", new object?[] { script });
+            return string.IsNullOrWhiteSpace(token) ? null : token;
+        }
+        catch
+        {
+            // JS 未就绪（SSR 阶段 / 电路刚建立）⇒ 返回 null，由服务端 401 + 上面 Snackbar 明确告知，不静默。
+            return null;
         }
     }
 

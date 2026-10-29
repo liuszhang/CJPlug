@@ -75,7 +75,11 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
 
                 try
                 {
-                    using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                    // P5.8 C2：主服务已启用内部密钥闸门（工位机回连属"受信内部调用"）。
+                    // CreateClient 只在目标端口 == GlobalData.ServerPort 时附加 X-Internal-Key，
+                    // 不会把密钥发给外部图站/镜像站。
+                    using var httpClient = InternalApiKey.CreateClient();
+                    httpClient.Timeout = TimeSpan.FromSeconds(15);
                     var response = await httpClient.GetAsync($"{baseUrl}/api/Tool/GetAllTools");
                     if (!response.IsSuccessStatusCode)
                         return Results.BadRequest($"获取工具列表失败，HTTP状态码: {response.StatusCode}");
@@ -218,7 +222,9 @@ namespace CJ.Plug_Aspire.StationApiService.StationApi
                         SafeDeleteFile(tempZipPath);
 
                         // 使用带超时的 HttpClient
-                        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+                        // P5.8 C2：同样接内部密钥（部署包可能由主服务提供；外部镜像站不会收到该头）
+                        using var httpClient = InternalApiKey.CreateClient();
+                        httpClient.Timeout = TimeSpan.FromMinutes(30);
                         var response = await httpClient.GetAsync(downloadUrl);
                         if (!response.IsSuccessStatusCode)
                             return Results.BadRequest($"下载工具失败，HTTP状态码: {response.StatusCode}");

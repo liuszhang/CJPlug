@@ -16,6 +16,15 @@
     <ProjectReference Include="..\..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
     
     <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
+
+    <!--
+      P5.9 / D-P5-7：独立执行程序的身份传递。
+      只需编译期可见 CJCore.Framework.Api 的 CJCoreEmbedTicketStore（一次性换票码表）——
+      「AT → 60s 单次码 → 浏览器导航换 Cookie」三段式是认证基座已有的公共件（CJWork 同源嵌入在用），
+      本模块不新造轮子、也不注册任何 CJCore 服务。
+      ⚠ 刻意只引 Framework.Api，不引任何 CJCore.Modules.*（避免连带 UI/菜单）。
+    -->
+    <ProjectReference Include="..\..\..\..\..\CJCore\src\Framework\CJCore.Framework.Api\CJCore.Framework.Api.csproj" />
     
     <ProjectReference Include="..\..\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
     

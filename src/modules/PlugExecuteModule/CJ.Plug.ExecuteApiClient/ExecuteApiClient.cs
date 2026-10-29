@@ -218,9 +218,22 @@ public class ExecuteApiClient : BaseApiClient, IExecuteApiClient
 
     }
 
-    public async Task LaunchStandaloneAppAsync(string definitionId, CancellationToken cancellationToken = default)
+    public async Task LaunchStandaloneAppAsync(string definitionId, string? accessToken = null, CancellationToken cancellationToken = default)
     {
-        await httpClient.PostAsync($"/api/plug/launchStandalone/{definitionId}", null, cancellationToken);
+        // P5.9 / D-P5-7：accessToken 是 WebView2 拿到登录态的唯一凭据来源，服务端据此签一次性换票码。
+        // ⚠ 必须检查状态码：旧实现 PostAsync 后不看响应，401 也当成功 ⇒ 前端提示「已启动」但根本没起进程。
+        using var response = await httpClient.PostAsJsonAsync(
+            $"/api/plug/launchStandalone/{definitionId}",
+            new { accessToken },
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    ? "登录态未就绪（未读到访问令牌），请刷新页面后重试。"
+                    : $"启动独立执行程序失败（HTTP {(int)response.StatusCode} {response.ReasonPhrase}）。");
+        }
     }
 
 }

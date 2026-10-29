@@ -2,6 +2,7 @@
 using CJ.Plug.ApiServer.Infrastructure;
 using CJ.Plug.DispatchServer;
 using CJ.Plug.HostWebServer;
+using CJ.Plug.HostWebServer.Shell;
 using CJ.Plug.McpServer.Bridge;
 using CJ.Plug.McpServer.Services;
 using CJ.Plug.ElsaIntegration.ApiClient;
@@ -426,6 +427,19 @@ app.UseExceptionHandler();
 
 //添加验证中间件
 app.UseAuthentication();
+
+// ── P5.8 方案 C2：内部密钥入站闸门（2026-10-29）──────────────────────────
+// 只认「请求头 X-Internal-Key 是否等于配置密钥」，用于后续给业务 /api/* 收口。
+// ⚠ 默认 Observe = **只统计不拦截**。Universe 顺序要点：
+//   ① 必须在 UseAuthentication 之后（Enforce 时不会误伤已认证的用户请求，口径与后续授权一致）；
+//   ② 必须在 UseRouting 之前 —— 本中间件不依赖 endpoint，早挂早统计，避免被端点级短路跳过；
+//   ③ InternalApi:Key 为空时中间件**完全不挂**（零开销、零行为改变）。
+// 收口依据：Observe 跑一轮后看日志里 "[InternalKey] 业务 API 请求未携带内部密钥" 的清单，
+//   逐条补齐出站客户端后再把 GateMode 改成 Enforce。
+app.UseInternalApiKeyGate(
+    app.Configuration["InternalApi:GateMode"],
+    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("InternalApiKeyGate"));
+
 // 必须先调用 UseRouting
 app.UseRouting();
 
@@ -470,6 +484,57 @@ app.UseElsaEndpoints();
 //                        同 pattern 两个端点会抛 AmbiguousMatchException（实测 3001 根路径原为 405）。
 app.MapPlugMcpBridge();
 app.MapMcp("/mcp");
+
+// ── P5.8 C2 观测端点 ──────────────────────────────────────────────────────
+// 给出「业务 API 请求里带内部密钥的比例」。这是把 GateMode 从 Observe 推到 Enforce 的**唯一依据**：
+// coverage 必须 100% 且 missingPaths 为空，否则开 Enforce 就是全站 401。
+//
+// ⚠ 不用 IsDevelopment() 做开关（2026-10-29 实测踩到）：本仓在 ASPNETCORE_ENVIRONMENT=Development 下
+//   **根本起不来** —— 开发环境开启 DI 作用域验证后暴露两处存量生命周期缺陷
+//   （AiWorkflowBuilderService[Singleton]→IDeepSeekService[Scoped]、PermissionFunctionsService[Singleton]→IMenuService[Scoped]），
+//   容器构建即抛 AggregateException。也就是说 IsDevelopment() 分支在本仓是**永远走不到的死代码**。
+// ⚠ 替代保护：端点自身要求携带内部密钥；不匹配一律 404（连"端点存在"都不告诉探测者）。
+//   运维查覆盖率时用同一把钥匙 curl 一次即可。
+app.MapGet("/api/diagnostics/internal-key", (HttpContext http) =>
+{
+    var presented = http.Request.Headers[InternalApiKey.HeaderName].ToString();
+    if (!InternalApiKey.Matches(presented))
+    {
+        return Results.NotFound();
+    }
+
+    var snap = InternalApiKeyGate.Snapshot();
+    var readTotal = snap.ReadWithKey + snap.ReadWithoutKey;
+    var writeTotal = snap.WriteWithKey + snap.WriteWithoutKey;
+    var missingWrite = snap.Missing.Where(kv => kv.Key.StartsWith("W:", StringComparison.Ordinal)).ToDictionary();
+    var missingRead = snap.Missing.Where(kv => kv.Key.StartsWith("R:", StringComparison.Ordinal)).ToDictionary();
+
+    return Results.Ok(new
+    {
+        gateMode = app.Configuration["InternalApi:GateMode"] ?? "(unset)",
+        keyConfigured = InternalApiKey.IsEnabled,
+
+        // 写侧是 EnforceWrite 的判定依据（必须 100% 且 missingWrite 为空）
+        write = new
+        {
+            withKey = snap.WriteWithKey,
+            withoutKey = snap.WriteWithoutKey,
+            requestTotal = writeTotal,
+            coverage = snap.WriteCoverage is null ? "n/a" : $"{snap.WriteCoverage:F2}%",
+            missingPaths = missingWrite,
+        },
+
+        // 读侧是全量 Enforce 的判定依据
+        read = new
+        {
+            withKey = snap.ReadWithKey,
+            withoutKey = snap.ReadWithoutKey,
+            requestTotal = readTotal,
+            coverage = snap.ReadCoverage is null ? "n/a" : $"{snap.ReadCoverage:F2}%",
+            missingPaths = missingRead,
+        },
+    });
+}).AllowAnonymous();
 
 // Phase 4：MCP 的动态工具缓存初始化 + 静态工具的 ApiServer 地址注入（原 McpServer 的启动段）。
 //   ⚠ RefreshAsync 走 HTTP 调**本进程自己**，不能在 app.Run() 之前 await（Kestrel 未绑定必失败），
