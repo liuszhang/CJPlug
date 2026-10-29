@@ -100,10 +100,10 @@ LLM+**MCP TOOL**=AI Agent,寸金插座平台（CJPlug）可以将**任意软件�
 
 ### 方式二：Aspire 一键启动全部服务
 
-在开发环境中，通过 .NET Aspire AppHost 一键启动所有 8 个服务：
+在开发环境中，通过 .NET Aspire AppHost 一键启动编排资源（主服务端 + 工位机服务）：
 
 ```bash
-cd src/Framework/CJ.Plug.AspireHost.AppHost
+cd ../../CJCore/src/Apps/CJCore.AspireHost.AppHost
 dotnet run
 ```
 
@@ -382,7 +382,7 @@ git clone https://github.com/YOUR_USERNAME/CJPlug.git
 
 解决方案中的主要入门项目：
 
-- **CJ.Plug.AspireHost.AppHost** — .NET Aspire 编排器，一键启动全部服务（推荐从这里开始探索）
+- **CJCore.AspireHost.AppHost** — .NET Aspire 编排器（源码已迁至 CJCore 仓的 `src/Apps/`），一键启动全部服务（推荐从这里开始探索）
 - **CJ.Plug.ApiServer** — 主 API 服务器（:8687）
 - **CJ.Plug.HostWebServer** — Blazor 前端入口（:5066）
 - **CJ.Plug.ElsaApiServer** — Elsa 工作流引擎（:5001）

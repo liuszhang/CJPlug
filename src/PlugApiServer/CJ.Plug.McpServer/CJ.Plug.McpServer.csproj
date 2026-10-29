@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
-    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.AspireHost.ServiceDefaults\CJCore.AspireHost.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

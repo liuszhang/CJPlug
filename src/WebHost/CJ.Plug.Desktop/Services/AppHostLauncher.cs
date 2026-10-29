@@ -9,7 +9,8 @@ namespace CJ.Plug.Desktop.Services;
 public class AppHostLauncher : IDisposable
 {
     private const string DashboardUrl = "http://localhost:15288";
-    private const string DllName = "CJ.Plug.AspireHost.AppHost.dll";
+    // 2026-10-29《Aspire 编排壳迁移 CJCore》：项目已迁至 CJCore/src/Apps，程序集随之改名。
+    private const string DllName = "CJCore.AspireHost.AppHost.dll";
     private const int ReadyTimeoutSeconds = 30;
 
     private readonly ILogger<AppHostLauncher> _logger;
@@ -57,7 +58,7 @@ public class AppHostLauncher : IDisposable
         if (dllPath == null)
         {
             _logger.LogError("未能找到 {DllName}，请确认 AppHost 项目已编译", DllName);
-            throw new FileNotFoundException($"找不到 {DllName}，请先编译 CJ.Plug.AspireHost.AppHost 项目。");
+            throw new FileNotFoundException($"找不到 {DllName}，请先编译 CJCore.AspireHost.AppHost 项目。");
         }
 
         _logger.LogInformation("启动 AppHost 进程: {DllPath}", dllPath);
@@ -326,10 +327,12 @@ public class AppHostLauncher : IDisposable
     /// <summary>
     /// 按优先级自动探测 AppHost DLL 路径。
     /// ① <b>安装形态</b>（方案 §4.3 / 枝 17）：桌面端与 AppHost 装在同一根下，各自位于
-    ///    <c>&lt;根&gt;\{CJ.Plug.Desktop|CJ.Plug.AspireHost.AppHost}\Release\&lt;tfm&gt;\</c>。
+    ///    <c>&lt;根&gt;\{CJ.Plug.Desktop|CJCore.AspireHost.AppHost}\Release\&lt;tfm&gt;\</c>。
     ///    本方法原先只认开发仓布局（<see cref="FindProjectRoot"/> 要求同时存在 src 与 02.Publish），
     ///    装到 <c>%ProgramFiles%\CJ\CJPlug</c> 后必然找不到 AppHost，直接抛「找不到 dll，请先编译」。
-    /// ② 开发仓布局（BaseOutputPath → 02.Publish / 标准 bin）作为回退。
+    /// ② 开发仓布局（BaseOutputPath → CJPlug/02.Publish / CJCore 侧 bin）作为回退。
+    /// ⚠ 2026-10-29《Aspire 编排壳迁移 CJCore》：项目源码在 **CJCore 仓**，但 BaseOutputPath 仍指向
+    ///    CJPlug 的唯一发布根 ⇒ 「02.Publish」两条候选只改项目名，「标准 bin」两条要跨到兄弟目录。
     /// </summary>
     private string? FindAppHostDll()
     {
@@ -343,15 +346,15 @@ public class AppHostLauncher : IDisposable
         var candidates = new List<string>
         {
             // 优先级 0: 安装形态（发布根为 Release 单配置）
-            Path.Combine(installRoot, "CJ.Plug.AspireHost.AppHost", "Release", "net10.0", DllName),
+            Path.Combine(installRoot, "CJCore.AspireHost.AppHost", "Release", "net10.0", DllName),
             // 优先级 1: BaseOutputPath → 02.Publish (Debug)
-            Path.Combine(projectRoot, "02.Publish", "CJ.Plug.AspireHost.AppHost", "Debug", "net10.0", DllName),
+            Path.Combine(projectRoot, "02.Publish", "CJCore.AspireHost.AppHost", "Debug", "net10.0", DllName),
             // 优先级 2: BaseOutputPath → 02.Publish (Release)
-            Path.Combine(projectRoot, "02.Publish", "CJ.Plug.AspireHost.AppHost", "Release", "net10.0", DllName),
-            // 优先级 3: 标准 bin/Debug/net10.0
-            Path.Combine(projectRoot, "src", "Framework", "CJ.Plug.AspireHost.AppHost", "bin", "Debug", "net10.0", DllName),
-            // 优先级 4: 标准 bin/Release/net10.0
-            Path.Combine(projectRoot, "src", "Framework", "CJ.Plug.AspireHost.AppHost", "bin", "Release", "net10.0", DllName),
+            Path.Combine(projectRoot, "02.Publish", "CJCore.AspireHost.AppHost", "Release", "net10.0", DllName),
+            // 优先级 3: 标准 bin/Debug/net10.0（跨仓：<仓库根>/CJCore/src/Apps/...）
+            Path.Combine(projectRoot, "..", "CJCore", "src", "Apps", "CJCore.AspireHost.AppHost", "bin", "Debug", "net10.0", DllName),
+            // 优先级 4: 标准 bin/Release/net10.0（跨仓同上）
+            Path.Combine(projectRoot, "..", "CJCore", "src", "Apps", "CJCore.AspireHost.AppHost", "bin", "Release", "net10.0", DllName),
         };
 
         foreach (var path in candidates)

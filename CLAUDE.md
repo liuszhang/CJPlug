@@ -225,7 +225,7 @@ SignalR Hub 广播结果 → ApiServer 回报 → 触发后续流程节点
 | `mcpserver` (McpServer) | 3001 | MCP 协议服务器 |
 | `mcpInspector` | 6274 | MCP 调试工具 (`npx @modelcontextprotocol/inspector`) |
 
-编排器位置: `src/Framework/CJ.Plug.AspireHost.AppHost/AppHost.cs`
+编排器位置: 已迁至 `CJCore/src/Apps/CJCore.AspireHost.AppHost/AppHost.cs`（2026-10-29《Aspire 编排壳迁移 CJCore》）
 
 ### 信号中枢：SignalR Hub 拓扑
 
@@ -264,8 +264,10 @@ src/
 │       └── CJ.Plug.AmisIntegration/         #   Amis UI 集成
 │
 ├── Framework/                               # 框架层
-│   ├── CJ.Plug.AspireHost.AppHost/          # Aspire 编排器入口 (AppHost.cs)
-│   └── CJ.Plug.AspireHost.ServiceDefaults/  # OTel / 服务发现 / HTTP 弹性
+│   └── CJ.Plug.Setup/                       # 安装引导
+│                                            # ⚠ Aspire 两项目已于 2026-10-29 迁至 CJCore：
+│                                            #   CJCore/src/Framework/CJCore.AspireHost.ServiceDefaults
+│                                            #   CJCore/src/Apps/CJCore.AspireHost.AppHost
 │
 ├── PlugApiServer/                           # API 服务层
 │   ├── CJ.Plug.ApiServer/                   # 主 API 服务器 (port 8687)
@@ -477,7 +479,7 @@ WorkflowTranslator.Translate()
 | 配置项 | 路径 |
 |--------|------|
 | 解决方案文件 | `CJ.Plug-Aspire.sln` |
-| Aspire 编排配置 | `src/Framework/CJ.Plug.AspireHost.AppHost/appsettings.json` |
+| Aspire 编排配置 | `CJCore/src/Apps/CJCore.AspireHost.AppHost/appsettings.json` |
 | 用户插件配置 | `PlugConfig/UserPlugs.xml` |
 | NuGet 中央版本 | `Directory.Packages.props` |
 | MCP 包版本 | `ModelContextProtocol` v0.3.0, `ModelContextProtocol.AspNetCore` v1.4.0 |

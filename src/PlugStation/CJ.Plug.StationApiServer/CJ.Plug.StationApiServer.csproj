@@ -35,7 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
-    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.AspireHost.ServiceDefaults\CJCore.AspireHost.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
     <ProjectReference Include="..\..\modules\FileManageModule\CJ.Plug.FileManageApiClient\CJ.Plug.FileManageApiClient.csproj" />
   </ItemGroup>

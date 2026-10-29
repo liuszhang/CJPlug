@@ -8,7 +8,7 @@
     产出（均相对 CJPlug 根）：
 
         05.Release\main\       → cjplug 组件载荷（服务器形态）
-                                  CJ.Plug.AspireHost.AppHost\<Cfg>\<tfm>\   （含 aspire\dcp、aspire\dashboard）
+                                  CJCore.AspireHost.AppHost\<Cfg>\<tfm>\   （含 aspire\dcp、aspire\dashboard）
                                   Services\<Cfg>\net10.0\ 、net10.0-windows\
                                   PlugConfig\                               （运行时真源，含 UserPlugs.xml）
         05.Release\desktop\    → cjplug-desktop 组件载荷（个人形态）
@@ -215,7 +215,7 @@ if ($Target -in @('main', 'all')) {
     Reset-Staging $mainStaging | Out-Null
 
     # cjplug（服务器形态）：AppHost（含自带 DCP/Dashboard）+ Services + PlugConfig
-    Copy-Tree (Join-Path $publishDir "CJ.Plug.AspireHost.AppHost\$Configuration\net10.0") (Join-Path $mainStaging "CJ.Plug.AspireHost.AppHost\$Configuration\net10.0")
+    Copy-Tree (Join-Path $publishDir "CJCore.AspireHost.AppHost\$Configuration\net10.0") (Join-Path $mainStaging "CJCore.AspireHost.AppHost\$Configuration\net10.0")
     Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0") (Join-Path $mainStaging "Services\$Configuration\net10.0")
     Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0-windows") (Join-Path $mainStaging "Services\$Configuration\net10.0-windows")
     Copy-Tree (Join-Path $publishDir 'PlugConfig') (Join-Path $mainStaging 'PlugConfig')
@@ -224,9 +224,9 @@ if ($Target -in @('main', 'all')) {
     Remove-DebugSymbols $mainStaging
 
     Assert-Paths $mainStaging @(
-        "CJ.Plug.AspireHost.AppHost\$Configuration\net10.0\CJ.Plug.AspireHost.AppHost.dll",
-        "CJ.Plug.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
-        "CJ.Plug.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
+        "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.dll",
+        "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
+        "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
         "Services\$Configuration\net10.0\CJ.Plug.ApiServer.dll",
         "Services\$Configuration\net10.0\CJ.Plug.McpServer.dll",
         "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.dll",

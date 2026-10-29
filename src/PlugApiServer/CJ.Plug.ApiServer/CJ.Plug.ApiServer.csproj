@@ -80,7 +80,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
-    <ProjectReference Include="..\..\Framework\CJ.Plug.AspireHost.ServiceDefaults\CJ.Plug.AspireHost.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.AspireHost.ServiceDefaults\CJCore.AspireHost.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
     <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
     <ProjectReference Include="..\CJ.Plug.DispatchServer\CJ.Plug.DispatchServer.csproj" />

@@ -22,8 +22,8 @@ CJ.Plug 桌面启动器 —— 基于 WPF + WebView2 的 Windows 桌面 Shell �
 ### 1. 发布 AppHost
 
 ```bash
-cd D:\Pro\CJ.Plug-Aspire
-dotnet publish src/Framework/CJ.Plug.AspireHost.AppHost -c Debug -o 02.Publish/CJ.Plug.AspireHost.AppHost/Debug/net10.0
+cd D:\Pro\CJ.Plug.Github
+dotnet publish CJCore/src/Apps/CJCore.AspireHost.AppHost -c Debug -o CJPlug/02.Publish/CJCore.AspireHost.AppHost/Debug/net10.0
 ```
 
 ### 2. 启动 Desktop Shell
