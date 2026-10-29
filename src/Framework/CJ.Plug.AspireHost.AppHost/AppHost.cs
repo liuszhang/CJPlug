@@ -52,6 +52,15 @@ const string ConfigPathEnvKey = "ASPNETCORE_CONFIG_PATH";
 // 当 ASPNETCORE_CONFIG_PATH 未生效时，此变量作为兜底覆盖 Kestrel EndPoints 配置
 const string KestrelUrlEnvKey = "Kestrel__EndPoints__Http__Url";
 
+// 2026-10-29《CJPlug 服务架构简化》Phase 5：端口已从各服务的 appsettings 里移除（改为代码契约 + 环境变量覆盖），
+// 因此这里统一用 ASPNETCORE_URLS 显式下发，运维改端口只需改这一处。
+const string AspNetCoreUrlsEnvKey = "ASPNETCORE_URLS";
+
+// 主宿主的端口契约（与 CJ.Plug.ApiServer/Program.cs 的 ContractUrls 保持一致）。
+// 2026-10-29 第二轮（C 档 + 单端口）：整个主服务端只监听 5066 一个端口，
+//   Web 页面 / API / Elsa / MCP / 调度 Hub 全部按路径区分。
+const string ApiServerContractUrls = "http://*:5066";
+
 // If running on Windows and not elevated, restart the entire application with elevation (UAC)
 // --no-elevate: 由 Desktop 服务管理器启动时跳过自身提权，Desktop 会自行处理管理员权限
 var skipElevation = args.Any(a => a.Equals("--no-elevate", StringComparison.OrdinalIgnoreCase));
@@ -201,20 +210,27 @@ Console.OutputEncoding = Encoding.UTF8;
 //builder.AddProject<Projects.CJ_Plug_DispatchServer>("cj-plug-sds");
 //builder.AddProject("cj-plug-sds", @"../PlugApiServer/CJ.Plug.DispatchServer/CJ.Plug.DispatchServer.csproj");
 //builder.AddProject("cj-plug-sds", dispatchServer);
-builder.AddExecutable(
-        name: "sds",
-        command: "dotnet",
-        workingDirectory: servicesDir,
-        args: dispatchServerDllName // DLL 文件名
-    ).WithEnvironment(Utf8EnvKey, Utf8EnvVal)
-     .WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.DispatchServer.json"))
-     .WithEnvironment(KestrelUrlEnvKey, "http://*:8686")
-     .WithUrl("http://localhost:8686");
+// 2026-10-29 Phase 5：DispatchServer 已并入 apiservice（同进程监听 8686，Hub 与 /api/dispatch/* 不变）。
+//   ⚠ 回退：取消下面整段注释，并把 apiservice 的 Dispatch__Url 环境变量去掉。
+//builder.AddExecutable(
+//        name: "sds",
+//        command: "dotnet",
+//        workingDirectory: servicesDir,
+//        args: dispatchServerDllName // DLL 文件名
+//    ).WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+//     .WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.DispatchServer.json"))
+//     .WithEnvironment(KestrelUrlEnvKey, "http://*:8686")
+//     .WithUrl("http://localhost:8686");
 
 //builder.AddProject<Projects.CJ_Plug_ApiServer>("apiservice").WithEnvironment(Utf8EnvKey, Utf8EnvVal);
 //builder.AddProject("apiservice", @"../PlugApiServer/CJ.Plug.ApiServer/CJ.Plug.ApiServer.csproj");
 //builder.AddProject("apiservice", apiServer);
-builder.AddExecutable("apiservice", "dotnet", servicesDir, apiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:8687").WithUrl("http://localhost:8687");
+builder.AddExecutable("apiservice", "dotnet", servicesDir, apiServerDllName)
+    .WithEnvironment(Utf8EnvKey, Utf8EnvVal)
+    .WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ApiServer.json"))
+    // 主宿主 = 主 API(8687) + 调度 Hub(8686) + Elsa 引擎(5001) + MCP 面(3001) 四端点一个进程。
+    .WithEnvironment(AspNetCoreUrlsEnvKey, ApiServerContractUrls)
+    .WithUrl("http://localhost:8687");
 
 //builder.AddProject<Projects.CJ_Plug_StationApiServer>("stationapi");
 //builder.AddProject("stationapi", @"../PlugStation/CJ.Plug.StationApiServer/CJ.Plug.StationApiServer.csproj");
@@ -225,7 +241,10 @@ builder.AddExecutable("stationapi", "dotnet", servicesDir, stationApiServerDllNa
 //builder.AddProject<Projects.CJ_Plug_ElsaApiServer>("elsaapiserver");
 //builder.AddProject("elsaapiserver", @"../PlugApiServer/CJ.Plug.ElsaApiServer/CJ.Plug.ElsaApiServer.csproj");
 //builder.AddProject("elsaapiserver", elsaApiServer);
-builder.AddExecutable("elsaapiserver", "dotnet", servicesDir, elsaApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ElsaApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5001").WithUrl("http://localhost:5001");
+// 2026-10-29 Phase 5：Elsa 引擎与主 API 同进程（Elsa 端点仍在 /elsa/api，端口仍是 5001）。
+//   ⚠ 回退：取消下面整段注释 + apiservice 去掉 Elsa__Url，并把 Program.cs 的 AddElsaServicesForApi()
+//     换回 ConfigElsaServicesWithOutDB()。
+//builder.AddExecutable("elsaapiserver", "dotnet", servicesDir, elsaApiServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.ElsaApiServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5001").WithUrl("http://localhost:5001");
 
 //builder.AddProject<Projects.CJ_Plug_ElsaStudio>("elsastudio");
 //builder.AddProject("elsastudio", @"../PlugWebHost/CJ.Plug.ElsaStudio/CJ.Plug.ElsaStudio.csproj");
@@ -235,12 +254,18 @@ builder.AddExecutable("elsaapiserver", "dotnet", servicesDir, elsaApiServerDllNa
 //builder.AddProject<Projects.CJ_Plug_HostWebServer>("webfrontend").WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithUrl("http://localhost:5066");
 //builder.AddProject("webfrontend", @"../PlugWebHost/CJ.Plug.HostWebServer/CJ.Plug.HostWebServer.csproj");
 //builder.AddProject("webfrontend", webFrontend);
-builder.AddExecutable("webfrontend", "dotnet", servicesDir, webFrontendDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.HostWebServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5066").WithUrl("http://localhost:5066");
+// 2026-10-29 第二轮（C 档）：Web 宿主（Blazor Server）已并入 apiservice，不再独立起进程。
+//   其 DI 注册与请求管道由 CJ.Plug.ApiServer 调用 WebHostStartup 的三个扩展方法接入。
+//   ⚠ 回退：取消下面整段注释，并把 apiservice 的 AspNetCoreUrls 改回 "http://*:8687;http://*:8686;http://*:5001;http://*:3001"
+//     同时恢复 Program.cs 里的 app.UsePlugPortGate()。
+//builder.AddExecutable("webfrontend", "dotnet", servicesDir, webFrontendDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.HostWebServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:5066").WithUrl("http://localhost:5066");
 
 //builder.AddProject<Projects.CJ_Plug_McpServer>("cj-plug-mcpserver");
 //builder.AddProject("cj-plug-mcpserver", @"../PlugApiServer/CJ.Plug.McpServer/CJ.Plug.McpServer.csproj");
 //builder.AddProject("cj-plug-mcpserver", mcpServer);
-builder.AddExecutable("mcpserver", "dotnet", servicesDir, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.McpServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:3001").WithUrl("http://localhost:3001");
+// 2026-10-29 Phase 5：MCP 面并入主宿主（3001 由 apiservice 监听，客户端连接串不变）。
+//   ⚠ 回退：取消下面整段注释 + apiservice 去掉 Mcp__Url，并在 Program.cs 恢复 await registry.RefreshAsync()。
+//builder.AddExecutable("mcpserver", "dotnet", servicesDir, mcpServerDllName).WithEnvironment(Utf8EnvKey, Utf8EnvVal).WithEnvironment(ConfigPathEnvKey, Path.Combine(servicesDir, "appsettings.CJ.Plug.McpServer.json")).WithEnvironment(KestrelUrlEnvKey, "http://*:3001").WithUrl("http://localhost:3001");
 
 
 //MCP TOOL测试工具：mcp inspector，基于 @modelcontextprotocol/inspector 实现的 MCP 协议调试工具，提供可视化界面查看 MCP 消息交互

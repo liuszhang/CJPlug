@@ -89,7 +89,7 @@ namespace CJ.Plug.DeekSeekIn
             var config = new McpServerConfiguration
             {
                 Name = "test",
-                Command = "http://localhost:3001",
+                Command = "http://localhost:5066/mcp",
                 //等待ollama支持 Streamable HTTP ^ ^
                 TransportType = McpServerTransportType.Sse
             };
@@ -211,7 +211,7 @@ namespace CJ.Plug.DeekSeekIn
             var config = new McpServerConfiguration
             {
                 Name = "test",
-                Command = "http://localhost:3001",
+                Command = "http://localhost:5066/mcp",
                 TransportType = McpServerTransportType.Sse
             };
 

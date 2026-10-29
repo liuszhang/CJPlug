@@ -342,7 +342,7 @@ namespace CJ.Plug.MCPToolsManageApi.Services
             mcpServers["cj-mcpserver"] = new JsonObject
             {
                 ["type"] = "streamableHttp",
-                ["url"] = "http://localhost:3001"
+                ["url"] = "http://localhost:5066/mcp"
             };
 
             // 写入文件

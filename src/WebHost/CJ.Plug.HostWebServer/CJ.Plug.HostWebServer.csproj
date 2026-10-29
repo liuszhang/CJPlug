@@ -42,6 +42,14 @@
     <ProjectReference Include="..\..\..\..\CJCore\src\Modules\SystemConfig\CJCore.Modules.SystemConfig.UI\CJCore.Modules.SystemConfig.UI.csproj" />
     <!-- P8：A2A 工具面 —— IToolExecutor / DefaultToolRegistry / McpSurface 契约。 -->
     <ProjectReference Include="..\..\..\..\CJCore\src\Modules\AgentTool\CJCore.AgentTool.MCPTools\CJCore.AgentTool.MCPTools.csproj" />
+    <!-- P8.3（C 分支）：Agent 执行链 —— LLMAgentBase / IAgentConfig / AgentRequest（Agent.Abstractions），
+         ILLMChatService / ILLMConfigReader / ToolDefinition（LLM.Abstractions），
+         LLMChatService 现成实现 + AddLLMChatService<T>()（LLM.LLMClient）。 -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\Agent\CJCore.Agent.Abstractions\CJCore.Agent.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.Abstractions\CJCore.LLM.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\CJCore\src\Modules\LLM\CJCore.LLM.LLMClient\CJCore.LLM.LLMClient.csproj" />
+    <!-- P8.3.1：平台默认模型的来源（AskAI 页面同一份配置，不另建模型配置真理源）。 -->
+    <ProjectReference Include="..\..\modules\LlmConfigModule\CJ.Plug.LlmConfigApiClient\CJ.Plug.LlmConfigApiClient.csproj" />
   </ItemGroup>
 
   <ItemGroup>

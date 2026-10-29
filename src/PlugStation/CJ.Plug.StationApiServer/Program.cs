@@ -67,8 +67,10 @@ if (!string.IsNullOrEmpty(StaticData.MainServerUrl) && StaticData.MainServerUrl 
     try
     {
         var uri = new Uri(StaticData.MainServerUrl);
-        // 主服务典型架构：Dispatcher 8686，API Server 8687
-        GlobalData.MainApiServer = $"{uri.Scheme}://{uri.Host}:8687";
+        // 2026-10-29 单端口后：主服务端的调度面与业务 API 同源同端口，直接复用配置值。
+        //   （原实现是 $"{uri.Scheme}://{uri.Host}:8687"，把「Disptacher 8686 / API 8687」这个
+        //    双端口假设硬编码在了工位机侧 —— 主服务端改端口时工位机会静默连不上。）
+        GlobalData.MainApiServer = StaticData.MainServerUrl;
         Console.WriteLine($"[GlobalData] MainDispatcherServer -> {GlobalData.MainDispatcherServer}");
         Console.WriteLine($"[GlobalData] MainApiServer -> {GlobalData.MainApiServer}");
     }
@@ -89,7 +91,7 @@ else
             var uri = new Uri(envMainServerHost);
             StaticData.MainServerUrl = envMainServerHost;
             GlobalData.MainDispatcherServer = envMainServerHost;
-            GlobalData.MainApiServer = $"{uri.Scheme}://{uri.Host}:8687";
+            GlobalData.MainApiServer = envMainServerHost;   // 单端口：同源
             Console.WriteLine($"[GlobalData] 从环境变量 MAIN_SERVER_HOST 获取主服务地址: {envMainServerHost}");
             Console.WriteLine($"[GlobalData] MainApiServer -> {GlobalData.MainApiServer}");
         }

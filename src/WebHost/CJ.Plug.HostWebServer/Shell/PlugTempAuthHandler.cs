@@ -43,6 +43,15 @@ public sealed class PlugTempAuthHandler : AuthenticationHandler<AuthenticationSc
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // 2026-10-29 第二轮（单端口）：本 Handler 是全局唯一 scheme，UseAuthentication 会对**每个请求**调用它。
+        //   若一律返回 Admin，业务 API（/api/*）、调度 Hub（/mainHub）、MCP 面（/mcp）的请求都会凭空
+        //   多出一个已认证的 Admin 身份 —— 而这三处历来是「无认证身份」的既有行为（部分逻辑依赖它）。
+        //   故按路径收敛：只有页面 / Elsa / CJCore 管理端点才产出主体，其余返回 NoResult（保持匿名）。
+        if (!CJ.Plug.HostWebServer.WebHostStartup.NeedsIdentity(Request.Path))
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         // 无人认领 = 恒成功，产出一个带 Admin 角色的主体。
         var identity = new ClaimsIdentity(new[]
         {

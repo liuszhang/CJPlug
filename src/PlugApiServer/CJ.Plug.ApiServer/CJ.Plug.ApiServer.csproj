@@ -84,6 +84,16 @@
     <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
     <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
     <ProjectReference Include="..\CJ.Plug.DispatchServer\CJ.Plug.DispatchServer.csproj" />
+    <!-- 2026-10-29《CJPlug 服务架构简化》Phase 4：MCP 面并入主宿主，3001 由本进程监听。 -->
+    <ProjectReference Include="..\CJ.Plug.McpServer\CJ.Plug.McpServer.csproj" />
+    <!--
+      2026-10-29《CJPlug 服务架构简化》第二轮（C 档）：Blazor Web 宿主并入本进程。
+      只消费其 WebHostStartup 的三个扩展方法（AddPlugWebHost / MapPlugWebHost / MapPlugWebRazorComponents），
+      不消费它的 Program.cs 入口 —— 那边已退化为可独立启动的薄壳，作为回退路径保留。
+      ⚠ 它是 Microsoft.NET.Sdk.Web 可执行项目，被引用时会把自己的 static web assets
+        （MudBlazor / Radzen / Elsa Studio 等 RCL 的 _content/）一并带进共享输出目录，这正是本进程需要的。
+    -->
+    <ProjectReference Include="..\..\WebHost\CJ.Plug.HostWebServer\CJ.Plug.HostWebServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

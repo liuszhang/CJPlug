@@ -14,11 +14,10 @@
     <PackageReference Include="NSwag.AspNetCore" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Update="appsettings.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+  <!-- 2026-10-29《CJPlug 服务架构简化》Phase 5：本项目已降级为被 ApiServer 引用的类库，
+       不再把自己的 appsettings.json 复制进共享输出目录 —— 否则会与 ApiServer 的配置互相覆盖
+       （所有服务共用 02.Publish/Services/{Config}/net10.0，构建顺序决定谁赢）。
+       回退独立部署时把这段恢复。 -->
 
 	<ItemGroup>
 		<!-- 复制当前 .csproj 文件到输出目录 -->

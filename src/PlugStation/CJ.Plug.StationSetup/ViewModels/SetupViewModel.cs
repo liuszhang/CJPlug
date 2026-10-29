@@ -6,7 +6,8 @@ namespace CJ.Plug.StationSetup.ViewModels;
 public class SetupViewModel : INotifyPropertyChanged
 {
     private string _installPath = @"C:\CJStation";
-    private string _mainServerUrl = "http://192.168.1.100:8686";
+    // 2026-10-29 单端口契约：主服务端统一 5066（原 8686 是调度端口，已并入 5066）
+    private string _mainServerUrl = "http://192.168.1.100:5066";
     private string _statusText = "";
     private double _progressValue;
     private bool _isInstalling;

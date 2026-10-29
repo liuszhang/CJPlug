@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
@@ -21,6 +23,13 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        // 2026-10-29《CJPlug 服务架构简化》：统一支持 ASPNETCORE_CONFIG_PATH。
+        //   所有服务共用同一个输出目录（02.Publish/Services/{Config}/net10.0），目录里的 appsettings.json
+        //   只可能属于"最后一个构建/打包"的服务 ⇒ 每个服务必须靠这个环境变量指向自己的
+        //   appsettings.{项目名}.json。AppHost 一直在传它，但此前**没有任何代码读**，
+        //   于是配置悄悄腐化（实测 6 份里 4 份端口写成 5066）也没人发现。
+        LoadServiceScopedConfig(builder);
+
         // 强制每个子服务进程的控制台输出为 UTF-8，解决 Aspire Dashboard 中文乱码
         // 必须在子进程内部设置，仅靠 AppHost 的环境变量传递在 Windows 上不够可靠
         try
@@ -55,6 +64,37 @@ public static class Extensions
         // });
 
         return builder;
+    }
+
+    /// <summary>
+    /// 加载 <c>ASPNETCORE_CONFIG_PATH</c> 指向的服务专属配置文件（存在才加载）。
+    /// 后添加的配置源优先级高于默认 appsettings.json，因此同名键以服务专属文件为准。
+    /// </summary>
+    private static void LoadServiceScopedConfig(IHostApplicationBuilder builder)
+    {
+        var path = Environment.GetEnvironmentVariable("ASPNETCORE_CONFIG_PATH");
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            if (builder.Configuration is IConfigurationBuilder configBuilder)
+            {
+                configBuilder.AddJsonFile(
+                    new PhysicalFileProvider(Path.GetDirectoryName(path)!),
+                    Path.GetFileName(path),
+                    optional: true,
+                    reloadOnChange: false);
+                Console.WriteLine($"[Config] 已加载服务专属配置: {path}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // 配置加载失败不应阻止进程启动：回落默认 appsettings.json 并显式告警。
+            Console.WriteLine($"[Config] ⚠ 加载服务专属配置失败（回落默认 appsettings.json）: {ex.Message}");
+        }
     }
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder

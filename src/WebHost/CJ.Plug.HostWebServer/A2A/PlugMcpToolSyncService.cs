@@ -134,6 +134,13 @@ public static class PlugMcpBridgeClientOptions
     /// <summary>HttpClient 逻辑名（AddHttpClient(name, ...)）。</summary>
     public const string HttpClientName = "CJPlugMcpBridge";
 
-    /// <summary>默认地址 —— 与 McpServer 的既有部署端口一致（AppHost 里 KestrelUrl=3001）。</summary>
-    public const string DefaultBaseAddress = "http://localhost:3001";
+    /// <summary>
+    /// 默认地址。2026-10-29 单端口收敛后 = 主服务端根地址（<c>/api/plugbridge/*</c> 挂在它下面）。
+    /// <para>
+    /// ⚠ 不要写成 <c>http://localhost:5066/mcp</c>：这是给 <c>/api/plugbridge/*</c> 用的内部客户端，
+    /// 每次请求都带绝对相对路径（<see cref="PlugMcpBridgePaths.ToolsRel"/>），BaseAddress 必须是根。
+    /// 面向 IDE 的 MCP 连接串（<c>/mcp</c>）在 MCPToolsManage 那几处 UI 文案里单独维护。
+    /// </para>
+    /// </summary>
+    public const string DefaultBaseAddress = "http://localhost:5066";
 }

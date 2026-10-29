@@ -147,7 +147,7 @@
             mcpServers["cj-mcpserver"] = new JsonObject
             {
                 ["type"] = "streamableHttp",
-                ["url"] = "http://localhost:3001"
+                ["url"] = "http://localhost:5066/mcp"
             };
 
             _editableJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

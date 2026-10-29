@@ -1,0 +1,150 @@
+@page "/debug/plug-agent"
+@using CJ.Plug.HostWebServer.Agent
+@using CJCore.Agent.Abstractions
+@using CJCore.LLM.Abstractions
+@inject PlugWorkflowAgent Agent
+@inject ISnackbar Snackbar
+
+<PageTitle>工作流 Agent（调试）</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <MudText Typo="Typo.h5" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2" />工作流 Agent（P8 消费链调试入口）
+    </MudText>
+
+    @* ── 安全口径（D2=A）：入口收敛 + 显式确认，审批门控待 P8.4 ── *@
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+        <MudText Typo="Typo.body2">
+            本页的工具 = 平台里<b>已发布的工作流</b>，调用即<b>触发真实执行</b>（可能是工位机动作）。
+            当前阶段（D2=A）工具的 <code>IsDangerous</code> 为 <code>false</code>，<b>没有审批门控</b>，
+            安全边界完全依赖「本页是唯一入口 + 你在下面勾选确认」。审批流程见 P8.4。
+        </MudText>
+    </MudAlert>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-2">模型可见的工具清单（= IToolRegistry.AllEnabledDefinitions）</MudText>
+        <MudText Typo="Typo.caption" Class="mb-2">
+            这里显示的就是会喂给模型的那一份：static ∪ dynamic，只按 Enabled 过滤 ⇒ 页面与模型不会看到两个版本。
+        </MudText>
+
+        @if (_tools.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                当前没有可用工具。常见原因：① McpServer（3001）未启动；② 平台里没有已发布的工作流；③ 工具同步服务尚未跑完首轮（启动后约 5 秒）。
+            </MudAlert>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>工具名</th>
+                        <th>描述</th>
+                        <th>参数 Schema</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _tools.Count; i++)
+                    {
+                        var t = _tools[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td><code>@t.Name</code></td>
+                            <td>@t.Description</td>
+                            <td><MudText Typo="Typo.caption">@(string.IsNullOrWhiteSpace(t.ParametersJson) ? "(无)" : t.ParametersJson)</MudText></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ReloadTools" Class="mt-2">刷新清单</MudButton>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-2">跑一次会话</MudText>
+
+        <MudTextField @bind-Value="_question" Label="问题" Variant="Variant.Outlined" Lines="3"
+                      Placeholder="例如：现在有哪些可用能力？" Class="mb-2" />
+
+        <MudCheckBox @bind-Value="_confirmed" Color="Color.Warning" Class="mb-2"
+                     Label="我已确认上述工作流的实际动作，允许 Agent 调用它们" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RunAsync"
+                   Disabled="@(_running || !_confirmed || string.IsNullOrWhiteSpace(_question))">
+            @(_running ? "执行中…" : "执行")
+        </MudButton>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4">@_error</MudAlert>
+        }
+
+        @if (_response is not null)
+        {
+            <MudPaper Class="pa-3 mt-4" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.subtitle2">
+                    结果：@(_response.Success ? "成功" : "失败") ｜ 耗时 @_response.ElapsedMs ms
+                    @if (_response.RequiresApproval)
+                    {
+                        <span> ｜ 需审批（ApprovalId=@_response.ApprovalId）</span>
+                    }
+                </MudText>
+                <MudText Typo="Typo.body1" Class="mt-2" Style="white-space: pre-wrap;">@_response.Message</MudText>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    /// <summary>模型可见的工具（每次进入/刷新时重取，与模型看到的同一份）。</summary>
+    private IReadOnlyList<ToolDefinition> _tools = [];
+
+    private string? _question;
+    private bool _confirmed;
+    private bool _running;
+    private string? _error;
+    private AgentResponse? _response;
+
+    protected override void OnInitialized() => ReloadTools();
+
+    private void ReloadTools()
+    {
+        try
+        {
+            _tools = Agent.GetVisibleTools();
+        }
+        catch (Exception ex)
+        {
+            _error = $"读取工具清单失败：{ex.Message}";
+        }
+    }
+
+    private async Task RunAsync()
+    {
+        _running = true;
+        _error = null;
+        _response = null;
+
+        try
+        {
+            _response = await Agent.RunAsync(_question ?? string.Empty, CancellationToken.None);
+            Snackbar.Add($"Agent 执行完成（{_response.ElapsedMs} ms）",
+                _response.Success ? Severity.Success : Severity.Warning);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("未配置默认模型"))
+        {
+            // LLMChatService 在无默认模型时抛的是这句；翻译成人能看懂的指引，别把异常原样丢到页面上。
+            _error = "平台尚未配置默认模型：请先到「LLM 配置」里设置默认模型与 API 地址，再回来执行。";
+        }
+        catch (Exception ex)
+        {
+            _error = $"执行失败：{ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+            ReloadTools();
+        }
+    }
+}

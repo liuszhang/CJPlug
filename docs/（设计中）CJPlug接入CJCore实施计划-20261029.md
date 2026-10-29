@@ -1505,9 +1505,9 @@ dotnet build CJOntology/CJOntology.sln
 | 3 | P6.3（`AccessKey` 与模块内功能键对齐） | P5 的 Permission 矩阵（D9=A） | 权限语义，须 P5 先行 |
 | 4 | P7.1 严格口径 | ApiServer 接入 CJCore SystemConfig 模块 | — |
 | 5 | P7.2（许可证） | 差异对照表对齐 | 计划写明"未对齐不得替换" |
-| 6 | **P8 端到端验收** | ① CJPlug 接入 CJCore.Agent 消费链；② **先解决端口冲突**（见 #8） | 供给侧已完成 |
+| 6 | **P8 端到端验收** | ① CJPlug 接入 CJCore.Agent 消费链；② ~~先解决端口冲突（见 #8）~~ | 供给侧 + 桥接**已端到端打通（附录 H.3）**；剩**消费链**未接 |
 | 7 | **删除 `PlugTempAuthHandler` + `PlugTempAdminAuthStateProvider`** | P5 上线当天 | 两件必须**成对**删，否则是永久安全后门 / 权限口径错位 |
-| 8 | **跨进程端口规划**（本轮新发现） | `CJ.Plug.McpServer/appsettings.json` 的 Kestrel URL = `http://*:5066`，**与 Web 宿主撞端口**；且它会覆盖 `app.Run("http://localhost:3001")` | 既存问题，非本次引入；不修则 P8 端到端永远跑不通 |
+| 8 | **跨进程端口规划**（本轮新发现） | `CJ.Plug.McpServer/appsettings.json` 的 Kestrel URL = `http://*:5066`，**与 Web 宿主撞端口**；且它会覆盖 `app.Run("http://localhost:3001")` | ✅ **已修复**（附录 H.1/H.2）：appsettings 改为 `http://*:3001`，与 `app.Run`、Aspire `KestrelUrl` 三处口径归一 |
 
 > **当前结论**：计划中「不涉及数据搬迁、不依赖认证栈、不需要外部对齐」的编码**已全部完成**；
 > 上表 7 项每一项的阻塞都不在编码能力范围内，而在**实机验证结果、备份可用性、或一轮决策**。
@@ -1566,7 +1566,8 @@ ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:8687 \
 | T3 | 侧栏菜单分组归一 | ✅ **3 组 23 项**：通用 10 / 管理 8 / 调试 5；「管理」含**模块管理 + 系统配置**；孤立「系统」组消失 |
 | T4 | 旧路由已死 | ✅ `/nonexist-abc`、`/SystemConfig` 均命中 catch-all 404 页（含「未找到 / 404 / 页面不存在」） |
 | T5 | `/admin/modules` 可打开 | ✅ **200**（由 302 修复）；渲染出 5 个分组与全部中文模块名 ⇒ **P6.1 元数据确实被 UI 消费** |
-| T6 | P8 工具清单同步 | ❌ **未通过**：bridge 端点受本机端口访问策略限制（curl 返回 `HTTP=000`）无法直连验证；McpServer 侧已实证拉到 **111 个工具**（`[DynamicWorkflowTool] Tool=111`） |
+| T6 | P8 工具清单同步 | ❌ **未通过**：bridge 端点受本机端口访问策略限制（curl 返回 `HTTP=000`）无法直连验证；McpServer 侧日志见 `[DynamicWorkflowTool] Tool=111` |
+| ⚠ | **上条 T6 备注存在误读（附录 H.4 更正）** | 当时把 `Tool=111` 读成「111 个工具」。**真相：当前库里只有 1 条已发布工作流，其 `Name` 就叫 `111`** ⇒ `Tool=111` 是**工具名**而非数量。第六轮已用 bridge 返回值实证（`count=1`，`name="111"`） |
 | T7 | 既有页面无回归 | ✅ 剩余服务端异常仅一类：**Z.Blazor.Diagrams 在 SSR 静态渲染期 Dispose**（第三方库，非本次引入） |
 
 ### G.5 编译门禁（第五轮）
@@ -1582,4 +1583,284 @@ ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:8687 \
 2. **「编译通过」不等于「能跑」** —— 换壳 / 换契约这类结构性改动必须跑一轮实机，否则全部 Blind Spot 延后到运行时爆炸。
 3. **修复 A 引入 regression B 时，要回到 A 本身找根因** —— 本轮 hideMenu 与 P5 前认证占位两套修复互相打架，表象在 B（页面 302），根因在 A（临
 时 scheme 改变了框架兜底分支的判定）。
+
+---
+
+## 附录 H：第六轮 —— 跨进程端口归一 + P8 供给侧端到端（2026-10-29）
+
+> **本轮产出**：修掉第五轮留下的 #8（端口冲突），并把 T6 从 ❌ 翻成 ✅。
+> 同时**更正第五轮一处读错日志导致的错误结论**（H.4）。
+
+### H.1 端口冲突根因：一处错值，三处口径
+
+| 来源 | 端口值 | 判定 |
+|---|---|---|
+| `CJ.Plug.McpServer/appsettings.json` → `Kestrel:EndPoints:Http:Url` | `http://*:5066` | ❌ **错**：与 Web 宿主撞端口，且 Kestrel 配置优先级**高于** `app.Run` |
+| `CJ.Plug.McpServer/Program.cs:116` → `app.Run("http://localhost:3001")` | `3001` | ✅ 对，但被上一行覆盖 |
+| `CJ.Plug.AspireHost.AppHost/AppHost.cs:243` → `KestrelUrlEnvKey=http://*:3001` + `WithUrl("http://localhost:3001")` | `3001` | ✅ 对（部署形态） |
+| `PlugMcpBridgeClientOptions.DefaultBaseAddress` | `http://localhost:3001` | ✅ 对 |
+
+**根因**：`appsettings.json` 是从其它服务的模板复制而来，端口没跟着改 —— 属于「复制粘贴型错值」，不是设计决策。
+**修法（最小改动）**：appsettings 改为 `http://*:3001`，让「不带任何环境变量裸启动」也落在正确端口；同步改
+`02.Publish/Services/{Debug,Release}/net10.0/appsettings.CJ.Plug.McpServer.json`（该目录不随构建刷新，是打包脚本产物）。
+
+> ⚠ **顺带确认的既存打包约定（本轮不改）**：全部服务共用同一输出目录，`appsettings.json` **只有一份**（最后构建的服务那份会被复制进去，当前是 McpServer 的）。
+> 因此「从该目录裸启动任一服务」读到的都是同一份；**部署形态靠 `ASPNETCORE_ENVIRONMENT` + 每服务的 `appsettings.CJ.Plug.X.json` 区分**。
+> 这意味着：**任何服务都不要依赖 appsettings 里的 Kestrel 端口裸启动**，端口必须由启动方显式给（AppHost 已经是这么做的）。
+
+### H.2 本轮第二个「假故障」：会话注入的 `HTTP_PROXY`
+
+| 现象 | 根因 | 证据 | 结论 |
+|---|---|---|---|
+| McpServer 调 `http://localhost:8687/api/mcp/getPublishedWorkflows` 返回 **502 Bad Gateway**；SignalR 连 `8686` 同样 502；curl 直连返回 `HTTP=000` | **本会话 shell 注入了 `HTTP_PROXY/HTTPS_PROXY=http://127.0.0.1:52257`**，.NET `HttpClient` 默认继承代理，把 loopback 请求也送进代理 | `env \| grep -i proxy` 可见四个代理变量；加 `no_proxy` 后同一请求立刻 200 | **不是产品缺陷** —— 第五轮把 T6 判成 ❌，真实原因其实是「端口冲突 + 代理假象」两件事叠加 |
+
+**冒烟必须这样起进程**（否则任何跨进程调用都会 502）：
+
+```bash
+env -u HTTP_PROXY -u http_proxy -u HTTPS_PROXY -u https_proxy \
+    NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+    ASPNETCORE_ENVIRONMENT=Development \
+    Kestrel__EndPoints__Http__Url=http://127.0.0.1:<port> \
+    dotnet <Service>.dll
+```
+
+### H.3 T6 复跑结果（✅ 通过）
+
+| # | 判据 | 结果 |
+|---|---|---|
+| H-1 | McpServer 绑 3001 | ✅ `Now listening on: http://127.0.0.1:3001`，无 `Failed to bind` |
+| H-2 | 工具清单来自 ApiServer（非缓存） | ✅ 启动期 `GET /api/mcp/getPublishedWorkflows` 成功（不再 502） |
+| H-3 | bridge 端点可用 | ✅ `GET http://127.0.0.1:3001/api/plugbridge/tools` → **200 / count=1**（工具名 `111`） |
+| H-4 | 宿主自动同步（**未加任何环境变量、未改代码**） | ✅ Web 日志：`[P8] 已从 CJPlug McpServer 同步 1 个动态工具到 CJCore IToolRegistry` |
+| H-5 | 执行链路错误路径不炸 | ✅ `POST /api/plugbridge/call {"name":"__no_such_tool__"}` → **404** `{"error":"未找到工具: __no_such_tool__"}`（非 500、非未处理异常） |
+| H-6 | 既有页面无回归 | ✅ `/`=200、`/admin/modules`=200、`/system-config`=200、`/nonexist-abc` → 404 页（含「未找到 / 404 / 页面不存在」） |
+
+**供给侧可达性（代码级证明）**：`DefaultToolRegistry.AllEnabledDefinitions` = static ∪ dynamic，仅按 `Enabled` 过滤；
+`PlugMcpToolExecutor` 的 `Enabled=true`、`AgentName=null` ⇒ CJPlug 工具会同时出现在 `AllEnabledDefinitions` 和任意
+`GetDefinitionsForAgent(agentName)` 里。
+
+**仍缺的那一半（= #6 消费链）**：CJPlug 宿主目前**没有 `CJCore.Agent` 执行链** —— `IToolRegistry` 的消费方只存在于
+`CJCore.SystemMonitorAgent` 与 `CJCore.Modules.Dsl.Workbench`。即工具「能查到」但「没人调」。
+
+### H.4 更正第五轮的一处误读（重要）
+
+G.4 的 T6 备注把日志 `[DynamicWorkflowTool] Tool=111` 读成「111 个工具」。
+**真相：当前库里只有 1 条已发布工作流，它的 `Name` 就叫 `111`** ⇒ `Tool=111` 是**工具名**而不是数量。
+本轮用 bridge 的返回体实证：`count=1`、`name="111"`（`description="Execute workflow: 111"`）。
+**教训：日志里的数字要先确认语义（ID？名称？计数？）再写进结论。**
+
+### H.5 编译门禁（第六轮）
+
+| 目标 | 结果 |
+|---|---|
+| `dotnet build CJPlug/CJ.Plug-Aspire.sln` | **0 错误 / 2394 警告**（基线 2399 ±5） |
+| 下游 `CJCore.sln` / `CJOntology.sln` | 本轮**未跑**（仅改 JSON，无代码改动，无 API 面变化） |
+
+### H.6 剩余阻塞（更新版）
+
+| # | 项 | 需要的输入 | 状态 |
+|---|---|---|---|
+| 1 | P4（41 表归一） | P2 冒烟结论（✅ 已出）+ **db 备份确认** | 含数据搬迁，须实机 |
+| 2 | P5（身份替换） | P4 + 管理员初始密码写入方案 | **不可整体回滚** |
+| 3 | P6.3（`AccessKey` 与模块内功能键对齐） | P5 的 Permission 矩阵 | 须 P5 先行 |
+| 4 | P7.1 严格口径（ApiServer 侧贡献配置） | 确认 F.2 记录的偏差口径 | 需你拍板 |
+| 5 | P7.2（许可证） | 差异对照表对齐 | 计划写明「未对齐不得替换」 |
+| 6 | **P8 消费链**（CJPlug 接入 CJCore.Agent） | **先拍 D1（附录 I.3）**：A 可观测 / B 换工具源 / C 起 Agent / D 维持现状 | 供给侧 ✅，消费侧未接（**调研已发现既有 MCP 直连消费链，见附录 I.1 第 4 条**） |
+| 7 | **删 `PlugTempAuthHandler` + `PlugTempAdminAuthStateProvider`** | P5 上线当天 | 两件必须**成对**删 |
+
+> **本轮未 commit**（沿用纪律：commit/push 由你触发）。
+> 本轮改动文件：`src/PlugApiServer/CJ.Plug.McpServer/appsettings.json`、
+> `02.Publish/Services/{Debug,Release}/net10.0/appsettings.CJ.Plug.McpServer.json`、本附录。
+
+---
+
+## 附录 I：P8 消费链 —— 调研结论与 D1 决策点（待拍板，2026-10-29）
+
+> **结论先行：D1 的真问题不是"接哪条 Agent"，而是"要不要现在就给 `IToolRegistry` 造消费方"。**
+> 因为调研发现 —— **「让 LLM 调用 CJPlug 工具」这件事在 CJPlug 里早就通了**，走的是 MCP 协议，不是 `IToolRegistry`。
+
+### I.1 现状盘点（逐条附证据）
+
+| # | 事实 | 证据 |
+|---|---|---|
+| 1 | 宿主只引了 `CJCore.AgentTool.MCPTools`（注册表），**未引 `CJCore.Agent.Abstractions`** | `CJ.Plug.HostWebServer.csproj:44` |
+| 2 | `IToolRegistry` 的**消费方只存在于 CJCore 侧**：`CJCore.SystemMonitorAgent`、`CJCore.Modules.Dsl.Workbench` | 全仓 grep `IToolRegistry` |
+| 3 | `McpSurface` 在 CJCore 里**只有枚举定义、零消费方** ⇒ 注释里写的「内部面 `/mcp`、对外面 `/mcp/device`」**尚未实现** | 仅 `MCPTools/McpSurface.cs` 命中 |
+| 4 | **CJPlug 已有一条「LLM + 工具」消费链**：`AskAI.razor` → `IDeepSeekService.AskWithTool` → `OllamaSharp.Chat` + `AllowRecursiveToolCalls` → `GetFromMcpServers()` 直连 **MCP `http://localhost:3001`（SSE）** | `DeepSeekService.Ollama.cs:75-102`：`Command = "http://localhost:3001"`、`TransportType = McpServerTransportType.Sse` |
+| 5 | 另有**平行的第三条**：`CJ.Plug.AIChat`（`MEAI` 的 `IChatClient` + `UseFunctionInvocation`，Ollama `localhost:11434`/`qwen3:4b`），它的工具是**自带的** `DataIngestor`/`SemanticSearch`，与 `IToolRegistry` 无关 | `CJ.Plug.AIChat/Program.cs`、`ServiceCollectionExtensions.cs` |
+| 6 | CJCore 的 Agent 宿主官方入口是 `AddCJCoreAgentHost(...)`，但它管的是 **Agent *插件* 的装配/门控**（`IAgentPluginCatalog`），**不是**单次会话执行 | `CJCore.Agent.Host/AgentHostServiceCollectionExtensions.cs:22` |
+| 7 | CJCore 的 `ILLMChatService` **没有通用注册扩展**，只有 `SystemMonitorAgent` 自己 `new` 出来注册 | `SystemMonitorAgent/Program.cs:77` |
+
+### I.2 由调研得出的三条推论
+
+1. **3001 是 CJPlug 的真实约定端口**（既有 AI 问答把它硬编码在代码里）⇒ 附录 H.1 把 appsettings 改成 3001 不只是"修冲突"，
+   而是让「裸启动 McpServer」与既有消费方对齐 —— **裸启动场景下 AI 问答的工具此前一直是断的**（部署形态由 Aspire 注入 `KestrelUrl=3001`，所以线上不受影响）。
+2. **「LLM 调 CJPlug 工具」已通** ⇒ 附录 F/H 建的 `IToolRegistry` 链路**不是它的替代品**，而是**给 CJCore 平台内 Agent 用的第二条路**。
+   现在给它造消费方 = 同一批工具多一条通道，**有重复建设的实质风险**。
+3. 因此 D1 应当先回答：**这一步到底要解决什么** —— 是"让工具被 CJCore 平台内 Agent 看见"，还是"再给 AI 问答换一条工具源"。
+
+### I.3 D1 决策点（本轮只定这一个）
+
+| 选项 | 做法 | 成本 | 收益 | 风险 / 副作用 | 与「接入 CJCore」主线 |
+|---|---|---|---|---|---|
+| **A（推荐）** | **不新增消费方**。把 `IToolRegistry` 定位为「CJCore 平台内 Agent 的唯一工具源」；本阶段只补**可观测面**（调试页/端点列出 `AllEnabledDefinitions` + 工具数），把"能查到"变成**可见、可验收** | 低（1 个页面/端点） | 供给侧可验收、零重复建设、不动在用链路 | 工具仍"没人调"，但这是**当前事实**，不是缺陷 | ✅ 一致（等 Agent 来了自然接上） |
+| **B** | 让现有 `AskAI` 改走 `IToolRegistry`（把 OllamaSharp 的 MCP 工具源换成注册表适配出的 `AIFunction`） | 中 | 统一到进程内注册表 | ⚠ **等价于重复建设**：既有 MCP 直连已可用且是同一批工具；且要改**正在使用**的 AI 链路 | ⚠ 表面一致，实际动的是 CJPlug 自有链路 |
+| **C** | 宿主内起 **CJCore.Agent 执行链**：`LLMAgentBase` + 自写 `ILLMChatService` 的 Ollama 适配 + `IAgentConfig`/SystemPrompt | 中高 | 与主线**最一致**，可复用审批门控 / 执行追踪 / 上下文压缩 | 需新增 `CJCore.Agent.Abstractions` + `CJCore.LLM.Abstractions` 引用、并把 CJPlug 现有 LLM 通路（Ollama 直连）翻译成 CJCore 接口 | ✅✅ 最一致 |
+| **D** | 维持现状（MCP 给平台外/既有问答，`IToolRegistry` 给未来平台内 Agent），**明确这就是终态**，不再为此立项 | 0 | 立即收口，避免反复 | 交付物里多一条"暂未消费"的通路，需在文档里写明定位 | ✅ 一致（但等于放弃本阶段验收可视化） |
+
+> **推荐 A**：先让"工具进了注册表"这件事**看得见**（这正是当前唯一缺的验收证据），不重复造消费方、不动在用链路；
+> 等 CJPlug 真要起平台内 Agent 时（= C 的时机），`IToolRegistry` 直接就是它的工具源，无需返工。
+
+### I.4 顺带发现的既有缺陷（本轮不定，登记为 D2 候选）
+
+| # | 缺陷 | 证据 |
+|---|---|---|
+| 1 | `AskAI` 从 LLM 配置取到 `_mcpConnectionString` 并传给 `AskWithTool`，但**实现里根本没用它**（硬编码 `http://localhost:3001`）⇒ **用户在配置里改 MCP 地址不生效** | `AskAI.razor:110-116` vs `DeepSeekService.Ollama.cs:214` |
+| 2 | AI 资产三套并存、职责重叠：`CJ.Plug.AI`（页面 + LLM 配置读取）、`CJ.Plug.DeepSeekIn`（Ollama/DeepSeek + MCP 工具）、`CJ.Plug.AIChat`（MEAI + 自带 RAG 工具） | 三个项目并列于 `modules/AIModule/` |
+
+### I.5 本轮不做的事
+
+- **不编码**（纪律：先评审后落地）。
+- 不改 `AskAI` / `DeepSeekService`（缺陷 #1 属既有行为，是否与 D1 一起修由你定）。
+- 不动 `McpSurface`（它在 CJCore 里尚无消费方，本次不为其立项）。
+
+> **D1 已定：选 C（宿主内起 CJCore.Agent 执行链）** ⇒ 展开见**附录 J**。
+
+---
+
+## 附录 J：P8 消费链 —— C 分支实施方案（**待评审**，2026-10-29）
+
+### J.1 结论先行：C 分支比 I.3 预估的**轻很多**
+
+调研前以为要"手搓 LLM 循环 + 翻译工具协议"，实际 CJCore 已备好绝大部分：
+
+| 需要的东西 | 我以为 | 实际 | 证据 |
+|---|---|---|---|
+| LLM 客户端（带工具调用） | 要自己写 Ollama 适配 | **现成 `LLMChatService`**，构造 `(ILLMConfigReader, HttpClient)`，已含 `CompleteWithToolsAsync` / `CompleteStreamingWithToolsAsync` 两个带工具重载 | `CJCore.LLM.LLMClient/LLMChatService.cs:13` |
+| LLM 配置来源 | 要接 CJCore 的配置体系 | **`ILLMConfigReader` 只有一个方法**：`GetDefaultModelConfigAsync() → (Endpoint, ApiKey, ModelName)`；CJPlug 现有 `ILlmConfigApiClient`（`AskAI` 在用，返回 `ProviderName/ApiBaseUrl/ModelName/ApiKey`）一行就能满足 | `CJCore.LLM.Abstractions/ILLMConfigReader.cs` |
+| 多轮循环 / 工具结果回填 / 轮次上限 / 危险工具中断 | 要自己写 | **`LLMAgentBase` 全包**（`RunAgentLoopAsync`），派生类只管"装请求 + 交回响应" | `LLMAgentBase.cs:299+` |
+| 工具定义类型转换 | 要自己映射 | 基类直接吃 `ToolDefinition`，与 `IToolRegistry.AllEnabledDefinitions` 同源 | `LLMAgentBase.cs:240-302` |
+
+⇒ **CJPlug 侧真正要新写的只有 4 件**：`ILLMConfigReader` 实现、`IAgentConfig` 实现、一个继承 `LLMAgentBase` 的 Agent、一个调用入口（+ 对应的 DI 注册）。
+
+### J.2 新增引用与已知坑
+
+**新增 ProjectReference**（宿主 `CJ.Plug.HostWebServer`）：
+
+| 程序集 | 用途 |
+|---|---|
+| `CJCore.Agent.Abstractions` | `LLMAgentBase`、`IAgentConfig`、`AgentRequest`、`DefaultAgentContext`、`AgentResponse` |
+| `CJCore.LLM.Abstractions` | `ILLMChatService`、`ILLMConfigReader`、`ChatRequest`、`ChatMessage` |
+| `CJCore.LLM.LLMClient` | 现成 `LLMChatService` 实现 |
+| （已有）`CJCore.AgentTool.MCPTools` | `IToolRegistry` / `DefaultToolRegistry` / `PlugMcpToolExecutor` / `PlugMcpToolSyncService` |
+
+**已知坑（务必先看）**：
+
+1. **同名类型冲突**（沿用附录 B 登记）：`ToolDefinition` 在 `CJCore.AgentTool.MCPTools` 与 `CJCore.LLM.Abstractions` **两边都有**；`ChatMessage` 同理 ⇒ 必须显式限定，否则 CS0104。
+2. **`HttpClient` 共享陷阱**：`LLMChatService` 内部 `new LLMClient(httpClient)` 会写 `BaseAddress`/`Timeout`。
+   SystemMonitorAgent 踩过：HttpClient 一旦发过请求，这两个属性**再也不能改**（`InvalidOperationException`）⇒ **必须 transient**（`AddHttpClient()` 默认即 transient，别改成 Singleton）。
+3. **未配默认模型时的表现**：`LLMChatService` 直接抛 `InvalidOperationException("未配置默认模型，请先在 LLM 配置中设置")` ⇒ 入口要有兜底提示，不能把异常直接抛到页面上。
+
+### J.3 落地步骤（P8.3.1 – P8.3.6）
+
+| 步骤 | 内容 | 落点 |
+|---|---|---|
+| P8.3.1 | `PlugLlmConfigReader : ILLMConfigReader` —— 走现有 `ILlmConfigApiClient.GetDefaultModelInfoAsync()`，映射成 `(Endpoint, ApiKey, ModelName)`；取不到就返回空串让上层给出可读提示 | 宿主 `A2A/` 或 `Agent/` 目录 |
+| P8.3.2 | DI 注册：`ILLMConfigReader`（Scoped）→ `ILLMChatService` = `new LLMChatService(reader, transient HttpClient)`；**不套** SystemMonitorAgent 那套台账装饰器（本阶段不做调用上报） | `Program.cs` |
+| P8.3.3 | `PlugAgentConfig : IAgentConfig` —— `AgentName="plug-workflow-agent"`、`SystemPrompt`（说明：可用工具 = 平台已发布的工作流；不确定就先问清再调）、`Model=null`（用全局默认）、`Temperature`、`MaxToolCallRounds` **先给显式上限**（见 J.6 风险 4） | 同上 |
+| P8.3.4 | `PlugWorkflowAgent : LLMAgentBase<PlugAgentConfig>` —— 只暴露 `RunAsync(string question, CancellationToken)`；不注入 `ISessionStore`（⇒ 每次独立会话，与 SystemMonitorAgent 做法一致）、不注入 `IProgressReporter`（本阶段不做流式进度） | 同上 |
+| P8.3.5 | **最小可验收入口**：一个调试页（挂「调试」组，与 `/admin/modules` 并列）+ 一个只读端点 `GET /api/plug-agent/tools`（列出 `IToolRegistry.AllEnabledDefinitions` 中 CJPlug 的工具：名称/描述/启用态/来源）。**不碰既有 `AskAI`** | 宿主 `Pages/` 或 `CJ.Plug.MainPageContent` |
+| P8.3.6 | 观测：日志统一前缀 `[P8-Agent]`，记录"本轮喂给模型的工具数 / 模型返回的 tool_calls / 每个调用耗时 / 结果摘要" | 同上 |
+
+### J.4 非目标（本分支明确不做）
+
+- ❌ **不替换**既有 `AskAI` → MCP(3001) 直连链路（附录 I.4 缺陷 #1 另议，不在本分支）。
+- ❌ 不做会话持久化（不注入 `ISessionStore`）。
+- ❌ 不做审批流程 UI（见 J.7 的 D2）。
+- ❌ 不接 `AddCJCoreAgentHost`（它管的是 Agent **插件**装配，不是单次会话执行）。
+- ❌ 不做 LLM 调用台账 / 预算闸（SystemMonitorAgent 那套装饰器）。
+
+### J.5 验收清单
+
+| # | 判据 |
+|---|---|
+| 1 | 调试页能看到**来自 `IToolRegistry`** 的工具清单（数量与 McpServer bridge 一致，当前 = 1） |
+| 2 | 提问 → LLM 返回 `tool_calls` → 宿主经 `PlugMcpToolExecutor` 打到 bridge → 结果回填 → LLM 给出最终答复（**须先用一条无副作用的工作流验证，见 J.6 风险 1**） |
+| 3 | 未配置默认模型时，页面给出可读提示（不是 500） |
+| 4 | 既有页面无回归（`/`、`/admin/modules`、`/system-config` 均 200） |
+| 5 | `dotnet build CJPlug/CJ.Plug-Aspire.sln` 0 错误 |
+
+### J.6 风险登记
+
+| # | 风险 | 说明 | 处置 |
+|---|---|---|---|
+| 1 | **工具副作用未知（最大）** | 当前库里唯一工具叫 `111`；`main-elsa.db` 的 `WorkflowDefinitions` 里存在 `111 / 333 / 666 / 888` 等**测试命名**的工作流，可能驱动真实工位机 | **验收前置**：先在客户端人工打开该工作流确认它做什么；必要时先发布一条只读/空操作工作流用于验收 |
+| 2 | 危险工具门控语义 | `LLMAgentBase` 对 `IsDangerous=true` 的工具是**永不直接执行**（fail-closed，进待审批队列）；而 `PlugMcpToolExecutor.IsDangerous` 当前**硬编码 `false`** ⇒ 等于"无审批即可执行" | 见 J.7 的 D2 |
+| 3 | LLM 配置通路 | `ILlmConfigApiClient` 走 ApiServer(8687)；宿主内可用（`AskAI` 在用）⇒ 风险低，但需实测 | P8.3.1 完成后先单测一次 |
+| 4 | 轮次无上限烧 token | `MaxToolCallRounds ≤ 0` = 不限轮次 | P8.3.3 **显式给上限**（建议 8），后续按实际调整 |
+| 5 | 同名类型冲突 | `ToolDefinition` / `ChatMessage` 双份 | 全程显式限定（附录 B） |
+| 6 | 两条消费链并存 | 既有 MCP 直连 + 新增 Agent 链 | 本分支**刻意并存**（J.4）；定位写清楚，避免后续误判为重复建设 |
+
+### J.7 D2 决策点（本轮只定这一个）
+
+**D2：CJPlug 动态工具的「危险 / 审批」口径怎么定？**
+（背景：`LLMAgentBase` 的语义是 —— `IsDangerous=true` ⇒ **永不直接执行**，必须走 `IPendingApprovalStore` 待审批队列由外部消费；`IConfirmationGateway` 只是**第一道闸**（返回 false 才拒绝），通过之后仍然只是"进队列"。⇒ 标 true 而没有审批消费方 = 工具**永远跑不起来**。）
+
+| 选项 | 做法 | 后果 | 成本 |
+|---|---|---|---|
+| **A（推荐）** | `IsDangerous` 保持 `false`（可直接执行）+ 入口限定在**调试页** + 只暴露经确认的工作流；把"危险标记 + 审批"列入下一阶段 P8.4 | 本阶段能真跑通（J.5 判据 2 可达）；安全靠"入口收敛 + 人工先确认工作流副作用"兜底 | 低 |
+| **B** | `IsDangerous=true` + 补完整审批（`IPendingApprovalStore` 实现 + 审批页 + 审批后执行通道） | 最安全，但本阶段交付量翻倍，且**在此之前工具一次都跑不起来** | 高 |
+| **C** | 按工作流元数据区分危险与否（需 `PublishedWorkflowDto` 补 `IsDangerous` 字段，由发布侧声明） | 最合理，但**跨进程 + 跨端**（McpServer / ApiServer / 发布端），本阶段动不了 | 高（依赖外部） |
+
+> **推荐 A**：先把链路跑通（这是 C 分支的目的），安全边界用"调试入口 + 发布前人工确认"兜；P8.4 再按 B/C 收口审批。
+
+### J.8 本轮不做的事
+
+- **不编码**（等 J 评审通过）。
+- 不改 `PlugMcpToolExecutor.IsDangerous`（等 D2）。
+- 不发布/不执行任何工作流（等 J.6 风险 1 的人工确认）。
+
+> **D2 已定：选 A**（`IsDangerous=false` + 入口收敛到调试页 + 只暴露经确认的工作流；审批门控留 P8.4）⇒ 编码已完成，记录见 **J.9**。
+
+### J.9 P8.3 实施记录（2026-10-29 实机验收）
+
+**新增/改动文件**
+
+| 文件 | 作用 |
+|---|---|
+| `Agent/PlugLlmConfigReader.cs` | P8.3.1：`ILLMConfigReader` 实现，把既有 LLM 配置的 `ApiBaseUrl/ApiKey/ModelName` 翻译给 CJCore（**不另建模型配置真理源**） |
+| `Agent/PlugAgentConfig.cs` | P8.3.3：`IAgentConfig`（`MaxToolCallRounds = 8`，显式上限） |
+| `Agent/PlugWorkflowAgent.cs` | P8.3.4：`LLMAgentBase<PlugAgentConfig>` 派生类 + `GetVisibleTools()`（只读，源 = `IToolRegistry.AllEnabledDefinitions`） |
+| `Agent/PlugAgentModule.cs` | P8.3.5 **必要条件**：宿主程序集首个 `IModule` —— 没有它，`/debug/plug-agent` 一律 404 |
+| `Agent/PlugAgentMenuService.cs` | 菜单项挂「调试」组 |
+| `Pages/PlugAgentDebug.razor` | 调试页（工具清单 + 提问 + **勾选确认才可执行** + 未配模型的兜底提示） |
+| `Program.cs` | 注册（LlmConfig HttpClient、`AddLLMChatService<PlugLlmConfigReader>()`、Agent、模块、菜单）+ 端点 `GET /api/plug-agent/tools`（只读） |
+| `CJ.Plug.HostWebServer.csproj` | +4 引用：`Agent.Abstractions` / `LLM.Abstractions` / `LLM.LLMClient` / `CJ.Plug.LlmConfigApiClient` |
+
+**比 J.3 更省的地方**：`AddLLMChatService<TConfigReader>()` 一行同时注册
+`ILLMConfigReader` + `ILLMChatService` + **transient HttpClient**（`CJCore.LLM.LLMClient/ServiceCollectionExtensions.cs`），
+无需手写 `new LLMChatService(...)`。
+
+**实机验收（四进程：8686 Dispatch / 8687 Api / 3001 Mcp / 5066 Web）**
+
+| # | 判据 | 结果 |
+|---|---|---|
+| 1 | `GET /api/plug-agent/tools` | ✅ **200**：`[{"name":"111","description":"Execute workflow: 111","parametersJson":{...}}]` ⇒ 工具确实进了 `IToolRegistry` 且被 Agent 面看到 |
+| 2 | `/debug/plug-agent` 可打开 | ✅ **200**，SSR 渲染出工具清单 + 「没有审批门控」警示 + 确认勾选框 |
+| 3 | 宿主程序集 `@page` 进路由发现 | ✅（`PlugAgentModule` 生效，验证了对 J.2 坑 #1 之外那条框架约束） |
+| 4 | 菜单 / 模块登记 | ✅ 首页 HTML 命中 `plug-agent`；`/admin/modules` 命中 2 次（模块元数据被消费） |
+| 5 | 既有页面无回归 | ✅ `/`、`/admin/modules`、`/system-config` 均 200 |
+| 6 | 编译门禁 | ✅ `dotnet build CJ.Plug-Aspire.sln --no-incremental` → **0 错误 / 2395 警告**（基线 2399±5） |
+| 7 | **真跑一次工具调用** | ⏸ **未做**（J.6 风险 1：工作流 `111` 的副作用未人工确认；且需平台已配默认模型）⇒ 保持 J.8 的纪律 |
+
+**本轮新发现（登记，未修）**
+
+| # | 发现 | 影响 |
+|---|---|---|
+| 1 | **`DynamicToolRegistry` 只在启动时刷新一次**，之后仅靠 DispatchServer(8686) 的 SignalR `MCPToolUpdated` 通知 | 若 McpServer 先于 ApiServer 起来 ⇒ 拉到 0 个工具且**再也不会自愈**（本次实测复现：日志 `Failed to refresh... Using 0 cached`，重启 McpServer 后 `refreshed: 1 tools`）。建议给 `DynamicToolRegistry` 加周期刷新兜底（属 CJPlug 既有代码，不在 P8.3 范围） |
+| 2 | 该日志同时给出**确证**：`DynamicToolRegistry refreshed: 1 tools registered` ⇒ 数量就是 1，工具名才是 `111`（再次印证 H.4 的更正） |
+
+**J.2 坑 #1 的更正**：方案里写「`ToolDefinition` 两边同名」——实测**只有一份**
+（`CJCore.LLM.Abstractions`，`AgentTool.MCPTools` 只是 `using` 它）⇒ 无同名冲突，无需显式限定。
+（同类提醒对 `ChatMessage` 同样不成立。）
 
