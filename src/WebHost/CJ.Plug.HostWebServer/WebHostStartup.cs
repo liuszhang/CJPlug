@@ -69,7 +69,18 @@ public static class WebHostStartup
     {
         // ① CJCore 管理端点：明确需要（它们带 RequireAuthorization 元数据）。
         //    必须排在 ② 之前 —— 它们也以 /api 开头。
-        if (path.StartsWithSegments("/api/module-admin") || path.StartsWithSegments("/api/system-config"))
+        //    ⚠ 2026-10-30（P6.3 实测）补入两条前缀，均为「端点声明了 RequireAuthorization 但落到 ② 分支 ⇒ 恒 500」：
+        //      · /api/permission —— PermissionAdminEndpoints 的 MapGroup("/api/permission")
+        //      · /api/modules    —— ModuleAdminEndpoints 的 MapGroup("/api/modules")（注意不是 /api/module-admin）
+        //    此前无人调用这两个 API 故未暴露：权限矩阵页走 @inject PermissionFunctionsService、
+        //    模块管理页走 @inject DefaultModuleCatalog，都绕过了 HTTP，所以 UI 正常而上游 API 一直是坏的。
+        if (path.StartsWithSegments("/api/modules")
+            || path.StartsWithSegments("/api/module-admin")
+            || path.StartsWithSegments("/api/system-config")
+            || path.StartsWithSegments("/api/permission")
+            // P5.5 第三批（2026-10-30）：/api/plug-agent/tools 由匿名改为 RequireModuleAccess("plug-agent:tools")。
+            // 声明了授权元数据就必须走授权中间件，否则恒 500（同 /api/permission 的历史坑）。
+            || path.StartsWithSegments("/api/plug-agent"))
             return true;
 
         // ①.5 P5：三员 / 个人中心端点同样带 RequireAuthorization 元数据。
@@ -218,6 +229,25 @@ public static class WebHostStartup
             .Contains("postgre", StringComparison.OrdinalIgnoreCase)
             ? CJCore.Modules.Data.DataProvider.PostgreSql
             : CJCore.Modules.Data.DataProvider.Sqlite;
+
+        // ── 业务模块 DbConfig 必须与 ApiServer 同集合（2026-10-30 修）─────────────────
+        // 症状：本宿主只调了 ConfigModulePageServices()（页面/UI 服务），而 18 个业务
+        //   IModuleBusinessDbConfig 的注册全在 ConfigModuleApiServices() 里 ⇒ 本宿主的
+        //   DataDbContext 模型只剩 CJCore 框架自带的表（29 张），而 main.db 实际有 80 张
+        //   （由 ApiServer 迁移建成，快照 __CjModelSnapshot 也是 80 张）。
+        //   后果：自动迁移引擎按「模型 vs 实际库」diff，判定「模型整体回退」要删 51 张表
+        //   ⇒ MASS-ARCHIVE-BLOCKED fail-fast ⇒ HostWebServer 直接起不来（Elsa 引擎宿主
+        //   在 5066，起不来等于整条流程执行链不可用）。护栏拦住了删除，但服务是死的。
+        //
+        // 修法：本宿主也要把业务模块 DbConfig 注册进来（只注册服务，**不**调
+        //   ConfigModuleApis() 映射端点 ⇒ 5066 不会因此多出业务 API），使模型与库/快照一致。
+        //   注意：必须在 AddCJCoreDataApi 之前，迁移引擎建模时要能看到完整集合。
+        //
+        // ⚠ 2026-10-30 更正：本段**不在这里补**。合并形态（CJ.Plug.ApiServer 引用本类的
+        //   AddPlugWebHost）下，业务 DbConfig 已由 ApiServer 侧的 ConfigModuleApiServices() 注册，
+        //   这里再补一份会出现**重复注册**（实测 21 条 DbConfig 各打印两次 = 42 行）。
+        //   只有「独立启动形态」（本项目的 Program.cs 薄壳）才需要补 —— 已挪到 Program.cs，
+        //   而合并形态根本不会执行 Program.cs，两边互不干扰。
 
         services.AddSingleton<CJCore.Modules.Data.IModuleDbConfig,
                               CJ.Plug.Models.Services.BusinessModuleDbConfigAdapter>();
@@ -463,12 +493,26 @@ public static class WebHostStartup
         // P8.3.5：Agent 工具面只读端点 —— 与调试页同源（IToolRegistry.AllEnabledDefinitions），
         // 便于用 curl 验收"工具真的进了注册表"，不必开浏览器。
         // ⚠ 只读：返回名称/描述/参数 schema，不提供执行入口。
+        //
+        // ⚠ P5.5 第三批（2026-10-30）：本端点此前**完全匿名**。它虽只读，但会吐出全部启用工具的
+        //   名称 + 描述 + 完整参数 schema —— 等于把 Agent 的能力面摊开，是枚举攻击的第一步。
+        //   收口方式与页面/菜单同键（`plug-agent` 的派生数据权限键 `plug-agent:tools`）：
+        //     · pairedWith 声明"本接口是 plug-agent 页面的运行必需依赖"，矩阵里勾了页面没勾接口会提醒；
+        //     · AdminRoles 硬保护（ModuleAccessStrategy 0.2）⇒ system_admin 恒定放行。
+        //   ⚠ 端点声明了 RequireAuthorization 元数据 ⇒ 必须同时进 NeedsIdentity() 的 ① 分支，
+        //     否则落到 ② 分支缺 AuthorizationMiddleware，EndRequest 直接抛 ⇒ 恒 500（P6.3 同类坑）。
         app.MapGet("/api/plug-agent/tools", (CJ.Plug.HostWebServer.Agent.PlugWorkflowAgent agent) =>
             agent.GetVisibleTools()
                  .Select(t => new { t.Name, t.Description, t.ParametersJson })
                  .ToList())
            .WithName("PlugAgentTools")
-           .WithTags("P8-Agent");
+           .WithTags("P8-Agent")
+           .RequireModuleAccess(
+               "plug-agent:tools",
+               roles: ["system_admin"],
+               moduleName: "工作流 Agent（调试）",
+               displayName: "读取 Agent 工具清单",
+               pairedWith: ["plug-agent"]);
 
         // ⚠ 刻意**不**在这里调 app.MapRemoteDesktopApi()：
         //   该端点（/api/remote/vnc 等，端点名 VncWebSocketProxy）由 Guacamole 模块的 API 扩展映射，

@@ -5,6 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    <!-- P9.1（2026-10-30，D2 = B「回退形态一次全删」）：本项目降级为**类库**，不再产出 exe。
+         唯一宿主是 CJPlug.Server（5066），调度面由它经 AddDispatchApiService() /
+         MapDispatchServiceEndpoints() 挂载。本项目源码（MainHub / DispatcherApi /
+         StationService）被 CJPlug.Server 直接 ProjectReference，全部保留；
+         删掉的只有旧启动壳 Program.cs —— 其内容已逐条核对并被宿主覆盖，无遗漏。 -->
+    <OutputType>Library</OutputType>
 	  <!-- 添加此属性以控制是否跳过构建 -->
 	  <!--<SkipBuild Condition="'$(SkipBuild)' == 'true'">true</SkipBuild>-->
 	  <SkipBuild>true</SkipBuild>

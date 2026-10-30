@@ -1,4 +1,19 @@
 ﻿using CJ.Plug.ApiServer;
+// ═══════════════════════════════════════════════════════════════════════════════════
+//  CJPlug.Server —— CJPlug 的唯一宿主（P9 / 2026-10-30，D1 = A）
+//
+//  本文件于 2026-10-30 从 CJ.Plug.ApiServer/Program.cs **原样搬迁**（逐字搬迁，未重写逻辑），
+//  搬迁的唯一目的是让"谁负责装配"只有一个答案：
+//    · 改之前：exe 叫 ApiServer 却承载全站，装配入口分裂在 ApiServer/Program.cs 与
+//              HostWebStartup.cs 两处，边界只写在注释里 ⇒ 部署链按旧形态维护 ⇒ 双宿主事故。
+//    · 改之后：本文件 = 装配编排表（按顺序调各模块包的扩展方法 + 固定管道顺序 + 端口契约）；
+//              CJ.Plug.ApiServer = 纯类库（打包发布业务）。
+//
+//  ⚠ 新增业务注册不要去改这个文件：按归属加到对应模块包的扩展方法里
+//    （Web 侧 → HostWebStartup；打包发布 → ApiServer/PackageServiceCollectionExtensions）。
+//  ⚠ 下游模块包不得反向引用本项目（本项目是叶子节点）。
+// ═══════════════════════════════════════════════════════════════════════════════════
+
 using CJ.Plug.ApiServer.Infrastructure;
 using CJ.Plug.DispatchServer;
 using CJ.Plug.HostWebServer;
@@ -127,8 +142,13 @@ builder.Services.AddSingleton<HubConnectionManagerService>(dispatchHubConnection
 builder.Services.AddDispatchApiService();
 
 // ===== Phase 4：MCP 协议面并入本进程 =====
-// 原 CJ.Plug.McpServer 独立进程（3001）的注册整体搬到这里；3001 仍由本进程监听，
-// 对外契约（Cursor/Trae 连 http://host:3001）不变，路径隔离见 Infrastructure/PlugPortGate.cs。
+// 原 CJ.Plug.McpServer 独立进程（3001）的注册整体搬到这里。
+// ⚠ 契约更正（2026-10-30，P9.1）：**3001 已经不存在**。原注释写"3001 仍由本进程监听、
+//   对外契约不变"，与代码矛盾 —— UseUrls 只有 5066（见本文第 ② 处的端口说明），
+//   AppHost 清单也只有 5066 一条。真实的对外契约是 **http://<host>:5066/mcp**
+//   （路径由旧独立形态的根路径 "/" 改为 "/mcp"，见下方 app.MapMcp("/mcp")）。
+//   6001/3001 一类旧端口表述集中在 PlugPortGate.cs / PlugMcpBridgeEndpoints.cs /
+//   PlugMcpToolExecutor.cs，本轮只改注释不改行为。
 // ⚠ 未搬运 McpServer 的 AddOpenTelemetry().UseOtlpExporter()：本进程已由 AddServiceDefaults() 统一接管 OTel。
 var mcpDispatchUrl = builder.Configuration["DispatchServer:Url"] ?? GlobalData.MainDispatcherServer;
 var mcpApiUrl = builder.Configuration["ApiServer:Url"] ?? GlobalData.MainApiServer;

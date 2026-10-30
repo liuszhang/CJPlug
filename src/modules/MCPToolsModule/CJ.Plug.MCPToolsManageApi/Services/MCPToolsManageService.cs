@@ -85,8 +85,18 @@ namespace CJ.Plug.MCPToolsManageApi.Services
             //    return saved;
 
             // 2. 查找对应的 PDZ 定义
+            //    修复（2026-10-30）：只 Include PlugVariableDatas 时，CopyPDZ 里遍历的
+            //    PDZVariables / PlugDatas / PlugStatusDatas / ActionDatas / ActionVariableDatas /
+            //    DataFlowDatas 全部为空集合 ⇒ 复制出来的是"缺壳"的 Use0 PDZ。
+            //    这里必须与 CopyPDZ 实际复制的集合**完全对齐**。
             var designPDZ = await _dbContext.Set<PlugDataZone>()
+                .Include(p => p.PDZVariables)
                 .Include(p => p.PlugVariableDatas)
+                .Include(p => p.PlugDatas)
+                .Include(p => p.PlugStatusDatas)
+                .Include(p => p.ActionDatas)
+                .Include(p => p.ActionVariableDatas)
+                .Include(p => p.DataFlowDatas)
                 .FirstOrDefaultAsync(p => p.PlugDefinitionId == tool.SourcePlugId && p.Type == PDZTypeEnum.Desi.ToString());
 
             if (designPDZ == null)

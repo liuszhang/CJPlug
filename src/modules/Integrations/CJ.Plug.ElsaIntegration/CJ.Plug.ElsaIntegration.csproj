@@ -34,6 +34,12 @@
     <ProjectReference Include="..\..\..\Core\CJ.Plug.ApiClient\CJ.Plug.ApiClient.csproj" />
     <ProjectReference Include="..\..\..\Core\CJ.Plug.PlugBaseCore\CJ.Plug.PlugBaseCore.csproj" />
     <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
+    <!--
+      D7=A（2026-10-30）：仅需 IAuthSchemeOverrideSelector 这一个抽象（零实现、零 ASP.NET 依赖），
+      用于把 /elsa/api/* 的认证交回 Elsa 自己的 "Jwt-or-ApiKey" 方案。
+      与 CJ.Plug.ExecuteApi 引 CJCore.Framework.Api 的理由同类：宿主认证基座的可扩展点在此程序集。
+    -->
+    <ProjectReference Include="..\..\..\..\..\CJCore\src\Framework\CJCore.Framework.Abstractions\CJCore.Framework.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

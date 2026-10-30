@@ -213,11 +213,27 @@ public class PDZManageService : IPDZManageService
 
     public async Task<bool> DeletePDZ(string PDZId, CancellationToken cancellationToken = default)
     {
-        var pdz = await _dbContext.Set<PlugDataZone>().FindAsync(new object[] { PDZId }, cancellationToken);
+        // 修复（2026-10-30）：路由 /api/pdz/deletePDZ/{PDZId} 传的是**业务键 PDZId（字符串）**，
+        // 原实现用 FindAsync(PDZId) 按**主键 Id(int)** 查找 ⇒ 键值类型不匹配 ⇒ EF 抛异常 ⇒ 恒 500。
+        // 现在先按业务键匹配；未命中且入参是纯数字时按主键回退（兼容旧调用方）。
+        PlugDataZone? pdz = null;
+        if (!string.IsNullOrWhiteSpace(PDZId))
+        {
+            pdz = await _dbContext.Set<PlugDataZone>()
+                .FirstOrDefaultAsync(p => p.PDZId == PDZId, cancellationToken);
+            if (pdz == null && int.TryParse(PDZId, out var id))
+            {
+                pdz = await _dbContext.Set<PlugDataZone>()
+                    .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            }
+        }
         if (pdz == null)
         {
             return false;
         }
+        // 子表（PDZVariable / PlugVariableDatas / PlugDatas / PlugStatusDatas /
+        // ActionDatas / ActionVariableDatas / DataFlowDatas）在库侧均为 ON DELETE CASCADE
+        // （PRAGMA foreign_key_list 实测），删除主体即可级联清理。
         _dbContext.Set<PlugDataZone>().Remove(pdz);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;

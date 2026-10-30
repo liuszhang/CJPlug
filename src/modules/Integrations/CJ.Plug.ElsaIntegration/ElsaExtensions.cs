@@ -268,7 +268,17 @@ public static class ElsaExtensions
     public static WebApplicationBuilder AddElsaServicesForApi(this WebApplicationBuilder builder)
     {
         builder.Services.ConfigElsaServices(builder.Configuration);
-        
+
+        // ── D7=A（2026-10-30）：/elsa/api/* 的认证交回 Elsa 自己的身份体系 ──────────────────────
+        //   不注册的后果（实机已验）：CJCore 的 PolicyScheme 只认 "Bearer " 前缀 ⇒ Elsa 管理员 JWT 被送进
+        //   CJCore 的 JwtBearer（密钥不同）⇒ 验签失败 ⇒ Cookie challenge ⇒ 302 登录页 ⇒ 客户端跟随重定向
+        //   拿到 200 的 HTML = 「保存假成功」（引擎库里根本没有这条定义）。详见 ElsaAuthSchemeOverride 注释。
+        //   只在本方法注册（此处必然已 AddElsa ⇒ scheme 存在）；不放进 ConfigElsaServices，
+        //   以免没有 Elsa 认证方案的宿主被执行到「返回未注册 scheme」。
+        builder.Services.AddSingleton<
+            CJCore.Framework.Abstractions.IAuthSchemeOverrideSelector,
+            CJ.Plug.ElsaIntegration.Auth.ElsaAuthSchemeOverride>();
+
         builder.Services.AddScoped<IElsaEngineService, ElsaEngineService>();
 
         builder.Services.AddScoped<IElsaApiClient, ElsaApiClient>();

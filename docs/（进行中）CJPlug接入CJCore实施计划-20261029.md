@@ -1,7 +1,17 @@
 # （进行中）CJPlug 接入 CJCore 实施计划
 
-> 状态：进行中（P0–P4 / P6 / P7.1 / P8 已完成；剩 P5 身份替换、P7.2 许可证、P6.3 权限键对齐）　|　日期：2026-10-29　|　作者：旺财　|　位置：`CJPlug/docs/`
-> **最新进度看附录 K**（P4 业务表归一，2026-10-29；含 K.6 存量库处置执行、K.7 隐患登记、**K.8 代理与日志刷屏修复（已实施并实测）**、**K.9 启动期自调用时序修复（已实施并实测）**）；此前各轮记录依次见附录 D（P1）、E（P2/P3/P6）、F（P7.1/P8/P6.1）、G（实机冒烟）、H（端口归一）、J（P8.3 Agent 链路）。
+> 状态：进行中（P0–P7 完成；**P8 已完成** —— 发布/同步/发现/调用/删除 五步实测全通，见附录 M/N/O；**P9 + P9.1 已完成** —— 唯一宿主 `CJPlug.Server` 上线，**所有回退形态 exe 已下线**（D2=B，附录 Q.8）；剩 **P7.1a 退役 SystemConfig**（待拍板）、**P7.2 许可证**（等授权语义）、**PackageService 部署脚本改单进程**（建议下轮，见 Q.7-#2）、**AIChat 形态待确认**（Q.7-#1）　|　日期：2026-10-29（**2026-10-30 更新**）　|　作者：旺财　|　位置：`CJPlug/docs/`
+> **⚠ 2026-10-30 进度更正（本轮）**：
+> ① **P5 身份替换已完成**（P5.1~P5.9 + P5.8 C1/C2 收口，见 `（已完成）D-P5-6 Cookie会话绑定方案-20261030.md`）；
+> ② **P6.3 权限键对齐已完成**（见 `（已完成）P5.5第三批+P6.3 权限声明归口方案-20261030.md`）；
+> ③ **P6.3 的"矩阵无接口行"残留已彻底解决** —— 原记载「端点扫描在 CJPlug 托管形态下失效」是**错误归因**，真因与修法见 `CJCore/docs/（已完成）策略②接口权限键可授性方案-20261030.md`（D1=A / D6=C / D4，V1~V14 全部实测通过）；
+> ④ **H.6 第 7 项（删 `PlugTempAuthHandler` + `PlugTempAdminAuthStateProvider`）已执行**（P5 收尾批，两个文件已物理删除）；
+> ⑤ **P8 供给侧零数据已量化定位**（见附录 L）：链路三跳全通，工具数为 0 是 `MCPTools` 表 0 条记录的**数据空态**，非缺陷。
+> ⑥ **P8 端到端验收已执行（D1=B，见附录 M）**：发布 / 同步 / 发现 / 删除 **四步全部实测通过**（`/api/plug-agent/tools` 由 `[]` → 1 条 `P8_E2E_Tool`）；**调用失败** —— 根因是 Elsa 保存链（`DeleteByDefinitionId` 405 被吞 + 保存结果不校验 ⇒ 定义未入库 ⇒ 执行不存在的定义 ⇒ 500）。数据已全部清理复原（与备份逐表核对一致）。
+> ⑦ **P8 调用链已打通（D7=A）+ P9 宿主中立已完成**：`/elsa/api` 认证交回 Elsa 后 `addTool → call` 全绿；宿主收敛为 `CJPlug.Server`（ApiServer 降级类库），部署链（AppHost 清单 / 打包断言 / 启动脚本）已同步（附录 O / P）。
+> ⑧ **M.4 两个遗留缺陷已收口（见附录 Q）**：`deletePDZ` 恒 500 已修（实测 API 删除成功）；`entryVariables 恒 []` 经复验判定为**误诊**（数据空态），但顺带查出并修掉真实缺陷「`PublishToolAsync` 只 Include 一个子集合 ⇒ Use0 PDZ 丢壳」。打包脚本 `-Target main` 已实跑通过。`CJCore/docs/CJCore-登录认证统一架构方案.md` 补了 §8（宿主自带身份体系的接缝）。
+> ⑨ **D2 = B 已执行（附录 Q.8）**：回退形态全部下线 —— `DispatchServer`/`McpServer`/`HostWebServer` 类库化（源码保留、删启动壳），`ElsaApiServer`/`ElsaStudio` 移出 sln；执行前先交叉核对 3 个旧 `Program.cs`，确认**注册层面 0 缺失**。Release 实机八面 + Hub 协商 + Elsa 接缝全绿，发布包 Service 面只剩 `CJPlug.Server.exe`。
+> **最新进度看附录 Q**（M.4 缺陷收口 + 打包实跑，2026-10-30）；此前各轮记录依次见附录 D（P1）、E（P2/P3/P6）、F（P7.1/P8/P6.1）、G（实机冒烟）、H（端口归一）、J（P8.3 Agent 链路）、K（P4 业务表归一）、L（P8 供给侧量化取证）、M（P8 端到端）、N（D2=B）、O（D7=A）、P（P9）。
 > 替代文档：`CJCore/docs/CJPlug-接入CJCore框架迁移计划.md`（v2.0 / 2026-07-07，已过期，见 §1.6）
 > 关联文档（均在 `CJCore/docs/`）：`CJOntology-接入方案-v2.md`、`（已完成）模块配置管理界面方案.md`、`（已完成）CJCore-统一根组件FrameworkApp与模块资源贡献方案.md`、`CJCore-模块角色管理配置ModuleAccess实施方案.md`、`CJCore-登录认证统一架构方案.md`
 > 本文档全部路径以**仓库根** `D:\Pro\CJ.Plug.Github` 为基准。
@@ -645,7 +655,7 @@ P4 业务表归一(逐模块) ──► P5 身份替换+权限矩阵+4模块下�
 |---|---|
 | 6.1 | 29 个模块补元数据（`ModuleId` / `Group` / `Order` / `DependsOn`） |
 | 6.2 | `AddCJCoreModuleAdmin()` + `MapCJCoreModuleAdmin()`——此时 Data 底座已就位，**启停状态可持久化**（`MA_` 表） |
-| 6.3 | 菜单/AppBar 的 `AccessKey` 与模块 `ModuleId` 对齐；模块内功能键（每模块 1–3 个） |
+| 6.3 | 菜单/AppBar 的 `AccessKey` 与模块 `ModuleId` 对齐；模块内功能键（每模块 1–3 个） | ✅ **2026-10-30 完成**：4 个缺席模块补 `IModuleAccessDeclaration` + 2 个菜单补 `AccessKey`；`/api/modules` 实测各得 1 个 feature。详见 `（已完成）P5.5第三批+P6.3 权限声明归口方案-20261030.md` §9 |
 | 6.4 | 验收：关掉某模块 → 菜单项与 AppBar 项即时消失；重启后状态保留 |
 
 ---
@@ -1417,6 +1427,20 @@ dotnet build CJOntology/CJOntology.sln
 
 > 若你要求严格按 7.1a 收敛，前置条件是：**ApiServer 也接入 CJCore SystemConfig 模块**（届时把本审批这一节删掉即可，`PlugSystemConfigStore` 两端复用同一个实现）。
 
+#### 🔍 2026-10-30 复核：偏差的技术前提比原文更硬，短期不能收敛
+
+为评估能否"顺手做掉 P7.1a"，本轮重新核了一遍依赖面：
+
+| 事实 | 证据 |
+|---|---|
+| `CJ.Plug.HostWebServer/Program.cs`（独立 Web 薄壳）**没有任何数据库注册** —— 纯前端，全部数据经 HTTP 打 ApiServer | 该文件 `AddData` / `DbContext` / `IModuleDbConfig` 零命中 |
+| `PlugSystemConfigStore` 因此**只能**走 `ISystemConfigApiClient`（HTTP 自调用） | `SystemConfig/PlugSystemConfigStore.cs` 构造函数 |
+| 工位机 `CJ.Plug.StationApiServer` 引用 `CJ.Plug.ApiClient` ⇒ 删 `CJ.Plug.SystemConfigApiClient` 会连带改工位机 | 其 csproj `ProjectReference` |
+| `CJ.Plug.ModuleConfig` 同时引用 `CJ.Plug.SystemConfig` + `CJ.Plug.SystemConfigApi`，并调用 `AddSystemConfigPageModuleServices` / `AddSystemConfigModuleApiServices` / `AddSystemConfigModuleApi` | `ModuleConfig.cs:10,17,70,108,147` |
+
+⇒ P7.1a 的真实工作量 = **给 Web 薄壳补数据访问层（或推翻"薄壳无库"的架构前提）+ 改工位机引用 + 拆 3 个模块注册点 + 数据迁移**。
+不是"一次性机械改动"，需单独决策。**本轮不做**。
+
 ### F.3 P8 —— A2A 工具面（供给侧）
 
 **为什么必须新开两个 REST 端点，而不是让桥直接走 MCP**：McpServer 对外是标准 MCP（Streamable HTTP / JSON-RPC），
@@ -1663,11 +1687,11 @@ G.4 的 T6 备注把日志 `[DynamicWorkflowTool] Tool=111` 读成「111 个工�
 |---|---|---|---|
 | 1 | P4（41 表归一） | P2 冒烟结论（✅ 已出）+ **db 备份确认** | 含数据搬迁，须实机 |
 | 2 | P5（身份替换） | P4 + 管理员初始密码写入方案 | **不可整体回滚** |
-| 3 | P6.3（`AccessKey` 与模块内功能键对齐） | P5 的 Permission 矩阵 | 须 P5 先行 |
+| 3 | P6.3（`AccessKey` 与模块内功能键对齐） | ✅ **已收口（2026-10-30）**：4 模块补声明、5 模块旧权限契约归口、27 个功能点进矩阵；显示名 3 处统一（`plug-tool-action` features 0→1）；P5.5 真第三批 `/api/plug-agent/tools` 收口（匿名 401 实测）+ 临时认证死代码删除。**原"矩阵无接口行"残留已于同日解决**：原归因（端点扫描失效）**是错的**，真因是 `GetAllAsync` 硬编码 `includeEndpoints:false`，修法见 `CJCore/docs/（已完成）策略②接口权限键可授性方案-20261030.md`（V1~V14 全过） | 见方案 §9、§10 |
 | 4 | P7.1 严格口径（ApiServer 侧贡献配置） | 确认 F.2 记录的偏差口径 | 需你拍板 |
 | 5 | P7.2（许可证） | 差异对照表对齐 | 计划写明「未对齐不得替换」 |
 | 6 | **P8 消费链**（CJPlug 接入 CJCore.Agent） | **先拍 D1（附录 I.3）**：A 可观测 / B 换工具源 / C 起 Agent / D 维持现状 | 供给侧 ✅，消费侧未接（**调研已发现既有 MCP 直连消费链，见附录 I.1 第 4 条**） |
-| 7 | **删 `PlugTempAuthHandler` + `PlugTempAdminAuthStateProvider`** | P5 上线当天 | 两件必须**成对**删 |
+| 7 | **删 `PlugTempAuthHandler` + `PlugTempAdminAuthStateProvider`** | ~~P5 上线当天~~ | ✅ **已执行（2026-10-30 P5 收尾批）**：两件成对删除（`Shell/PlugTempAuthHandler.cs`、`Shell/PlugTempAdminAuthStateProvider.cs`）。附录 K 末尾登记的 `InvalidCastException: PlugTempAdminAuthStateProvider → AccessToken…` 应随之消失（未单独复测） |
 
 > **本轮未 commit**（沿用纪律：commit/push 由你触发）。
 > 本轮改动文件：`src/PlugApiServer/CJ.Plug.McpServer/appsettings.json`、
@@ -2140,3 +2164,549 @@ K.9 登记的第三方库问题单独评审后落地，改动比预想小得多�
 1. `InvalidCastException: PlugTempAdminAuthStateProvider → Elsa.Studio.Login.Services.AccessToken…`（登录后 circuit 内抛）—— 与 P5 身份替换直接相关，P5 时需一并处理。
 2. `Can only have one anonymous define call per script file` ×2 —— 疑似 AMD 脚本（Monaco/require）重复加载，既有噪音。
 3. 登录表单提交后 `page.url()` 停在 `/login`（cookie 已种、后续访问正常）—— 需人工确认登录后是否自动跳转，可能是脚本时机问题。
+
+---
+
+## 附录 L：P8 供给侧量化取证 —— 工具清单为何是空的（2026-10-30）
+
+> **结论先行：`/api/plug-agent/tools` 返回 `[]` 不是缺陷，是数据空态。** 三跳链路全部 200 可用，
+> 工具数为 0 是因为 `MCPTools` 表 **0 条记录**（没有任何已发布并启用的 MCP 工具）。
+> 这一条同时意味着：**P8.3 的"可验收"目标至今没有真正达成过** —— 管道建好了，但从未流过水。
+
+### L.1 三跳链路逐跳实测（2026-10-30 08:00，服务已停）
+
+| 跳 | 端点 | 实测 | 说明 |
+|---|---|---|---|
+| 1 | `GET /api/mcp/getPublishedWorkflows` | **200 `[]`** | 上游数据源（ApiServer 侧 `MCPToolsManageService`） |
+| 2 | `GET /api/plugbridge/tools` | **200 `[]`** | McpServer 桥接窗，读 `DynamicToolRegistry.GetProtocolTools()` |
+| 3 | `GET /api/plug-agent/tools`（管理员） | **200 `[]`** | 宿主侧 `PlugWorkflowAgent.GetVisibleTools()`，源 = `IToolRegistry.AllEnabledDefinitions` |
+| 回归 | 同上（匿名） | **401** | P6.3 权限收口仍生效（未因本次调研回退） |
+
+### L.2 数据源为空的实证（直接读库，非推断）
+
+```
+CJPlug/02.Publish/Services/main.db        1,191,936 B  (-wal 424,392 B)
+sqlite> SELECT COUNT(*) FROM MCPTools;  →  0
+```
+
+过滤条件是 `IsEnabled == true`（`MCPToolsManageService.GetActiveToolsAsync():60`），
+而表里**连一条记录都没有** ⇒ 不是"有工具但没启用"，是**从未发布过**。
+
+### L.3 途中排除的两个错误假设（留档，避免重复排查）
+
+| 假设 | 排除依据 |
+|---|---|
+| 「`PlugPortGate` 把 `/api/plugbridge/*` 拦在 3001，5066 上访问不到」 | 错。`case WebPort` 分支是 `!IsMcpEndpoint(path) && !path.StartsWithSegments("/elsa")`，`plugbridge` 在 **5066 上放行**；`case McpPort` 才显式列它。实测第 2 跳 200 也直接证伪 |
+| 「`MapPlugMcpBridge()` 没挂载 ⇒ 404」 | 错。`ApiServer/Program.cs:485` 与 `McpServer/Program.cs:113` **都挂了** |
+
+### L.4 这件事的真正含义（比"清单为空"重要）
+
+P8.3（附录 J）的验收目标是把「工具进了注册表」变成**可见、可验收**。现状是：
+
+| 已验证 | 从未验证 |
+|---|---|
+| 三跳 HTTP 200、`IToolRegistry` 可被解析、`PlugMcpToolSyncService` 已注册为 HostedService、`/api/plug-agent/tools` 权限收口 | `PlugMcpToolExecutor` **从未真正执行过一次**、`LLMAgentBase` 的**多轮工具循环从未真正跑过**、`ToolNameSanitizer` 对真实工作流名的净化结果未见过 |
+
+⇒ **J.5 验收清单里凡是"喂给模型的工具数 > 0"相关的条目，实际都没跑过。**
+这不阻塞交付（CJPlug 本来就没有已发布工作流可暴露），但**不能用"实测通过"来描述 P8.3**。
+
+### L.5 决策点 D1（本轮只定这一个）：要不要让 P8 供给侧真正流过一次水？
+
+> **✅ 已选定 B（2026-10-30 08:0x）**：真发端到端跑一遍。完整执行记录与结论见**附录 M**。
+> 结论剧透：**"调用"这一跳是坏的** —— 桥接层以上全通，末端 Elsa 执行必然 500。
+
+| 选项 | 做法 | 成本 | 收益 | 副作用 |
+|---|---|---|---|---|
+| **A（推荐）** | **不动真实库**：补一个单测/集成探针，用桩 `IToolExecutor` 直接塞进 `DefaultToolRegistry`，断言 `AllEnabledDefinitions` 与 `Resolve` 的行为（含同名覆盖、Enabled 过滤） | 低，只加测试 | 把"注册表语义"变成可回归的断言，零数据污染 | 不覆盖真实 MCP 工具执行路径 |
+| **B** | 在测试库发一个工作流做端到端验收（发 → 同步 → 列表 → 调用 → 删） | 中 | 真正跑通 `PlugMcpToolExecutor` + 多轮循环 | ⚠ 会写 `MCPTools` 表与 Use0 PDZ；删除能否干净无保证 |
+| **C** | 结案不动：文档写明「P8.3 管道已建、零数据未验收，待有真实工作流时补验」 | 0 | 立即收口 | 交付物里 P8.3 的"可验收"目标实际是空的 |
+
+---
+
+## 附录 M：P8 供给侧端到端验收（D1=B 执行记录，2026-10-30）
+
+> **结论先行：发布 / 同步 / 发现 / 删除四条链路全部打通且实测通过；「调用」这一跳是坏的。**
+> 更准确地说：**P8 自己负责的桥接层（发现 → 执行器 → 桥 → 引擎入口）全部走通，
+> 断在它下游的 Elsa 保存链上**。这一个"第一次真正执行"暴露了附录 J 从未测到的真实缺陷。
+
+### M.0 安全前置（B 方案是写库操作，先做了三件事）
+
+| # | 动作 | 结果 |
+|---|---|---|
+| 1 | 备份 `main.db` 三件套（db / -wal / -shm，共 1.67 MB） | `CJPlug/02.Publish/Services/_bak_20261030_P8/` |
+| 2 | 确认执行目标 `G8zB` 是否安全 | `ActivityJsonData` 仅 **88 字节**，只有 `id/nodeId/definitionId/type/name`，**无任何活动节点** ⇒ 执行为 no-op |
+| 3 | 选定工具名 `P8 E2E 验收-Tool`（含中文+空格+连字符） | 专门用来验 `ToolNameSanitizer` 对真实中文名的净化结果 |
+
+> 库内现状：`Plugs` 1 条（`G8zB`）、`PlugDataZones` 2 条（含 `adminG8zBDesi` / Type=`Desi`）、`PlugDatas` 1 条变量 `111`。
+> 具备发布条件（`PublishToolAsync` 需要 Desi PDZ 才能复制出 Use0 模板）。
+
+### M.1 五步实测结果
+
+| 步 | 动作 | 实测 | 判定 |
+|---|---|---|---|
+| 1 | `POST /api/mcp/addTool`（sourcePlugId=`G8zB`） | **200**，`Id=1`；库内 `MCPTools` 0→1，自动创建 `MCP_Use0_G8zB`（Type=Use0，UserName=`MCP_System`） | ✅ |
+| 2 | 同步（`SignalR MCPToolUpdated` 即时 + 宿主 30s 兜底） | 发布后**立即可见**，无需等待轮询 | ✅ |
+| 3 | 发现三跳 | `getTools`=1、`getPublishedWorkflows`=1、**`/api/plug-agent/tools` 0→1** | ✅ **核心判据达成** |
+| 4 | 调用 `POST /api/plugbridge/call` | ❌ **HTTP 400 / 下游 500**（详见 M.3） | ❌ |
+| 5 | 删除 `DELETE /api/mcp/deleteTool/1` | **200**，`getTools` 回到 `[]` | ✅ |
+
+### M.2 净化器的真实结果（J.5 里"从未见过"的那一项）
+
+发布名 `P8 E2E 验收-Tool` ⇒ **实际工具名 `P8_E2E_Tool`**。
+
+| 阶段 | 值 |
+|---|---|
+| 非法字符替换（`[^A-Za-z0-9_.\-]`→`_`） | `P8_E2E___-Tool`（空格→`_`、中文"验收"→`__`） |
+| 连续分隔符压缩（`[_.\-]{2,}`→`_`） | `P8_E2E_Tool` |
+| Trim | `P8_E2E_Tool` |
+
+⇒ **中文工作流名会被整段吞掉，只留下拉丁字符骨架**。两个同名中文流程会**碰撞**，
+靠 `EnsureUnique` 追加 `_2` 区分 —— 管理员在 MCP 客户端里看到的将是 `P8_E2E_Tool` 与 `P8_E2E_Tool_2`，**无法反推原流程**。
+
+### M.3 调用失败的根因链（四环，每环都是通用缺陷）
+
+异常（服务端日志实拍）：
+
+```
+System.InvalidOperationException: 触发流程执行失败（DefinitionId=G8zB）：
+  引擎返回 200 但未带 x-elsa-workflow-instance-id 头
+  at ElsaApiClient.ExecuteAsync (ElsaApiClient.cs:309)
+  at ElsaApiClient.PrepareAndExecuteWorkflow (:371)
+  at McpWorkflowRunner.ExecuteMcpWorkflowFromRequest (:167)
+  at PlugExecutionEngine.ExecuteFlowSourcePathAsync (FlowSource.cs:38)
+  at PlugExecuteService.ExecuteMcpTool (:321)
+```
+
+逐环实证：
+
+| 环 | 事实 | 位置 |
+|---|---|---|
+| **①** | `SaveWorkflowFromJsonAsync` 先调 `DeleteByDefinitionIdAsync`，用 **DELETE** 打 `/elsa/api/workflow-definitions/{id}` ⇒ Elsa 返回 **405 MethodNotAllowed**；该方法**只 `Console.WriteLine` 不抛**，异常被吞 | `ElsaApiClient.cs:196 / 231-250`（日志实拍 `Error: MethodNotAllowed`） |
+| **②** | `PrepareAndExecuteWorkflow` 对 `SaveWorkflowFromJsonAsync` 的返回值**丢弃不校验**，保存失败仍继续 | `ElsaApiClient.cs:356` |
+| **③** | 结果：`G8zB` **根本没进 Elsa** —— `main-elsa.db` 的 `WorkflowDefinitions` 6 条定义的 DefinitionId 为 `emrq/3kFU/ae78/myfD/Vm2I/thDC`，**没有 G8zB** | 库级实证，非推断 |
+| **④** | 随后执行一个不存在的定义 ⇒ Elsa 返回 2xx 但无 `x-elsa-workflow-instance-id` 头 ⇒ 抛 `InvalidOperationException` ⇒ **HTTP 500** | `ElsaApiClient.cs:304-310` |
+
+> **性质判定**：① 的 405 与 ② 的不校验都**与流程内容无关**，是通用缺陷。
+> 差别只在于"空流程是否会让保存也失败"——但即使保存成功，① 仍会吞掉 405。
+> ⇒ **保守结论：MCP Workflow 工具的执行链路当前不可用；待用非空流程复验以确认是否叠加了空流程因素。**
+
+**排除的两个误判（留档）**：
+
+| 我的误判 | 纠正 |
+|---|---|
+| "`PlugExecutionRequest.PlugDefinitionId` 与 `ExecuteResultData.Ids.PlugDefinitionId` 字段错位" | 错。前者是**间接属性**，setter 直写后者（`PlugExecutionRequest.PlugDefinitionId` 的 `set => ExecuteResultData.Ids.PlugDefinitionId = value`）。读代码要认出间接属性 |
+| "`ExecuteNoPlugIdPathAsync` 因 PlugTypeKey 为 null 而崩" | 错。Ids 有 `= new()` 默认值，不会 NRE；实际走的是 `ExecuteFlowSourcePathAsync` |
+
+### M.4 顺带发现的两个数据空态缺陷
+
+| # | 现象 | 实证 | 影响 |
+|---|---|---|---|
+| 1 | **Use0 PDZ 复制了壳，没复制变量** | 发布后 `PlugVariableDatas` 仍为 0（该表与 `PlugDatas` 是两张表，`CopyPDZ` 复制的是前者）⇒ 日志 `No PlugVariableDatas found. pdZ exists=True, count=0` ⇒ `EntryVariables count=0` | 工具能被列出，但**入口参数恒为空**，`parametersJson` 永远是 `{"type":"object","properties":{}}` |
+| 2 | **`DELETE /api/pdz/deletePDZ/{id}` 恒 500** | 6 个 PDZ 逐个删除全部 500 | 发布产生的 PDZ **无法通过 API 清理**（本次改由库级删除完成） |
+
+### M.5 清理与复原（已核对，与备份逐表比对）
+
+| 项 | 处理 |
+|---|---|
+| `MCPTools` | 走 API 删除（`deleteTool/1` ⇒ 200），已回 0 |
+| `PlugDataZones` | 库级删除 Id 3–8（`MCP_Use0_G8zB` + 5 个 `MCP_CallerG8zBJob3*`），已回 2 条 |
+| `Jobs` / `PlugVariableDatas` | 库级删除各 5 条（本次执行产生的孤儿），已回 0 |
+| **残留差异** | 仅 `AuditLogs` +15、`TRA_SysLoginSessions` +1、`sqlite_sequence` +3 —— **审计日志按合规保留，未删** |
+
+`MCPTools / PlugDataZones / PlugDatas / Plugs / Jobs / PlugVariableDatas` 六张业务表现值**与备份完全一致**。
+
+### M.6 决策点 D2（本轮只定这一个）：Elsa 保存链要不要修？
+
+| 选项 | 做法 | 收益 | 代价 |
+|---|---|---|---|
+| **A（推荐）** | 只修**最小必要**：② 保存结果强制校验（失败即中断并回明确错误）+ ① 405 不再静默（至少升为 Warning 日志） | 让失败**立刻可见且语义正确**，不再伪装成"引擎 200 无头" | 不修根因（DELETE 端点可能本身就该换路径/方法），执行仍会失败，只是失败得明白 |
+| **B** | 修根因：定位 Elsa 侧 `workflow-definitions/{id}` 正确的删除方式并改对，再用**非空流程**复验整链 | 真正让 MCP Workflow 可执行 | 要动 Elsa 集成；需先造一个非空流程（库里没有现成的） |
+| **C** | 结案不动：文档写明「发布/同步/发现/删除已验收，调用不可用（断在 Elsa 保存链）」 | 立即收口，交付物诚实 | 附录 J 的"可验收"目标里，调用一项为红 |
+
+> 另有两个**独立**缺陷不入 D2，需另立条目：`Use0` 变量未复制（M.4-#1）、`deletePDZ` 恒 500（M.4-#2）。
+
+---
+
+## 附录 N：D2 = B 执行记录（2026-10-30）
+
+> 决策：D2 选 **B（修根因 + 非空流程复验）**。
+> 结果：**代码修复已完成并生效；但复验把根因从"删除端点用错方法"升级到认证层，保存链仍未打通** —— 需新决策（N.5）。
+
+### N.1 代码修复（已落地，2 处）
+
+| # | 位置 | 改动 | 效果 |
+|---|---|---|---|
+| 1 | `ElsaApiClient.DeleteByDefinitionIdAsync` | 返回 `Task<bool>`；**2xx=成功、404=本来不存在（也判成功）、其余（含 405/302）记 `CLog.Warning` 并带响应体**；传输异常降为 Warning。**不再只 `Console.WriteLine` 吞掉**，也不阻断保存（保存是 upsert，删除只是清历史版本的可选前置） | 失败可见；不再伪装"已删除" |
+| 2 | `ElsaApiClient.PrepareAndExecuteWorkflow` + 新增 `EnsureWorkflowSavedAsync` | 保存后**按 definitionId 回读校验**，读不到就抛「流程保存未生效……」；`SaveWorkflowFromPlugAsync` / `SaveWorkflowFromJsonAsync` 同样校验 | 环②「保存结果丢弃」被彻底堵死：症状不再漂移成"引擎 200 无实例 ID" |
+
+**修复效果实证**：第④步调用失败时，异常文本由原来的
+`触发流程执行失败：引擎返回 200 但未带 x-elsa-workflow-instance-id 头`
+变为
+`流程保存未生效（DefinitionId=G8zB）：引擎接受了保存请求，但按 definitionId 回读不到定义……`
+—— 语义正确，指向真因。
+
+### N.2 复验环境先撞上「部署形态与已合并架构不一致」
+
+| 现象 | 证据 | 判定 |
+|---|---|---|
+| 按 `02.Publish/start-services.cmd` 起了 **4 个进程**（8686/8687/3001/5066） | 该脚本仍写着"starting 4 services" | ⚠ **脚本停留在融合前形态**：单端口收敛（第二轮，2→1 进程 / 5→1 端口 5066）后应只起主宿主 |
+| 5066（独立 HostWebServer）启动即被自动迁移拦死 | `MASS-ARCHIVE-BLOCKED`：删表 51 张 ≥ 阈值；模型 **29 张** vs 库 **80 张** | HostWebServer 只调 `ConfigModulePageServices()`，**17 个业务 `IModuleBusinessDbConfig` 全在 `ConfigModuleApiServices()` 里** |
+| 数据是否受损 | 逐表核对 `Plugs 1 / MCPTools 0 / PlugDataZones 2 / PlugDatas 1 / Jobs 0 / PlugVariableDatas 0`，`__CjModelSnapshot` 的 ModelHash 与备份**完全一致**，无新增 `_dropped_*` 表 | ✅ **护栏生效，数据零丢失** |
+
+**修法（已落地）**：`ModuleConfig` 新增 `ConfigModuleDbConfigServices()`（只注册 17 个 DbConfig，**不注册**端点/API 客户端），调用点放在 **`HostWebServer/Program.cs`（独立形态专用薄壳）**，不放在共享的 `AddPlugWebHost()` —— 否则合并形态会重复注册。
+
+### N.3 合并形态复验（唯一宿主 = `CJ.Plug.ApiServer` @ 5066）
+
+| 事实 | 证据 |
+|---|---|
+| 合并方向 = **Web 并入 ApiServer** | `ApiServer/Program.cs:87 ContractUrls="http://*:5066"`、`:286 builder.AddPlugWebHost()`、`:465 app.MapPlugWebHost()`；`WebHostStartup.cs:31-35` 注释 |
+| 单进程启动成功 | `Now listening on http://[::]:5066`、`Application started`、`MASS-ARCHIVE-BLOCKED` **0 次** |
+| 服务面齐全 | 首页 200、`/api/mcp/getTools` 200、登录 `/api/three-role/account/login` 200 |
+| DbConfig 打印 42 行 = **21 模块 × 迁移引擎两次建模**（快照模型 + 目标模型） | 不是重复注册；重复注册会是同一集合进两次 DI |
+
+**五步结果（非空流程夹具：`Elsa.Flowchart` + `Elsa.WriteLine`，311 B）**：
+
+| 步 | 动作 | 结果 |
+|---|---|---|
+| ① | `POST /api/mcp/addTool`（sourcePlugId=`G8zB`） | ✅ 200，`Id=2` |
+| ② | 同步 | ✅ 立即可见 |
+| ③ | `getTools` / `getPublishedWorkflows` | ✅ 1 条 / 1 条（`entryVariables` 仍为 `[]`，见 N.6） |
+| ④ | `POST /api/plugbridge/call` | ❌ HTTP 400，下游 500 —— **但错误语义已正确**（N.1） |
+| ⑤ | `DELETE /api/mcp/deleteTool/2` | ✅ 200，`getTools` 回 `[]` |
+
+**清理**：删 PDZ Id 9–13（5 条）、Jobs Id 6–9（4 条）、`PlugVariableDatas` 0 条；`Plugs.ActivityJsonData` 还原为原 88 B 值。六张业务表回到基线。
+
+### N.4 ④ 的真根因：**`/elsa/api/*` 被 CJCore 三员认证拦成 302**（比 M.3 深一层）
+
+| # | 事实 | 证据 |
+|---|---|---|
+| 1 | Elsa 3.9 删除端点契约**本来就是对的**：`DELETE /workflow-definitions/{definitionId}`，删成功 **204**、找不到 **404** | Elsa 源码 `Endpoints/WorkflowDefinitions/Delete/Endpoint.cs`（`Delete("/workflow-definitions/{definitionId}")` + `RequirePermission(Definitions, CoreVerbs.Delete)`） |
+| 2 | 现状：`/elsa/api/*` **全部 302 到登录页**（DTO 连 `/elsa/api/workflow-definitions` POST 也是 302） | `curl -i POST /elsa/api/workflow-definitions` → `302 Location: /three-role/login?ReturnUrl=...`；带三员 Bearer 同样 302 |
+| 3 | HttpClient **自动跟随** 302 → 拿到 **200 的登录页 HTML** ⇒ 保存被判"成功" | 库实证：`main-elsa.db` 的 `WorkflowDefinitions` 仍只有 6 条旧定义，**没有 G8zB**；日志出现 `'<' is an invalid start of a value`（HTML 撞 JSON 反序列化） |
+| 4 | 机制：CJCore 的 `ForwardDefaultSelector` **只认 `Bearer ` 前缀** → 一律送 CJCore 自己的 JwtBearer（密钥与 Elsa 不同）⇒ Elsa 的 admin JWT 验签失败 ⇒ 未认证 ⇒ Cookie challenge 302 | `CJCoreAuthServiceCollectionExtensions.cs:62-68`；Elsa 侧配置是 `UseDefaultAuthentication(UseAdminApiKey())` + Elsa.Identity 自己的 JWT |
+| 5 | 归因：**P5 认证替换的遗留缺口** —— P5.5 收紧认证时没给 `/elsa/api` 留身份通道；而 `InternalApiKeyGate` 注释里写的「/elsa/api 按 D-P5-9=A 保持匿名」只覆盖内部密钥网关，**没覆盖三员认证** | `InternalApiKeyGate.cs:114` vs 实际 302 |
+
+### N.5 待拍板（新决策点 D7）：认证接缝怎么补 —— **已拍板 A 并已实施，见附录 O**
+
+| 选项 | 做法 | 代价 |
+|---|---|---|
+| **A（推荐）** | CJCore 认证的 `ForwardDefaultSelector` 增加「路径 → scheme」映射：`/elsa/api` + `Bearer` ⇒ 转发到 **Elsa 自己的 JwtBearer scheme**（每个前缀用自家身份体系，语义最正） | 改 CJCore 框架一处（需确认 Elsa 注册的 scheme 名并做可配置化），影响面小 |
+| **B** | ElsaApiClient 改发 Elsa 的 **ApiKey** 头 + Elsa 侧显式配置 ApiKey（3.9 未配置=全拒）+ Selector 认 `ApiKey` 头转发 | 两处改，密钥要落配置 |
+| **C** | `/elsa/api` 认证层放行（匿名），安全边界交给 `InternalApiKeyGate`（EnforceWrite 档）+ 内网 | 依赖网络边界；Elsa 端点自身 `RequirePermission` 仍需处理，可能仍 302/403 |
+
+> 推荐 **A**：它是 P5 认证替换的收口动作，且能同时修好流程编辑器（Studio 侧 `CjElsaAutoLoginJwtAccessor` 走的是同一套 Elsa JWT）。
+
+### N.6 顺带取证
+
+| 项 | 结论 |
+|---|---|
+| `getPublishedWorkflows.entryVariables` 恒 `[]` | **M.4-#1 复现**：`CopyPDZ` 复制 `PlugVariableDatas`（0 行）而非 `PlugDatas` ⇒ 入口参数恒空。独立缺陷，不入 D2/D7 |
+| `02.Publish/start-services.cmd` | **必须改**：融合后只剩 1 个进程（`CJ.Plug.ApiServer`，5066）。留着 4 进程会持续制造"回退形态"事故 |
+| `CJPlug.Server` 中立宿主提议 | 方向认同（装配入口单一化），建议作为独立决策点（P9）评审后再动；眼下先修脚本 + 收敛双头装配注释 |
+
+## 附录 O：D7 = A 执行记录 —— `/elsa/api` 认证交回 Elsa（2026-10-30）
+
+> 状态：**已实施并实测通过**。P8 供给侧 ①~⑤ 全绿，④ 调用首次返回真实实例 ID。
+
+### O.1 结论先行
+
+| 项 | 结果 |
+|---|---|
+| 根因 | CJCore 统一认证基座的 `ForwardDefaultSelector` 只按 `Bearer ` 前缀分流 ⇒ Elsa 的 JWT 被送进 CJCore 的 JwtBearer 验签失败 ⇒ Cookie challenge ⇒ 302 登录页 ⇒ 客户端跟随重定向拿到 200 的 HTML（保存"假成功"） |
+| 修法 | CJCore 新增中立扩展点 `IAuthSchemeOverrideSelector`（CJCore 不认识 Elsa）；Elsa 模块注册"`/elsa/api` 前缀 ⇒ Elsa 的 `Jwt-or-ApiKey`" |
+| 效果 | `POST /elsa/api/workflow-definitions` 真正入库（`main-elsa.db` 出现 `G8zB`，`IsPublished=1`），`plugbridge/call` 返回实例 ID `8bb06570f4d1e74d` |
+| 影响面 | 仅"带 selector 且路径命中"的请求改变分流；未注册 selector 的宿主（CJCore 其它产品）**零行为变化** |
+
+### O.2 改动清单（4 处）
+
+| # | 文件 | 改动 |
+|---|---|---|
+| 1 | `CJCore/src/Framework/CJCore.Framework.Abstractions/IAuthSchemeOverrideSelector.cs`（新增） | 扩展点接口：`string? SelectScheme(string path)`，约定 Singleton、返回 null 不接管、多实现按注册顺序首个非空生效 |
+| 2 | `CJCore/src/Framework/CJCore.Framework.Api/Auth/CJCoreAuthServiceCollectionExtensions.cs` | `ForwardDefaultSelector` 先问 selector（惰性解析并缓存一次），命中即整体转交；未命中回落到原 Bearer/Cookie 分流 |
+| 3 | `CJPlug/.../CJ.Plug.ElsaIntegration/Auth/ElsaAuthSchemeOverride.cs`（新增） | 路径按"段边界"匹配 `/elsa/api`，返回 Elsa 的 scheme `Jwt-or-ApiKey` |
+| 4 | `CJPlug/.../CJ.Plug.ElsaIntegration/ElsaExtensions.cs` + `.csproj` | 在 `AddElsaServicesForApi` 注册 selector（**只在此处**：此处必然已 `AddElsa`，scheme 一定存在）；csproj 增 `CJCore.Framework.Abstractions` 项目引用 |
+
+### O.3 关键取证：Elsa 侧的 scheme 名
+
+| 取证点 | 结论 | 来源 |
+|---|---|---|
+| Elsa 注册了哪些认证 scheme | `Services.AddAuthentication("Jwt-or-ApiKey").AddPolicyScheme("Jwt-or-ApiKey") + .AddJwtBearer() + .AddJwtBearer("RefreshToken") + ApiKey` | `Elsa.Identity/Features/DefaultAuthenticationFeature.cs` @3.9.0（`private const string MultiScheme = "Jwt-or-ApiKey"`） |
+| 该方案自己怎么分流 | 头部含 `ApiKey` ⇒ `ApiKey`；否则 ⇒ `Bearer` | 同上 `ForwardDefaultSelector` |
+| `IdentityAuthenticationSchemes.AccessToken` | = `JwtBearerDefaults.AuthenticationScheme`（即 `"Bearer"`） | `Elsa.Identity/Constants/IdentityAuthenticationSchemes.cs` |
+| 为什么 302 而不是 401 | 失败后由 `DefaultChallengeScheme`（CJCore 设为自己的 Cookie）处理 ⇒ `Location: /three-role/login?ReturnUrl=...` | 实测响应头 |
+
+> ⚠ `"Jwt-or-ApiKey"` 是 Elsa 的**私有常量**，升级 Elsa 大版本须复核（未命中会抛 "Scheme not registered" —— 显性失败，不会静默）。已在代码注释中标注。
+
+### O.4 实测（合并形态：唯一宿主 `CJ.Plug.ApiServer` @ 5066）
+
+| 步 | 操作 | 结果 |
+|---|---|---|
+| 0 | 启动 | `Now listening on http://[::]:5066`、`Application started`、**MASS-ARCHIVE 拦截 0 次**；`GET /`=200 |
+| — | 认证面基线 | `GET /elsa/api/...` 无凭据仍 302 → `/three-role/login`（未命中 selector 的路径行为不变）；`POST /elsa/api/identity/login` = **200**（此前被 302 成登录页 HTML，是 `'<' is an invalid start of a value` 的来源之一） |
+| ① | `POST /api/mcp/addTool`（sourcePlugId=G8zB） | 200，`Id=3` |
+| ② | `GET /api/mcp/getTools` | 1 条（`P8 E2E 验收-Tool`） |
+| ③ | `GET /api/mcp/getPublishedWorkflows` | 1 条（`workflowDefinitionId=G8zB`，`entryVariables` 仍 `[]` = M.4-#1 未修，已知独立缺陷） |
+| ④ | `POST /api/plugbridge/call` `{name:"P8_E2E_Tool"}` | **200，1.2s，`工作流执行成功，实例 ID: 8bb06570f4d1e74d`** |
+| ⑤ | `DELETE /api/mcp/deleteTool/3` | 200，`getTools` = `[]` |
+| 入库校验 | `main-elsa.db` | `WorkflowDefinitions` 7 条（新增 `G8zB`/`111`/v1/`IsPublished=1`）、`WorkflowInstances` 7 条 |
+
+> 与附录 M 的对照：M 阶段 ④ 恒 400/500；本次 ④ 首次成功。**"保存假成功"链路彻底消除**（D2=B 的回读校验也一并验证：未生效即抛，不再静默）。
+
+### O.5 数据零残留
+
+清理口径：`MCPTools` 走 API 删除；`PlugDataZones`/`Jobs`/`PlugVariableDatas` 按 Id 段库删；`Plugs.ActivityJsonData` 还原为原 88 B；`main-elsa.db` 删除 `G8zB` 的定义与实例。
+
+与 `_bak_20261030_P8/main.db` **逐表内容比对（行数 + 全行 sha256 前 16 位）**：
+
+| 表 | 当前 | 备份 | 一致 |
+|---|---|---|---|
+| Plugs | 1 / `bf90a07358d66b19` | 1 / `bf90a07358d66b19` | ✅ |
+| MCPTools | 0 / `4f53cda18c2baa0c` | 0 / `4f53cda18c2baa0c` | ✅ |
+| PlugDataZones | 2 / `b5b681ee1918422f` | 2 / `b5b681ee1918422f` | ✅ |
+| PlugDatas | 1 / `ebcfcca8a11e10d9` | 1 / `ebcfcca8a11e10d9` | ✅ |
+| Jobs | 0 / `4f53cda18c2baa0c` | 0 / `4f53cda18c2baa0c` | ✅ |
+| PlugVariableDatas | 0 / `4f53cda18c2baa0c` | 0 / `4f53cda18c2baa0c` | ✅ |
+
+`main-elsa.db` 回到 6 条定义 / 6 条实例（本轮前基線）。
+
+### O.6 遗留与后续
+
+| 项 | 状态 |
+|---|---|
+| M.4-#1 `entryVariables` 恒 `[]` | ✅ **已收口（附录 Q.3）**：原归因「CopyPDZ 复制错表」经复验推翻，实为数据空态；顺带修掉真缺陷（`PublishToolAsync` Include 不全） |
+| M.4-#2 `DELETE /api/pdz/deletePDZ/{id}` 恒 500 | ✅ **已修（附录 Q.2）**：`FindAsync` 用 string 打 int 主键，改按业务键查 + 数字回退 |
+| `02.Publish/start-services.cmd` 仍起 4 进程 | ✅ 已改为**只起 `CJPlug.Server`**（P9，原件备份 `start-services.cmd.bak4proc`） |
+| `CJPlug.Server` 中立宿主（P9） | ✅ **已完成**，见 `（已完成）CJPlug.Server中立宿主方案-20261030.md` |
+| CJCore 侧是否需要"认证方案覆盖"的对外文档 | ✅ 已补：`CJCore/docs/CJCore-登录认证统一架构方案.md` §8（`IAuthSchemeOverrideSelector` 契约 + 约束 + 实测） |
+
+## 附录 P：P9 中立宿主 CJPlug.Server 实施记录（2026-10-30）
+
+> 详细方案与逐项改动见 **`（已评审）CJPlug.Server中立宿主方案-20261030.md`**（D1 = A，含 §9 实施记录）。本附录只留验收结论与跨文档引用。
+
+### P.1 结论
+
+**CJPlug 的宿主已由 `CJ.Plug.ApiServer` 改为 `CJPlug.Server`**（新项目 `src/Server/CJPlug.Server`，`Microsoft.NET.Sdk.Web`）；`CJ.Plug.ApiServer` 降级为**类库**，只保留打包发布业务（PackageApi / PackageService / Hubs / Infrastructure）+ 两个扩展方法。
+
+装配入口从此**物理唯一**：改之前分裂在 `ApiServer/Program.cs`（553 行）与 `HostWebStartup.cs`（552 行）两处，边界只写在注释里 —— 2026-10-30 上午的"补丁放错位置 ⇒ 重复注册 ⇒ 17677 条 ESTABLISHED"就是它导致的。
+
+### P.2 顺带决策：`CJ.Plug.Setup` 废弃
+
+用户决策：**CJPlug 安装器废弃，交付统一走 CJSuite 打包与安装器**。取证确认它早已弃用（不在 sln、不在打包脚本、无项目引用），已物理删除 `src/Framework/CJ.Plug.Setup`。
+
+### P.3 验收（单进程 Debug，全绿）
+
+| 项 | 结果 |
+|---|---|
+| 构建 | `CJPlug.Server` 0 错误；全解构建见 §P.4 |
+| 启动 | `Now listening on http://[::]:5066`、MASS-ARCHIVE 拦截 **0 次** |
+| 模型集 | `Module Db EntityConfig` **42 行**（21 模块 × 迁移引擎两次建模，与附录 O 合并形态同值） |
+| 五面 | `/` 200、`/three-role/login` 200、`/api/mcp/getTools` 200、`/api/plugbridge/tools` 200、`/api/pdz/getAllPDZ` 200 |
+| 认证接缝（附录 O） | `POST /elsa/api/identity/login` 200；无凭据 `/elsa/api/*` 仍 302 到登录页（行为不变） |
+| Elsa 链 | `addTool`(Id=4) → `call` **200 / 1.13s / 实例 ID `a86ac1f5cdff5205`** → 定义入库 → `deleteTool/4` 200 → `getTools=[]` |
+| 数据 | 与 `_bak_20261030_P8/main.db` 逐表 hash **全等**；`main-elsa.db` 回 6 条定义 |
+
+### P.4 待补
+
+- ~~全解构建结果~~：`dotnet build CJ.Plug-Aspire.sln` **0 错误**（139 条既有警告）—— ApiServer 类库化 + Setup 删除未破坏任何项目。
+- ~~`assemble-release.ps1 -Target main` 实跑一次~~：**已完成（2026-10-30，见附录 Q.5）**，0 错误、断言通过、发布根清单正确。
+- ~~`02.Publish/CJ.Plug.AspireHost.AppHost`（含旧 Release）与 `02.Publish/CJ.Plug.Setup`~~：**已移出（见附录 Q.4）**，落在 `CJPlug/_trash_20261030/`（1.5 GB），确认无误后可整目录删除。
+
+---
+
+## 附录 Q：M.4 遗留缺陷收口 + 打包实跑（2026-10-30）
+
+> 本轮无新决策点，都是**已登记缺陷的收口**与**误诊纠正**。唯一新抛出的决策点是 Q.6（回退形态去留）。
+
+### Q.1 动作清单
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | `DELETE /api/pdz/deletePDZ/{PDZId}` 恒 500（M.4-#2） | **已修**，实测三个场景全通（Q.2） |
+| 2 | `entryVariables` 恒 `[]`（M.4-#1） | **定性纠正**：原归因错误（Q.3）；顺带修掉一个**真实**缺陷 |
+| 3 | `CopyPDZ` 无 null 守卫 | **已加**：子集合归一成空集合，语义 = "无子项可复制" |
+| 4 | 陈旧产物目录（1.5 GB） | **已移出**工作路径（Q.4） |
+| 5 | 发布根组装实跑 | **通过**（Q.5） |
+| 6 | CJCore 侧「宿主自带身份体系的接缝」文档 | **已补**（`CJCore/docs/CJCore-登录认证统一架构方案.md` §8） |
+
+### Q.2 M.4-#2：`deletePDZ` 恒 500 的根因与修复
+
+**根因（一行代码，类型错配）**：
+
+```csharp
+// 改前
+var pdz = await _dbContext.Set<PlugDataZone>().FindAsync(new object[] { PDZId }, ct);
+```
+
+`PlugDataZone` 的主键是 `Id(int)`，而路由 `/api/pdz/deletePDZ/{PDZId}` 传进来的是**业务键 `PDZId`（string，如 `MCP_Use0_G8zB`）**。`FindAsync` 按主键查找，string 塞进 int 主键 ⇒ EF 抛键值类型异常 ⇒ 端点恒 500。**与数据库、与方法/路径、与权限都无关** —— 这也是 M.5 当时只能"改由库级删除"的原因。
+
+**修复**（`PDZManageService.DeletePDZ`）：
+
+| 改前 | 改后 | 效果 |
+|---|---|---|
+| `FindAsync(PDZId)` 按 int 主键找 string | `FirstOrDefaultAsync(p => p.PDZId == PDZId)`；未命中且入参是纯数字时再按 `Id` 回退 | 业务键命中；旧调用方传主键也兼容 |
+
+子表清理依赖**库侧级联**（`PRAGMA foreign_key_list` 实测：`PDZVariable` / `PlugVariableDatas` / `PlugDatas` / `PlugStatusDatas` / `ActionDatas` / `ActionVariableDatas` / `DataFlowDatas` 对 `PlugDataZones` 全部 `ON DELETE CASCADE`），不需要逐个 Include 后再删。
+
+> 顺带登记（本轮**未改**）：同文件 `DeleteByFilter` 用 `p.PDZId.Contains(filter.PlugDefinitionId)` 做**子串**匹配 —— 传 `G8` 会连 `adminG8zBDesi` 一起删。`DeletePDZByDeletePlug` 走的正是这个方法，属"删插头时连带删 PDZ"的批量路径，误删面较大，建议后续改为按 `PlugDefinitionId` 精确匹配 + `Type` 过滤。
+
+**实测**（单进程 `CJPlug.Server` @5066，Debug）：
+
+| 场景 | 改前 | 改后 |
+|---|---|---|
+| 不存在的 PDZId（`__no_such_pdz__`） | 500 | **200 + `false`** |
+| 纯数字未知主键（`999999`） | 500 | **200 + `false`** |
+| 真实 PDZ（`__smoke_del__`，带 1 条 PlugDatas + 1 条 PlugVariableDatas） | 500 | **200 + `true`**，三表子行同时归零 |
+| 真实 PDZ（`MCP_Use0_ZzSmokePlug` / `adminZzSmokePlugDesi`） | — | **200 + `true`**（发布产生的 PDZ 现在能通过 API 清理） |
+
+### Q.3 M.4-#1：`entryVariables` 恒 `[]` 是**误诊**，但底下压着一个真缺陷
+
+原记载（附录 M.4）是「**Use0 PDZ 复制了壳，没复制变量** —— `CopyPDZ` 复制的是 `PlugVariableDatas`，该表与 `PlugDatas` 是两张表」。**这句归因是错的**，直接读代码即可推翻：
+
+`PlugDataZone.CopyPDZ` 依次复制 **7 个集合**（`PDZVariables` / `PlugVariableDatas` / `PlugDatas` / `PlugStatusDatas` / `ActionDatas` / `ActionVariableDatas` / `DataFlowDatas`），并不存在"复制错表"。
+
+**真因（数据空态，直读库取证）**：
+
+| 表 | 值 | 说明 |
+|---|---|---|
+| `PlugVariableDatas` | **0 行** | 整个库没有任何 PDZ 变量行 |
+| `PDZVariable` | **0 行** | 同上 |
+| `PlugVariables` | **0 行** | Plug 定义层也没有变量 |
+| `PlugDatas`（PDZ 1 = `adminG8zBDesi`） | 1 行（`Name='111'`） | 唯一的插头数据，不是变量 |
+
+⇒ `G8zB` 这个 plug **本身没有变量定义**，复制出来的 Use0 PDZ 自然是 0 条 ⇒ 日志 `No PlugVariableDatas found. count=0` ⇒ `entryVariables=[]`。**它不是 bug，是空数据。**
+
+**顺带查出的真缺陷**（这才是要修的东西）：
+
+```csharp
+// 改前：PublishToolAsync 查 Desi PDZ 时只 Include 一个集合
+.Include(p => p.PlugVariableDatas)
+// 而 CopyPDZ 要遍历 7 个集合 ⇒ 其余 6 个是空集合 ⇒ 复制出来的是"缺壳"的 Use0 PDZ
+```
+
+| 改前 | 改后 | 效果 |
+|---|---|---|
+| `PublishToolAsync` 只 Include `PlugVariableDatas` | 与 `CopyPDZ` 遍历的 7 个集合**完全对齐** | Use0 PDZ 的壳（`PlugDatas` / `PDZVariables` / 动作/数据流）不再丢 |
+| `CopyPDZ` 直接 `foreach`（未 Include 时导航为 null 会 NRE） | 方法入口把这些集合 `??= new()` | 调用方 Include 不全时降级为"无子项"，不炸 |
+
+**用带变量的源复验（这才是 M.4-#1 的正确判据）**：造一个源 Desi PDZ（`PlugDatas` 1 / `PlugVariableDatas` 2 / `PDZVariable` 1），走 `POST /api/mcp/addTool`：
+
+| 检查项 | 结果 |
+|---|---|
+| `MCP_Use0_ZzSmokePlug` 是否创建 | 是（Id=20，Type=`Use0`） |
+| 复制出的 `PlugDatas` / `PlugVariableDatas` / `PDZVariable` | **1 / 2 / 1**（与源一致） |
+| `POST /api/mcp/addTool` | 200 |
+| `GET /api/mcp/getPublishedWorkflows` 的 `entryVariables` | **2 条**（`v1` / `v2`，`type=String`）——不再是 `[]` |
+
+> 结论：**链路上没有"变量复制不了"的缺陷**；M.4 当时看到 `[]` 是因为那条数据本身没有变量。修复的价值在"壳"（缺少 `PlugDatas` 时，Use0 PDZ 无法作为参数模板供后续 UI/执行链使用）。
+
+### Q.4 数据零残留（与备份逐表比对）
+
+备份：`02.Publish/Services/_bak_20261030_pdzfix/main.db`。比对方式：行数 + 全行 sha256 前 16 位。
+
+| 表 | 现值 | 备份 | 一致 |
+|---|---|---|---|
+| Plugs | 1 / `21a721f495486690` | 1 / `21a721f495486690` | ✅ |
+| MCPTools | 0 | 0 | ✅ |
+| PlugDataZones | 2 / `4459fdd1e83d925d` | 2 / `4459fdd1e83d925d` | ✅ |
+| PlugDatas | 1 / `6e717e1563b97ba9` | 1 / `6e717e1563b97ba9` | ✅ |
+| Jobs | 0 | 0 | ✅ |
+| PlugVariableDatas | 0 | 0 | ✅ |
+| PDZVariable | 0 | 0 | ✅ |
+| `AuditLogs` | 561 | 561 | ✅（无新增） |
+
+仅 `sqlite_sequence` 前移（自增不复用，属预期）。
+
+**产物清理**：`02.Publish/CJ.Plug.Setup`（1047 MB）、`02.Publish/CJ.Plug.AspireHost.AppHost`（228 MB，含旧 Debug/Release，项目源码与 sln 条目早已不存在）→ 移入 `CJPlug/_trash_20261030/`，**未直接删除**（可回退）。确认无误后可直接删该目录。
+
+### Q.5 发布根组装实跑（`assemble-release.ps1 -Target main`）
+
+| 检查项 | 结果 |
+|---|---|
+| 退出码 | **0** |
+| 构建 | 整解 Release，**0 错误** |
+| 断言 `Services\Release\net10.0\CJPlug.Server.dll` | **通过**（P9 改的断言生效） |
+| 发布根结构 | `CJCore.AppHost.Manager` / `CJCore.AspireHost.AppHost` / `PlugConfig` / `Services` |
+| AppHost 清单 `Resources[]` | **2 条**：`apiservice`=`CJPlug.Server.dll`@5066（Locked）、`stationapi`@7660；**不再出现** DispatchServer/McpServer/WebFrontend |
+| 耗时 | 1 分 25 秒 |
+
+> 说明：`Services/Release/net10.0` 仍是**共享输出目录**，所以包里同时存在 `CJ.Plug.DispatchServer.exe` / `CJ.Plug.HostWebServer.exe` / `CJ.Plug.McpServer.exe` / `CJ.Plug.ElsaApiServer.exe` 等文件 —— 但**清单不启动它们**，属于"冗余体积"，不是行为错误。这正是 Q.6 的决策对象。
+
+### Q.6 决策点：回退形态的去留（**已决议 D2 = B，执行记录见 Q.8**）
+
+现状取证：
+
+| 形态 | 产物 | 清单是否启动 | 源码 |
+|---|---|---|---|
+| `CJPlug.Server`（唯一宿主） | `CJPlug.Server.exe` | ✅ 启动（5066） | `src/Server/CJPlug.Server` |
+| `CJ.Plug.HostWebServer` | `.exe` | ❌ | 仅剩**回退薄壳 Program.cs** |
+| `CJ.Plug.DispatchServer` | `.exe` | ❌ | 完整 |
+| `CJ.Plug.McpServer` | `.exe` | ❌ | 完整 |
+| `CJ.Plug.ElsaApiServer` / `ElsaStudio` | `.exe` | ❌ | 完整（Elsa 独立进程形态） |
+
+| 选项 | 做法 | 收益 | 代价 |
+|---|---|---|---|
+| **A** | **保留**回退形态（现状不动），只在文档里写清"非交付路径" | 零风险；排查时可单独起某个面 | 包体冗余（多个 exe + 各自 deps/runtimeconfig）；新人误起旧 exe 会重演"双宿主同库"事故 |
+| **B** | **删除**回退 exe（HostWebServer / DispatchServer / McpServer / ElsaApiServer / ElsaStudio 全部类库化或移出 sln） | 包体瘦身、装配入口真正唯一、杜绝误起 | 工作面较大；Elsa 独立进程形态若仍被工位机/Studio 依赖，需要逐个确认 |
+| **C** | **折中**：只删 `HostWebServer`（已无独有价值，全站已在 `CJPlug.Server`），其余保留 | 干掉最危险的那个（它能独立起一个"半套"UI 宿主，正是 2026-10-30 事故的引信） | 冗余仍在，只是去掉了最危险项 |
+
+> 建议 **C 起步、B 作后续**：`HostWebServer` 作为独立宿主已无任何独有能力（`WebHostStartup` 被 `CJPlug.Server` 完全覆盖），留着只会被误起；DispatchServer/McpServer/ElsaApiServer 还承担"单面排查"价值，可等发版节奏允许时再收。
+
+### Q.8 D2 = B 执行记录：回退形态一次全删（2026-10-30）
+
+> 决策：**B** —— 旧的多进程独立形态全部下线，装配入口物理唯一。执行前先做了交叉核对，确认不是"砍 regulate 功能"。
+
+#### Q.8.1 先分层：能不能删，取决于有没有人引用
+
+| 项目 | 被 ProjectReference | 源码资产 | 处置 |
+|---|---|---|---|
+| `CJ.Plug.DispatchServer` | ✅ (CJPlug.Server) | MainHub / DispatcherApi / StationService | **类库化**（保留源码，删启动壳） |
+| `CJ.Plug.McpServer` | ✅ | Tools/ Services/ Bridge/ | **类库化** |
+| `CJ.Plug.HostWebServer` | ✅ | Agent / A2A / SystemConfig / razor 页面 | **类库化**（必须保留 `Sdk.Web`，含 razor） |
+| `CJ.Plug.ElsaApiServer` | ❌ 0 引用 | 仅 Program.cs | **移出 sln**（不参与构建） |
+| `CJ.Plug.ElsaStudio` | ❌ 0 引用 | 仅 Program.cs + Error.cshtml.cs | **移出 sln** |
+
+#### Q.8.2 交叉核对结论（这是能动手的前提）
+
+逐条比对 3 个旧 `Program.cs`（66 / 116 / 90 行）与 `CJPlug.Server\Program.cs`（569 行，由 ApiServer 的 553 行逐字搬迁而来）：
+
+- **注册/管道 0 条真缺失** —— 每条都能在宿主侧找到对应位置，或被更上层扩展方法等价覆盖；
+- **8 条语义差异**（融合时的刻意变更）：NSwag 双文档合并、`MapDefaultEndpoints` 位置、OTel 由 `AddSource("*")` 收窄到 ServiceDefaults、日志 sink 名 `Front`→`API`、**授权由全局改为按路径**（`NeedsIdentity`）、**MCP 路径 `/`→`/mcp` + 端口 3001 消亡**、工具刷新改为启动后异步；
+- **2 条必须在删之前登记**：主机保护蜡 MCP 端口契约、前 3 秒 ListTools 空窗；
+- 明确**不要**把旧 `Program.cs` 里的 `ConfigModuleDbConfigServices()` / `MapRemoteDesktopApi()` 补回 HostWebStartup —— 会造成 21 条 DbConfig 重复注册 + 端点名重复致全站 500（2026-10-30 上午已踩过）。
+
+#### Q.8.3 处置清单
+
+| # | 位置 | 改动 |
+|---|---|---|
+| 1 | 三个 csproj | 加 `<OutputType>Library</OutputType>` + 说明注释（HostWebServer 保留 `Sdk.Web`） |
+| 2 | `DispatchServer/McpServer/HostWebServer/Program.cs` | **物理删除**（顶层语句在 Library 下是 CS8805 硬错误；源码其余全部保留） |
+| 3 | `CJ.Plug-Aspire.sln` | 移除 `ElsaApiServer` / `ElsaStudio`（源码目录保留，可随时加回） |
+| 4 | `05.Build/assemble-release.ps1` | 新增 `Assert-Absent`（**负向断言**）+ `Remove-StationStandaloneExe`；原 `McpServer.dll`/`DispatchServer.dll` 正向断言改为断言 **exe 不存在** |
+| 5 | 4 处 3001 口径注释 | `CJPlug.Server/Program.cs`、`PlugPortGate.cs`、`PlugMcpBridgeEndpoints.cs`、`PlugMcpToolExecutor.cs` 全部更正为 **5066 `/mcp`** |
+| 6 | `McpServer` / `HostWebServer` 的 launchSettings.json | profiles 置空（类库下 `dotnet run` 会失败，避免误读成"服务崩了"） |
+| 7 | 输出目录残留 | `CJ.Plug.Elsa*`（40 个文件）移出共享输出目录，避免被 robocopy 搬进发布包 |
+
+#### Q.8.4 验收（Release 配置，实机）
+
+| 项 | 结果 |
+|---|---|
+| `dotnet build CJPlug.Server` | **0 错误** |
+| 输出目录 exe | `CJ.Plug.DispatchServer.exe` / `McpServer.exe` / `HostWebServer.exe` **全部消失** |
+| `assemble-release.ps1 -Target main` | 退出 **0**、0 错误、负向断言通过、图站独立 exe 剔除 2 个、main 载荷 857.8 MB（耗时 1m08s） |
+| 发布包 Services 面 exe | 只剩 `CJPlug.Server.exe`（+ 遗留的 `CJ.Plug.AIChat.exe`，见 Q.7） |
+| Release 实机八面 | `/` 200、`/three-role/login` 200、`/api/mcp/getTools` 200、`/api/plugbridge/tools` 200、`/api/pdz/getAllPDZ` 200、`/api/dispatch/getStations` 200、`/mcp` 200、`/health` 200 |
+| 调度 Hub（原 DispatchServer 独立进程 8686） | `POST /mainHub/negotiate` **200** |
+| Elsa 认证接缝（附录 O） | 无凭据 `GET /elsa/api/workflow-definitions` → **302 → /three-role/login**（行为不变）；资源契约仍由 Elsa 自己应答 JSON，未被 CJCore 拦成登录页 HTML |
+| 数据 | 七张表与备份逐表 hash **全等**；`AuditLogs` 563（+2，本次冒烟产生，按合规保留） |
+
+### Q.7 剩余待办（按优先级）
+
+| # | 项 | 归属 |
+|---|---|---|
+| 1 | **`CJ.Plug.AIChat`** 仍是 exe 且不在任何清单里：它被 `CJ.Plug.AI` 引用但自身仍产出 exe，需确认其端点是否已被 `CJPlug.Server` 覆盖后再决定类库化还是保留 | 待你确认 |
+| 2 | `CJ.Plug.ApiServer/PackageService.cs` 生成的 `start.bat` / `docker-compose` 仍按旧多进程写（`HostWebServer.exe`、`McpServer.exe`，端口 8687/8690）⇒ 交付物(zip) 用户拿到就坏；需改成单进程 `CJPlug.Server` | 建议下轮 |
+| 3 | `寸金 - 快捷方式.lnk` 指向旧 exe，需人工重建（二进制，不可脚本化） | 人工 |
+| 4 | 部署配置文件名仍为 `appsettings.CJ.Plug.ApiServer.json`（有意沿用，改名需同步 DefaultResources + 现场文件） | 独立迁移 |
+| 5 | `_trash_20261030/`（1.5 GB + 40 个残留文件）确认后删除 | 由你确认 |
+| 6 | 三个被类库化项目的 `appsettings.json` 仍会复制进共享输出目录（构建顺序决定谁赢，实测 `InternalApi` 段已被覆盖丢失）——改 `<Content Remove>` 会改变运行时读到的配置，风险需单独评估 | 建议单独立项 |
+| 7 | P7.1a 退役 `CJ.Plug.SystemConfig`、P7.2 许可证、C3 IP 白名单 | 你说先不做 |

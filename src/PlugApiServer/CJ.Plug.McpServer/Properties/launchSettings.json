@@ -1,14 +1,7 @@
 ﻿{
+  // P9.1（2026-10-30，D2 = B）：本项目已降级为**类库**，`dotnet run` 从此不可用
+  // —— 原来的 http(5224) profile 会让 IDE 启动失败，且容易被误读成"服务崩了"。
+  // 唯一宿主是 CJPlug.Server（5066），开发调试请直接启动它。
   "$schema": "https://json.schemastore.org/launchsettings.json",
-  "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": false,
-      "applicationUrl": "http://localhost:5224",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  }
+  "profiles": {}
 }

@@ -25,6 +25,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService,ProcessManageMenu>();
 
+        // P6.3：模块权限声明 —— 供权限矩阵扫描出本模块键 + 作为功能键归属锚点。
+        // ⚠ AccessKey 必须与 Module.ModuleId 逐字一致（同源），否则模块启停与权限键会分叉。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-process-manage", ["system_admin"], "流程管理"));
+
         services.AddHttpClient<IProcessManageApiClient, ProcessManageApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
@@ -47,7 +52,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<WorkflowTranslator>();
 
         // 注册功能权限提供者
-        services.AddSingleton<IFunctionPermissionProvider, ProcessManagePermissionProvider>();
+        // P5.5 第三批：显式全限定为 CJCore 版接口（自有同名接口已删除，且只有 CJCore 版会被权限矩阵注入）。
+        services.AddSingleton<CJCore.Framework.Abstractions.IFunctionPermissionProvider, ProcessManagePermissionProvider>();
 
         services.AddHttpClient<IProcessManageApiClient, ProcessManageApiClient>(client =>
         {

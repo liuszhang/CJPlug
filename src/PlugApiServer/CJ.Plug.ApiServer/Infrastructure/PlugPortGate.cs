@@ -56,8 +56,11 @@ public static class PlugPortGate
                 return path.StartsWithSegments("/elsa");
 
             case McpPort:
-                // 根路径仍放行：MCP 客户端（Cursor/Trae）配的是 http://host:3001，
-                // 请求被 Program.cs 里的重写中间件转到 /mcp。这是对外契约的一部分，不能拦。
+                // ⚠ 2026-10-30（P9.1）：**McpPort(3001) 这个分支在唯一宿主形态下已不再被触发**
+                // —— 进程只监听 5066，MCP 面是 5066 上的 /mcp（原注释写的
+                // "根路径仍放行，请求被重写中间件转到 /mcp"是旧独立进程形态的口径）。
+                //   本行保留是为了 switch 完备性与将来真要开第二端口时不用重写；
+                //   实际门控由 IsMcpEndpoint + /api/plugbridge 承担，根路径 "/" 现在属于 Blazor。
                 return path == "/"
                     || IsMcpEndpoint(path)
                     || path.StartsWithSegments("/api/plugbridge");

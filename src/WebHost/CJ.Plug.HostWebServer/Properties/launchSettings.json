@@ -1,23 +1,7 @@
 {
+  // P9.1（2026-10-30，D2 = B）：HostWebServer 已降级为**类库**，`dotnet run` 从此不可用
+  // —— 原来的 http(6600) / https(7203) profile 会让 IDE 启动失败。
+  // Web 侧装配仍由本项目的 WebHostStartup.cs 提供，但**启动入口**已统一为 CJPlug.Server（5066）。
   "$schema": "https://json.schemastore.org/launchsettings.json",
-  "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "http://0.0.0.0:6600",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "https://0.0.0.0:7203;http://0.0.0.0:6600",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  }
+  "profiles": {}
 }

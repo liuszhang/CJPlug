@@ -15,7 +15,10 @@ namespace CJ.Plug.ApiServer.Infrastructure;
 /// 增量通知。这里加 60 秒周期刷新作为兜底。
 /// </para>
 /// </summary>
-internal sealed class PlugMcpToolRefreshService : BackgroundService
+// P9（2026-10-30）：由 internal 改 public —— 装配入口搬到独立项目 CJPlug.Server 后，
+//   `builder.Services.AddHostedService<PlugMcpToolRefreshService>()` 需要跨程序集可见。
+//   本类只做「启动后延迟刷新 + 60s 兜底」，无内部状态泄漏风险。
+public sealed class PlugMcpToolRefreshService : BackgroundService
 {
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(60);

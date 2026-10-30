@@ -5,6 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    <!-- P9.1（2026-10-30，D2 = B）：降级为类库，不再产出 exe。
+         ⚠ 必须保留 Microsoft.NET.Sdk.Web —— 本项目含 razor 页面（Pages/PlugAgentDebug.razor）
+         与 static web assets，换 SDK 会丢 Razor 编译。
+         全站装配入口现在是 CJPlug.Server（Program.cs 搬迁自 ApiServer），
+         Web 侧仍经 WebHostStartup.cs 提供；删掉的只有旧启动壳 Program.cs。 -->
+    <OutputType>Library</OutputType>
     <!-- Disable build-time compression of static web assets to avoid MSB4018 DiscoverPrecompressedAssets duplicate-key errors -->
     <DisableBuildCompression>true</DisableBuildCompression>
   </PropertyGroup>

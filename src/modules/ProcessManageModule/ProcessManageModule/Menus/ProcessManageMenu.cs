@@ -19,6 +19,9 @@ namespace ProcessManageModule.Menus
                     Icon = Icons.Material.Filled.AccountTree,
                     Href = "/ProcessManageList",
                     Text = "流程管理",
+                    // P6.3：与 Module.ModuleId / IModuleAccessDeclaration.AccessKey 三处逐字一致。
+                    //   作用：① 权限矩阵扫描为可见性行；② 模块管理页经此键反查模块归属，生成功能开关项。
+                    AccessKey = "plug-process-manage",
                     //GroupName = MenuItemGroups.General.Name,
                 }
             };

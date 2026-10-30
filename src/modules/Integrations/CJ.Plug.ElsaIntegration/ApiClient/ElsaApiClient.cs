@@ -171,10 +171,13 @@ public partial class ElsaApiClient : IElsaApiClient
         //workflowDefinition.Options.ActivityCategory = Plug.GroupName;
         //workflowDefinition.Options.AutoUpdateConsumingWorkflows = false;
 
-        await DeleteByDefinitionIdAsync(workflowDefinition.DefinitionId);
+        var deleted = await DeleteByDefinitionIdAsync(workflowDefinition.DefinitionId, cancellationToken);
+        if (!deleted)
+            CLog.Warning($"清理历史版本未生效，直接进入保存（DefinitionId={workflowDefinition.DefinitionId}）—— 见上一条 Warning");
 
-        var response = await SaveWorkflowAsync(workflowDefinition,publish);
-        return response;        
+        var response = await SaveWorkflowAsync(workflowDefinition, publish, cancellationToken);
+        await EnsureWorkflowSavedAsync(workflowDefinition.DefinitionId, "插头转流程", cancellationToken);
+        return response;
     }
 
 
@@ -193,9 +196,14 @@ public partial class ElsaApiClient : IElsaApiClient
         //workflowDefinition.Options.ActivityCategory = Plug.GroupName;
         //workflowDefinition.Options.AutoUpdateConsumingWorkflows = false;
 
-        await DeleteByDefinitionIdAsync(workflowDefinition.DefinitionId);
+        var deleted = await DeleteByDefinitionIdAsync(workflowDefinition.DefinitionId, cancellationToken);
+        if (!deleted)
+            CLog.Warning($"清理历史版本未生效，直接进入保存（DefinitionId={workflowDefinition.DefinitionId}）—— 见上一条 Warning");
 
-        var response = await SaveWorkflowAsync(workflowDefinition, publish);
+        var response = await SaveWorkflowAsync(workflowDefinition, publish, cancellationToken);
+
+        // 保存结果不再丢弃：回读不到定义就立刻响亮失败，而不是让症状漂移成「执行无实例 ID」。
+        await EnsureWorkflowSavedAsync(workflowDefinition.DefinitionId, "流程", cancellationToken);
         return response;
     }
 
@@ -228,7 +236,19 @@ public partial class ElsaApiClient : IElsaApiClient
 
 
 
-    public async Task DeleteByDefinitionIdAsync(string definitionId, CancellationToken cancellationToken = default(CancellationToken))
+    /// <summary>
+    /// 删除指定 definitionId 的流程定义（Elsa 3.9 契约：<c>DELETE /workflow-definitions/{definitionId}</c>，
+    /// 成功 204、不存在 404 —— 源码实测，见实施计划附录 M.7）。
+    /// </summary>
+    /// <remarks>
+    /// <b>为什么改成返回 bool 且不再静默</b>（2026-10-30 修）：
+    /// 原实现把非 2xx 只 <c>Console.WriteLine</c> 一句「Error: MethodNotAllowed」就吞掉，
+    /// 调用方拿到的是"删除已完成"的假象；配合 <c>PrepareAndExecuteWorkflow</c> 对保存结果的不校验，
+    /// 真因（定义没进 Elsa）一直伪装成「引擎返回 200 但缺 x-elsa-workflow-instance-id 头」。
+    /// 现在：<b>失败必须看得见</b>（CLog.Warning 带状态码与响应体），且<b>不阻断保存</b> ——
+    /// 保存是 upsert，删除只是清理历史版本的可选前置，因删不掉就让整个流程跑不起来是不对的。
+    /// </remarks>
+    public async Task<bool> DeleteByDefinitionIdAsync(string definitionId, CancellationToken cancellationToken = default(CancellationToken))
     {
         var url = new Uri($"/elsa/api/workflow-definitions/{definitionId}", UriKind.Relative);
         try
@@ -236,17 +256,53 @@ public partial class ElsaApiClient : IElsaApiClient
             var response = await httpClient.DeleteAsync(url, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Workflow with ID {definitionId} deleted successfully.");
+                CLog.Information($"已删除流程定义（DefinitionId={definitionId}）：DELETE {url} → {(int)response.StatusCode}");
+                return true;
             }
-            else
+
+            // 404 = 定义本来就不存在。对「先删后存」的语义而言这就是成功，不是错误。
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                Console.WriteLine($"Error: {response.StatusCode}");
+                CLog.Information($"流程定义不存在，跳过删除（DefinitionId={definitionId}）：DELETE {url} → 404");
+                return true;
             }
+
+            var detail = await DescribeFailureAsync(response, cancellationToken);
+            response.Dispose();
+            CLog.Warning($"删除流程定义未生效（DefinitionId={definitionId}）：DELETE {url} → {detail}。" +
+                         "保存按 DefinitionId+Version 为 upsert，本次继续保存；若后续执行报「定义不存在」，请以上面这段为准排查。");
+            return false;
         }
         catch (Exception e)
         {
-            Console.WriteLine(e.Message);
+            CLog.Warning($"删除流程定义请求未送达（DefinitionId={definitionId}）：DELETE {url} → {e.Message}（引擎地址 {httpClient.BaseAddress}）。" +
+                         "本次继续保存，若后续执行失败请以本条为准排查。");
+            return false;
         }
+    }
+
+    /// <summary>
+    /// 保存落库校验：Elsa 的保存是「请求成功 ≠ 定义已入库」，必须按 definitionId 回读一次。
+    /// 原实现不校验 ⇒ 定义没进库时，症状会一路漂移到「执行返回 2xx 但无 x-elsa-workflow-instance-id 头」，
+    /// 真因被完全掩盖（2026-10-30 P8 实测，见实施计划附录 M.3/M.7）。
+    /// </summary>
+    private async Task EnsureWorkflowSavedAsync(string definitionId, string what, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var saved = await GetByDefinitionIdAsync(definitionId, VersionOptions.Latest, cancellationToken);
+            if (saved != null)
+                return;
+        }
+        catch (Exception e)
+        {
+            throw new InvalidOperationException(
+                $"{what}保存后回读失败（DefinitionId={definitionId}）：GET /elsa/api/workflow-definitions/by-definition-id/{definitionId} 异常 —— {e.Message}", e);
+        }
+
+        throw new InvalidOperationException(
+            $"{what}保存未生效（DefinitionId={definitionId}）：引擎接受了保存请求，但按 definitionId 回读不到定义。" +
+            "后续执行必然拿不到工作流实例 ID；常见原因是引擎侧保存被权限/只读策略拒绝但返回了 2xx，或保存与回读用的不是同一个引擎库。");
     }
 
     /// <summary>
@@ -353,7 +409,20 @@ public partial class ElsaApiClient : IElsaApiClient
     {
         //Log.Information(WorkflowJson.ToString());
 
-        await SaveWorkflowFromJsonAsync(WorkflowJson, true, cancellationToken);
+        // 保存结果不再丢弃：SaveWorkflowFromJsonAsync 内部已「回读校验」，这里再兜一层显式判断，
+        // 保证「保存没成功却继续触发执行」这条路径被彻底堵死（原缺陷环②，见实施计划附录 M.3）。
+        var saveResponse = await SaveWorkflowFromJsonAsync(WorkflowJson, true, cancellationToken);
+        if (saveResponse is null || !saveResponse.IsSuccessStatusCode)
+        {
+            var detail = saveResponse is null
+                ? "保存未返回响应"
+                : $"{(int)saveResponse.StatusCode} {saveResponse.ReasonPhrase}";
+            saveResponse?.Dispose();
+            var message = $"流程保存失败，终止执行（DefinitionId={WorkflowJson.GetId()}）：{detail}";
+            CLog.Error(message);
+            throw new InvalidOperationException(message);
+        }
+        saveResponse.Dispose();
 
         //创建一条Job记录，用于后续作业追踪
         //var job = new ProcessJob

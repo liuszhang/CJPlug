@@ -14,8 +14,10 @@ namespace CJ.Plug.McpServer.Bridge;
 /// 这里在<b>同一个权威源</b>（<see cref="DynamicToolRegistry"/>）上开一扇薄 REST 窗，
 /// 清单与执行的语义与 MCP 完全一致（名字经同一个 <c>ToolNameSanitizer</c>，参数经同一个 <c>McpSchemaGenerator</c>）。</para>
 ///
-/// <para><b>端口/暴露面</b>：与 MCP 端点同在 <c>http://localhost:3001</c>（现有 Process 部署口径），
-/// 不新增端口、不新增对外面。</para>
+/// <para><b>端口/暴露面</b>：与 MCP 端点同处<b>唯一宿主 CJPlug.Server（5066）</b> —— 旧口径写的是
+/// <c>http://localhost:3001</c>（McpServer 独立进程形态），该进程已于 2026-10-30 下线（P9.1，D2=B）；
+/// 现在的完整地址是 <c>http://&lt;host&gt;:5066/api/plugbridge</c>，MCP 协议面则为
+/// <c>http://&lt;host&gt;:5066/mcp</c>。不新增端口、不新增对外面。</para>
 /// </summary>
 public static class PlugMcpBridgeContracts
 {

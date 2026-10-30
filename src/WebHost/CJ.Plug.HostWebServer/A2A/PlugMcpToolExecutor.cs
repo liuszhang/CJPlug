@@ -18,7 +18,8 @@ namespace CJ.Plug.HostWebServer.A2A;
 /// → DispatchServer <c>/api/plug/executeMcpTool</c>。与 MCP 客户端进来时<b>走同一条链</b>，不会分叉。</para>
 ///
 /// <para><b>McpSurface = External</b>（方案 8.2）：CJPlug 的工具本来就是给<b>外部 MCP 客户端</b>用的
-///（TRAE / Cursor 等 IDE 已经直接连 <c>http://localhost:3001</c>），挂内部面反而变了语义。</para>
+///（TRAE / Cursor 等 IDE 连的是 <c>http://&lt;host&gt;:5066/mcp</c>；旧口径的 <c>http://localhost:3001</c>
+/// 随 McpServer 独立进程于 2026-10-30 下线，P9.1），挂内部面反而变了语义。</para>
 /// </summary>
 public sealed class PlugMcpToolExecutor : IToolExecutor
 {

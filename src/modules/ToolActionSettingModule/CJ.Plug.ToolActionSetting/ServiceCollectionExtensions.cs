@@ -34,11 +34,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService, ToolActionSettingMenu>();
 
-        // P5.5：模块权限声明（矩阵页可见性）。
-        // ⚠ 与本模块已有的 IFunctionPermissionProvider（Plug.View/Plug.Create… 细粒度键）**不是同一体系**：
-        //   后者是 P5 前遗留、当前全仓只注册无消费方；页面准入走 CJCore 的 ModuleAccess 链。
+        // P5.5：模块权限声明（矩阵页可见性 + 模块内功能键归属锚点）。
+        // ⚠ 与本模块的 IFunctionPermissionProvider（功能点：view/create/edit/delete/publish/station-*）**不是同一体系**，
+        //   而是两个层次：
+        //     ① 本声明（AccessKey = plug-tool-action）→ 模块级角色白名单，喂给鉴权判定链；
+        //     ② 功能点 Provider → 权限矩阵里的按钮行，靠 FunctionPermissionItem.ParentKey 挂到本键下。
+        //   2026-10-30 更正：旧注释称功能点 Provider「全仓只注册无消费方」，**该结论是错的** ——
+        //   它当时注册的是 CJPlug 自有的同名接口（CJ.Plug.Models.Contracts），而权限矩阵注入的是
+        //   CJCore.Framework.Abstractions.IFunctionPermissionProvider，DI 按类型解析导致 27 个功能点静默不可见。
+        //   接口已在 P5.5 第三批归口到 CJCore 版，功能点现已能进矩阵。
         services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
-            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-tool-action", ["system_admin"], "插件管理"));
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-tool-action", ["system_admin"], "工具动作配置"));
         services.AddHttpClient<ITASApiClient,TASApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
@@ -63,8 +69,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IPlugManageService, PlugManageService>();
 
-        // 注册功能权限提供者
-        services.AddSingleton<IFunctionPermissionProvider, ToolActionSettingPermissionProvider>();
+        // 注册功能点权限提供者（P5.5 第三批：全限定为 CJCore 版，自有同名接口已删除）
+        services.AddSingleton<CJCore.Framework.Abstractions.IFunctionPermissionProvider, ToolActionSettingPermissionProvider>();
 
         services.AddHttpClient<ITASApiClient, TASApiClient>(client =>
         {

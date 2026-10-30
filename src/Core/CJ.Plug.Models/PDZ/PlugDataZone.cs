@@ -396,6 +396,17 @@ public partial class PlugDataZone
         //复制PDZ，根据目标PDZ类型不同可能会有不同的处理逻辑
         public PlugDataZone CopyPDZ(string? UserName, string? TargetPDZType, string? JobDefinitionId)
         {
+            // 防御：调用方若用「只 Include 了部分子集合」的查询拿到源 PDZ，
+            // 未 Include 的导航可能为 null，下面的 foreach 会直接 NRE。
+            // 统一归一成空集合，语义 = "没有子项可复制"。
+            PDZVariables ??= new List<PDZVariable>();
+            PlugVariableDatas ??= new List<PlugVariableData>();
+            PlugDatas ??= new List<PlugData>();
+            PlugStatusDatas ??= new List<PlugStatusData>();
+            ActionDatas ??= new List<ActionData>();
+            ActionVariableDatas ??= new List<ActionVariableData>();
+            DataFlowDatas ??= new List<DataFlowData>();
+
             var newPDZ = new PlugDataZone();
             newPDZ.UserName = UserName;
             newPDZ.PlugDefinitionId = PlugDefinitionId;

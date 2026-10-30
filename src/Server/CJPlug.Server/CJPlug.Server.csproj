@@ -1,0 +1,69 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    CJPlug.Server —— CJPlug 的唯一宿主（P9 / 2026-10-30，D1 = A）。
+
+    为什么单独建这个项目：
+      单端口收敛（2026-10-29）之后，CJ.Plug.ApiServer 事实上已在承载全站 —— Blazor UI / 调度 Hub /
+      Elsa 引擎 / MCP 协议面全在它的进程里，但项目名仍叫 ApiServer。名实不符的直接后果是部署链
+      （AppHost 清单 / 打包断言 / start-services.cmd）始终按"前后端分离"的旧形态维护，
+      2026-10-30 上午因此双启两个宿主、模型集 29 vs 80 表、迁移误判"整表回退"。
+
+      本项目的职责只有一件：**装配编排**。它不承载业务代码，只按顺序调各模块包的扩展方法
+      （ApiServer 的打包发布 API / HostWebServer 的 Web 装配 / DispatchServer 的调度面 /
+      McpServer 的协议面 / ElsaIntegration 的引擎），并把管道顺序与端口契约固定下来。
+
+    与原 CJ.Plug.ApiServer 的关系：
+      搬迁式，不是包装式 —— Program.cs 原样迁到本项目；CJ.Plug.ApiServer 降级为**类库**，
+      只保留 PackageApi / PackageService / Hubs / Infrastructure 与两个扩展方法。
+      ⚠ 不要再出现"Server 引用 ApiServer 的 Program"这种反向依赖。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>CJPlug.Server</AssemblyName>
+    <RootNamespace>CJPlug.Server</RootNamespace>
+
+    <!-- 与 02.Publish/Services 同级输出：AppHost 用 AddExecutable("dotnet", servicesDir, dll) 拉起 -->
+    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+
+    <!-- 与 ApiServer 一致：强制禁用冲突的 CodeAnalysis 加载 -->
+    <DisableRoslynAnalyzers>true</DisableRoslynAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Elsa.Api.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client.Core" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="NSwag.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 主 API 模块（已降级为类库）：AddPackageModuleServices / AddPackageModuleApi -->
+    <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ApiServer\CJ.Plug.ApiServer.csproj" />
+    <!-- Web 装配：AddPlugWebHost / MapPlugWebHost / MapPlugWebRazorComponents -->
+    <ProjectReference Include="..\..\WebHost\CJ.Plug.HostWebServer\CJ.Plug.HostWebServer.csproj" />
+    <!-- 调度面：AddDispatchApiService / MapDispatchServiceEndpoints -->
+    <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.DispatchServer\CJ.Plug.DispatchServer.csproj" />
+    <!-- MCP 协议面：MapPlugMcpBridge / DynamicToolRegistry -->
+    <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.McpServer\CJ.Plug.McpServer.csproj" />
+    <!-- Elsa 引擎：AddElsaServicesForApi / UseElsaEndpoints / ElsaApiClient -->
+    <ProjectReference Include="..\..\modules\Integrations\CJ.Plug.ElsaIntegration\CJ.Plug.ElsaIntegration.csproj" />
+    <!-- 业务模块聚合（ConfigModuleApiServices 等） -->
+    <ProjectReference Include="..\..\modules\CJ.Plug.ModuleConfig\CJ.Plug.ModuleConfig.csproj" />
+    <!-- 插件包（能力注册用 RESTPlug / PythonPlug / CMDPlug / AiAgentPlug） -->
+    <ProjectReference Include="..\..\PlugLibrary\PlugsBundle\PlugsBundle.csproj" />
+    <!-- 模型与共享 -->
+    <ProjectReference Include="..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
+    <!-- Aspire ServiceDefaults（AddServiceDefaults / 服务专属配置加载） -->
+    <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.AspireHost.ServiceDefaults\CJCore.AspireHost.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

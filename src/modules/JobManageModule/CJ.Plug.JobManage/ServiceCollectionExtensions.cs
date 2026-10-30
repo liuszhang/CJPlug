@@ -34,6 +34,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
         services.AddScoped<CJCore.Framework.Abstractions.IMenuService, JobManageMenu>();
 
+        // P6.3：模块权限声明 —— 供权限矩阵（/admin/role-permissions）扫描出本模块键，
+        //   同时作为「模块内功能键」的归属锚点：DefaultModuleCatalog.BuildFeatures 用它反查
+        //   每个 AccessKey 属于哪个模块，未声明的键不参与归组（故漏注册 = 模块管理页无功能键）。
+        // ⚠ AccessKey 必须与 Module.ModuleId 逐字一致（同源），否则模块启停与权限键会分叉。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-job-manage", ["system_admin"], "作业管理"));
+
         services.AddHttpClient<IJobManageApiClient, JobManageApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);
@@ -50,7 +57,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IJobManageService, JobManageService>();
 
         // 注册功能权限提供者
-        services.AddSingleton<IFunctionPermissionProvider, JobManagePermissionProvider>();
+        // P5.5 第三批：显式全限定为 CJCore 版接口。CJPlug 自有的同名接口（CJ.Plug.Models.Contracts）已删除，
+        //   且只有 CJCore 版会被 PermissionFunctionsService 注入 —— 用错版本会让功能点在权限矩阵里静默消失。
+        services.AddSingleton<CJCore.Framework.Abstractions.IFunctionPermissionProvider, JobManagePermissionProvider>();
 
         services.AddHttpClient<IJobManageApiClient, JobManageApiClient>(client =>
         {

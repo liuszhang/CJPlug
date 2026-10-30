@@ -109,6 +109,7 @@ $excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin', 'CJ
     #   %LOCALAPPDATA%\CJ\AppHostManager\WebView2（不落安装目录），这里仍列进黑名单做双保险 ——
     #   一旦将来有人改回默认位置，Assert-Clean 会当场拦下，而不是把浏览缓存发到客户机。
     'CJCore.AppHost.Manager.exe.WebView2')
+$stationStandaloneExe = @('CJ.Plug.StationAgent.exe', 'CJ.Plug.StationApiServer.exe')
 $stripFilePatterns = @('*.pdb')
 
 function Write-Step([string]$msg) {
@@ -193,6 +194,39 @@ function Assert-Clean([string]$stagingRoot) {
     }
 }
 
+# P9.1（2026-10-30，D2 = B「回退形态一次全删」）：正向断言管"必须存在"，负向断言管"必须消失"。
+#   只做正向断言会漏掉一类静默回归：某个面又被改回 OutputType=Exe，exe 重新进包 —— 此时
+#   正向断言照样通过（dll 也在），包体变胖、装配入口重新分裂，而没人会注意到。
+# P9.1（2026-10-30）：Services\<Cfg>\net10.0 是**共享输出目录**（全部工程都往这里 build），
+#   于是 main 载荷会连带收进图站三件套的 exe —— 但它们有自己的独立 publish
+#   （-Target station 输出到 station\{Agent,ApiServer,SettingUI}，见 §9.8/D8），
+#   放在 main 里是纯冗余，且这些 exe 正是"回退形态"容易被误起的那批文件。
+function Remove-StationStandaloneExe([string]$stagingRoot, [string]$cfg) {
+    $dir = Join-Path $stagingRoot "Services\$cfg"
+    if (-not (Test-Path $dir)) { return }
+    $n = 0
+    foreach ($tfm in @('net10.0', 'net10.0-windows')) {
+        $d = Join-Path $dir $tfm
+        if (-not (Test-Path $d)) { continue }
+        foreach ($name in $stationStandaloneExe) {
+            $f = Join-Path $d $name
+            if (Test-Path $f) { Remove-Item -LiteralPath $f -Force; $n++ }
+        }
+    }
+    if ($n -gt 0) { Write-Host "  [strip] 已从 main 载荷剔除图站独立 exe $n 个（station 三件套自有独立 publish）" }
+}
+
+function Assert-Absent([string]$stagingRoot, [string[]]$relativePaths, [string]$reason) {
+    $found = @()
+    foreach ($rel in $relativePaths) {
+        $full = Join-Path $stagingRoot $rel
+        if (Test-Path $full) { $found += $rel }
+    }
+    if ($found.Count -gt 0) {
+        throw "组装后断言失败（$reason，不应出现 $($found.Count) 项）：`n  - $(($found -join "`n  - "))`n（staging: $stagingRoot）"
+    }
+}
+
 function Get-TreeSizeMB([string]$path) {
     if (-not (Test-Path $path)) { return 0 }
     $sum = (Get-ChildItem -LiteralPath $path -File -Recurse -Force -ErrorAction SilentlyContinue |
@@ -257,18 +291,29 @@ if ($Target -in @('main', 'all')) {
 
     Remove-ExcludedDirs $mainStaging
     Remove-DebugSymbols $mainStaging
+    Remove-StationStandaloneExe $mainStaging $Configuration
 
     Assert-Paths $mainStaging @(
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.dll",
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
         "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
         "CJCore.AppHost.Manager\$Configuration\net10.0-windows\CJCore.AppHost.Manager.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.ApiServer.dll",
-        "Services\$Configuration\net10.0\CJ.Plug.McpServer.dll",
-        "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.dll",
+        # P9（2026-10-30，D1 = A）：宿主 exe 由 CJ.Plug.ApiServer 改为 CJPlug.Server。
+        # ⚠ 断言的必须是**可执行宿主**，不是同名 dll 是否存在 —— ApiServer 降级为类库后
+        #   它的 dll 仍会随宿主进目录（这是正常的），若继续断言旧 dll 等于永远为真、失去护栏意义。
+        "Services\$Configuration\net10.0\CJPlug.Server.dll",
         "Services\$Configuration\net10.0-windows\CJ.Plug.ExecuteApp.exe",
         'PlugConfig\UserPlugs.xml'
     )
+    # P9.1（2026-10-30，D2 = B）：三个 referred 项目已类库化，包里不许再出现旧的多进程 exe。
+    Assert-Absent $mainStaging @(
+        "Services\$Configuration\net10.0\CJ.Plug.ApiServer.exe",
+        "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.exe",
+        "Services\$Configuration\net10.0\CJ.Plug.McpServer.exe",
+        "Services\$Configuration\net10.0\CJ.Plug.HostWebServer.exe",
+        "Services\$Configuration\net10.0\CJ.Plug.StationAgent.exe",
+        "Services\$Configuration\net10.0\CJ.Plug.StationApiServer.exe"
+    ) '回退形态 / 图站独立 exe 应已全部下线'
     Assert-Clean $mainStaging
 
     Write-Host ("  main\    : {0} MB" -f (Get-TreeSizeMB $mainStaging)) -ForegroundColor Green
