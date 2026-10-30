@@ -25,7 +25,12 @@ public static class PlugMcpBridgeContracts
     public const string ToolsPath = BasePath + "/tools";
     public const string CallPath = BasePath + "/call";
 
-    public sealed record ToolSummary(string Name, string Description, string ParametersJson);
+    public sealed record ToolSummary(
+        string Name,
+        string Description,
+        string ParametersJson,
+        /// <summary>发布侧声明的危险标记（原样透给宿主侧 <c>PlugMcpToolExecutor.IsDangerous</c>）。</summary>
+        bool IsDangerous);
 
     public sealed record CallRequest(string Name, string? ArgumentsJson);
 
@@ -51,7 +56,8 @@ public static class PlugMcpBridgeEndpoints
                     // InputSchema 是 JsonElement；取回原始 JSON 文本，宿主侧可直接当作 OpenAI function 参数 schema
                     t.InputSchema.ValueKind == JsonValueKind.Undefined
                         ? "{\"type\":\"object\",\"properties\":{}}"
-                        : JsonSerializer.Serialize(t.InputSchema, Json)))
+                        : JsonSerializer.Serialize(t.InputSchema, Json),
+                    registry.IsDangerous(t.Name)))
                 .ToList();
 
             return Results.Ok(tools);

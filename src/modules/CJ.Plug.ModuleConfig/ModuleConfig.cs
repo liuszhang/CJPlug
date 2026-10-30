@@ -7,14 +7,12 @@ using CJ.Plug.LlmConfig;
 using CJ.Plug.LicenseApi;
 using CJ.Plug.LicenseUI;
 using CJ.Plug.LlmConfigApi;
-using CJ.Plug.SystemConfig;
 using CJ.Plug.ModelManage;
 using CJ.Plug.ModelManageApi;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using CJ.Plug.SystemConfigApi;
 
 namespace CJ.Plug.ModuleConfig
 {
@@ -66,8 +64,12 @@ namespace CJ.Plug.ModuleConfig
             // LLM 配置模块
             services.AddLlmConfigPageModuleServices();
 
-            // 系统配置模块
-            services.AddSystemConfigPageModuleServices();
+            // ── P7.1a（2026-10-30）：CJPlug 私有系统配置模块已退役 ──
+            // 页面写侧早已由 CJCore 通用配置页 /system-config 接管（P7.1）；
+            // 本批把剩余的读侧（ToolExecuteService 经 /api/systemconfig/*）也换到
+            // IRemoteViewModeProvider（宿主实现见 HostWebServer/SystemConfig/CJCoreRemoteViewModeProvider）。
+            // 删掉的是整个 SystemConfigModule 目录（页面 / Api / ApiClient / Model 四个项目）与 SystemConfigItems 表。
+
             //许可证管理模块
             services.AddLicenseModulePageServices();
 
@@ -103,9 +105,6 @@ namespace CJ.Plug.ModuleConfig
 
             // 模型管理模块API
             services.AddOntologyManageModuleApiServices();
-
-            // 系统配置模块API
-            services.AddSystemConfigModuleApiServices();
 
             // 许可证模块API
             services.AddLicenseModuleApiServices();
@@ -144,7 +143,6 @@ namespace CJ.Plug.ModuleConfig
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.RelationApi.DbContext.RelationModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.SkillsManageApi.SkillsManageDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.StationManageApi.DbContext.StationManageDbConfig>();
-            services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.SystemConfigModel.DbContext.SystemConfigDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.ToolActionSettingApi.DbContext.TASModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.ToolResourceApi.DbContext.ToolResourceDbConfig>();
 
@@ -177,9 +175,6 @@ namespace CJ.Plug.ModuleConfig
 
             // 模型管理模块API
             app.AddOntologyManageModuleApi();
-
-            // 系统配置模块API
-            app.AddSystemConfigModuleApi();
 
             // 许可证模块API
             app.AddLicenseModuleApi();

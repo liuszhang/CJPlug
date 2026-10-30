@@ -10,12 +10,15 @@
     <!--
       P9 / 2026-10-30（D1 = A）：本项目已降级为**类库**。
         装配编排（端口契约 / 管道顺序 / Elsa+MCP+调度+Web 的接入）全部搬到了 src/Server/CJPlug.Server。
-        这里只剩「打包发布」这一块业务：PackageApi / PackageService / PackageProgress
-        + 两个跨进程通知件（SignalRMcpToolChangeNotifier / PlugMcpToolRefreshService）
-        + 回退用的 PlugPortGate，以及把它们接进容器与管道的两个扩展方法。
+        这里只剩三个跨进程/回退组件：
+          Hubs/SignalRMcpToolChangeNotifier（发布工作流后通知 MCP 刷新工具清单）
+          Infrastructure/PlugMcpToolRefreshService、Infrastructure/PlugPortGate
+        打包发布业务（PackageApi / PackageService / PackageProgress）已于 2026-10-30 整链删除：
+        四个生成端点 2026-10-07 起就固定返回 410（分发统一收敛到 CJSuite 安装包），
+        整条链只被 DI 注册、从不解析，留着只会让后来者误判"系统仍是多进程"。
       ⚠ 不要再往这里加 Program.cs —— 唯一宿主是 CJPlug.Server。
-      ⚠ 保留 Sdk.Web 而不换成 Sdk：本项目仍直接使用 ASP.NET Core 类型（IEndpointRouteBuilder、
-        IApplicationBuilder、HubContext 等），换 SDK 要补 FrameworkReference，收益为零风险不为零。
+      ⚠ 保留 Sdk.Web 而不换成 Sdk：本项目仍直接使用 ASP.NET Core 类型（IApplicationBuilder、
+        HubContext 等），换 SDK 要补 FrameworkReference，收益为零风险不为零。
     -->
     <OutputType>Library</OutputType>
 	  <!-- 添加此属性以控制是否跳过构建 -->

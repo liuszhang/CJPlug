@@ -1,6 +1,6 @@
 # （进行中）CJPlug 接入 CJCore 实施计划
 
-> 状态：进行中（P0–P7 完成；**P8 已完成** —— 发布/同步/发现/调用/删除 五步实测全通，见附录 M/N/O；**P9 + P9.1 已完成** —— 唯一宿主 `CJPlug.Server` 上线，**所有回退形态 exe 已下线**（D2=B，附录 Q.8）；剩 **P7.1a 退役 SystemConfig**（待拍板）、**P7.2 许可证**（等授权语义）、**PackageService 部署脚本改单进程**（建议下轮，见 Q.7-#2）、**AIChat 形态待确认**（Q.7-#1）　|　日期：2026-10-29（**2026-10-30 更新**）　|　作者：旺财　|　位置：`CJPlug/docs/`
+> 状态：进行中（P0–P9 + P13 完成；**P9 + P9.1 已完成** —— 唯一宿主 `CJPlug.Server` 上线，**所有回退形态 exe 已下线**（D2=B，附录 Q.8）；**P13 已完成** —— 死代码三件套清理 + `DeleteByFilter`/`IsDangerous` 两处缺陷收口 + 内部密钥读侧实测 100%（附录 U）；**P7.1a 已完成** —— SystemConfig 四项目退役 + ElsaStudio 退役 + 配置读写收敛 CJCore（附录 V，方案文档已翻转"已完成"）；**P7.1b 已完成** —— Amis 120 个示例页构建期排除（附录 W，B 批次的前置收口，页面门控缺口 151→31 页）；剩 **P7.2 许可证**（等授权语义）、**B 批次覆盖面**（用户拍板**缓做**，仅剩 B-1/B-2/B-3 三项）　|　日期：2026-10-29（**2026-10-30 更新**）　|　作者：旺财　|　位置：`CJPlug/docs/`
 > **⚠ 2026-10-30 进度更正（本轮）**：
 > ① **P5 身份替换已完成**（P5.1~P5.9 + P5.8 C1/C2 收口，见 `（已完成）D-P5-6 Cookie会话绑定方案-20261030.md`）；
 > ② **P6.3 权限键对齐已完成**（见 `（已完成）P5.5第三批+P6.3 权限声明归口方案-20261030.md`）；
@@ -3083,3 +3083,167 @@ services.AddSingleton<IModuleAccessDeclaration>(
 **仍在册（归 B 批次）**：`plug-file-manage` / `plug-process-edit` / `plug-relation` / `plug-system-config-read` 无入口键，管理页开关对它们仍无效；142 页无 `[ModuleAccess]`、33 个 MapGroup 几乎无 `RequireModuleAccess`。
 
 
+
+---
+
+## 附录 U：死代码清理 + 两处缺陷收口 + 内部密钥读侧实测（2026-10-30，P13）
+
+> 决策来源：用户拍板 **「P7.1a 确定退役 `CJ.Plug.SystemConfig`」** + 「按推荐顺序执行」。
+> 本附录记录**第 1~3 项**（死代码 / 缺陷 / 内部密钥读侧）；第 4 项（B 批次覆盖面）与第 5 项（P7.1a 退役）另开。
+
+### U.1 第一项：死代码三件套（已完成）
+
+**① 打包发布链整链删除**（`PackageService` 1280 行 + 周边）
+
+| 动作 | 文件 |
+|---|---|
+| 删 | `PlugApiServer/CJ.Plug.ApiServer/Services/PackageService.cs`、`Services/PackageProgress.cs`、`Apis/PackageApi.cs`、`PackageServiceCollectionExtensions.cs` |
+| 删 | `WebHost/CJ.Plug.MainPageContent/Pages/DownloadPackage.razor`、`modules/StationManageModule/.../Dialogs/StationDownloadDialog.razor` |
+| 改 | `CJPlug.Server/Program.cs`：去掉 `AddPackageModuleServices()` / `AddPackageModuleApi()` 两行与失效注释 |
+| 改 | `StationStatusList.razor`：「下载图站部署包」按钮 + `OpenStationDownloadDialog()` 方法 |
+| 改 | `StationSettingUI/Services/StationApiService.cs`：整段「图站部署包下载」**210 行**（3 个方法 + `PackageProgressInfo` 模型） |
+
+**删除理由（不是"看着像死的"）**：4 个生成端点自 2026-10-07 起固定返回 410，`PackageService` 只被 DI 注册、从不解析；`/api/package/progress`、`/api/package/download/{id}` 的数据源 `PackageProgressTracker` 只由 `PackageService` 写入 ⇒ 整组端点**永远无数据**。其内部模板仍是旧 4 进程形态（`HostWebServer.exe`/`McpServer.exe` + 8687/8690）。
+
+**② 三个孤儿**
+
+| 对象 | 处置 | 依据 |
+|---|---|---|
+| `src/modules/SkillsModule/CJ.Plug.SkillsManage` | **已删（整目录）** | 不在 `.sln`、零 `ProjectReference`；与在用的 `SkillsManageModule/CJ.Plug.SkillsManage` **同名类 + 同名扩展方法**，一旦被误引用直接编译冲突 |
+| `MainPageContent/Shell/PlugGuardModule.cs` | **已删** | P5 已移除注册；文件自述"P5 接入真认证后删除本模块" |
+| `src/WebHost/CJ.Plug.ElsaStudio` | **暂留** | 唯一引用只剩 `assemble-release.ps1` 注释。**它是 Elsa 原生 Studio（可视化工作流设计器）的唯一宿主**，而"设计器是否还要"尚未拍板 ⇒ 不预判删除，等答复后处理 |
+
+**③ 配置死键**（`src/Server/CJPlug.Server/appsettings.json`）
+
+| 键 | 处置 | 依据 |
+|---|---|---|
+| `MainServer:Url`（6660） | 删 | 唯一消费方是 `PackageService` 模板（已删）+ 一行被注释掉的工位机代码 |
+| `Guacamole`（整段，含账号密码） | 删 | 全仓 0 消费方（`RemoteDesktop:*` 才是在用那一段） |
+| `ConnectionStrings:Sqlite2`（`plug.db`） | 删 | 0 消费方 |
+| `ConnectionStrings:RabbitMq` | 删 | 0 消费方；本机 5672 无监听，Elsa 侧也不读 |
+| `ConnectionStrings:Sqlite`（`main333.db`） | **改**为 `../../main.db` | ⚠ **它不是死键，是兜底陷阱**：CJCore `DbConnectionProviderBase.ResolveConnectionString` 的 `_ =>` 分支取 `ConnectionStrings:Sqlite` ⇒ 任何回落都会**凭空造一个 `main333.db` 副库**。删掉只会退化成默认值 `cjontology.db`（同一颗雷），所以改成指向主库 |
+| `ApiBaseUrl` | **保留** | 误判修正：被 CJCore `PersonalCenterApiClientRegistration` / `MessageCenterApiClientRegistration` 读作基址，而 `MapCJCorePersonalCenter()` **已注册** ⇒ 活键 |
+
+### U.2 第二项：两处缺陷（已完成）
+
+**① `DeleteByFilter` 子串匹配 → 精确列匹配**
+
+```diff
+- .Where(p => p.PDZId.Contains(filter.PlugDefinitionId))
++ if (filter is null || string.IsNullOrWhiteSpace(filter.PlugDefinitionId)) return false;   // 防空条件退化成 IS NULL 全删
++ .Where(p => p.PlugDefinitionId == filter.PlugDefinitionId)
++ if (pdz.Count == 0) return true;   // 幂等：该插头本来就没有 PDZ
+```
+
+`PDZId` 的真实构成是「用户名 + 流程定义ID」⇒ 传 `G8` 会把 `adminG8zBDesi` 一并删掉；而 `PlugDataZone` 本来就有 `PlugDefinitionId` 列，`GetByFilter` 也是按它精确匹配 —— 修完两处语义一致。**触发面**：`POST /api/pdz/deleteByFilter` 对外可达，`DeletePDZByDeletePlug`（删插头连带删 PDZ）走的就是它。
+
+**② `IsDangerous` 恒 `false` → 发布侧显式声明，全链打通**
+
+| 环节 | 改动 |
+|---|---|
+| 声明位 | `MCPTool.ToolSettingsJson` 里写 `"isDangerous": true`（**不加表列**，复用既有自由 JSON 列，避开 SchemaDiffer 变更与存量库兼容） |
+| 投影 | `MCPToolsManageService.GetPublishedWorkflowsAsync` → `PublishedWorkflowDto.IsDangerous`（新增 `ReadIsDangerous`，容错：键缺失/JSON 坏 ⇒ false） |
+| 桥 | `PlugMcpBridgeContracts.ToolSummary` 增 `IsDangerous`；`DynamicToolRegistry.IsDangerous(name)` 供查 |
+| 执行器 | `PlugMcpToolExecutor` 构造函数收 `isDangerous`，`IsDangerous` 由"恒 false"改为透传（旧注释写着"按工具名前缀粗判"但**并无实现**） |
+| 同步 | `PlugMcpToolSyncService.ToolSummary` 增字段并传入 |
+
+**实测证据**（临时插一条 `ToolSettingsJson={"isDangerous":true}` 的工具 → 重启 → 抓桥 → 删行复原）：
+
+```json
+[{"name":"smoke_danger","description":"危险工具冒烟","parametersJson":"{\"type\":\"object\",\"properties\":{}}","isDangerous":true}]
+```
+
+消费端 `DefaultToolRegistry.IsDangerous(toolName)` 被 `LLMAgentBase.ToolLoop.cs:160` 与 `ToolInvocation.cs:42` 读取 ⇒ 危险工具回到二次确认。
+
+> **仍缺**：发布 UI 上没有"危险操作"勾选框，当前只能通过 `POST /api/mcp/addTool` 的 `ToolSettingsJson` 声明。属 B 批次的小尾巴。
+
+### U.3 第三项：内部密钥读侧实测（读侧无需补漏；EnforceWrite 仍待写路径观测）
+
+**方法**：以 `InternalApi__Key=obs-…` 启动（`GateMode` 保持默认 `Observe`），用浏览器（注入登录 Cookie）把 10 个业务页各渲染一遍 —— 内部 `MainApiClient` 全部走 `BaseApiClient`/`AddHttpClient` 出站，自动带 `X-Internal-Key`；随后带密钥读 `/api/diagnostics/internal-key`。
+
+| 维度 | 带密钥 | 缺密钥 | 覆盖率 |
+|---|---|---|---|
+| **读** | **156** | **0** | **100.00%** |
+| 写 | 0 | 0 | n/a（10 个页面全为只读渲染，本轮无写请求样本） |
+
+**结论**：P5.8 遗留的"读侧补漏"**实测为零漏网**，无需再补代码。`missingRead` / `missingWrite` 均为空。
+
+**为什么仍不能开 `EnforceWrite`**：它拦的是**写**方法，而写侧样本数为 0 —— 未测过就不能宣称"100%"。开之前必须先跑一轮**真实写路径**（发布工作流 `addTool`、保存插头、保存 LLM 配置、工位机心跳上报），确认 `write.withoutKey == 0`。
+**另**：密钥是部署期机密，`appsettings.json` 里的 `Key` 必须保持空（生产用 `InternalApi__Key` 环境变量或部署机配置注入），所以"收口"这一步**本质是部署动作**，代码侧本轮的产出是"读侧已证明无需补漏"。
+
+### U.4 本轮附带发现（未处置，登记）
+
+| # | 发现 | 影响 |
+|---|---|---|
+| 1 | **`/health` 根本不存在** | `app.MapDefaultEndpoints()`（Aspire）只在 `IsDevelopment()` 下映射 `/health`、`/alive`；而 Development 环境本就起不来（K.5 第 5 项）。交付态（Production）**任何健康探针都会落到 Blazor catch-all，拿到 200 HTML** ⇒ 编排/监控会误判"健康"。⚠ 本仓此前多次把"/health 200"当就绪判据，实为 catch-all，判据不严 |
+| 2 | `McpServer/Tools/JobsTool.cs:19` 打 `http://localhost:6661/api/Job/getJobs` | 6661 是已退役端口，该工具**必然失败**（静默） |
+| 3 | `ElsaIntegration/Services/ElsaEngineService.cs:36` 打 `http://localhost:5001/elsa/api` | 5001 是旧 Elsa 端口，同上 |
+| 4 | 四个 csproj 里的 `<SkipBuild>true</SkipBuild>` | **死属性**：全仓无任何 targets/props 消费它（`grep SkipBuild` 只命中定义处）⇒ 不产生任何效果，但会让读者误以为项目被跳过。建议连同注释一起删 |
+| 5 | 工位机 `src/PlugStation/CJ.Plug.StationApiServer/appsettings.json` 仍带 `Guacamole` / `MainServer` / `Sqlite2` / `RabbitMq` 同款死键 | 本轮**未动**：工位机是独立交付形态（7660），需单独起服验证后清 |
+
+---
+
+## 附录 V：P7.1a 退役 CJ.Plug.SystemConfig + ElsaStudio 退役（2026-10-30，已完成）
+
+> 决策来源：用户三连拍板 —— **D-P7.1a-1 = B**（不迁移直接删，接受 `window → fullscreen` 回退）、**可视化工作流设计器不要了**（ElsaStudio 一并退役）、**B 批次缓做**。
+> 详细方案、实际落地清单（10 项）、验收实测（读写删闭环）全部见 **`（已完成）P7.1a退役CJ.Plug.SystemConfig方案-20261030.md` §8~§10**，此处只留结论与索引。
+
+### V.1 结论
+
+| 项 | 结果 |
+|---|---|
+| `CJ.Plug.SystemConfig` 四项目（页面/Api/ApiClient/Model）+ `SystemConfigItems` 表 | **已退役**。表由 P4 迁移引擎启动时自动改名归档为 `_dropped_SystemConfigItems_20261030061040`（数据可回溯，零升级脚本） |
+| 读侧（`ToolExecuteService` 读 `RemoteViewMode`） | 改走新抽象 `IRemoteViewModeProvider`（PlugBaseCore 纯加法）：主宿主注入 `CJCoreRemoteViewModeProvider` 读 CJCore 配置快照；未注册宿主按 `fullscreen` 兜底 |
+| 写侧（`/system-config` 持久化） | `PlugSystemConfigStore` 重写为 CJCore Data 底座直读写，**复用 `TRA_SysConfigs`**（`Category="Plug"` 三边界隔离，零迁移；不换底座页面会退化为内存 Store 重启丢配置——方案 §4 未预估到的关键连锁） |
+| `CJ.Plug.ElsaStudio`（Elsa 原生设计器宿主） | **已删除**（sln 外 0 引用孤儿，`RegisterCustomElsaStudioElements` 来自 ElsaIntegration 不受影响） |
+| 验收 | 构建 0 错误；配置 PUT→GET→save(删) 闭环全通且 `TRA_SysConfigs` 的 TRA_ 行零污染；`/system-config` 200 + 「远程查看」页签在；`main_audit.db` 冒烟后复原（0 行差异） |
+| 交付说明 | 现场"远程查看"将回退为整桌面 VNC；要单窗口去 `/system-config → 远程查看` 改回 `window` |
+
+### V.2 B 批次（缓做，用户拍板）
+
+4 模块入口键（`plug-job-manage` 等）+ 142 页 `[ModuleAccess]` + 33 个 MapGroup `RequireModuleAccess` —— **暂不执行**，待后续批次启动。
+
+> **⚠ 2026-10-30 口径更正（见附录 W）**：①模块入口键的"4 个"应为 **3 个** —— `plug-system-config-read` 随本批 SystemConfig 退役一并消失；
+> ②"142 页"的**统计口径有误** —— 实测 152 处 `@page` 中 **120 处是 Amis 官方示例页**，已在 P7.1b 构建期排除，
+> 真实业务页 31 个、其中 11 个已有 `[ModuleAccess]` ⇒ **页面缺口实际为 ~14 页**，不是 142 页。
+
+### V.3 本批新登记的附带发现
+
+| # | 发现 | 处置 |
+|---|---|---|
+| 1 | `/api/systemconfig/*` 旧端点已随模块消失，但 curl 仍得 **200 + text/html**（catch-all 吞掉） | 无需处置；判活必须断言正文，与 U.4-1 `/health` 假 200 同源 |
+| 2 | `MainApiClient.cs` 原有 `SystemConfigApiClient` 连续两行重复赋值（无害死代码） | 随本批删除一并消失 |
+
+---
+
+## 附录 W：P7.1b Amis 示例页构建期排除（2026-10-30，已完成）
+
+> 决策来源：用户拍板 **「Amis 120 页的处置方向定下来：在构建期排除」**。
+> 完整取证 / 实现 / 验收见 **`（已完成）P7.1b排除Amis示例页方案-20261030.md`**，此处只留结论与口径更正。
+
+### W.1 结论
+
+| 项 | 结果 |
+|---|---|
+| 问题 | `CJ.Plug.AmisIntegration/Components/Pages/` 下 **120 个 Amis 官方示例页**（`/CRUD/*`、`/Form/*`、`/Event/*` …）随程序集被 `PlugBaseCore` 引用，**全部自动注册进唯一宿主路由且零门控** ⇒ 交付物自带 120 个匿名演示页 |
+| 处置 | csproj 加 1 个 `ItemGroup`：`Content Remove` + `RazorComponent Remove` 排除 `Components/Pages/**`。**源码留仓库**（Amis 用法参照），`-p:IncludeAmisDemoPages=true` 可临时编回 |
+| 为什么不是加 `[ModuleAccess]` | 只是上锁，120 页体积照旧出厂，且会给 B-2 添维护面 |
+| 为什么不是删源码 | 改 `Amis.razor` 渲染 / 排查 Amis 行为时需查用法；排除可逆 |
+| 功能影响 | **零**。业务只消费 `Components/Amis.razor`；`amisLoad` 定义在 `PlugMainPageContent/Shell/PlugHeadModule.cs:69`，均不在被排除目录 |
+| 验收 | 构建 0 错误；dll 26,112 B、`Components.Pages` 字符串 0 命中而 `Components.Amis` 1 命中；19 条抽样 demo 路由全部落 catch-all（200 +「404 - 页面未找到」）；8 个业务页 200；6 个 Amis 静态资源 200；三页死链 0；`main_audit.db` 复原 |
+
+### W.2 口径更正（本章节起以此为准）
+
+| 原口径 | 实测更正 | 来源 |
+|---|---|---|
+| "153 / 142 页无 `[ModuleAccess]`" | `@page` 共 **152 处 / 151 文件**；其中 **120 文件是 Amis 示例页**（P7.1b 已排除）；**真实业务页 31 个**，11 个已覆盖，6 个不该门控 ⇒ **页面缺口 ≈ 14 页** | `@page` 全量扫描 + 逐页核 `ModuleAccess` |
+| "4 个模块无入口键" | **3 个**：`plug-file-manage` / `plug-process-edit` / `plug-relation`；`plug-system-config-read` 随 P7.1a 退役消失 | `grep "plug-system-config-read"` 0 命中 |
+| "33 个 MapGroup" | **34 个**，`RequireModuleAccess` 实调用 **1 处**（`/api/plug-agent/tools`，另 1 处是注释） | `grep "MapGroup("` / `grep "RequireModuleAccess"` |
+
+### W.3 遗留
+
+| # | 项 | 说明 |
+|---|---|---|
+| 1 | `Components/Layout/NavMenu.razor` | 演示页专用导航菜单，Pages 排除后成**死代码**（全仓 0 引用），可后续一并排除 |
+| 2 | `wwwroot/test.html`、`wwwroot/photo/`、`img/` | Amis 演示资源，随 `wwwroot/**` 进交付物，属"出厂垃圾"，建议单独清理 |
+| 3 | B-2 可直接按 **14 页**排期 | 与 D9=A 全量权限矩阵合并推进成本更低 |

@@ -6,7 +6,7 @@ namespace CJ.Plug.MainPageContent.Shell;
 /// 宿主壳模块（2026-10-29《CJPlug 接入 CJCore》P2）。
 /// <para>
 /// 唯一职责：让 <c>CJ.Plug.MainPageContent</c> 程序集进入框架路由发现。
-/// 该程序集内含 4 个 <c>@page</c>（DownloadPackage / Error / JobManageList2 / JobMonitor2），
+/// 该程序集内含 3 个 <c>@page</c>（Error / JobManageList2 / JobMonitor2），
 /// 切换到 <c>FrameworkApp</c> 后 AppAssembly 变成 <c>CJCore.Framework.UI</c>，不注册就会 404。
 /// </para>
 /// </summary>

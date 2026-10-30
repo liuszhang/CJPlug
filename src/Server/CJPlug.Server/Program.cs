@@ -7,10 +7,10 @@
 //    · 改之前：exe 叫 ApiServer 却承载全站，装配入口分裂在 ApiServer/Program.cs 与
 //              HostWebStartup.cs 两处，边界只写在注释里 ⇒ 部署链按旧形态维护 ⇒ 双宿主事故。
 //    · 改之后：本文件 = 装配编排表（按顺序调各模块包的扩展方法 + 固定管道顺序 + 端口契约）；
-//              CJ.Plug.ApiServer = 纯类库（打包发布业务）。
+//              CJ.Plug.ApiServer = 纯类库（能力模块的服务/API 注册）。
 //
 //  ⚠ 新增业务注册不要去改这个文件：按归属加到对应模块包的扩展方法里
-//    （Web 侧 → HostWebStartup；打包发布 → ApiServer/PackageServiceCollectionExtensions）。
+//    （Web 侧 → HostWebStartup；业务模块 → 各模块 ServiceCollectionExtensions）。
 //  ⚠ 下游模块包不得反向引用本项目（本项目是叶子节点）。
 // ═══════════════════════════════════════════════════════════════════════════════════
 
@@ -253,9 +253,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 添加打包模块服务
-builder.Services.AddPackageModuleServices();
-
+// 添加各模块服务
 builder.Services.ConfigModuleApiServices();
 // 独立认证服务由 CJCore 三员模块提供（P5.6：旧 AddLoginModuleApiServices 已随 LoginModule 删除）
 
@@ -486,9 +484,6 @@ app.MapPlugWebHost();
 
 //添加各模块的注入端点
 app.ConfigModuleApis();
-
-// 添加打包模块API
-app.AddPackageModuleApi();
 
 // Phase 2：调度面端点（/mainHub + /api/dispatch/*）—— 原 DispatchServer 独立进程的全部暴露面。
 //   ⚠ 工位机/Electron/Desktop 连的都是 /mainHub，合并后由本进程在同一端口提供。

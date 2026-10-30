@@ -27,9 +27,8 @@
     <ProjectReference Include="..\RelationManageModule\CJ.Plug.Relation\CJ.Plug.Relation.csproj" />
     <ProjectReference Include="..\SkillsManageModule\CJ.Plug.SkillsManage\CJ.Plug.SkillsManage.csproj" />
     <ProjectReference Include="..\StationManageModule\CJ.Plug.StationManage\CJ.Plug.StationManage.csproj" />
-    <ProjectReference Include="..\SystemConfigModule\CJ.Plug.SystemConfig\CJ.Plug.SystemConfig.csproj" />
-    <ProjectReference Include="..\SystemConfigModule\CJ.Plug.SystemConfigApi\CJ.Plug.SystemConfigApi.csproj" />
-    <ProjectReference Include="..\SystemConfigModule\CJ.Plug.SystemConfigApiClient\CJ.Plug.SystemConfigApiClient.csproj" />
+    <!-- P7.1a（2026-10-30）：SystemConfigModule 三项目已退役（页面/Api/ApiClient），
+         系统配置统一走 CJCore 通用配置页 /system-config。 -->
     <ProjectReference Include="..\ToolResourceModule\CJ.Plug.ToolResource\CJ.Plug.ToolResource.csproj" />
     <ProjectReference Include="..\ToolActionSettingModule\CJ.Plug.ToolActionSetting\CJ.Plug.ToolActionSetting.csproj" />
     <ProjectReference Include="..\UnitTestModule\CJ.Plug.UnitTest\CJ.Plug.UnitTest.csproj" />

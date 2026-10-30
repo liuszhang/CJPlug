@@ -10,12 +10,13 @@
       2026-10-30 上午因此双启两个宿主、模型集 29 vs 80 表、迁移误判"整表回退"。
 
       本项目的职责只有一件：**装配编排**。它不承载业务代码，只按顺序调各模块包的扩展方法
-      （ApiServer 的打包发布 API / HostWebServer 的 Web 装配 / DispatchServer 的调度面 /
-      McpServer 的协议面 / ElsaIntegration 的引擎），并把管道顺序与端口契约固定下来。
+      （HostWebServer 的 Web 装配 / DispatchServer 的调度面 / McpServer 的协议面 /
+      ElsaIntegration 的引擎），并把管道顺序与端口契约固定下来。
 
     与原 CJ.Plug.ApiServer 的关系：
       搬迁式，不是包装式 —— Program.cs 原样迁到本项目；CJ.Plug.ApiServer 降级为**类库**，
-      只保留 PackageApi / PackageService / Hubs / Infrastructure 与两个扩展方法。
+      只保留 Hubs / Infrastructure（SignalR 工具刷新通知、PlugPortGate）。
+      打包发布业务（PackageApi / PackageService / PackageProgress）已于 2026-10-30 整链删除。
       ⚠ 不要再出现"Server 引用 ApiServer 的 Program"这种反向依赖。
   -->
   <PropertyGroup>

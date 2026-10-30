@@ -101,6 +101,7 @@ public sealed class PlugMcpToolSyncService : BackgroundService
 
             var executor = new PlugMcpToolExecutor(
                 t.Name, t.Description ?? string.Empty, t.ParametersJson ?? string.Empty,
+                t.IsDangerous,
                 http, _loggerFactory.CreateLogger<PlugMcpToolExecutor>());
 
             // DefaultToolRegistry 对 dynamic 池是「同名覆盖」；static 池有同名内置工具时会被忽略（不抢占）。
@@ -125,7 +126,8 @@ public sealed class PlugMcpToolSyncService : BackgroundService
             tools.Count);
     }
 
-    private sealed record ToolSummary(string Name, string Description, string? ParametersJson);
+    /// <param name="IsDangerous">发布侧声明的危险标记，原样交给执行器（见 <see cref="PlugMcpToolExecutor.IsDangerous"/>）。</param>
+    private sealed record ToolSummary(string Name, string Description, string? ParametersJson, bool IsDangerous);
 }
 
 /// <summary>桥用 HttpClient 的逻辑名与地址（由 Program.cs 注入具体地址）。</summary>

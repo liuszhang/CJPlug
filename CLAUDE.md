@@ -282,9 +282,10 @@ src/
 │
 ├── PlugWebHost/                             # Web 托管层
 │   ├── CJ.Plug.AllInOneServer/              # 一体化服务器 (Elsa + SignalR + PlugsBundle)
-│   ├── CJ.Plug.ElsaStudio/                  # Elsa 可视化设计器 (port 5010)
 │   ├── CJ.Plug.HostWebServer/               # 主 Web 前端入口 (port 5066)
 │   └── CJ.Plug.MainPageContent/             # 主页面内容组件
+│   # 注：CJ.Plug.ElsaStudio（Elsa 原生可视化设计器宿主，port 5010）已于 2026-10-30 退役删除，
+│   #     用户拍板“可视化工作流设计器不再需要”，全仓 0 引用。
 │
 ├── PlugStation/                             # 工作站层
 │   ├── CJ.Plug.StationApiServer/            # 工作站 API 服务 (port 7660)

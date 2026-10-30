@@ -31,7 +31,8 @@
     <ProjectReference Include="..\..\modules\ToolActionSettingModule\CJ.Plug.TASApiClient\CJ.Plug.TASApiClient.csproj" />
     <ProjectReference Include="..\..\modules\GuacamoleModule\CJ.Plug.GuacamoleApiClient\CJ.Plug.GuacamoleApiClient.csproj" />
     <ProjectReference Include="..\..\modules\SkillsManageModule\CJ.Plug.SkillApiClient\CJ.Plug.SkillApiClient.csproj" />
-    <ProjectReference Include="..\..\modules\SystemConfigModule\CJ.Plug.SystemConfigApiClient\CJ.Plug.SystemConfigApiClient.csproj" />
+    <!-- P7.1a（2026-10-30）：SystemConfigApiClient 已随 CJPlug 私有配置模块退役，
+         远程查看模式改由 PlugBaseCore 的 IRemoteViewModeProvider 读取。 -->
   </ItemGroup>
 
 </Project>

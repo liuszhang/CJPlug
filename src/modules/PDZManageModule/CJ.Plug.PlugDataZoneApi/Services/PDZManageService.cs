@@ -241,13 +241,26 @@ public class PDZManageService : IPDZManageService
 
     public async Task<bool> DeleteByFilter(PDZFilter filter, CancellationToken cancellationToken = default)
     {
-        var pdz = await _dbContext.Set<PlugDataZone>().Include(p => p.PDZVariables)
-            .Where(p => p.PDZId.Contains(filter.PlugDefinitionId))
-            .ToListAsync(cancellationToken);
-        if (pdz == null)
+        // ⚠ 2026-10-30 修：原实现是 p.PDZId.Contains(filter.PlugDefinitionId) —— **子串**匹配。
+        //   而 PDZId 的真实构成是「用户名 + 流程定义ID」（见 PDZFilter.PDZId 注释），
+        //   于是传 "G8" 会把 "adminG8zBDesi" 一并删掉（删插头时连带删 PDZ 的批量路径，误删面大）。
+        //   PlugDataZone 本来就有 PlugDefinitionId 列，这里与 GetByFilter 保持同一精确匹配语义。
+        if (filter is null || string.IsNullOrWhiteSpace(filter.PlugDefinitionId))
         {
+            // 空条件在 SQL 里会退化成 "PlugDefinitionId IS NULL"，等于删掉所有无归属 PDZ ⇒ 直接拒绝
             return false;
         }
+
+        var pdz = await _dbContext.Set<PlugDataZone>().Include(p => p.PDZVariables)
+            .Where(p => p.PlugDefinitionId == filter.PlugDefinitionId)
+            .ToListAsync(cancellationToken);
+
+        if (pdz.Count == 0)
+        {
+            // 幂等语义：该插头本来就没有 PDZ，视为成功（保持原实现的返回值口径）
+            return true;
+        }
+
         _dbContext.Set<PlugDataZone>().RemoveRange(pdz);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;

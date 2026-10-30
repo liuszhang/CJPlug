@@ -15,7 +15,6 @@ using CJ.Plug.PlugDataZoneApiClient;
 using CJ.Plug.ProcessManageApiClient;
 using CJ.Plug.SkillApiClient;
 using CJ.Plug.StationManageApiClient;
-using CJ.Plug.SystemConfigApiClient;
 using CJ.Plug.ToolResourceApiClient;
 using CJ.Plug.TASApiClient;
 using Blazored.LocalStorage;
@@ -43,7 +42,6 @@ public partial class MainApiClient
     public readonly Lazy<IMCPToolApiClient> MCPToolApiClient;
     public readonly Lazy<IGuacamoleApiClient> GuacamoleApiClient;
     public readonly Lazy<ISkillApiClient> SkillApiClient;
-    public readonly Lazy<ISystemConfigApiClient> SystemConfigApiClient;
     //public readonly Lazy<IDeepSeekService> DeepSeekApiClient;
 
     // P5.6+：旧身份体系（登录/用户/角色/部门/用户组/授权请求/角色权限）已整体下线，
@@ -75,8 +73,6 @@ public partial class MainApiClient
         MCPToolApiClient = new Lazy<IMCPToolApiClient>(() => serviceProvider.GetRequiredService<IMCPToolApiClient>());
         GuacamoleApiClient = new Lazy<IGuacamoleApiClient>(() => serviceProvider.GetRequiredService<IGuacamoleApiClient>());
         SkillApiClient = new Lazy<ISkillApiClient>(() => serviceProvider.GetRequiredService<ISkillApiClient>());
-        SystemConfigApiClient = new Lazy<ISystemConfigApiClient>(() => serviceProvider.GetRequiredService<ISystemConfigApiClient>());
-        SystemConfigApiClient = new Lazy<ISystemConfigApiClient>(() => serviceProvider.GetRequiredService<ISystemConfigApiClient>());
         //DeepSeekApiClient = new Lazy<IDeepSeekService>(() => serviceProvider.GetRequiredService<IDeepSeekService>());
 
         // 初始化审计日志辅助类

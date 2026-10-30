@@ -19,7 +19,11 @@ namespace CJ.Plug.PlugBaseCore.Services
     public class ToolExecuteService(
         MainApiClient MainApiClient,
         ToolDownloadGuard DownloadGuard,
-        ResilientDownloader ResilientDownloader) : IToolExecuteService
+        ResilientDownloader ResilientDownloader,
+        // P7.1a（2026-10-30）：远程查看模式改由宿主注入读取（见 IRemoteViewModeProvider 注释）。
+        // ⚠ 可空 + 显式默认值：工位机 / 独立执行壳等未注册该服务的宿主必须能构造本类，
+        //   未注册即按 RemoteViewModes.Fullscreen 继续（与迁移前行为一致）。
+        IRemoteViewModeProvider? RemoteViewModeProvider = null) : IToolExecuteService
     {
         public async Task<ExecuteResultData?> ExecuteToolAsync(PlugExecutionRequest plugExecutionRequest)
         {
@@ -324,7 +328,7 @@ namespace CJ.Plug.PlugBaseCore.Services
             CLog.Information($"准备启动远程桌面");
             // 远程查看模式：读取系统配置 RemoteViewMode（默认 fullscreen 整桌面 VNC，向后兼容）
             // window=单窗口 RFB VNC（协议 window，端口 5901）
-            string remoteViewMode = "fullscreen";
+            string remoteViewMode = RemoteViewModes.Fullscreen;
             var vncPlugDefId = plugExecutionRequest.ExecuteResultData?.Ids?.PlugDefinitionId;
             var pdzForVnc = await MainApiClient.GetPDZByPDZIdAsync(plugExecutionRequest.PDZId);
             var plugDataForVnc = pdzForVnc?.GetPlugData(vncPlugDefId);
@@ -340,11 +344,24 @@ namespace CJ.Plug.PlugBaseCore.Services
                 {
                     // 远程查看模式：读取系统配置 RemoteViewMode（默认 fullscreen 整桌面 VNC，向后兼容）
                     // window=单窗口 RFB VNC（协议 window，端口 5901）
+                    // P7.1a：读法改由宿主注入的 IRemoteViewModeProvider 提供（原先经 MainApiClient 打
+                    //        ApiServer 的 /api/systemconfig/get/RemoteViewMode，该模块已退役）。
+                    // 配置面异常绝不能打断工具执行 ⇒ 就地吞掉并记日志，按默认值继续。
                     string protocol;
                     string? processName = null;
-                    var configuredMode = await MainApiClient.SystemConfigApiClient.Value.GetValueAsync("RemoteViewMode");
-                    if (!string.IsNullOrEmpty(configuredMode)) remoteViewMode = configuredMode;
-                    if (remoteViewMode == "window")
+                    if (RemoteViewModeProvider is not null)
+                    {
+                        try
+                        {
+                            var configuredMode = await RemoteViewModeProvider.GetRemoteViewModeAsync();
+                            if (!string.IsNullOrEmpty(configuredMode)) remoteViewMode = configuredMode!;
+                        }
+                        catch (Exception ex)
+                        {
+                            CLog.Error($"[P7.1a] 读取 RemoteViewMode 失败，按 {RemoteViewModes.Fullscreen} 继续：{ex.Message}");
+                        }
+                    }
+                    if (remoteViewMode == RemoteViewModes.Window)
                     {
                         protocol = "window";
                         processName = Tool.RemoteViewProcessName;

@@ -242,7 +242,7 @@ Write-Host "  目标        : $Target"
 
 # ── ⓪ 构建（**按 Target 拆**，2026-10-07 二次修正见方案 §9.8） ────────────────────────────
 # main：**必须**整解构建。AppHost 用 AddExecutable("dotnet", servicesDir, xxx.dll) 拉起服务，而
-#       DispatchServer / HostWebServer / ElsaStudio 都**不是** AppHost 的 ProjectReference ⇒
+#       DispatchServer / HostWebServer 都**不是** AppHost 的 ProjectReference ⇒
 #       共享目录 02.Publish\Services 靠"整解全量构建"铺满，收窄会打不出完整载荷。
 # desktop：载荷只有 CJ.Plug.Desktop\Release\net10.0-windows（闭包 4 个工程）⇒ 只 build 该工程，
 #       与整解 165 个 src 工程彻底解耦（原实现让 desktop 也跑整解：实测空转一次 ≈47s）。

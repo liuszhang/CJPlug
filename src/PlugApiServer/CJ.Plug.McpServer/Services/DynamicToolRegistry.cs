@@ -60,6 +60,18 @@ public class DynamicToolRegistry : IDisposable
     }
 
     /// <summary>
+    /// 该工具是否声明为危险操作（发布侧在 <c>ToolSettingsJson</c> 里写 <c>"isDangerous": true</c>）。
+    /// <para>桥清单用它把危险标记透给宿主侧的工具执行器；找不到工具时返回 <c>false</c>。</para>
+    /// </summary>
+    public bool IsDangerous(string name)
+    {
+        lock (_lock)
+        {
+            return _tools.TryGetValue(name, out var tool) && tool.Dto.IsDangerous;
+        }
+    }
+
+    /// <summary>
     /// 从 ApiServer 刷新工作流缓存，重建工具映射
     /// </summary>
     public async Task RefreshAsync(CancellationToken ct = default)

@@ -10,4 +10,28 @@
       <ProjectReference Include="..\..\..\Core\CJ.Plug.SharedPages\CJ.Plug.SharedPages.csproj" />
     </ItemGroup>
 
+    <!--
+      P7.1b（2026-10-30 拍板）：Amis 官方示例页**构建期排除**。
+
+      为什么：Components/Pages/** 下有 120 个 @page（/CRUD/*、/Form/*、/Event/* …），
+      是 Amis 官网的演示页，随本程序集被 PlugBaseCore 引用后会**全部注册进 Blazor 路由**，
+      等于交付物自带 120 个匿名可访问的演示页面。对客户环境零价值、纯攻击面。
+
+      为什么不删源码：它是 Amis 各组件的**用法参照**，将来改 Amis 渲染要查；
+      保留在仓库里、只在构建时排除，可逆（去掉本 ItemGroup 即恢复）。
+
+      对功能零影响（已取证）：
+        · 业务侧只消费 <see cref="Components.Amis"/>，即 Components/Amis.razor —— 不在 Pages 下；
+        · 其 JS 入口 amisLoad 定义在 CJ.Plug.MainPageContent/Shell/PlugHeadModule.cs:69，不在本项目；
+        · 全仓对 CJ.Plug.AmisIntegration.Components 的引用共 3 处（PlugSettingDialogCore / GUIEditor /
+          BaseGuiItemWidget），全部只用 Amis 组件，无一处引用 Pages.* 或 Layout.*。
+
+      临时需要 demo 页时：dotnet build -p:IncludeAmisDemoPages=true
+    -->
+    <ItemGroup Condition="'$(IncludeAmisDemoPages)' != 'true'">
+        <!-- .razor 在 Razor SDK 中同时挂在 Content 与 RazorComponent 两个 item 上，两处都要 Remove -->
+        <Content Remove="Components\Pages\**\*.razor" />
+        <RazorComponent Remove="Components\Pages\**\*.razor" />
+    </ItemGroup>
+
 </Project>

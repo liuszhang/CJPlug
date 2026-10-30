@@ -32,6 +32,7 @@ public sealed class PlugMcpToolExecutor : IToolExecutor
         string name,
         string description,
         string parametersJson,
+        bool isDangerous,
         HttpClient http,
         ILogger<PlugMcpToolExecutor> logger)
     {
@@ -41,6 +42,7 @@ public sealed class PlugMcpToolExecutor : IToolExecutor
         Name = name.Trim();
         Description = description ?? string.Empty;
         ParametersJson = string.IsNullOrWhiteSpace(parametersJson) ? FallbackSchema : parametersJson;
+        IsDangerous = isDangerous;
         _http = http;
         _logger = logger;
     }
@@ -52,11 +54,19 @@ public sealed class PlugMcpToolExecutor : IToolExecutor
     public string ParametersJson { get; }
 
     /// <summary>
-    /// 是否危险操作。<b>按工具名前缀粗判</b>：CJPlug 的动态工具没有声明式副作用元数据，
-    /// 统一判 safe 会让"启动真实设备 / 下发工单"一类工具绕过二次确认；这里对明显的执行类动词判危险。
-    /// TODO(P8 后续)：在 PublishedWorkflowDto 上补 <c>IsDangerous</c> 字段，由发布侧显式声明。
+    /// 是否危险操作 —— <b>由发布侧显式声明</b>，不在执行器里猜。
+    /// <para>
+    /// 传递链：<see cref="CJ.Plug.Models.MCPTools.MCPTool.ToolSettingsJson"/> 里的
+    /// <c>"isDangerous": true</c> → <c>PublishedWorkflowDto.IsDangerous</c> →
+    /// <c>GET /api/plugbridge/tools</c> 的 <c>isDangerous</c> 字段 → 本属性。
+    /// 为 <c>true</c> 时 CJCore Agent 执行前须二次确认。
+    /// </para>
+    /// <para>
+    /// ⚠ 2026-10-30 之前这里硬编码 <c>false</c>（注释写着"按工具名前缀粗判"但并无实现），
+    /// 等于"启动真实设备 / 下发工单"一类工作流经 A2A 工具面可直接执行、绕过人工确认。
+    /// </para>
     /// </summary>
-    public bool IsDangerous { get; } = false;
+    public bool IsDangerous { get; }
 
     public bool Enabled { get; set; } = true;
 

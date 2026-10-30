@@ -310,6 +310,8 @@ public static class WebHostStartup
 
         // ── P7.1：通用配置页 /system-config ───────────────────────────────
         // ① 宿主持久化 Store 必须先注册 —— AddCJCoreSystemConfig 内部是 TryAdd，不会覆盖。
+        //    P7.1a（2026-10-30）：内容已换 — 不再经旧配置模块的 HTTP 客户端，
+        //    改为本进程直读写在 CJCore Data 底座（TRA_SysConfigs / Category="Plug"）。
         services.AddSingleton<CJCore.Modules.SystemConfig.Abstractions.ISystemConfigStore,
                               CJ.Plug.HostWebServer.SystemConfig.PlugSystemConfigStore>();
         services.AddSingleton<CJCore.Modules.SystemConfig.Abstractions.ISystemConfigFieldProvider,
@@ -319,6 +321,11 @@ public static class WebHostStartup
             // P5：三员体系的系统管理员角色码（原 P2–P4 临时体系的 "Admin" 已退役）
             o.AccessRoles = ["system_admin"];
         });
+        // ①' P7.1a：远程查看模式的**读**侧入口（ToolExecuteService 消费）。
+        //     旧配置模块退役后，原先打 /api/systemconfig/get/RemoteViewMode 的 HTTP 读法一并消失，
+        //     由本实现在同进程读 CJCore 配置快照替代；未注册本服务的宿主按 fullscreen 兜底。
+        services.AddSingleton<CJ.Plug.PlugBaseCore.Contracts.IRemoteViewModeProvider,
+                              CJ.Plug.HostWebServer.SystemConfig.CJCoreRemoteViewModeProvider>();
         // ② UI 层（页面 + 模块实例）。它自带的菜单把分组写死成"系统"，
         //    与 D3=A（菜单归一「通用/管理/调试」）冲突 ⇒ 摘掉后换宿主自己的。
         services.AddCJCoreSystemConfigUI();

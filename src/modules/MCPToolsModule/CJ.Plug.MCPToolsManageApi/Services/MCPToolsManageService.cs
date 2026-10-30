@@ -169,6 +169,9 @@ namespace CJ.Plug.MCPToolsManageApi.Services
                     Name = tool.Name,
                     Description = tool.Description,
                     ToolType = tool.ToolType ?? "Workflow",
+                    // 危险标记由发布侧在 ToolSettingsJson 里显式声明（"isDangerous": true），
+                    // 不改表结构 —— MCPTool 自带这列自由 JSON，正是给这种扩展位用的。
+                    IsDangerous = ReadIsDangerous(tool.ToolSettingsJson),
                 };
 
                 // 从 Use PDZ 提取入口变量
@@ -258,6 +261,47 @@ namespace CJ.Plug.MCPToolsManageApi.Services
                 IsArray = v.IsArray,
                 Value = v.Value,
             };
+        }
+
+        /// <summary>
+        /// 从 <see cref="MCPTool.ToolSettingsJson"/> 读危险标记（键名 <c>isDangerous</c>，大小写不敏感）。
+        /// <para>
+        /// 解析失败/键缺失 ⇒ <c>false</c>（保持历史行为：默认可直接执行）。
+        /// 之所以走这列自由 JSON 而不加表列：<c>MCPTool</c> 已有 <c>ToolSettingsJson</c>，
+        /// 加列要走 SchemaDiffer 变更 + 存量库兼容，收益不抵风险。
+        /// </para>
+        /// </summary>
+        private static bool ReadIsDangerous(string? toolSettingsJson)
+        {
+            if (string.IsNullOrWhiteSpace(toolSettingsJson))
+                return false;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(toolSettingsJson);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                    return false;
+
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (!string.Equals(prop.Name, "isDangerous", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    return prop.Value.ValueKind switch
+                    {
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.String => bool.TryParse(prop.Value.GetString(), out var b) && b,
+                        _ => false,
+                    };
+                }
+            }
+            catch (JsonException)
+            {
+                // 配置列写坏了不应阻断发布清单 —— 按"最保守的可执行"处理并让上层日志可见
+            }
+
+            return false;
         }
 
         // ---- Trae MCP 配置 ---- 
