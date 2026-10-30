@@ -2,6 +2,15 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!--
+      类库化（2026-10-30，D2=B 收尾）：本项目**只是 AI 聊天 UI 的 Razor 组件 + 服务注册库**，
+      由 CJ.Plug.AI 以 ProjectReference 引用（StaticWebAssetProjectMode=Reference 本就是类库语义）。
+      它的 Program.cs 是开发者本地单独调试用的启动壳（Ollama localhost:11434 / 端口 5143），
+      不属于交付内容 —— 但 OutputType 默认 Exe 会让它产出 CJ.Plug.AIChat.exe，
+      并被传递复制进 station\ApiServer\ 等载荷（既不在任何服务清单里、也不该被启动）。
+      改为 Library 后该 exe 不再产出；删掉 Program.cs 是因为顶层语句在 Library 下是 CS8805 硬错误。
+    -->
+    <OutputType>Library</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>f8e6d0b9-7b83-4099-9333-a4ee229c7eca</UserSecretsId>

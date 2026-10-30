@@ -21,6 +21,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 配置归一（2026-10-30）：本项目是类库，MCP 面的运行期配置由唯一宿主 CJPlug.Server 的
+         appsettings.json 提供。不再把自己的 appsettings.json 复制到共享输出目录 —— 否则会与
+         宿主的同名文件互相覆盖（构建顺序决定谁赢，历史上曾导致主服务连错库且无任何报错）。
+         回退为独立进程时把这段恢复，并改用专属文件名 appsettings.CJ.Plug.McpServer.json。 -->
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Core\CJ.Plug.Models\CJ.Plug.Models.csproj" />
     <ProjectReference Include="..\..\..\..\CJCore\src\Framework\CJCore.AspireHost.ServiceDefaults\CJCore.AspireHost.ServiceDefaults.csproj" />
   </ItemGroup>

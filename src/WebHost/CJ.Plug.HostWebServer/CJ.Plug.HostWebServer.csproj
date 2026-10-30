@@ -76,8 +76,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 配置归一（2026-10-30）：本项目已降级为类库，Blazor 面的运行期配置由唯一宿主 CJPlug.Server 的
+         appsettings.json 提供。原先这里是 Always —— 那是共享输出目录里 appsettings.json 被覆盖成
+         非主服务配置的主要推手（构建顺序决定谁赢 ⇒ 主服务直连时连错库且无报错）。改为 Never。
+         ⚠ 只影响 appsettings.json 这一个文件，下面的 wwwroot 静态资产不受影响。 -->
     <Content Update="appsettings.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
     <Content Update="wwwroot\app.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

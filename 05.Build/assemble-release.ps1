@@ -302,6 +302,12 @@ if ($Target -in @('main', 'all')) {
         # ⚠ 断言的必须是**可执行宿主**，不是同名 dll 是否存在 —— ApiServer 降级为类库后
         #   它的 dll 仍会随宿主进目录（这是正常的），若继续断言旧 dll 等于永远为真、失去护栏意义。
         "Services\$Configuration\net10.0\CJPlug.Server.dll",
+        # 配置归一（2026-10-30）：主服务的配置只有执行目录下的 appsettings.json 一份。
+        # 必须断言它存在 —— 它是连接串 / InternalApi / 三员种子密码的唯一载体，
+        # 缺了服务仍能起来但会连错库（历史上就是这样静默坏掉的）。
+        "Services\$Configuration\net10.0\appsettings.json",
+        # 工位机是独立进程，配置走专属文件名（唯一保留的专属配置）。
+        "Services\$Configuration\net10.0\appsettings.CJ.Plug.StationApiServer.json",
         "Services\$Configuration\net10.0-windows\CJ.Plug.ExecuteApp.exe",
         'PlugConfig\UserPlugs.xml'
     )
@@ -312,8 +318,19 @@ if ($Target -in @('main', 'all')) {
         "Services\$Configuration\net10.0\CJ.Plug.McpServer.exe",
         "Services\$Configuration\net10.0\CJ.Plug.HostWebServer.exe",
         "Services\$Configuration\net10.0\CJ.Plug.StationAgent.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.StationApiServer.exe"
-    ) '回退形态 / 图站独立 exe 应已全部下线'
+        "Services\$Configuration\net10.0\CJ.Plug.StationApiServer.exe",
+        # 2026-10-30：CJ.Plug.AIChat 是 UI 组件库（被 CJ.Plug.AI 引用），曾被传递复制成 exe。
+        "Services\$Configuration\net10.0\CJ.Plug.AIChat.exe"
+    ) '回退形态 / 图站独立 / UI 组件 exe 应已全部下线'
+    # 配置归一（2026-10-30）：类库化项目的专属配置不再生成 —— 它们没有自己的进程，
+    # 留着会让人以为还有独立服务在跑，也会掩盖「根 appsettings.json 被覆盖」这类故障。
+    Assert-Absent $mainStaging @(
+        "Services\$Configuration\net10.0\appsettings.CJ.Plug.ApiServer.json",
+        "Services\$Configuration\net10.0\appsettings.CJ.Plug.DispatchServer.json",
+        "Services\$Configuration\net10.0\appsettings.CJ.Plug.McpServer.json",
+        "Services\$Configuration\net10.0\appsettings.CJ.Plug.HostWebServer.json",
+        "Services\$Configuration\net10.0\appsettings.CJPlug.Server.json"
+    ) '配置归一后不应再出现类库项目的专属配置'
     Assert-Clean $mainStaging
 
     Write-Host ("  main\    : {0} MB" -f (Get-TreeSizeMB $mainStaging)) -ForegroundColor Green
@@ -374,6 +391,11 @@ if ($Target -in @('station', 'all')) {
         'ApiServer\CJ.Plug.StationApiServer.exe',
         'SettingUI\StationSettingUI.exe'
     )
+    # 负向断言（2026-10-30）：CJ.Plug.AIChat 是 UI 组件库，曾被传递复制成 exe 混进图站载荷
+    # （StationApiServer → ModuleConfig → CJ.Plug.AI → CJ.Plug.AIChat）。已类库化，这里守住不回退。
+    Assert-Absent $stationStaging @(
+        'ApiServer\CJ.Plug.AIChat.exe'
+    ) '图站载荷不得混入库组件 exe（CJ.Plug.AIChat 已类库化）'
     Assert-Clean $stationStaging
 
     Write-Host ("  station\ : {0} MB" -f (Get-TreeSizeMB $stationStaging)) -ForegroundColor Green

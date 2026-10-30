@@ -48,4 +48,17 @@
     <Compile Remove="D:\Pro\CJ.Plug-Aspire\01.Scripts\Utf8ConsoleInit.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      配置归一（2026-10-30）：共享输出目录里的 appsettings.json 归**唯一宿主 CJPlug.Server 独有**，
+      本项目不再往那里写同名文件 —— 否则谁赢由构建顺序决定（历史上主服务因此连错 ../../main.db
+      且无任何报错）。工位机是独立进程（7660），它自己的配置走专属文件名
+      appsettings.CJ.Plug.StationApiServer.json，由 Directory.Build.targets 的
+      CopyAppSettingsWithProjectName 目标生成（AppHost 按 dll 名推导正好命中该文件）。
+    -->
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

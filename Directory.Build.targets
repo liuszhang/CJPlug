@@ -21,17 +21,49 @@
   </ItemGroup>
 
   <!--
-    共享输出目录配置复制：
+    共享输出目录配置复制（2026-10-30「配置归一」后**白名单化**）：
     当多个服务输出到同一目录时，各自的 appsettings.json 会互相覆盖。
-    此 Target 将每个项目的 appsettings.json 额外复制一份为 appsettings.{项目名}.json，
-    供 AppHost 通过 ASPNETCORE_CONFIG_PATH 环境变量为每个服务指定独立的配置文件。
+    此 Target 将项目的 appsettings.json 额外复制一份为 appsettings.{项目名}.json，
+    供 AppHost 通过 ASPNETCORE_CONFIG_PATH 环境变量为该服务指定独立的配置文件。
+
+    ⚠ 归一后**只有仍是独立进程的项目才需要专属文件**：
+      · 主服务 CJPlug.Server —— 不需要。它的配置已归一为执行目录下的 appsettings.json
+        （由该项目自带、CopyToOutputDirectory=Always 保证胜出）。再生成 appsettings.CJPlug.Server.json
+        只是多一份同内容文件，反而容易被改错、被误当成"真正生效的那份"。
+      · CJ.Plug.ApiServer / DispatchServer / McpServer / HostWebServer —— 不需要。
+        它们已降级为类库、没有自己的进程，专属文件是纯冗余；留着会让人以为还有独立服务在跑，
+        （历史上正是这些文件的存在掩盖了"根 appsettings.json 被覆盖 ⇒ 主服务连错库且无报错"）。
+      · CJ.Plug.StationApiServer（工位机，7660）—— **需要**，是目前唯一在白名单里的。
+
+    ⚠ 新增独立进程服务时，把项目名加进下面的白名单；降级为类库时记得移出。
   -->
   <Target Name="CopyAppSettingsWithProjectName"
           AfterTargets="Build"
-          Condition="Exists('$(MSBuildProjectDirectory)\appsettings.json')">
+          Condition="Exists('$(MSBuildProjectDirectory)\appsettings.json') And '$(MSBuildProjectName)' == 'CJ.Plug.StationApiServer'">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
           DestinationFiles="$(OutputPath)appsettings.$(MSBuildProjectName).json"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    共享输出目录**主配置**复制（2026-10-30 配置归一）：
+    唯一可执行宿主的 appsettings.json 落成执行目录下的 appsettings.json。
+
+    ⚠ 为什么不用 <Content CopyToOutputDirectory="Always">（更直觉的写法）：
+      Content 复制的文件会被 `IncrementalClean` 当作「本项目的输出」写进
+      obj/<配置>/<项目>.csproj.FileListAbsolute.txt；一旦**另一个**项目（如工位机）
+      曾经复制过同名文件、后来改为不复制，它重新构建时 IncrementalClean 会把
+      「上一轮由我写出、这一轮不再写」的 appsettings.json 删掉 —— 实测直接把主服务的
+      配置删空（构建后目录里只剩 appsettings.Development.json）。
+      走 Target 复制不进 FileList，任何项目重新构建都不会动它。
+    ⚠ SkipUnchangedFiles=false：主配置必须每次以项目内的版本为准（现场改坏的配置会被构建纠正）。
+  -->
+  <Target Name="CopySharedRootAppSettings"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'CJPlug.Server' And Exists('$(MSBuildProjectDirectory)\appsettings.json')">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
+          DestinationFiles="$(OutputPath)appsettings.json"
+          SkipUnchangedFiles="false" />
   </Target>
 
   <!--

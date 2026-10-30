@@ -2710,3 +2710,376 @@ var pdz = await _dbContext.Set<PlugDataZone>().FindAsync(new object[] { PDZId },
 | 5 | `_trash_20261030/`（1.5 GB + 40 个残留文件）确认后删除 | 由你确认 |
 | 6 | 三个被类库化项目的 `appsettings.json` 仍会复制进共享输出目录（构建顺序决定谁赢，实测 `InternalApi` 段已被覆盖丢失）——改 `<Content Remove>` 会改变运行时读到的配置，风险需单独评估 | 建议单独立项 |
 | 7 | P7.1a 退役 `CJ.Plug.SystemConfig`、P7.2 许可证、C3 IP 白名单 | 你说先不做 |
+
+---
+
+## 附录 R：配置归一（2026-10-30，P10）
+
+### R.1 问题形态（为什么必须归一）
+
+`02.Publish/Services/{Config}/net10.0/` 是**所有服务共享的输出目录**，归一前那里躺着 6 份配置，谁生效取决于构建顺序：
+
+| 文件 | 内容归属 | 归一前状态 |
+|---|---|---|
+| `appsettings.json` | **工位机**风格（`main333.db`、Guacamole、MainServer 6660） | md5 与 Dispatch/Mcp/HostWeb 三份完全相同 —— 谁最后构建谁赢 |
+| `appsettings.CJ.Plug.ApiServer.json` | 主服务权威配置（连接串 `../../main.db`、`InternalApi`、`ThreeRoleAdmin`） | 由 `Directory.Build.targets` 按项目名自动生成 |
+| `appsettings.CJ.Plug.{DispatchServer,McpServer,HostWebServer}.json` | 与根配置内容相同 | 同上，类库化后纯冗余 |
+| `appsettings.CJ.Plug.StationApiServer.json` | 工位机专属（`RemoteDesktop:RfbWindow`） | 唯一有存在必要的专属配置 |
+
+**危害**：不经 AppHost、直接 `dotnet CJPlug.Server.dll` 时没有 `ASPNETCORE_CONFIG_PATH`，服务只读根 `appsettings.json` ⇒ 连到 `main333.db`（空库，会现场建库并跑种子）、`ThreeRoleAdmin` 段缺失 ⇒ 用默认 `123456` ⇒ **无任何报错**。这类"配置静默回退"是最难查的故障。
+
+### R.2 方案（唯一权威文件 + 三条护栏）
+
+| 决策 | 内容 |
+|---|---|
+| 唯一配置 | 主服务的配置只有 `{执行目录}/appsettings.json`，由 `src/Server/CJPlug.Server/appsettings.json` 提供（内容 = 原 ApiServer 专属配置，逐键核对 31 → 38 键、同键同值、零丢失） |
+| 复制方式 | **不走 `<Content CopyToOutputDirectory>`**，改由 `Directory.Build.targets` 的 `CopySharedRootAppSettings` target 复制（`SkipUnchangedFiles=false`） |
+| 类库闭嘴 | ApiServer / DispatchServer / McpServer / HostWebServer 的 `appsettings.json` 一律 `CopyToOutputDirectory=Never` |
+| 工位机例外 | StationApiServer 的 `appsettings.json` 也设为 `Never`，专属文件由 `CopyAppSettingsWithProjectName` **白名单**生成（当前白名单只有它一个） |
+| AppHost | `ConfigFile = "appsettings.json"`；并新增**旧名纠正**：现场清单若仍写 `appsettings.CJ.Plug.ApiServer.json` 等已下线名称，启动时自动改为 `appsettings.json` 并打印告警 |
+
+### R.3 踩到的坑（必须记住）
+
+> **`IncrementalClean` 会把主配置删掉。**
+
+`<Content CopyToOutputDirectory="Always">` 看起来最直觉，但它把文件写进 `obj/<Config>/<项目>.csproj.FileListAbsolute.txt`，等于声明"这个输出归我管"。工位机项目历史上也复制过同名 `appsettings.json`，一旦把它改成 `Never` 再构建，`IncrementalClean` 就按"上一轮我写的、这一轮不再写"把它**删除** —— 实测构建后目录里只剩 `appsettings.Development.json`，主配置消失且无任何警告。
+
+走 Target 复制的文件不进 `FileListAbsolute.txt`，任何项目重新构建都不会动它。构建顺序鲁棒性已实测（Station → Server → Station 三步，根配置全程存活）。
+
+### R.4 验收
+
+| 项 | 结果 |
+|---|---|
+| 构建 | Debug/Release 均 **0 错误**；`assemble-release.ps1 -Target main` 退出 0，main 载荷 858.2 MB |
+| 输出形态 | `appsettings.json`（38 键，`PlugDb=../../main.db`）+ `appsettings.CJ.Plug.StationApiServer.json` + `appsettings.Development.json`，类库专属配置 **0 个** |
+| 直启冒烟（不传任何配置环境变量） | 六面 `/`、`/three-role/login`、`getAllPDZ`、`getTools`、`plugbridge/tools`、`/health` **全 200**；`/elsa/api/workflow-definitions` 无凭据仍 **302**；admin 登录 200 |
+| 连库判据 | **未产生 `main333.db`**，日志 `[SeedData] 已存在，跳过` ⇒ 连的是既有 `main.db` |
+| 数据 | 七张业务表与 `_bak_20261030_pdzfix` 逐表 hash 全等 |
+| 打包护栏 | 新增正向断言（`appsettings.json` + Station 专属必须存在）与负向断言（4 个类库专属配置不得出现） |
+
+### R.5 剩余
+
+| # | 项 | 说明 |
+|---|---|---|
+| 1 | `appsettings.Development.json` 仍在共享目录（HostWebServer 的） | 只在 Development 环境生效，而 Development 起不来（见 D2）；不动 |
+| 2 | `ConnectionStrings:Sqlite = main333.db` 是历史遗留键 | CJPlug 主业务走 `PlugDb`/`DatabaseConfig`，但 CJCore 的 `DbConnectionProviderBase` 有 `GetConnectionString("Sqlite")` 兜底 ⇒ 保留（改动属另一议题） |
+| 3 | 配置里的 `ThreeRoleAdmin:AdminPassword` 与库内实际密码可能不一致 | 配置只影响**种子初始化**；既有库改配置不会改密码。当前库内 admin 实测密码为 `Admin@2026` |
+| 4 | 三员登录页底部提示"默认账号 admin / 123456"来自 CJCore 组件硬编码文案 | 接入方覆盖默认密码后提示就对不上，建议改为读配置或不显示 |
+| 5 | `ThreeRoleAdmin:AdminPassword` 现值 `123456` | **用户手改，按用户值保留**（2026-10-30 确认）。它只影响种子初始化，不改既有账号密码 |
+
+---
+
+## 附录 S：工位机配置形态核验 + 载荷清理（2026-10-30，P11）
+
+### S.1 问题
+
+用户问："工位机的 `appsettings.json` 应该是独立的、和工位机程序在同目录对吧？"——归一后需确认工位机没有被主服务的归一动作误伤。
+
+**结论：是，独立且同目录，本来就是。** 两套形态并存，互不冲突：
+
+| 形态 | 位置 | 配置文件名 | 谁在读 |
+|---|---|---|---|
+| 开发态（单机编排） | `02.Publish\Services\<Cfg>\net10.0\` | 根 `appsettings.json` = 主服务；`appsettings.CJ.Plug.StationApiServer.json` = 工位机 | AppHost 用 `ASPNETCORE_CONFIG_PATH` 把工位机指向专属文件 |
+| 交付态（独立发布） | `05.Release\station\ApiServer\` | `appsettings.json`（与 exe 同目录） | 工位机自己 |
+
+`StationApiServer.csproj` 里的 `<Content Update="appsettings.json"><CopyToOutputDirectory>Never` **只作用于共享输出目录的 Build，不影响独立 `dotnet publish`**（实测 publish 仍产 `appsettings.json`，36 键全为工位机配置）。这是两套形态能不冲突的机制前提。
+
+### S.2 清理项 1：`CJ.Plug.AIChat` 类库化
+
+| 项 | 内容 |
+|---|---|
+| 现象 | `station\ApiServer\` 里混入 `CJ.Plug.AIChat.exe`（不在任何服务清单、不该被启动） |
+| 传递链 | `StationApiServer → ModuleConfig → CJ.Plug.AI → CJ.Plug.AIChat`；后者 `OutputType` 默认 Exe ⇒ 被 publish 复制出来 |
+| 定性 | 该项目本来就是 **UI 组件 + 服务注册库**（`StaticWebAssetProjectMode=Reference` 已是类库语义），`Program.cs` 只是开发者单机调试壳（Ollama `localhost:11434` / 端口 5143） |
+| 修改 | `OutputType=Library`；删除 `Program.cs`（顶层语句在 Library 下是 CS8805 硬错误）；`launchSettings.json` profiles 置空；`Components/Routes.razor` 的 `typeof(Program).Assembly` → `typeof(Routes).Assembly`（入口类型随 Program 一起消失） |
+| 功能等价性 | `ServiceCollectionExtensions.AddAIChatServices()` 与 Program 的服务注册**逐条等价**（唯一差异：`builder.Environment.WebRootPath` → `GlobalData.MainWebFileServer`），删壳不丢功能 |
+| 验收 | 单项目构建 0 错误、不再产 exe；主服务构建 0 错误；主服务实机启动六面全 200 且 `/aichat` **200**（组件承载面正常）；station 载荷 exe 只剩 `CJ.Plug.StationApiServer.exe` |
+
+### S.3 清理项 2：工位机配置里的死键
+
+删掉 `src/PlugStation/CJ.Plug.StationApiServer/appsettings.json` 中三条指向 `../../main.db` 的残留：
+`ConnectionStrings:PlugDb`、`ConnectionStrings:ElsaDb`、`DatabaseConfig` 整段。
+
+依据（工位机代码里这些键**无读取方**）：
+
+| 键 | 真实读取方 | 工位机是否走 |
+|---|---|---|
+| `ConnectionStrings:PlugDb` | `DbConnectionString.ReadFromConfig` → 仅 `WebHostStartup.cs:223`（主服务 `AddPlugWebHost`） | 否 |
+| `ConnectionStrings:ElsaDb` | Elsa 集成 | 否（工位机不注册 Elsa） |
+| `DatabaseConfig` 整段 | `DbConnectionString` / `ElsaExtensions.cs:248` / Desktop 配置页 | 否 |
+
+工位机的本地库是**硬编码路径**、与连接串无关：`station_config.db`（`StationConfigHelper`）、`station_tasks.db`（`StationTaskStore`，`AppContext.BaseDirectory`）。工位机 `Program.cs` 全文只读三个配置键：`FileServer:ToolAgentServer`、`RemoteDesktop:RfbWindow`、`InternalApi:Key`。
+
+顺带说明：`../../main.db` 在 `station\ApiServer\` 下会解析到 `05.Release\main.db`（不存在）——正因无读取方所以从未暴露，但留着会让后来者误以为工位机连主库。
+
+### S.4 一个不是缺陷的现象：工位机连 `127.0.0.1:8686`
+
+本机冒烟时工位机连 8686（旧调度端口，已并入 5066）而非 5066。取证结论：**本机环境残留，不是交付缺陷**。
+
+- 主服务地址优先级：`%ProgramData%\CJStation\station_config.db` 的 `MainServerUrl` → 环境变量 `MAIN_SERVER_HOST` → `GlobalData.MainDispatcherServer`（默认已是 `http://localhost:5066`）。
+- 本机 `C:\ProgramData\CJStation\station_config.db`（2026-10-07 遗留）里写着 `MainServerUrl=http://127.0.0.1:8686`，优先级最高，把正确默认值盖掉了。
+- 交付到客户机（无该文件）时走默认 5066，行为正确。**本机联调需先把该文件里的值改成 5066 或删掉该文件。**
+- 注意 `appsettings.json` 的 `MainServer:Url` / `Backend:Url` **不是**工位机主服务地址的来源（`Program.cs:107` 的 `GetSection("MainServer")` 已被注释）。
+
+### S.5 验收
+
+| 项 | 结果 |
+|---|---|
+| `-Target station` 实跑 | 退出 0，station 484.3 MB（比清理前少 0.1 MB ≈ AIChat.exe 体积） |
+| `station\ApiServer\` | exe 仅 `CJ.Plug.StationApiServer.exe`；`appsettings.json` 顶层段 `Logging/AllowedHosts/ConnectionStrings/Backend/Guacamole/MainServer/FileServer/RemoteDesktop`；`ConnectionStrings` 只剩 `Sqlite/Sqlite2/RabbitMq`；无 `DatabaseConfig` |
+| 主服务冒烟 | 构建 0 错误；启动 `Now listening http://[::]:5066`；六面 200、接缝 302 不变、`/aichat` 200 |
+| 工位机冒烟 | 启动正常：`the service port is:7660` / `Now listening http://[::]:7660` / `Application started`，删配置未引发任何配置异常 |
+| 缓存清理 | 共享输出目录残留的 `CJ.Plug.AIChat.exe` 与冒烟产生的 `StationLogs` 已移入 `_trash_20261030/aichat-lib/` |
+| 防回归断言 | `assemble-release.ps1` 两个 target 各加一条 `Assert-Absent`：main 的 `Services\…\CJ.Plug.AIChat.exe`、station 的 `ApiServer\CJ.Plug.AIChat.exe`。理由同 P9.1——只做正向断言等于永远为真，某天有人把 `OutputType` 改回 Exe 就发现不了 |
+| 打包复验 | `-Target station` 与 `-Target main` 均退出 0；main 三段构建 0 错误、858 MB；main 载荷内只剩 `CJ.Plug.AIChat.dll` + staticwebassets（主服务 AI UI 需要），无 exe |
+
+### S.6 剩余
+
+| # | 项 | 说明 |
+|---|---|---|
+| 1 | `MainServer:Url`（`localhost:6660`）/ `Backend:Url` / `Guacamole` 段在工位机配置里也是死键 | 本轮只清用户指定的三条 `../../main.db` 残留；这些是否一并清，待定 |
+| 2 | `C:\ProgramData\CJStation\station_config.db` 的值仍是 8686 | 属本机环境数据，不擅自改；需人工更新或删除 |
+| 3 | `DbConnectionString.FindConfigPath()` 绕过 `IConfiguration`，硬编码读仓库根的 `src\PlugApiServer\CJ.Plug.ApiServer\appsettings.json`，无 src 时回退硬编码 `../../main.db` | 配置归一的漏网点。当前只被主服务 `WebHostStartup.cs:223` 调用，属独立议题 |
+
+---
+
+## 附录 T：P6.4 模块启停实机验收（2026-10-30，P12）
+
+### T.1 结论先行（12:0x 已更正 —— 见 T.7）
+
+**P6.4 判据对"已声明 AccessKey 的模块"成立，对"未声明的模块"不成立。框架三面链路（菜单 / AppBar / 页面）全部已通，缺的是声明覆盖。**
+
+> ⚠ **本节初判已证伪。** 11:55 首轮只测了 `plug-knowledge`（其菜单无 `AccessKey`）就得出"整条能力从未落地"，
+> 12:0x 用 `plug-job-manage`（有 `AccessKey` + 有 feature 声明）复测，**菜单当场从 24 项变 23 项**，
+> 用 `plug-llm-config` 复测页面，**正文变为「无权访问」**。初判错在把"单个样本缺声明"当成"框架缺能力"。
+> 完整更正与三面矩阵见 **T.7**；下表与 T.3 保留首轮记录，仅作过程留痕，**不作结论引用**。
+
+`IModuleCatalog` 实现同时充当 `CJCore.Framework.Abstractions.IModuleEnablementGate`，
+该闸门已被 `CoreMenu`、`FrameworkLayout`（AppBar）、`ModuleAccessStrategy`（策略层）三处消费 —— **链路本就完整**。
+
+### T.2 验收过程与逐项结果
+
+构建 `dotnet build src/Server/CJPlug.Server/CJPlug.Server.csproj -c Release` → **0 错误 / 2189 警告**；
+启动 `CJPlug.Server.exe`（`ASPNETCORE_URLS=http://*:5066`，CWD 在 `02.Publish/Services/Release/net10.0`）→ **15 s 后 `/health` = 200**；
+登录 `POST /api/three-role/account/login`（`admin` / `Admin@2026`）→ **200**，Cookie `.ThreeRole.Auth` + `.ThreeRole.Token` 均下发。
+
+| # | 判据 | 结果 | 证据 |
+|---|---|---|---|
+| 1 | `/api/modules/` 列出全部模块 | ✅ | **34 个模块**，`plug-*` 30 个 + 框架 4 个（`Framework` / `Framework UI` / `三员管理` / `Permission` / `系统配置` 等）+ 4 个强制模块（`plug-head` / `plug-shell` / `plug-runtime` / `module-admin`） |
+| 2 | 关闭模块返回成功 | ✅ | `PUT /api/modules/plug-knowledge/enabled {"enabled":false}` → **200** `{"success":true}` |
+| 3 | 状态落库并可回读 | ✅ | 复查 `GET /api/modules/` → `plug-knowledge.enabled = False`（对照 `plug-market = True` 未受影响） |
+| 4 | **菜单项即时消失** | ❌ **不成立** | 关掉前后首页侧栏**同为 24 项**，`/KnowledgeManage │ 知识管理` 仍在（`html.unescape` 后统计，非实体误判） |
+| 5 | **页面访问被拦** | ❌ **不成立** | 禁用后 `GET /KnowledgeManage` → **200 / 210 818 B**，正文「知识」命中 7 次，无「无权访问」、无 404 页 |
+| 6 | 强制模块拒绝禁用 | （未触发） | 端点逻辑 `IsMandatory && !enabled → 403`，本轮未测 |
+| 7 | 状态还原 | ✅ | `PUT ... {"enabled":true}` → 200，回读 `True`；验收后无脏状态 |
+
+> 判据 4/5 的失败**与 P5 身份替换无关**：菜单 HTML 是 SSR 预渲染产出（`mud-nav-link-text` 内为 HTML 实体），两侧对比同源同法，排除"渲染方式差异"干扰。
+
+### T.3 初判根因（**已证伪，仅留痕**）
+
+| # | 根因 | 证据 |
+|---|---|---|
+| 1 | `IModuleCatalog`/`IModuleStore` **只被 ModuleAdmin 自己消费**，框架的菜单与路由装配链里没有任何引用 | `grep IModuleCatalog` 全仓：命中全在 `Modules/ModuleAdmin/**`；`Framework/**` 下 **0 命中** |
+| 2 | 菜单可见性只做**权限**过滤，**不做启停**过滤 | `CJCore.Framework.UI/Components/MenuVisibilityRules.cs:27 IsVisibleAsync(...)`：入参只有 `item / user / userRoles / router`，**没有 catalog** |
+| 3 | 启停的"下游"只有**插件门控**，且是**装配期（下次启动）**读文件，不是即时事件 | `DefaultModuleCatalog.SetEnabledAsync` → `_store.SetEnabledAsync` + `PublishEnablementSnapshot` + `Changed?.Invoke()`；而 `Changed` 事件全仓**零订阅方**；`module-enablement.json` 的读者只有 `AgentPluginGateFactory` 与 `ModulePluginGateFactory`（注释明写「管理页启停 → 下次启动装配期生效」） |
+
+**推论**：`ModuleAdminEndpoints` 里那句注释「D2=B：即时生效，无需重启」（`ModuleAdminEndpoints.cs:34`）与实现不符 ——
+它只对 `IModulePlugin`（Agent 插件 / 模块插件）在**重启后**成立，对 CJPlug 的 34 个 `IModule` 既不时也不延。
+
+### T.4 顺带发现：10 个菜单类没有 `AccessKey`
+
+启停要联动菜单，前提是菜单项能反查到所属模块；而 `AccessKey` 正是这条链上的关联键。现状覆盖不全：
+
+```
+NO-AccessKey: FMDModule/CJ.Plug.FMD/Menus/FMDMenu.cs
+NO-AccessKey: HomeModule/CJ.Plug.HomePage/Menus/HomePageMenu.cs
+NO-AccessKey: KnowledgeManageModule/.../Menus/KnowledgeManageMenu.cs
+NO-AccessKey: ModelManageModule/.../Menus/OntologyManageMenu.cs
+NO-AccessKey: PlugMarketModule/.../Menus/PlugMarketMenu.cs
+NO-AccessKey: SkillsManageModule/.../Menus/SkillsManageMenu.cs
+NO-AccessKey: SkillsModule/.../Menus/SkillsManageMenu.cs      ← 与上一行同名的遗留目录
+NO-AccessKey: StationManageModule/.../Menus/StationManageMenu.cs
+NO-AccessKey: ToolResourceModule/.../Menus/ToolResourceMenu.cs
+NO-AccessKey: UnitTestModule/.../Menus/UnitTestMenu.cs
+```
+
+后果有两层：① 这些菜单项**不受权限矩阵控制**（走 `MenuItem.Roles` 回退，无 Roles 即对任何登录用户可见）；
+② 将来做启停联动时**无法归属模块**。属 P6.3 的欠账（当时只补了 4 个模块的 `IModuleAccessDeclaration` 与 2 个菜单）。
+
+### T.5 待拍板：D-P6-1 模块启停的生效口径
+
+> ⚠ **本节前提已变**（T.7 证伪了"框架缺能力"）。现口径只剩"补齐声明到什么范围"，见 **T.7.5 的 D-P6-2**。
+> 下表保留首轮选项，仅作决策过程留痕。
+
+| 选项 | 做法 | 覆盖 | 成本 | 代价 |
+|---|---|---|---|---|
+| **A（推荐）** | **补齐 `AccessKey` 后做即时联动**：`MenuVisibilityRules` 注入 catalog，按 `AccessKey → moduleId` 判定；AppBar 同一规则；路由由 `ModuleAccessHandler` 侧拦截 | 菜单 + AppBar + 路由，**三面即时** | 中（框架 1 处 + 菜单 10 处 + 路由 1 处） | 框架行为变更，需先出方案评审；每次渲染多一次 catalog 查询（catalog 已是内存快照） |
+| **B** | **改为"下次启动生效"**：装配期按 catalog 过滤 `IModule` 注册与菜单聚合，运行期不做判断 | 三面，但需重启 | 中低 | 与 D2=B 的"即时"承诺相反，管理页体验变差（关完没反应） |
+| **C** | **收窄口径**：承认启停只对 `IModulePlugin` 生效；把本计划 P6.4 判据与端点注释改成"仅插件级、下次启动" | 无业务面 | 低（只改文档与注释） | "模块管理"页对 34 个模块形同虚设，等于放弃该能力 |
+
+> **推荐 A**：`/api/modules` 已把每个模块的 `featureKey`/`accessKey` 统一成 `moduleId`（如 `plug-process-manage`），关联键现成；
+> 补齐 `AccessKey` 本身是 P6.3 欠账，不补则权限矩阵对这 10 个页面也是漏的 —— 无论启停怎么做都得补。
+> A 落地后 P6.4 才能真验收，本计划的"接入完成"才有完整出口。
+
+### T.6 顺带发现（登记，不在本轮改）：`PackageService` 整条链已是死代码
+
+| 事实 | 证据 |
+|---|---|
+| 4 个包生成端点**已全部退役**，统一返回 410 | `PackageApi.cs:14/20/26/32` → `RetiredPackageFeature()`；退役说明见同文件末注释（2026-10-07，改由 CJSuite 出包） |
+| `PackageService`（**1280 行**）**零活调用方** | 只在 `PackageServiceCollectionExtensions.cs:11` 被 DI 注册，**从不解析**；4 个退役端点不注入它 |
+| 生成的脚本/配置**全是旧多进程形态** | `CreateStartupScripts`：4 个 exe（`ApiServer`/`HostWebServer`/`ElsaApiServer`/`McpServer`）+ 端口 8687/8688/8689/8690；`CreateDockerConfiguration`：4 容器同套端口；`CreateConfigurationFiles`：另建 `config/appsettings.json`（与"配置必须与 exe 同目录"的新形态冲突） |
+| 前端仍有 3 处**僵尸入口**打这些端点（点必 410） | `MainPageContent/Pages/DownloadPackage.razor:361/405/444/486`、`StationManage/Dialogs/StationDownloadDialog.razor:93`、`StationSettingUI/Services/StationApiService.cs:271/342/372/397` |
+
+处置建议（待你定）：**整链物理删除**（`PackageService.cs` + `PackageProgress.cs` + `PackageServiceCollectionExtensions.cs` + `PackageApi.cs` + `Program.cs:257/491` 两行注册），
+并把 `DownloadPackage.razor` 与 `StationDownloadDialog` 的下载入口一并下线（包分发已由 CJSuite 的 `cjplug`/`cjplug-desktop`/`station-settingui` 三个组件承担）。
+理由：留着 1280 行旧形态代码，任何后来者读它都会得出"系统还是多进程"的错误结论。
+
+---
+
+## 附录 T.7：归因更正与三面/四面复验（2026-10-30 12:0x）
+
+### T.7.1 结论反转
+
+**框架侧零缺陷。** `IModuleCatalog` 的实现 `DefaultModuleCatalog` 同时实现 `IModuleEnablementGate`，该闸门已被三处消费：
+
+| 消费点 | 位置 | 用法 |
+|---|---|---|
+| 菜单 | `CJCore.Framework.UI/Components/CoreMenu.razor:65` | 订阅 `Changed` 重算；条目过滤走 `MenuVisibilityRules` → `IPermissionStrategyRouter` |
+| AppBar | `CJCore.Framework.UI/FrameworkLayout.razor:259` | `_gate.IsAccessKeyEnabled(item.AccessKey)` |
+| 策略层 | `Permission.Api/Services/ModuleAccessStrategy.cs:65` | **`EvaluateAsync` 第 0 步**：`!_gate.IsAccessKeyEnabled(accessKey)` → 直接 Deny，**先于 AdminRoles 硬保护**（管理员同样受约束） |
+
+DI 也是同一实例：`ModuleAdminModuleExtensions.cs:41` 用 `services.Replace(Singleton<IModuleEnablementGate>(sp => sp.GetRequiredService<DefaultModuleCatalog>()))`，
+故 `Changed` 事件在 UI 与目录之间是通的。
+
+### T.7.2 三组对照实验（同一进程、同一会话）
+
+| # | 关闭的模块 | 该模块的声明情况 | 菜单 | 页面直达 | 判定 |
+|---|---|---|---|---|---|
+| 1 | `plug-knowledge` | 菜单**无** AccessKey、模块 **0 feature** | 24 项**不变** | `/KnowledgeManage` 200 正常渲染 | ❌ 不生效 |
+| 2 | `plug-job-manage` | 菜单有 `AccessKey="plug-job-manage"`、有同名 feature | **24 → 23 项**，`/JobManageList│作业列表`**消失** | 200 正常渲染（该页无 `[ModuleAccess]`） | ✅ 菜单生效 |
+| 3 | `plug-llm-config` | 菜单有 AccessKey、有 feature、页面有 `[ModuleAccess]` | 消失 | `/LlmConfig` **200 但正文「无权访问」**、内容不渲染（67 KB vs 正常 ~200 KB） | ✅ 菜单+页面双生效 |
+
+> 三个样本的唯一变量就是"有没有声明"。第 1 组是**声明缺失**，不是框架失效。
+
+### T.7.3 机制真相：`AccessKey` 是唯一开关，且必须"有归属"
+
+`_accessKeyIndex` 的构建链（`DefaultModuleCatalog.cs`）：
+
+```
+CollectFeaturesAsync()                       ← 三个来源
+  ① IModuleAccessDeclaration.AccessKey        Owner = declaration.ModuleName
+  ② IMenuService 菜单项的 AccessKey           Owner = ① 里同键的 Owner（无则 null）
+  ③ IAppBarService.KeyedAppBarItems.AccessKey Owner = null
+        ↓
+Scan() → BuildFeatures(moduleId, moduleName, features)
+        仅当 IsSameModule(moduleId, moduleName, entry.Owner) 为真才收进该模块的 Features
+        （Owner 为 null ⇒ 一律 false）
+        ↓
+Apply() → _accessKeyIndex 只从 module.Features 建
+        ↓
+IsAccessKeyEnabled(key)：索引里没有该键 ⇒ **返回 true（放行）**
+```
+
+**两条硬结论**：
+
+1. **只给菜单加 `AccessKey` 而不注册 `IModuleAccessDeclaration` 是无效的** —— Owner 为 null，键进不了索引，仍放行。
+2. **`ModuleName` 必须等于 `moduleId` 或模块显示名**（`IsSameModule` 只认这两个）。CJPlug 现有 10 个声明传的都是**中文显示名**（如 `"作业管理"`），恰好与 `IModule.Name` 相同，所以能命中 —— 这是个**脆弱的隐式约定**：一旦改模块显示名，门控就会静默失效。
+
+### T.7.4 四面缺口清单（实测，非推断）
+
+`GET /api/modules/` 显示 34 个模块，其中**只有 13 个有 feature（进了索引）**：
+
+```
+有 feature（受门控）: plug-process-manage / plug-job-manage / plug-tool-action / plug-execute /
+                      plug-pdz / plug-ai(仅 plug-ai:keys) / plug-mcptools / plug-guacamole /
+                      plug-llm-config / plug-license / 三员管理(3) / 系统配置(3) / plug-agent
+无 feature（门控恒放行）: plug-home / plug-station / plug-tool-resource / plug-market /
+                      plug-process-edit / plug-file-manage / plug-unit-test / plug-relation /
+                      plug-fmd / plug-skills-manage / plug-knowledge / plug-model-manage /
+                      plug-system-config-read
+                      （另有 Framework / Framework UI / 个人中心 / Permission /
+                        plug-head / plug-shell / plug-runtime / module-admin 属框架侧或强制模块）
+```
+
+逐面覆盖：
+
+| 面 | 门控机制 | 声明总量 | 已覆盖 | 缺口 |
+|---|---|---|---|---|
+| 菜单 | `MenuItem.AccessKey` → `MenuVisibilityRules` | 23 个 `IMenuService` | **6** | 10 个菜单类无 `AccessKey`（T.4 已列） |
+| AppBar | `FrameworkLayout:259` 直接查 gate | 2 项 | `plug-runtime`（强制，不需） | `plug-ai` 键**未入索引**（该模块只声明了 `plug-ai:keys`）⇒ AskAI 按钮不受控 |
+| 页面 | `[ModuleAccess(key)]` → `ModuleAccessRouteView` | 153 个 `@page` | **11 页 / 7 键** | 142 页无特性 |
+| API | `RequireModuleAccess(key)` | 33 个 `MapGroup` | **≈1**（另 1 处是注释） | 几乎全部业务端点未声明 |
+
+### T.7.5 待拍板：D-P6-2 声明补齐的范围（**已定 A，见 T.7.7**）
+
+| 选项 | 做法 | 覆盖 | 工作量 | 评价 |
+|---|---|---|---|---|
+| **A（推荐）** | **只补"入口面"**：13 个无 feature 的业务模块各补 1 条 `IModuleAccessDeclaration` + 对应菜单 `AccessKey`，并给 `plug-ai` 补一条模块级键 | 菜单全量 + AppBar + 启停可验收 | 约 15 处声明 + 10 处菜单 | 让 P6.4 判据**真实成立**；不动在用 API，风险最低 |
+| **B** | A + **页面全量**（142 页补 `[ModuleAccess]`，键按模块归属） | 入口面 + 页面 | 约 150 处 | 工作量集中但机械；与 D9=A「全量矩阵」是同一件事，可合并 |
+| **C** | A + B + **API 端点全量**（33 个 MapGroup 补 `RequireModuleAccess`） | 四面全 | 约 200+ 处 | **改动面最大**：任何一处键写错都会让在用 API 变 403，须逐端点回归 |
+
+> **推荐 A**，理由：① P6.4 的判据原文只要求"菜单项与 AppBar 项消失"，A 即可闭环；
+> ② 页面/API 的铺开与 **D9=A 全量权限矩阵**是同一批工作，混进来会让"启停验收"和"权限验收"互相污染，出问题难定位；
+> ③ A 之后仍可单独开一批做 B/C，且那时有 A 的 13 个键作为样板，成本更低。
+
+### T.7.6 若选 A，落地配方（三件套，缺一不生效）
+
+以 `plug-knowledge` 为例：
+
+```csharp
+// ① 菜单：补 AccessKey（键 = moduleId，Q8 定案口径）
+new() { Icon = ..., Href = "/KnowledgeManage", Text = "知识管理", AccessKey = "plug-knowledge" }
+
+// ② 声明：ModuleName 必须等于 moduleId 或模块显示名（建议传 moduleId，去掉改名脆性）
+services.AddSingleton<IModuleAccessDeclaration>(
+    new ModuleAccessDeclaration("plug-knowledge", ["system_admin"], "plug-knowledge"));
+
+// ③ 验收：关模块 → 菜单消失；开回来 → 菜单回来（不必重启）
+```
+
+> ⚠ 现有 10 条声明传的是中文显示名，**建议本轮顺手改成 `moduleId`** —— 否则将来改一个模块的中文名，门控会静默失效，且没有任何报警。
+
+> **⚠ 该"顺手改"建议已于 T.7.7 作废**：`ModuleName` 被权限矩阵当作**分组显示名**消费，改传 `moduleId` 会让矩阵分组变成 `plug-job-manage` 这类机器串。改为「约定 + 验收断言」兜底。
+
+### T.7.7 收口：D-P6-2 = A（2026-10-30 12:1x）
+
+**用户拍板 A（只补入口面）。** 立项文档：`CJPlug/docs/（待评审）P6.4模块启停入口面补齐方案-20261030.md`。
+
+**A 的精确范围（比 T.7.5 的粗估更小、更准）**
+
+| 项 | T.7.5 粗估 | 核实后 | 差异原因 |
+|---|---|---|---|
+| 待补声明 | 13 条 | **9 条** | 13 个零 feature 业务模块中：4 个**无菜单入口**（`plug-file-manage`/`plug-process-edit`/`plug-relation`/`plug-system-config-read`）补了也没有任何键检查它 = 矩阵噪音，归 B；`plug-home` 是导航兜底入口不纳入；余 **8** 个各补 1 条 + `plug-ai` 补第 2 条（现只有 `plug-ai:keys`）= **9** |
+| 待补菜单键 | 10 个 | **8 个** | 10 个无 `AccessKey` 的菜单文件中，1 个属 `plug-home`（不纳入）、1 个是**孤儿项目** `skillsModule/CJ.Plug.SkillsManage`（运行期不存在，与 `SkillsManageModule` 同名类同名扩展方法，仅后者被引用） |
+| 框架改动 | — | **0 行** | 全部落在 CJPlug 侧 |
+
+**T.7.6 配方的一处更正**
+
+原写「建议 ModuleName 传 moduleId，去掉改名脆性」——**作废**，但理由按实测修正：矩阵分组名是 `ResolveGroupName = FirstNonEmpty(菜单 GroupName, 声明 ModuleName)`（`PermissionFunctionsService.cs:446`，2026-10-21 口径）；**有菜单的键**分组取菜单 `GroupName`，`ModuleName` 不参与显示（改了无效果也无收益）；**无菜单的纯声明键**才回落 `ModuleName`（实测 `plug-ai` 分组显示"AI 助手"即来自此），这类键改传 `moduleId` 会把分组变成机器串。故：`ModuleName` 一律保持模块中文名。
+
+改名脆性实际也被兜住一半：`IsSameModule` 除逐字相等外还有**双向包含**（`moduleName.Contains(owner)`），所以"作业管理"→"作业管理中心"仍能命中，只有**彻底换词**才断。收口方式改为：① 声明注释里写死"`ModuleName` 必须与 `Module.Name` 逐字一致"；② 验收脚本断言"凡 `featureKey == moduleId` 的功能项，其 `name` 必须等于模块 `name`"，漂移自动暴露。
+
+**唯一未定项**：D-P6-4 —— 新增 9 条声明的角色白名单用 `["*"]`（零可见性回归，推荐）还是 `["system_admin"]`（与既有 11 条一致，但非管理员将立即看不到这 8 个菜单 + AskAI）。详见立项文档 §5。
+
+### T.8 P6.4 收口：D-P6-2=A / D-P6-4=A 已落地并验收通过（2026-10-30 12:3x）
+
+**结论：P6.4 判据（关模块 → 菜单/AppBar 消失）现已真实成立。** 框架零改动，只补 CJPlug 侧 9 个文件 / 17 处新增。
+
+| 项 | 内容 |
+|---|---|
+| 菜单补键 | `plug-fmd`(对象管理) / `plug-knowledge` / `plug-model-manage` / `plug-market` / `plug-skills-manage` / `plug-station` / `plug-tool-resource` / `plug-unit-test` |
+| 补声明 | 上列 8 个 + `plug-ai`（第 2 条，管 AppBar AskAI；原只有 `plug-ai:keys` 管 `/AIAgent`） |
+| 角色口径 | 全部 `Roles=["*"]`（D-P6-4=A）⇒ **零可见性回归**，只获得"可被模块启停关掉"的能力 |
+| 验收 | **18/18 断言通过**：`/api/modules/` 有功能键模块 13→**21**；侧栏基线 24；逐个关闭 24→23→…→17；`plug-ai` 关后 AppBar「智能命令」1→0；全部还原 34/34 |
+
+**三处探针口径修正（都是测量问题，不是缺陷）**
+
+1. **图站管理菜单不可验**：`StationManageMenu` 在 `!status.IsActivated` 时直接返回空，本机 `/api/license/status` → `isActivated=false`，菜单**本就不渲染**。故该项只验"PUT 200 + 文字不在"，键归属由"9 条新键归属正确"证明。
+2. **AppBar 探针词**：`AskAI` 是组件类名，HTML 中恒 0；实际渲染的是 `Placeholder="智能命令"` 的 `MudTextField`，改数该词才是有效探针。
+3. **判据 7（非管理员不回归）未实证**：三员种子账号密码已非配置默认值（`sysadmin/autadmin/audadmin` + `123456` 全返回 `InvalidCredentials`），重置会改数据。仅静态证明：`ModuleAccessStrategy.Decide` 对 `Roles.Contains("*")` 直接 `Allow`（`ModuleAccessStrategy.cs:161-164`），`"*"` 有 CJOntology `HomeUiModule` 先例。
+
+**清理**：启停持久化文件 `module-enablement.json`（34 项全 true）已从 Release 输出目录移入 `_trash_20261030/smoke/`，避免随交付物带出陈旧状态。
+
+**仍在册（归 B 批次）**：`plug-file-manage` / `plug-process-edit` / `plug-relation` / `plug-system-config-read` 无入口键，管理页开关对它们仍无效；142 页无 `[ModuleAccess]`、33 个 MapGroup 几乎无 `RequireModuleAccess`。
+
+

@@ -46,6 +46,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      配置归一（2026-10-30）：本进程是**唯一可执行宿主**，共享输出目录里的 appsettings.json
+      只由本项目提供，其它项目不再往那里写同名文件（见各项目 csproj 与 Directory.Build.targets）。
+      ⚠ 这里刻意用 Never：appsettings.json **不走 Content 复制**，改由 Directory.Build.targets 的
+        CopySharedRootAppSettings 目标复制。原因见那边 —— Content 复制的文件会被 IncrementalClean
+        当成「本项目的输出」管理，实测工位机构建时会把主服务的配置删掉。
+    -->
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 主 API 模块（已降级为类库）：AddPackageModuleServices / AddPackageModuleApi -->
     <ProjectReference Include="..\..\PlugApiServer\CJ.Plug.ApiServer\CJ.Plug.ApiServer.csproj" />
     <!-- Web 装配：AddPlugWebHost / MapPlugWebHost / MapPlugWebRazorComponents -->
