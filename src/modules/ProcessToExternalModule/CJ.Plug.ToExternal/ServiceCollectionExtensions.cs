@@ -12,6 +12,12 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
 
+        // P7.1b-B-1：模块权限声明 —— 本模块无菜单（只有 API /api/cjprocess），此前未声明 ⇒
+        //   模块管理页开关对它完全无效（B-1 对账时补入：ModuleId 清单 27 个中唯一漏网的业务模块）。
+        // ⚠ 无菜单 ⇒ 矩阵分组名回落到 ModuleName，必须传中文显示名。Roles=["*"] = 零可见性回归。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-to-external", ["*"], "对外接口(ToExternal)"));
+
         return services;
     }
 

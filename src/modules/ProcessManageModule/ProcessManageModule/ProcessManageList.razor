@@ -1,6 +1,7 @@
 @page "/ProcessManageList"
 @* P5.5 第二批：业务页面「仅登录」底线 *@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-process-manage", "*")]
 
 @using CJ.Plug.Models.MCPTools
 @using CJ.Plug.Models.Plug

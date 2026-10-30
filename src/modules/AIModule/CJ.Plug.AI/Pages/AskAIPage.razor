@@ -1,6 +1,10 @@
 @page "/AskAI"
 @* P5.5 第二批：业务页面「仅登录」底线 *@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@* P7.1b-B-2：模块权限键 —— 关模块后直连 URL 也被拦（此前只靠菜单消失，URL 仍可进）。
+   第二参数当前不被 ModuleAccessRouteView 读取（角色由统一鉴权中心按声明 Roles 决定），
+   此处显式写 "*" 仅为与 D-P6-4=A 同口径，避免将来框架读它时误伤。 *@
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-ai", "*")]
 @using CJ.Plug.AIChat.Components.Pages.Chat
 @using CJ.Plug.ApiClient.Contracts
 @using CJ.Plug.DeekSeekIn

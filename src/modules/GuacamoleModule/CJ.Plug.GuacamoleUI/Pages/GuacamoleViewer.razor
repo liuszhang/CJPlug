@@ -1,6 +1,6 @@
 ﻿@page "/guacamole/{StationIp}"
 @* P5.5：可直连操作工位机桌面/终端，按模块键收口 *@
-@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-guacamole", "system_admin")]
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-guacamole", "*")]
 
 @using CJ.Plug.GuacamoleApiClient
 @using CJ.Plug.GuacamoleModels

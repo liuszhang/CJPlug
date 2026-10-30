@@ -1,6 +1,6 @@
 # （进行中）CJPlug 接入 CJCore 实施计划
 
-> 状态：进行中（P0–P9 + P13 完成；**P9 + P9.1 已完成** —— 唯一宿主 `CJPlug.Server` 上线，**所有回退形态 exe 已下线**（D2=B，附录 Q.8）；**P13 已完成** —— 死代码三件套清理 + `DeleteByFilter`/`IsDangerous` 两处缺陷收口 + 内部密钥读侧实测 100%（附录 U）；**P7.1a 已完成** —— SystemConfig 四项目退役 + ElsaStudio 退役 + 配置读写收敛 CJCore（附录 V，方案文档已翻转"已完成"）；**P7.1b 已完成** —— Amis 120 个示例页构建期排除（附录 W，B 批次的前置收口，页面门控缺口 151→31 页）；剩 **P7.2 许可证**（等授权语义）、**B 批次覆盖面**（用户拍板**缓做**，仅剩 B-1/B-2/B-3 三项）　|　日期：2026-10-29（**2026-10-30 更新**）　|　作者：旺财　|　位置：`CJPlug/docs/`
+> 状态：进行中（P0–P9 + P13 完成；**P9 + P9.1 已完成** —— 唯一宿主 `CJPlug.Server` 上线，**所有回退形态 exe 已下线**（D2=B，附录 Q.8）；**P13 已完成** —— 死代码三件套清理 + `DeleteByFilter`/`IsDangerous` 两处缺陷收口 + 内部密钥读侧实测 100%（附录 U）；**P7.1a 已完成** —— SystemConfig 四项目退役 + ElsaStudio 退役 + 配置读写收敛 CJCore（附录 V，方案文档已翻转"已完成"）；**P7.1b 已完成** —— Amis 120 个示例页构建期排除（附录 W，B 批次的前置收口，页面门控缺口 151→31 页）；**B 批次已完成** —— 4 条入口键声明 + 13 页 `[ModuleAccess]` + 业务 API 宿主侧启停门控（附录 X，D-B-1=C / D-B-3=A）；剩 **P7.2 许可证**（等授权语义）、**B-3 矩阵可见性**（A 方案的已知代价，需改走逐个加框架引用）　|　日期：2026-10-29（**2026-10-30 更新**）　|　作者：旺财　|　位置：`CJPlug/docs/`
 > **⚠ 2026-10-30 进度更正（本轮）**：
 > ① **P5 身份替换已完成**（P5.1~P5.9 + P5.8 C1/C2 收口，见 `（已完成）D-P5-6 Cookie会话绑定方案-20261030.md`）；
 > ② **P6.3 权限键对齐已完成**（见 `（已完成）P5.5第三批+P6.3 权限声明归口方案-20261030.md`）；
@@ -3246,4 +3246,53 @@ services.AddSingleton<IModuleAccessDeclaration>(
 |---|---|---|
 | 1 | `Components/Layout/NavMenu.razor` | 演示页专用导航菜单，Pages 排除后成**死代码**（全仓 0 引用），可后续一并排除 |
 | 2 | `wwwroot/test.html`、`wwwroot/photo/`、`img/` | Amis 演示资源，随 `wwwroot/**` 进交付物，属"出厂垃圾"，建议单独清理 |
-| 3 | B-2 可直接按 **14 页**排期 | 与 D9=A 全量权限矩阵合并推进成本更低 |
+| 3 | B-2 可直接按 **14 页**排期 | 与 D9=A 全量权限矩阵合并推进成本更低（**已于 B 批次执行，实测 13 页**） |
+
+---
+
+## 附录 X：B 批次权限声明收口（2026-10-30，已完成）
+
+> 决策：**D-B-1 = C**（B-1 + B-2 + B-3 全量）、**D-B-3 = A**（宿主侧集中门控）。
+> 完整方案、取证、验收见 **`（已完成）B批次权限声明收口方案-20261030.md`**，此处只留结论与新增认知。
+
+### X.1 结论
+
+| 项 | 结果 |
+|---|---|
+| B-1 入口键声明 | **4 条**（`plug-file-manage` / `plug-process-edit` / `plug-relation` / **`plug-to-external`**） |
+| B-2 页面 | 既有 11 处 `"system_admin"` 第二参数统一改 `"*"`（防御性）+ **13 页**补 `[ModuleAccess]` |
+| B-3 API | **宿主侧 `ModuleApiGate`**：按端点 Tag 映射模块键，模块停用 ⇒ 403。业务项目零改动 |
+| 死链 | `PlugShellMenu` 的 `/download-package`（P7.1a 漏删）已移除 |
+| 验收 | 构建 0 错误；`/api/modules/` 有键模块 21→25；关模块后页面显示「无权访问该页面」、API 403；同路径 `/api/plug` 三模块互不误伤 |
+
+### X.2 三条新增认知（本章节起以此为准）
+
+| # | 认知 | 依据 |
+|---|---|---|
+| 1 | **`[ModuleAccess]` 第二参数（DefaultRoles）当前不生效** | `CJCore.Framework.UI/ModuleAccessRouteView.cs:183-196` 只把 `AccessKey` 交给 `PermissionRouter`，从未读 `DefaultRoles`。角色口径由统一鉴权中心（声明 Roles / 配置 / 矩阵）决定 |
+| 2 | **页面补键后真正生效的是"声明里的 Roles"，不是特性第二参数** | `ModuleAccessStrategy.EvaluateAsync` 第 4 步取 `IModuleAccessDeclaration.Roles`。13 页中仅 `/JobManageList`、`/ProcessManageList` 引用 `["system_admin"]` 键 ⇒ 这 2 页补键后非管理员直连失效（与"菜单本就看不到"自洽，判定为接受收紧） |
+| 3 | **26 个模块 API 项目零 CJCore 引用** | 各模块 API csproj 里 `grep CJCore` 全空。`RequireModuleAccess` 在 `CJCore.Framework.Api` ⇒ 逐个补键必须先扩散框架依赖到全部业务项目。这是 D-B-3 选 A 的根本原因 |
+
+### X.3 B-3 实现要点（可复用经验）
+
+1. **用端点 Tag 而非路径前缀做模块归属**：`/api/plug` 被三个模块共用（插头执行 / 插头市场 / 插头管理），
+   按路径无法区分；`MapGroup(...).WithTags(...)` 已是天然模块身份，读 `ITagsMetadata` 即可，**零模块改动**。
+2. **未命中一律放行**：映射遗漏的后果是"该拦的没拦"，不是"误伤在用接口"。
+3. **不需要动 `NeedsIdentity()`**：A 方案不引入 `RequireAuthorization` 元数据，
+   因此不存在"缺授权中间件 ⇒ 恒 500"的陷阱（方案 §5.2 的担心在选 A 后消失）。
+4. **日志级别陷阱**：`appsettings` 的 `Logging:LogLevel:Default = Warning` ⇒ 中间件的 `LogInformation`
+   **一条都不输出**，极易误判为"中间件没跑"。判活要看行为（403），别看日志。
+
+### X.4 新坑登记
+
+| # | 坑 | 处置 |
+|---|---|---|
+| 1 | MSBuild 并行构建竞态：449 个 `MSB3030 无法复制 … pdb`（`ElsaIntegration` 抢在 CJCore 重建完成前复制） | 非代码问题，**重跑一次即通过** |
+| 2 | Edit 工具 `new_string` 里写 `\r\n` 会被当成**字面 4 个字符**写入文件（不是换行） | 需要换行就在参数里直接换行；已用 `git checkout` 回滚后按正确方式重做 |
+| 3 | Git Bash 的 `sed -i` 会把整个文件的 CRLF 转成 LF | 尽量用 Edit；已发生时用 `git checkout` 回滚重做 |
+
+### X.5 遗留
+
+1. 工位机 3 个 MapGroup（`/uvnc`、`api/station`、`api/station/remote`）+ Dispatch 1 个（`api/dispatch`）属独立进程，未覆盖。
+2. 权限矩阵看不到接口键（A 方案代价）；要矩阵可见需改走"逐个加 `CJCore.Framework.Api` 引用"（选项 B）。
+3. `ModuleApiGate` 默认 `Enforce`；上线前建议先跑一轮 `Observe` 看「未登记 Tag」清单补齐映射。

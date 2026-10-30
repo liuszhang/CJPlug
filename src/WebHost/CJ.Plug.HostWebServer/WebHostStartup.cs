@@ -482,6 +482,20 @@ public static class WebHostStartup
 
         app.MapStaticAssets();
 
+        // ===== Blazor 框架资产显式端点（2026-10-30 故障修复） =====
+        // 病因：本宿主的 UseStaticFiles() 注册在 UseRouting() **之后**（Program.cs 的 app.UseRouting()
+        //   早于本方法的调用），实测物理 wwwroot 一律取不到——新建一个 wwwroot/__probe.txt 请求回来
+        //   也是首页 HTML；而 wwwroot/_framework 里的资产**不在** MapStaticAssets 的清单里
+        //   （Debug/Release 两份 staticwebassets.endpoints.json 的 _framework 条目数均为 0）。
+        //   两头都不管 ⇒ GET /_framework/blazor.web.js 落到 Blazor fallback 返回首页 HTML
+        //   ⇒ 浏览器报 "Unexpected token '<'"、window.Blazor 始终 undefined
+        //   ⇒ 整站 **按钮有外观、无事件**（三员登录页点「登录」完全没反应即此故障）。
+        // 处置（本次选定：不动既有中间件顺序，零副作用）：把 Blazor 运行时真正用到的几个文件
+        //   用**端点**直接吐出去，白名单 + 防目录穿越；文件源按 内容根 wwwroot → 基目录 wwwroot 两级兜底。
+        // 技术债：根治应把静态中间件整体挪到 UseRouting() 之前（CJOntology.Web 就是该顺序且实测正常），
+        //   但那要回归认证 / 防伪造 / 网关的中间件事前依赖，另行立项。
+        app.MapBlazorFrameworkAssets();
+
         // P5：身份与权限端点 —— MapCJCoreThreeRoleAdmin() 一行映射 10 组：
         //   认证基座（api/three-role/account: login/logout/cookie/jwt/refresh）
         //   + me/会话/改密/重置密码 + 用户/角色/部门/用户组 + 角色权限配置

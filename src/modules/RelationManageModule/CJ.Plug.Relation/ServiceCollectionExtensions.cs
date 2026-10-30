@@ -30,6 +30,12 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<CJCore.Framework.Abstractions.IModule, Module>();
 
+        // P7.1b-B-1：模块权限声明 —— 本模块无菜单（只有 API），此前未声明 ⇒ 模块管理页开关对它
+        //   完全无效。补声明后开关才真正可用。
+        // ⚠ 无菜单 ⇒ 矩阵分组名回落到 ModuleName，必须传中文显示名。Roles=["*"] = 零可见性回归。
+        services.AddSingleton<CJCore.Framework.Abstractions.IModuleAccessDeclaration>(
+            new CJCore.Framework.Abstractions.ModuleAccessDeclaration("plug-relation", ["*"], "关系管理"));
+
         services.AddHttpClient<IRelationApiClient,RelationApiClient>(client =>
         {
             client.BaseAddress = new(GlobalData.MainDispatcherServer);

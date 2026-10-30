@@ -1,6 +1,7 @@
 @page "/JobManageList"
 @* P5.5 第二批：业务页面「仅登录」底线 *@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [CJCore.Framework.Abstractions.ModuleAccess("plug-job-manage", "*")]
 
 @using CJ.Plug.JobManage.Components
 @using CJ.Plug.JobManageApiClient

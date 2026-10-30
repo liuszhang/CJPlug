@@ -461,6 +461,19 @@ app.UseInternalApiKeyGate(
 // 必须先调用 UseRouting
 app.UseRouting();
 
+// ── P7.1b-B-3：业务 API 的模块启停门控（2026-10-30）────────────────────
+//   关掉模块后，其业务 API 也应拒绝（此前只有菜单/页面消失，API 仍可裸调）。
+//   采用宿主侧集中式（D-B-3=A）：26 个模块 API 项目零 CJCore 引用，逐个加框架依赖会把
+//   依赖扩散进全部业务项目；改在宿主按**端点 Tag** 映射模块键，业务项目一行不改。
+//   ⚠ 必须在 UseRouting() 之后 —— 依赖 ctx.GetEndpoint() 读 MapGroup(...).WithTags(...) 设的 Tag。
+//      用 Tag 而非路径前缀，是因为 /api/plug 被三个模块共用（插头执行/插头市场/插头管理），
+//      按路径无法区分归属。
+//   ⚠ 未命中映射表一律**放行**：映射遗漏的后果是"该拦的没拦"，不是"误伤在用接口"。
+//   模式：Off（不挂）/ Observe（只记日志）/ Enforce（403）。配置拼错或缺失按 Observe。
+app.UseModuleApiGate(
+    app.Configuration["ModuleApiGate:Mode"],
+    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ModuleApiGate"));
+
 // 启用CORS
 app.UseCors("AllowAll");
 
