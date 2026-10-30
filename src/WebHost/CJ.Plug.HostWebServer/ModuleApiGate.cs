@@ -43,7 +43,6 @@ public static class ModuleApiGate
         ["许可证管理"]            = "plug-license",
         ["LLM 配置管理"]          = "plug-llm-config",
         ["MCP管理"]               = "plug-mcptools",
-        ["本体管理"]              = "plug-model-manage",
         ["PDZ管理"]               = "plug-pdz",
         ["PDZ管理-Datas"]         = "plug-pdz",
         ["插头执行"]              = "plug-execute",

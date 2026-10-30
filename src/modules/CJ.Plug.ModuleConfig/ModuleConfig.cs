@@ -7,8 +7,6 @@ using CJ.Plug.LlmConfig;
 using CJ.Plug.LicenseApi;
 using CJ.Plug.LicenseUI;
 using CJ.Plug.LlmConfigApi;
-using CJ.Plug.ModelManage;
-using CJ.Plug.ModelManageApi;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using Microsoft.AspNetCore.Builder;
@@ -58,9 +56,6 @@ namespace CJ.Plug.ModuleConfig
             // Guacamole 远程桌面模块
             services.AddGuacamoleUIPageServices();
 
-            // 模型管理模块
-            services.AddOntologyManagePageModuleServices();
-
             // LLM 配置模块
             services.AddLlmConfigPageModuleServices();
 
@@ -103,9 +98,6 @@ namespace CJ.Plug.ModuleConfig
             // Guacamole 远程桌面模块API
             services.AddGuacamoleApiServices();
 
-            // 模型管理模块API
-            services.AddOntologyManageModuleApiServices();
-
             // 许可证模块API
             services.AddLicenseModuleApiServices();
 
@@ -136,7 +128,6 @@ namespace CJ.Plug.ModuleConfig
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.LicenseApi.DbContext.LicenseModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.LlmConfigModel.DbContext.LlmConfigDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.MCPToolsManageApi.DbContext.MCPToolsManageDbConfig>();
-            services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.ModelManageModel.DbContext.OntologyManageDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.PDZModels.DbContext.PDZModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, PlugMarketModuleDbConfig>();   // 该类型无命名空间（全局）
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.ProcessManageApi.DbContext.ProcessManageModuleDbConfig>();
@@ -172,9 +163,6 @@ namespace CJ.Plug.ModuleConfig
 
             // Guacamole 远程桌面模块API
             app.AddGuacamoleApi();
-
-            // 模型管理模块API
-            app.AddOntologyManageModuleApi();
 
             // 许可证模块API
             app.AddLicenseModuleApi();

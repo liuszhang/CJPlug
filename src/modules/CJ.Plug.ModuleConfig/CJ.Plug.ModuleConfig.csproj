@@ -35,7 +35,6 @@
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleApi\CJ.Plug.GuacamoleApi.csproj" />
     <ProjectReference Include="..\GuacamoleModule\CJ.Plug.GuacamoleUI\CJ.Plug.GuacamoleUI.csproj" />
     <ProjectReference Include="..\KnowledgeManageModule\CJ.Plug.KnowledgeManage\CJ.Plug.KnowledgeManage.csproj" />
-    <ProjectReference Include="..\ModelManageModule\CJ.Plug.ModelManage\CJ.Plug.ModelManage.csproj" />
     <ProjectReference Include="..\LlmConfigModule\CJ.Plug.LlmConfig\CJ.Plug.LlmConfig.csproj" />
     <ProjectReference Include="..\LlmConfigModule\CJ.Plug.LlmConfigApi\CJ.Plug.LlmConfigApi.csproj" />
     <ProjectReference Include="..\LicenseModule\CJ.Plug.LicenseApi\CJ.Plug.LicenseApi.csproj" />
