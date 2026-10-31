@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>d6f4775e-86af-4a29-81e0-3e7fd73d87fa</UserSecretsId>
-    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    
 
     <!--
       P9 / 2026-10-30（D1 = A）：本项目已降级为**类库**。

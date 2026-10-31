@@ -27,7 +27,7 @@
     <RootNamespace>CJPlug.Server</RootNamespace>
 
     <!-- 与 02.Publish/Services 同级输出：AppHost 用 AddExecutable("dotnet", servicesDir, dll) 拉起 -->
-    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    
 
     <!-- 与 ApiServer 一致：强制禁用冲突的 CodeAnalysis 加载 -->
     <DisableRoslynAnalyzers>true</DisableRoslynAnalyzers>

@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BaseOutputPath>..\..\..\02.Publish\Services</BaseOutputPath>
+    
     <!-- P9.1（2026-10-30，D2 = B）：降级为类库，不再产出 exe。
          ⚠ 必须保留 Microsoft.NET.Sdk.Web —— 本项目含 razor 页面（Pages/PlugAgentDebug.razor）
          与 static web assets，换 SDK 会丢 Razor 编译。
