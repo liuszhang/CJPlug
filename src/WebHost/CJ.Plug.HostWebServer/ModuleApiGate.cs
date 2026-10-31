@@ -32,7 +32,6 @@ public static class ModuleApiGate
     private static readonly Dictionary<string, string> TagToAccessKey = new(StringComparer.OrdinalIgnoreCase)
     {
         ["作业管理"]              = "plug-job-manage",
-        ["知识管理"]              = "plug-knowledge",
         ["图站管理"]              = "plug-station",
         ["图站配置"]              = "plug-station",
         ["工具管理"]              = "plug-tool-resource",

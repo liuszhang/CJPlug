@@ -2,7 +2,6 @@ using CJ.Plug.AuditApi;
 using CJ.Plug.GuacamoleApi;
 using CJ.Plug.GuacamoleUI;
 using CJ.Plug.HomePage;
-using CJ.Plug.KnowledgeManage;
 using CJ.Plug.LlmConfig;
 using CJ.Plug.LicenseApi;
 using CJ.Plug.LicenseUI;
@@ -36,8 +35,6 @@ namespace CJ.Plug.ModuleConfig
 
             services.AddRelationManagePageModuleServices();
 
-            services.AddFMDModuleServices();
-
             // ── P5.6 终态：旧身份四模块（Login / UserManage / Auth / Audit UI）已物理删除 ──
             // 删除范围（13 个项目，git 可恢复）：
             //   LoginModule/{CJ.Plug.Login, LoginApis, LoginPages, LoginApiClient}
@@ -51,7 +48,6 @@ namespace CJ.Plug.ModuleConfig
             // 接管方：CJCore.Modules.ThreeRoleAdmin（三员分权）+ PersonalCenter。
             services.AddMCPToolsModuleServices();
             services.AddSkillsModuleServices();
-            services.AddKnowledgeModuleServices();
 
             // Guacamole 远程桌面模块
             services.AddGuacamoleUIPageServices();
@@ -90,7 +86,6 @@ namespace CJ.Plug.ModuleConfig
             services.AddToExternalModuleApiServices();
             services.AddMCPToolsApiServices();
             services.AddSkillsApiServices();
-            services.AddKnowledgeApiServices();
 
             // 审计管理模块API（端点保留：业务侧 299 处 AuditLogHelper 调用写 /api/audit/log）
             services.AddAuditModuleApiServices();
@@ -124,7 +119,6 @@ namespace CJ.Plug.ModuleConfig
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.AuditApi.DbContext.AuditModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.FileManageApi.DbContext.FileModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.JobManageApi.DbContext.JobModuleDbConfig>();
-            services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.KnowledgeManageApi.KnowledgeManageDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.LicenseApi.DbContext.LicenseModuleDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.LlmConfigModel.DbContext.LlmConfigDbConfig>();
             services.AddSingleton<IModuleBusinessDbConfig, CJ.Plug.MCPToolsManageApi.DbContext.MCPToolsManageDbConfig>();
@@ -156,7 +150,6 @@ namespace CJ.Plug.ModuleConfig
             app.AddToExternalModuleApi();
             app.AddMCPToolsApi();
             app.AddSkillsApi();
-            app.AddKnowledgeApi();
 
             // 审计管理模块API（端点保留，见 ConfigModuleApiServices 注释）
             app.AddAuditModuleApi();

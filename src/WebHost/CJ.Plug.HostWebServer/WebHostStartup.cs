@@ -1,6 +1,5 @@
 using CJ.Plug.GuacamoleApi.Apis;
 using CJ.Plug.HostWebServer.Shell;
-using CJ.Plug.KnowledgeManage;
 using CJ.Plug.Models.Contracts;
 using CJ.Plug.Models.Services;
 using CJ.Plug.Models.Shared;
