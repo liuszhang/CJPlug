@@ -46,6 +46,24 @@
   </Target>
 
   <!--
+    工位机专属配置的 **publish 侧孪生**（2026-10-31《CJPlug 打包按 CJOntology 口径重设计》§5.2-2 / R3）。
+
+    为什么必须有：上面那条挂的是 `AfterTargets="Build"`、落点 `$(OutputPath)`。`dotnet publish` 收的是
+    ResolvedFileToPublish，自定义 target 直接往输出目录拷的文件**不会进发布目录** ⇒ 按 publish 产出的
+    工位机载荷会缺 appsettings.CJ.Plug.StationApiServer.json，清单的 verify-entry 当场回滚整台安装。
+  -->
+  <Target Name="CopyAppSettingsWithProjectNameOnPublish"
+          AfterTargets="Publish"
+          Condition="Exists('$(MSBuildProjectDirectory)\appsettings.json') And '$(MSBuildProjectName)' == 'CJ.Plug.StationApiServer' And '$(PublishDir)' != ''">
+    <PropertyGroup>
+      <_StationCfgPublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))</_StationCfgPublishDir>
+    </PropertyGroup>
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
+          DestinationFiles="$(_StationCfgPublishDir)appsettings.$(MSBuildProjectName).json"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
     共享输出目录**主配置**复制（2026-10-30 配置归一）：
     唯一可执行宿主的 appsettings.json 落成执行目录下的 appsettings.json。
 
@@ -63,6 +81,25 @@
           Condition="'$(MSBuildProjectName)' == 'CJPlug.Server' And Exists('$(MSBuildProjectDirectory)\appsettings.json')">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
           DestinationFiles="$(OutputPath)appsettings.json"
+          SkipUnchangedFiles="false" />
+  </Target>
+
+  <!--
+    主服务配置的 **publish 侧孪生**（2026-10-31《CJPlug 打包按 CJOntology 口径重设计》§5.2-3 / R1）。
+
+    ⚠ 这是本组改造里**后果最重**的一条：CJPlug.Server.csproj 把 appsettings.json 标了
+      `CopyToOutputDirectory=Never`（避免被 IncrementalClean 当成本项目输出），若不在这里补，
+      `dotnet publish` 出的宿主目录里**根本没有 appsettings.json** ⇒ 服务照常启动、但连接串/
+      InternalApi/三员种子密码全部回落默认值，连错库且无任何报错（历史上正是这个静默坏法）。
+  -->
+  <Target Name="CopySharedRootAppSettingsOnPublish"
+          AfterTargets="Publish"
+          Condition="'$(MSBuildProjectName)' == 'CJPlug.Server' And Exists('$(MSBuildProjectDirectory)\appsettings.json') And '$(PublishDir)' != ''">
+    <PropertyGroup>
+      <_RootCfgPublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))</_RootCfgPublishDir>
+    </PropertyGroup>
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json"
+          DestinationFiles="$(_RootCfgPublishDir)appsettings.json"
           SkipUnchangedFiles="false" />
   </Target>
 

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -124,6 +124,10 @@
          不再复制，避免与宿主的同名文件互相覆盖（构建顺序决定谁赢）。 -->
     <Content Update="appsettings.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <!-- 2026-10-31（《CJPlug打包按CJOntology口径重设计方案》§5.2）：publish 侧同样关掉。
+           CopyToOutputDirectory 只管 bin，**不影响 publish 清单**；不关会因宿主图里 5 个项目
+           都发布同名 appsettings.json 而直接 NETSDK1152 失败（dotnet publish 硬拦）。 -->
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 

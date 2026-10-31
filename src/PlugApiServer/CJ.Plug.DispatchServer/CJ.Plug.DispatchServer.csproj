@@ -27,6 +27,9 @@
          回退为独立进程时把这段恢复，并改用专属文件名 appsettings.CJ.Plug.DispatchServer.json。 -->
     <Content Update="appsettings.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <!-- 2026-10-31：publish 侧同样关掉（CopyToOutputDirectory 管不到 publish 清单），
+           否则宿主图里 5 个项目发布同名 appsettings.json 会 NETSDK1152 直接失败。 -->
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 

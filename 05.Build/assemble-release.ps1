@@ -1,126 +1,112 @@
 <#
 .SYNOPSIS
-    CJPlug 发布根组装（方案《CJPlug 发布纳入 CJSuite 与 AppHost 自带 DCP 方案》§4.4）。
+    CJPlug 组件载荷组装（《（进行中）CJPlug打包按CJOntology口径重设计方案-20261031》§5.1）。
 
 .DESCRIPTION
-    把 CJPlug 的构建产物按**白名单**组装成发布根，供 CJSuite.Pack 以 asset 型组件（sourceDir）收包。
+    口径对照 CJOntology：**每个组件一棵载荷树，全部由显式 `dotnet publish -o` 产出**。
+    本脚本**不再**读共享构建目录 `02.Publish\Services\{Cfg}\{tfm}` —— 那条路已于 2026-10-31 断链
+    （宿主改落各自 bin\Release\net10.0，共享目录里只剩旧副本；干净机上连旧副本都没有，
+    旧版脚本会在 Assert-Paths 处直接失败）。因此输出目录怎么改都与打包无关。
 
     产出（均相对 CJPlug 根）：
 
-        05.Release\main\       → cjplug 组件载荷（服务器形态）
-                                  CJCore.AspireHost.AppHost\<Cfg>\<tfm>\   （含 aspire\dcp、aspire\dashboard）
-                                  CJCore.AppHost.Manager\<Cfg>\net10.0-windows\（服务管理壳，与 AppHost 同根并排）
-                                  Services\<Cfg>\net10.0\ 、net10.0-windows\
-                                  PlugConfig\                               （运行时真源，含 UserPlugs.xml）
-        05.Release\desktop\    → cjplug-desktop 组件载荷（个人形态）
-                                  CJ.Plug.Desktop\<Cfg>\net10.0-windows\
-        05.Release\station\    → station-settingui 组件载荷（图站形态，独立 publish 三件套）
-                                  Agent\ 、ApiServer\ 、SettingUI\
+        -Component cjplug
+            05.Release\cjplug\                                  → 组件安装根 = %ProgramFiles%\CJ\CJPlug
+              Services\<Cfg>\net10.0\        ← publish CJ.Plug.StationApiServer（先：专属配置由发布侧 target 生成）
+              Services\<Cfg>\net10.0\        ← publish CJPlug.Server（后：appsettings.json 由宿主胜出）
+              Services\<Cfg>\net10.0-windows\ ← publish CJ.Plug.ExecuteApp
+              PlugConfig\                    ← 02.Publish\PlugConfig（源码目录，随包维护）
 
-    设计约束（方案锁定项）：
-      · 枝 2  ：不自带 dcptun_c / _manifest（由 AppHost 项目的构建目标控制）。
-      · 枝 7  ：只收 Release 单配置；**不收** CJ.Plug.Setup、**不收** Debug。
-      · 枝 8  ：组装后断言发布根内 dcp.exe 与 Aspire.Dashboard.exe 存在（护栏）。
-      · 枝 13 ：黑名单排除运行期残留（*.db / *.log / StationLogs / App_Data …）+ 组装后断言；
-                另按 PackageService 既有做法排除 *.pdb。
-      · 枝 18 ：图站三件套必须**独立 publish**（8 个服务共享同一输出目录，切不出小载荷）。
-      · D8    ：图站载荷保持 <根>\{Agent,ApiServer,SettingUI} 形状（与旧 CJ.Plug.StationSetup 期望一致）。
-      · Target 语义（2026-10-07 一次修正，原 D9 见方案 §9.6；**构建粒度**二次修正见 §9.8）：
-                -Target main    → 构建整解（铺满共享 Services 目录）+ **只**组装 main（cjplug 组件的命令）
-                -Target desktop → **只**构建 CJ.Plug.Desktop 的闭包 + **只**组装 desktop（cjplug-desktop 组件的命令）
-                -Target station → 只组装 station（三件套各自 publish，本就不需要整解构建）
-                -Target all     → 构建整解一次 + 三者全组装（本地一键）
-                为什么要把 main/desktop 拆开：
-                  ① 组装（§9.6）：避免"打 cjplug 与打 cjplug-desktop 各付一次全量组装
-                     （≈1.25GB 拷贝 + pdb 扫描，实测重复一遍约 56s）"；
-                  ② 构建（§9.8）：desktop 载荷只含 CJ.Plug.Desktop\Release\net10.0-windows，
-                     该工程唯一 ProjectReference 是 CJ.Plug.LicenseApiClient（闭包 4 个工程，实测）；
-                     而 AppHost 是用 AddExecutable("dotnet", servicesDir, xxx.dll) 拉起服务的，
-                     所以"整解构建"对**共享 Services 目录**是必需的、但对 desktop 是纯浪费
-                     （实测：整解构建空转一次 ≈47s，紧接别的构建活动时还会连带重编一批工程）。
+        -Component cjplug-orchestrator
+            05.Release\cjplug-orchestrator\                     → 安装根同上（与 cjplug 共根，运行期契约要求）
+              CJCore.AspireHost.AppHost\<Cfg>\net10.0\          ← publish AppHost（含 aspire\dcp、aspire\dashboard）
+              CJCore.AppHost.Manager\<Cfg>\net10.0-windows\     ← publish 服务管理壳
+
+        -Component cjplug-desktop
+            05.Release\cjplug-desktop\
+              CJ.Plug.Desktop\<Cfg>\net10.0-windows\
+
+        -Component station-settingui
+            05.Release\station-settingui\                       → 组件安装根 = %ProgramFiles%\CJ\CJPlugStation
+              Agent\ 、ApiServer\ 、SettingUI\
+
+    运行期硬契约（不要改树形，改了就运行期错位）：
+      · 宿主 cwd = Services\<Cfg>\net10.0；`Data Source=../../main.db` ⇒ 库落 Services\main.db
+      · `../../../PlugConfig` ⇒ 插件配置必须在本组件根
+      · 执行器由宿主按 hostDir\..\net10.0-windows 找
+      · AppHost 按自身目录上溯三级 + Services\<Cfg>\net10.0 推导服务目录；管理壳上溯三级找 AppHost
 
 .NOTES
     退出码：0 = 成功；非 0 = 失败（CJSuite.Pack 的「前置构建」按非 0 中止出包）。
-    本脚本**幂等**：每次先清空目标 staging 目录再组装。
+    幂等：每次先清空目标 staging 目录再组装。
+    本脚本**不提交 git**、不申请提权；只写 CJPlug\05.Release 与（-DevSync 时）02.Publish\Services。
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('main', 'desktop', 'station', 'all')]
-    [string]$Target = 'all',
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('cjplug', 'cjplug-orchestrator', 'cjplug-desktop', 'station-settingui')]
+    [string]$Component,
 
     [string]$Configuration = 'Release',
 
-    # 跳过 dotnet build（只重组装，用于快速迭代）
-    [switch]$SkipBuild,
+    # 目标 RID：只用于**裁剪 runtimes/**（保留本 RID 与 RID 图中更宽的 win/unix 回退目录）。
+    # ⚠ 不把 -r 传给 publish：传了会把 RID 传染给整条工程图，net48 的桥接工程
+    #   （DotnetCoreBridgeToDotnetFramework，被 CSharpPlug 引用）会因 RID 与自身 win-x86 默认值不符
+    #   直接 NETSDK1047 失败。故发布走 RID-less，落地后再裁掉其它平台的运行期原生库。
+    [string]$Runtime = 'win-x64',
 
-    # 跳过图站三件套的 dotnet publish（用于只出 main/desktop）
-    [switch]$SkipStationPublish
+    # 版本号：本参数 > 环境变量 CJSUITE_VERSION（打包器 RunPreBuildIfDeclared 注入）> CJSetup\packages.json 的 suite.version
+    [string]$Version,
+
+    # 只重组装、不 publish（排障用；要求 05.Release 下已有上次产物）
+    [switch]$SkipPublish,
+
+    # 开发期专用：把 cjplug 的 Services 树回灌 02.Publish\Services\{Cfg}\{tfm}，让本地 AppHost 直接可跑。
+    # ⚠ 这不是打包路径：打包只认 05.Release\<组件>（清单 sourceDir）。
+    [switch]$DevSync
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 # ── 控制台输出编码：钉死 UTF-8（2026-10-07 实测，勿删） ────────────────────────────────
-# 本脚本常被别的脚本 / 打包器以「重定向 stdout（进程无控制台）」的方式拉起；此时 PowerShell
-# 会按**系统 OEM 代码页**（本机 936/GBK）写中文，而调用方按 UTF-8 解码
-# ⇒ 中文全变 U+FFFD（在 GUI 里渲染成 ◆ 菱形）。原始字节证据：`=== D7E9D7B0 main ...`（GBK 的"组装"）。
-# 实测两种修法：① 本行（显式设置）→ 输出 UTF-8 ✔；② 只设环境变量 DOTNET_SYSTEM_CONSOLE_DEFAULT_ENCODING=utf-8 → 仍 GBK ✘。
-# 调用方口径见 CJSuite.Pack\Services\BuildOrchestrator.PreBuild.cs（按 UTF-8 解码子进程输出）。
+# 本脚本常被打包器以「重定向 stdout（进程无控制台）」的方式拉起；此时 PowerShell 会按系统 OEM
+# 代码页（本机 936/GBK）写中文，而调用方按 UTF-8 解码 ⇒ 中文全变 U+FFFD。
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
 
-# ── 路径：以本脚本位置推 CJPlug 根（05.Build 的上一级） ────────────────────────────────
+# ── 路径 ─────────────────────────────────────────────────────────────────────────────
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$publishDir = Join-Path $repoRoot '02.Publish'
+$publishRoot = Join-Path $repoRoot '02.Publish'
 $releaseRoot = Join-Path $repoRoot '05.Release'
-$sln = Join-Path $repoRoot 'CJ.Plug-Aspire.sln'
-# desktop 载荷的**唯一**来源工程（2026-10-07 §9.8）：desktop 组件的前置构建只 build 这一条闭包，
-# 不再拉整解（CJ.Plug.Desktop 唯一 ProjectReference = CJ.Plug.LicenseApiClient）。
-$desktopProj = Join-Path $repoRoot 'src\WebHost\CJ.Plug.Desktop\CJ.Plug.Desktop.csproj'
+$setupRoot = Join-Path (Split-Path $repoRoot -Parent) 'CJSetup'
 
-# AppHost 与服务管理壳（2026-10-29《CJCore AppHost 服务管理壳方案》）：
-#   两者源码都在**兄弟仓 CJCore**。AppHost 输出由其 csproj 的 BaseOutputPath 钉在 CJPlug\02.Publish 下；
-#   管理壳已改走默认 bin（2026-10-29 简化），发布落点由下方构建命令显式 -o。
-#   跨仓相对路径是已知代价（方案 §7 D-2 已登记）：CJPlug 目录布局调整时需同步这里。
-$appHostProj = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AspireHost.AppHost\CJCore.AspireHost.AppHost.csproj'
-$managerProj = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AppHost.Manager\CJCore.AppHost.Manager.csproj'
+$proj = @{
+    Host         = Join-Path $repoRoot 'src\Server\CJPlug.Server\CJPlug.Server.csproj'
+    StationApi   = Join-Path $repoRoot 'src\PlugStation\CJ.Plug.StationApiServer\CJ.Plug.StationApiServer.csproj'
+    ExecuteApp   = Join-Path $repoRoot 'src\modules\PlugExecuteModule\CJ.Plug.ExecuteApp\CJ.Plug.ExecuteApp.csproj'
+    Desktop      = Join-Path $repoRoot 'src\WebHost\CJ.Plug.Desktop\CJ.Plug.Desktop.csproj'
+    StationAgent = Join-Path $repoRoot 'src\PlugStation\CJ.Plug.StationAgent\CJ.Plug.StationAgent.csproj'
+    StationUi    = Join-Path $repoRoot 'src\PlugStation\StationSettingUI\StationSettingUI.csproj'
+}
+# 跨仓（CJCore）：编排壳与管理壳的源码已迁出 CJPlug（2026-10-29/30），路径按兄弟目录相对定位。
+$proj.AppHost = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AspireHost.AppHost\CJCore.AspireHost.AppHost.csproj'
+$proj.Manager = Join-Path $repoRoot '..\CJCore\src\Apps\CJCore.AppHost.Manager\CJCore.AppHost.Manager.csproj'
 
-if (-not (Test-Path $sln)) { throw "未找到解决方案：$sln（本脚本必须位于 <CJPlug>\05.Build\ 下）" }
+$plugConfigSrc = Join-Path $publishRoot 'PlugConfig'
 
-# ── 黑名单（枝 13）：运行期残留 + 调试符号 ────────────────────────────────────────────
-# ⚠ 两类要区分开（2026-10-07 实测教训）：
-#   ①「运行期残留」出现即**中止出包**（*_db/_log 是污染：曾实测把开发机的 station_tasks.db 与
-#     StationLogs\log2026*.txt 打进载荷，装到客户机就是拿开发数据覆盖人家数据）；
-#     `elsa-signing.key*` 同属此类：它是服务**首次启动自愈生成**的 JWT 签名密钥（方案 §9.7），
-#     开发机跑过一次就会落在服务目录里 —— 若随包分发，等于把同一把密钥发给所有客户（可互相伪造 token）。
-#   ②「调试符号 *pdb」是 publish 的正常副产物，**静默剔除**即可（PackageService 既有做法也是排除 pdb）——
-#     若一并当断言失败，图站三件套 publish 会因 161 个 .pdb 直接打不出包。
-$excludeFilePatterns = @('*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*', 'window-state.json',
-    # 2026-10-29《CJCore AppHost 服务管理壳方案》R5：用户覆盖配置是**本机运行期产物**，
-    #   开发机上改过一次端口就会落在 AppHost 输出目录里。若随包分发，会把开发者的
-    #   本机绝对路径（如 D:\Deploy\...）带到客户机 —— 与 *.db / elsa-signing.key 同属污染。
-    #   除 robocopy /XF 排除外，Assert-Clean 会做**反向断言**（发布包内不存在该文件）。
-    'apphost.user.json')
-# 2026-10-07 追加两类运行期残留（实测证据见方案 §9.8）：
-#   · window-state.json       —— 桌面端**窗口位置/大小**持久化文件，开发机跑过一次就会落在输出目录里；
-#   · *.exe.WebView2\         —— WebView2 的用户数据/缓存目录，实测 1073 文件 / 383MB（desktop 载荷 407MB 的大头），
-#                                装到客户机就是把开发机的浏览缓存与 Cookie 发出去（同 *.db / StationLogs 一类污染）。
-$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin', 'CJ.Plug.Desktop.exe.WebView2',
-    # 2026-10-29：管理壳的 WebView2 用户数据目录。壳已把 UserDataFolder 指到
-    #   %LOCALAPPDATA%\CJ\AppHostManager\WebView2（不落安装目录），这里仍列进黑名单做双保险 ——
-    #   一旦将来有人改回默认位置，Assert-Clean 会当场拦下，而不是把浏览缓存发到客户机。
-    'CJCore.AppHost.Manager.exe.WebView2')
-$stationStandaloneExe = @('CJ.Plug.StationAgent.exe', 'CJ.Plug.StationApiServer.exe')
+# ── 运行期残留 / 调试符号黑名单（沿用 2026-10-07 起的既有口径，勿松） ────────────────────
+$excludeFilePatterns = @(
+    '*.db', '*.db-shm', '*.db-wal', '*.log', 'elsa-signing.key*', 'window-state.json',
+    'apphost.user.json',   # 编排壳的用户覆盖配置：含开发机绝对路径
+    'services.user.json'   # 管理壳的服务清单覆盖：同上（2026-10-31 起纳入）
+)
+$excludeDirNames = @('StationLogs', 'Logs', 'App_Data', '.vs', 'obj', 'bin',
+    'CJ.Plug.Desktop.exe.WebView2', 'CJCore.AppHost.Manager.exe.WebView2', 'DshRuntime')
 $stripFilePatterns = @('*.pdb')
 
 function Write-Step([string]$msg) {
     Write-Host ''
     Write-Host "=== $msg ===" -ForegroundColor Cyan
-}
-
-function Invoke-Dotnet([string]$desc, [string[]]$dotnetArgs) {
-    Write-Host "[$desc] dotnet $($dotnetArgs -join ' ')" -ForegroundColor DarkGray
-    & dotnet @dotnetArgs
-    if ($LASTEXITCODE -ne 0) { throw "$desc 失败（exit=$LASTEXITCODE）：dotnet $($dotnetArgs -join ' ')" }
 }
 
 function Reset-Staging([string]$path) {
@@ -130,18 +116,59 @@ function Reset-Staging([string]$path) {
     if (-not $full.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "拒绝清理非发布根下的目录：$full"
     }
-    if (Test-Path $full) { Remove-Item -LiteralPath $full -Recurse -Force }
+    if (Test-Path -LiteralPath $full) { Remove-Item -LiteralPath $full -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $full | Out-Null
 }
 
+function Assert-Proj([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { throw "未找到工程文件：$path" }
+}
+
+function Invoke-Publish([string]$desc, [string]$csproj, [string]$outDir, [string[]]$extraArgs = @()) {
+    Assert-Proj $csproj
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    # RID-less 的**框架依赖发布**（D3 = 全线框架依赖），理由见参数块 $Runtime：
+    #   · 不带 -r：避免 RID 传染给整条工程图（net48 桥接工程会 NETSDK1047）；
+    #   · DisableBuildCompression=true：RID-less 发布时 SDK 的 ApplyCompressionNegotiation 会在
+    #     CJ.Plug.ApiServer（Sdk.Web 类库）上抛 "Endpoints not found for compressed asset"（MSB4018，
+    #     纯 bin 侧压缩问题）。关掉 build 侧压缩不影响载荷 —— publish 侧仍按 PublishCompressionFormats
+    #     产出 .gz/.br（实测 1000+ 个）。
+    $args = @('publish', $csproj, '-c', $Configuration, '--self-contained=false',
+        '-p:DisableBuildCompression=true', '--nologo', '-o', $outDir)
+    if (-not [string]::IsNullOrWhiteSpace($Version)) { $args += "-p:Version=$Version" }
+    if ($extraArgs.Count -gt 0) { $args += $extraArgs }
+    Write-Host "[$desc] dotnet $($args -join ' ')" -ForegroundColor DarkGray
+    & dotnet @args
+    if ($LASTEXITCODE -ne 0) { throw "$desc 失败（exit=$LASTEXITCODE）：dotnet $($args -join ' ')" }
+}
+
+function Remove-ForeignRuntimeAssets([string]$stagingRoot) {
+    # 裁剪 runtimes/：只保留本 RID、RID 图中的更宽目录（win / unix）与 any。
+    # 依据：载荷只面向 win-x64 部署；不裁会把 win-arm64/win-x86/linux*/osx*/android*/ios* 全带上
+    # （实测宿主载荷 runtimes 412.9MB，其中 win-arm64 104.3MB + win-x86 110.1MB 纯浪费）。
+    $keep = @('win', $Runtime, 'unix', 'any')
+    $removed = 0; $removedMb = 0.0
+    Get-ChildItem -LiteralPath $stagingRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Parent -and $_.Parent.Name -eq 'runtimes' } |
+        Where-Object { $keep -notcontains $_.Name } |
+        ForEach-Object {
+            $mb = (Get-ChildItem -LiteralPath $_.FullName -Recurse -File -ErrorAction SilentlyContinue |
+                    Measure-Object -Property Length -Sum).Sum
+            $removedMb += ($mb / 1MB)
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            $removed++
+        }
+    if ($removed -gt 0) {
+        Write-Host ("  [strip] 已裁剪非 {0} 的 runtimes 目录 {1} 个（约 {2} MB）" -f $Runtime, $removed, [math]::Round($removedMb, 1))
+    }
+}
+
 function Copy-Tree([string]$src, [string]$dst) {
-    if (-not (Test-Path $src)) { throw "源目录不存在：$src（请确认已构建对应项目）" }
+    if (-not (Test-Path -LiteralPath $src)) { throw "源目录不存在：$src" }
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
-    # robocopy 退出码 0..7 均为成功（位标志），>=8 才是失败
-    # 2026-10-07：黑名单目录改用 robocopy /XD **源头排除**（此前只在拷完后 Remove-ExcludedDirs 删），
-    #   净效果等价（都是"任何层级的同名目录都不要"），但省掉整份拷贝 —— 实测 desktop 载荷里
-    #   383MB 的 CJ.Plug.Desktop.exe.WebView2 不必先拷 407MB 再删。
-    $rcArgs = @($src, $dst, '/E', '/R:1', '/W:1', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/XD') + $excludeDirNames + @('/XF') + $excludeFilePatterns
+    # robocopy 退出码 0..7 均为成功（位标志），>=8 才是失败；黑名单走源头排除（省一次整拷）。
+    $rcArgs = @($src, $dst, '/E', '/R:1', '/W:1', '/NFL', '/NDL', '/NJH', '/NJS', '/NP',
+        '/XD') + $excludeDirNames + @('/XF') + $excludeFilePatterns
     & robocopy @rcArgs | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy 失败（exit=$LASTEXITCODE）：$src → $dst" }
     $global:LASTEXITCODE = 0
@@ -156,7 +183,6 @@ function Remove-ExcludedDirs([string]$stagingRoot) {
 }
 
 function Remove-DebugSymbols([string]$stagingRoot) {
-    # 剔除调试符号（*.pdb）：publish/build 的正常副产物，体积与现场无用途（对齐 PackageService 的既有排除）。
     $removed = 0
     foreach ($pat in $stripFilePatterns) {
         Get-ChildItem -LiteralPath $stagingRoot -File -Recurse -Force -Filter $pat -ErrorAction SilentlyContinue |
@@ -172,10 +198,21 @@ function Assert-Paths([string]$stagingRoot, [string[]]$relativePaths) {
     $missing = @()
     foreach ($rel in $relativePaths) {
         $full = Join-Path $stagingRoot $rel
-        if (-not (Test-Path $full)) { $missing += $rel }
+        if (-not (Test-Path -LiteralPath $full)) { $missing += $rel }
     }
     if ($missing.Count -gt 0) {
         throw "组装后断言失败（关键入口缺失）：`n  - $(($missing -join "`n  - "))`n（staging: $stagingRoot）"
+    }
+}
+
+function Assert-Absent([string]$stagingRoot, [string[]]$relativePaths, [string]$reason) {
+    $found = @()
+    foreach ($rel in $relativePaths) {
+        $full = Join-Path $stagingRoot $rel
+        if (Test-Path -LiteralPath $full) { $found += $rel }
+    }
+    if ($found.Count -gt 0) {
+        throw "组装后断言失败（$reason，不应出现 $($found.Count) 项）：`n  - $(($found -join "`n  - "))`n（staging: $stagingRoot）"
     }
 }
 
@@ -194,213 +231,228 @@ function Assert-Clean([string]$stagingRoot) {
     }
 }
 
-# P9.1（2026-10-30，D2 = B「回退形态一次全删」）：正向断言管"必须存在"，负向断言管"必须消失"。
-#   只做正向断言会漏掉一类静默回归：某个面又被改回 OutputType=Exe，exe 重新进包 —— 此时
-#   正向断言照样通过（dll 也在），包体变胖、装配入口重新分裂，而没人会注意到。
-# P9.1（2026-10-30）：Services\<Cfg>\net10.0 是**共享输出目录**（全部工程都往这里 build），
-#   于是 main 载荷会连带收进图站三件套的 exe —— 但它们有自己的独立 publish
-#   （-Target station 输出到 station\{Agent,ApiServer,SettingUI}，见 §9.8/D8），
-#   放在 main 里是纯冗余，且这些 exe 正是"回退形态"容易被误起的那批文件。
-function Remove-StationStandaloneExe([string]$stagingRoot, [string]$cfg) {
-    $dir = Join-Path $stagingRoot "Services\$cfg"
-    if (-not (Test-Path $dir)) { return }
-    $n = 0
-    foreach ($tfm in @('net10.0', 'net10.0-windows')) {
-        $d = Join-Path $dir $tfm
-        if (-not (Test-Path $d)) { continue }
-        foreach ($name in $stationStandaloneExe) {
-            $f = Join-Path $d $name
-            if (Test-Path $f) { Remove-Item -LiteralPath $f -Force; $n++ }
-        }
-    }
-    if ($n -gt 0) { Write-Host "  [strip] 已从 main 载荷剔除图站独立 exe $n 个（station 三件套自有独立 publish）" }
-}
-
-function Assert-Absent([string]$stagingRoot, [string[]]$relativePaths, [string]$reason) {
-    $found = @()
-    foreach ($rel in $relativePaths) {
-        $full = Join-Path $stagingRoot $rel
-        if (Test-Path $full) { $found += $rel }
-    }
-    if ($found.Count -gt 0) {
-        throw "组装后断言失败（$reason，不应出现 $($found.Count) 项）：`n  - $(($found -join "`n  - "))`n（staging: $stagingRoot）"
-    }
+function Get-Sha256([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return '' }
+    return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 function Get-TreeSizeMB([string]$path) {
-    if (-not (Test-Path $path)) { return 0 }
+    if (-not (Test-Path -LiteralPath $path)) { return 0 }
     $sum = (Get-ChildItem -LiteralPath $path -File -Recurse -Force -ErrorAction SilentlyContinue |
             Measure-Object -Property Length -Sum).Sum
     return [math]::Round($sum / 1MB, 1)
 }
 
+function Resolve-Version {
+    # 优先级：-Version > CJSUITE_VERSION（打包器注入）> CJSetup\packages.json 的 suite.version
+    if (-not [string]::IsNullOrWhiteSpace($Version)) { return $Version.Trim() }
+    $fromEnv = [string]$env:CJSUITE_VERSION
+    if (-not [string]::IsNullOrWhiteSpace($fromEnv)) { return $fromEnv.Trim() }
+    $manifest = Join-Path $setupRoot 'packages.json'
+    if (Test-Path -LiteralPath $manifest) {
+        try {
+            $json = Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($json.suite -and -not [string]::IsNullOrWhiteSpace($json.suite.version)) { return ([string]$json.suite.version).Trim() }
+        } catch { }
+    }
+    return ''
+}
+
+$Version = Resolve-Version
+
 # ══════════════════════════════════════════════════════════════════════════════════════
-Write-Host "CJPlug 发布根组装" -ForegroundColor Green
-Write-Host "  CJPlug 根   : $repoRoot"
-Write-Host "  配置        : $Configuration"
-Write-Host "  目标        : $Target"
+Write-Host "CJPlug 组件载荷组装" -ForegroundColor Green
+Write-Host "  CJPlug 根 : $repoRoot"
+Write-Host "  配置      : $Configuration"
+Write-Host "  组件      : $Component"
+Write-Host "  版本      : $(if ($Version) { $Version } else { '（未指定，publish 不带 -p:Version）' })"
 
-# ── ⓪ 构建（**按 Target 拆**，2026-10-07 二次修正见方案 §9.8） ────────────────────────────
-# main：**必须**整解构建。AppHost 用 AddExecutable("dotnet", servicesDir, xxx.dll) 拉起服务，而
-#       DispatchServer / HostWebServer 都**不是** AppHost 的 ProjectReference ⇒
-#       共享目录 02.Publish\Services 靠"整解全量构建"铺满，收窄会打不出完整载荷。
-# desktop：载荷只有 CJ.Plug.Desktop\Release\net10.0-windows（闭包 4 个工程）⇒ 只 build 该工程，
-#       与整解 165 个 src 工程彻底解耦（原实现让 desktop 也跑整解：实测空转一次 ≈47s）。
-# station：三件套走独立 publish（见 ③），不需要整解构建。
-# -Target all：整解只构建一次（desktop 块不再重复 build）。
-$slnBuilt = $false
-if ($Target -in @('main', 'all') -and -not $SkipBuild) {
-    Write-Step "构建解决方案（$Configuration）"
-    Invoke-Dotnet 'build solution' @('build', $sln, '-c', $Configuration, '-v:m', '-nologo')
-    $slnBuilt = $true
+switch ($Component) {
 
-    # 2026-10-29：AppHost 与服务管理壳的**源码在 CJCore 仓**，不在 CJ.Plug-Aspire.sln 里
-    #   （《Aspire 编排壳迁移 CJCore》把它们移出 CJPlug 解决方案），所以上面的整解构建覆盖不到这两个工程。
-    #   之前一直没暴露，是因为开发机上它们已被单独构建过；换台干净机器直接 -Target main 就会
-    #   在 Copy-Tree 处以「源目录不存在」失败。
-    Write-Step "构建 CJCore 侧编排器与管理壳（$Configuration）"
-    if (-not (Test-Path $appHostProj)) { throw "未找到工程：$appHostProj" }
-    if (-not (Test-Path $managerProj)) { throw "未找到工程：$managerProj" }
-    # AppHost：输出落点仍由其 csproj 的 BaseOutputPath 钉在 02.Publish（它必须与 Services 同根并排）。
-    Invoke-Dotnet 'build CJCore.AspireHost.AppHost' @('build', $appHostProj, '-c', $Configuration, '-v:m', '-nologo')
-    # 管理壳（2026-10-29 简化）：壳 csproj 不再有 BaseOutputPath（输出走默认 bin），
-    #   发布落点改由本脚本显式 -o —— 与 AppHost 同根并排的硬要求不变（AppHostLocator 上溯三级定位）。
-    $managerOut = Join-Path $publishDir "CJCore.AppHost.Manager\$Configuration\net10.0-windows"
-    Invoke-Dotnet 'build CJCore.AppHost.Manager' @('build', $managerProj, '-c', $Configuration, '-o', $managerOut, '-v:m', '-nologo')
-}
+    # ── ① 主服务端：宿主 + 本机工位机 + 独立执行器 + PlugConfig（一棵树，零重复） ─────────
+    'cjplug' {
+        $staging = Join-Path $releaseRoot 'cjplug'
+        $services = Join-Path $staging "Services\$Configuration\net10.0"
+        $servicesWin = Join-Path $staging "Services\$Configuration\net10.0-windows"
 
-# ── ① main staging（cjplug：服务器形态；枝 7 = 只收 Release 单配置） ────────────────────
-# 2026-10-07 修正（原 D9 见方案 §9.6）：Target 拆分，本块**只**组装 main。
-#   原实现里 -Target main / -Target desktop 走同一块、都同时组装两份 ⇒ 打 cjplug 与
-#   打 cjplug-desktop 各付一次全量（≈1.25GB 拷贝 + pdb 扫描，实测重复一遍约 56s）。
-if ($Target -in @('main', 'all')) {
-    Write-Step "组装 main（服务器形态：AppHost + Services + PlugConfig）"
+        if (-not $SkipPublish) {
+            Write-Step '组装 cjplug（主服务端）：publish 工位机 → 宿主 → 执行器'
+            Reset-Staging $staging | Out-Null
+            # 顺序是**契约**：两个可执行程序都有同名 appsettings.json。工位机先发（连同发布侧 target
+            # 生成的 appsettings.CJ.Plug.StationApiServer.json），宿主最后发，确保落地的根配置是宿主那份。
+            Invoke-Publish 'publish stationapi' $proj.StationApi $services
+            # ⚠ 宿主必须关掉 SDK 的预压缩（`EnableDefaultCompressionFormats=false`），理由是一次实测到的启动硬故障：
+            #   宿主把 Blazor 运行时资产（`wwwroot/_framework/blazor*.js`，见该目录 README）当普通静态资产参与
+            #   publish 压缩协商，与框架自带的那份 `.br/.gz` 路由撞车 ⇒ 启动即
+            #   `InvalidOperationException: The static asset '_framework/blazor.server.js.br' is already mapped to
+            #   _framework/blazor.server.<hash>.js.br`（IHost 直接起不来，不是"有外观无事件"而是"根本起不来"）。
+            #   关掉预压缩后：`_framework/blazor.web.js` 实测 200 / 200645B / text/javascript，首页 200。
+            #   代价：载荷内不再有 `.gz/.br` 预压缩副本（改由响应压缩/Kestrel 实时压缩），体积与传输特性略变。
+            Invoke-Publish 'publish host'       $proj.Host       $services -extraArgs @('-p:EnableDefaultCompressionFormats=false')
+            Invoke-Publish 'publish executeapp' $proj.ExecuteApp $servicesWin
 
-    $mainStaging = Join-Path $releaseRoot 'main'
-    Reset-Staging $mainStaging | Out-Null
+            Write-Step '组装 cjplug：拷贝 PlugConfig'
+            Copy-Tree $plugConfigSrc (Join-Path $staging 'PlugConfig')
+        }
+        else {
+            Write-Host '  （-SkipPublish：跳过 publish，仅重组装/断言）' -ForegroundColor Yellow
+        }
 
-    # cjplug（服务器形态）：AppHost（含自带 DCP/Dashboard）+ Services + PlugConfig
-    Copy-Tree (Join-Path $publishDir "CJCore.AspireHost.AppHost\$Configuration\net10.0") (Join-Path $mainStaging "CJCore.AspireHost.AppHost\$Configuration\net10.0")
-    # 服务管理壳（2026-10-29 新增）：与 AppHost **同根并排**是硬要求 ——
-    #   壳按「自身目录上溯三级 = 发布根」定位 AppHost（AppHostLocator），错位就找不到 dll。
-    #   体积约 4MB，故并入 main 载荷而不单开组件（服务器形态用不到 GUI 也不影响服务运行）。
-    Copy-Tree (Join-Path $publishDir "CJCore.AppHost.Manager\$Configuration\net10.0-windows") (Join-Path $mainStaging "CJCore.AppHost.Manager\$Configuration\net10.0-windows")
-    Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0") (Join-Path $mainStaging "Services\$Configuration\net10.0")
-    Copy-Tree (Join-Path $publishDir "Services\$Configuration\net10.0-windows") (Join-Path $mainStaging "Services\$Configuration\net10.0-windows")
-    Copy-Tree (Join-Path $publishDir 'PlugConfig') (Join-Path $mainStaging 'PlugConfig')
+        Remove-ExcludedDirs $staging
+        Remove-DebugSymbols $staging
+        Remove-ForeignRuntimeAssets $staging
 
-    Remove-ExcludedDirs $mainStaging
-    Remove-DebugSymbols $mainStaging
-    Remove-StationStandaloneExe $mainStaging $Configuration
+        Assert-Paths $staging @(
+            "Services\$Configuration\net10.0\CJPlug.Server.dll",
+            "Services\$Configuration\net10.0\CJPlug.Server.exe",
+            "Services\$Configuration\net10.0\appsettings.json",
+            # Blazor 运行时资产：由 BlazorFrameworkAssetsEndpoints 从物理 wwwroot/_framework 吐出。
+            # SDK 不产出它们（清单里 _framework 条目数为 0），必须靠源码随包（见该目录 README）；
+            # 缺了下场就是"整站有外观、无事件"，所以钉成硬断言。
+            "Services\$Configuration\net10.0\wwwroot\_framework\blazor.web.js",
+            "Services\$Configuration\net10.0\wwwroot\_framework\blazor.server.js",
+            "Services\$Configuration\net10.0\CJ.Plug.StationApiServer.dll",
+            "Services\$Configuration\net10.0\appsettings.CJ.Plug.StationApiServer.json",
+            "Services\$Configuration\net10.0-windows\CJ.Plug.ExecuteApp.exe",
+            'PlugConfig\UserPlugs.xml'
+        )
+        # 负向断言：回退形态 / UI 组件 exe 不得回潮（P9 之后它们只是类库）。
+        # ⚠ 工位机 exe 是**本组件的合法内容**（AppHost 用 dotnet 拉起它的 dll，exe 留着无害且便于排障），
+        #   故不再像旧脚本那样从载荷剔除。
+        Assert-Absent $staging @(
+            "Services\$Configuration\net10.0\CJ.Plug.ApiServer.exe",
+            "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.exe",
+            "Services\$Configuration\net10.0\CJ.Plug.McpServer.exe",
+            "Services\$Configuration\net10.0\CJ.Plug.HostWebServer.exe",
+            "Services\$Configuration\net10.0\CJ.Plug.AIChat.exe"
+        ) '回退形态 / UI 组件 exe 应已全部下线'
+        # 配置归一：类库化项目不应再有专属配置
+        Assert-Absent $staging @(
+            "Services\$Configuration\net10.0\appsettings.CJ.Plug.ApiServer.json",
+            "Services\$Configuration\net10.0\appsettings.CJ.Plug.DispatchServer.json",
+            "Services\$Configuration\net10.0\appsettings.CJ.Plug.McpServer.json",
+            "Services\$Configuration\net10.0\appsettings.CJ.Plug.HostWebServer.json",
+            "Services\$Configuration\net10.0\appsettings.CJPlug.Server.json"
+        ) '配置归一后不应再出现类库项目的专属配置'
+        Assert-Clean $staging
 
-    Assert-Paths $mainStaging @(
-        "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.dll",
-        "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
-        "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
-        "CJCore.AppHost.Manager\$Configuration\net10.0-windows\CJCore.AppHost.Manager.exe",
-        # P9（2026-10-30，D1 = A）：宿主 exe 由 CJ.Plug.ApiServer 改为 CJPlug.Server。
-        # ⚠ 断言的必须是**可执行宿主**，不是同名 dll 是否存在 —— ApiServer 降级为类库后
-        #   它的 dll 仍会随宿主进目录（这是正常的），若继续断言旧 dll 等于永远为真、失去护栏意义。
-        "Services\$Configuration\net10.0\CJPlug.Server.dll",
-        # 配置归一（2026-10-30）：主服务的配置只有执行目录下的 appsettings.json 一份。
-        # 必须断言它存在 —— 它是连接串 / InternalApi / 三员种子密码的唯一载体，
-        # 缺了服务仍能起来但会连错库（历史上就是这样静默坏掉的）。
-        "Services\$Configuration\net10.0\appsettings.json",
-        # 工位机是独立进程，配置走专属文件名（唯一保留的专属配置）。
-        "Services\$Configuration\net10.0\appsettings.CJ.Plug.StationApiServer.json",
-        "Services\$Configuration\net10.0-windows\CJ.Plug.ExecuteApp.exe",
-        'PlugConfig\UserPlugs.xml'
-    )
-    # P9.1（2026-10-30，D2 = B）：三个 referred 项目已类库化，包里不许再出现旧的多进程 exe。
-    Assert-Absent $mainStaging @(
-        "Services\$Configuration\net10.0\CJ.Plug.ApiServer.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.DispatchServer.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.McpServer.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.HostWebServer.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.StationAgent.exe",
-        "Services\$Configuration\net10.0\CJ.Plug.StationApiServer.exe",
-        # 2026-10-30：CJ.Plug.AIChat 是 UI 组件库（被 CJ.Plug.AI 引用），曾被传递复制成 exe。
-        "Services\$Configuration\net10.0\CJ.Plug.AIChat.exe"
-    ) '回退形态 / 图站独立 / UI 组件 exe 应已全部下线'
-    # 配置归一（2026-10-30）：类库化项目的专属配置不再生成 —— 它们没有自己的进程，
-    # 留着会让人以为还有独立服务在跑，也会掩盖「根 appsettings.json 被覆盖」这类故障。
-    Assert-Absent $mainStaging @(
-        "Services\$Configuration\net10.0\appsettings.CJ.Plug.ApiServer.json",
-        "Services\$Configuration\net10.0\appsettings.CJ.Plug.DispatchServer.json",
-        "Services\$Configuration\net10.0\appsettings.CJ.Plug.McpServer.json",
-        "Services\$Configuration\net10.0\appsettings.CJ.Plug.HostWebServer.json",
-        "Services\$Configuration\net10.0\appsettings.CJPlug.Server.json"
-    ) '配置归一后不应再出现类库项目的专属配置'
-    Assert-Clean $mainStaging
+        # 关键断言：落地的根配置必须是宿主的（防"后发的工位机配置盖掉主配置"这类静默故障）
+        $srcCfg = Join-Path $repoRoot 'src\Server\CJPlug.Server\appsettings.json'
+        $dstCfg = Join-Path $services 'appsettings.json'
+        $srcSha = Get-Sha256 $srcCfg
+        $dstSha = Get-Sha256 $dstCfg
+        if ($srcSha -and $dstSha -and $srcSha -ne $dstSha) {
+            throw "组装后断言失败（appsettings.json 不是宿主那份：src=$srcSha / payload=$dstSha）—— 检查 publish 顺序与发布侧 target。"
+        }
 
-    Write-Host ("  main\    : {0} MB" -f (Get-TreeSizeMB $mainStaging)) -ForegroundColor Green
-}
+        if ($DevSync) {
+            Write-Step 'DevSync：把 Services 树回灌 02.Publish\Services（仅开发期让本地 AppHost 直接跑）'
+            $devServices = Join-Path $publishRoot "Services\$Configuration\net10.0"
+            $devServicesWin = Join-Path $publishRoot "Services\$Configuration\net10.0-windows"
+            Copy-Tree $services $devServices
+            Copy-Tree $servicesWin $devServicesWin
+            Write-Host "  [DevSync] $devServices" -ForegroundColor Green
+        }
 
-# ── ② desktop staging（cjplug-desktop：个人形态，仅桌面端） ────────────────────────────
-if ($Target -in @('desktop', 'all')) {
-    Write-Step "组装 desktop（个人形态：仅 CJ.Plug.Desktop）"
-
-    # 构建粒度（§9.8）：只 build desktop 自己的闭包。`-Target all` 时整解已构建（$slnBuilt），此处跳过。
-    if (-not $SkipBuild -and -not $slnBuilt) {
-        if (-not (Test-Path $desktopProj)) { throw "未找到桌面前端工程：$desktopProj" }
-        Invoke-Dotnet 'build desktop' @('build', $desktopProj, '-c', $Configuration, '-v:m', '-nologo')
+        Write-Host ("  cjplug\   : {0} MB" -f (Get-TreeSizeMB $staging)) -ForegroundColor Green
     }
 
-    $desktopStaging = Join-Path $releaseRoot 'desktop'
-    Reset-Staging $desktopStaging | Out-Null
+    # ── ② 编排台：AppHost（含 DCP/Dashboard）+ 管理壳 ─────────────────────────────────
+    'cjplug-orchestrator' {
+        $staging = Join-Path $releaseRoot 'cjplug-orchestrator'
+        $appHostOut = Join-Path $staging "CJCore.AspireHost.AppHost\$Configuration\net10.0"
+        $managerOut = Join-Path $staging "CJCore.AppHost.Manager\$Configuration\net10.0-windows"
 
-    Copy-Tree (Join-Path $publishDir "CJ.Plug.Desktop\$Configuration\net10.0-windows") (Join-Path $desktopStaging "CJ.Plug.Desktop\$Configuration\net10.0-windows")
+        if (-not $SkipPublish) {
+            Write-Step '组装 cjplug-orchestrator：publish AppHost → 管理壳'
+            Reset-Staging $staging | Out-Null
+            # ⚠ Aspire AppHost 的 SDK 把 `IsPublishable` 默认设为 false（它是"运行器"，官方发布口径是
+            #   `aspire publish`，不是 `dotnet publish`）⇒ 不加下面这个开关，publish 只跑我们补的
+            #   aspire 拷贝目标、**不产 App 本体**（实测输出目录里只有 aspire\ 一个子目录）。
+            #   本组件要的是"可整树拷贝的运行目录"，故显式打开；deps.json/runtimeconfig 由普通
+            #   Exe 发布管线生成，与手动 `dotnet` 拉起无关（AppHost 自己的 exe 也一并产出）。
+            Invoke-Publish 'publish apphost' $proj.AppHost $appHostOut -extraArgs @('-p:IsPublishable=true')
+            Invoke-Publish 'publish manager' $proj.Manager $managerOut
+        }
+        else {
+            Write-Host '  （-SkipPublish：跳过 publish，仅重组装/断言）' -ForegroundColor Yellow
+        }
 
-    Remove-ExcludedDirs $desktopStaging
-    Remove-DebugSymbols $desktopStaging
+        Remove-ExcludedDirs $staging
+        Remove-DebugSymbols $staging
+        Remove-ForeignRuntimeAssets $staging
 
-    Assert-Paths $desktopStaging @("CJ.Plug.Desktop\$Configuration\net10.0-windows\CJ.Plug.Desktop.exe")
-    Assert-Clean $desktopStaging
+        Assert-Paths $staging @(
+            "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.dll",
+            "CJCore.AspireHost.AppHost\$Configuration\net10.0\CJCore.AspireHost.AppHost.exe",
+            "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dcp\dcp.exe",
+            "CJCore.AspireHost.AppHost\$Configuration\net10.0\aspire\dashboard\Aspire.Dashboard.exe",
+            "CJCore.AppHost.Manager\$Configuration\net10.0-windows\CJCore.AppHost.Manager.exe"
+        )
+        # 编排壳出厂配置：含 Resources[] 与端口契约，缺了 AppHost 起来但"没有服务"
+        Assert-Paths $staging @("CJCore.AspireHost.AppHost\$Configuration\net10.0\appsettings.json")
+        Assert-Clean $staging
 
-    Write-Host ("  desktop\ : {0} MB" -f (Get-TreeSizeMB $desktopStaging)) -ForegroundColor Green
-}
-
-# ── ③ station staging（枝 18/D8：三件套必须独立 publish） ─────────────────────────────
-if ($Target -in @('station', 'all')) {
-    Write-Step "组装 station（图站形态：Agent + ApiServer + SettingUI）"
-
-    $stationStaging = Join-Path $releaseRoot 'station'
-    Reset-Staging $stationStaging | Out-Null
-
-    if (-not $SkipStationPublish) {
-        # 注意：8 个服务共享 02.Publish\Services\<Cfg>\net10.0，**不能**靠切那棵树得到图站载荷。
-        # 框架依赖发布（D7，与现状 02.Publish 一致），由清单的 dotnet-runtime 预检兜住运行时。
-        Invoke-Dotnet 'publish Agent' @(
-            'publish', (Join-Path $repoRoot 'src\PlugStation\CJ.Plug.StationAgent\CJ.Plug.StationAgent.csproj'),
-            '-c', $Configuration, '-o', (Join-Path $stationStaging 'Agent'), '--nologo')
-        Invoke-Dotnet 'publish ApiServer' @(
-            'publish', (Join-Path $repoRoot 'src\PlugStation\CJ.Plug.StationApiServer\CJ.Plug.StationApiServer.csproj'),
-            '-c', $Configuration, '-o', (Join-Path $stationStaging 'ApiServer'), '--nologo')
-        Invoke-Dotnet 'publish SettingUI' @(
-            'publish', (Join-Path $repoRoot 'src\PlugStation\StationSettingUI\StationSettingUI.csproj'),
-            '-c', $Configuration, '-o', (Join-Path $stationStaging 'SettingUI'), '--nologo')
+        Write-Host ("  cjplug-orchestrator\ : {0} MB" -f (Get-TreeSizeMB $staging)) -ForegroundColor Green
     }
-    else {
-        Write-Host '  （-SkipStationPublish：跳过三件套 publish）' -ForegroundColor Yellow
+
+    # ── ③ 桌面端 ──────────────────────────────────────────────────────────────────────
+    'cjplug-desktop' {
+        $staging = Join-Path $releaseRoot 'cjplug-desktop'
+        $desktopOut = Join-Path $staging "CJ.Plug.Desktop\$Configuration\net10.0-windows"
+
+        if (-not $SkipPublish) {
+            Write-Step '组装 cjplug-desktop：publish CJ.Plug.Desktop'
+            Reset-Staging $staging | Out-Null
+            Invoke-Publish 'publish desktop' $proj.Desktop $desktopOut
+        }
+        else {
+            Write-Host '  （-SkipPublish：跳过 publish，仅重组装/断言）' -ForegroundColor Yellow
+        }
+
+        Remove-ExcludedDirs $staging
+        Remove-DebugSymbols $staging
+        Remove-ForeignRuntimeAssets $staging
+
+        Assert-Paths $staging @("CJ.Plug.Desktop\$Configuration\net10.0-windows\CJ.Plug.Desktop.exe")
+        Assert-Clean $staging
+
+        Write-Host ("  cjplug-desktop\ : {0} MB" -f (Get-TreeSizeMB $staging)) -ForegroundColor Green
     }
 
-    Remove-ExcludedDirs $stationStaging
-    Remove-DebugSymbols $stationStaging
-    Assert-Paths $stationStaging @(
-        'Agent\CJ.Plug.StationAgent.exe',
-        'ApiServer\CJ.Plug.StationApiServer.exe',
-        'SettingUI\StationSettingUI.exe'
-    )
-    # 负向断言（2026-10-30）：CJ.Plug.AIChat 是 UI 组件库，曾被传递复制成 exe 混进图站载荷
-    # （StationApiServer → ModuleConfig → CJ.Plug.AI → CJ.Plug.AIChat）。已类库化，这里守住不回退。
-    Assert-Absent $stationStaging @(
-        'ApiServer\CJ.Plug.AIChat.exe'
-    ) '图站载荷不得混入库组件 exe（CJ.Plug.AIChat 已类库化）'
-    Assert-Clean $stationStaging
+    # ── ④ 图站：Agent + ApiServer + SettingUI（三件套各自 publish；与现网结构一致） ──────
+    'station-settingui' {
+        $staging = Join-Path $releaseRoot 'station-settingui'
 
-    Write-Host ("  station\ : {0} MB" -f (Get-TreeSizeMB $stationStaging)) -ForegroundColor Green
+        if (-not $SkipPublish) {
+            Write-Step '组装 station-settingui：publish Agent → ApiServer → SettingUI'
+            Reset-Staging $staging | Out-Null
+            Invoke-Publish 'publish station agent' $proj.StationAgent (Join-Path $staging 'Agent')
+            Invoke-Publish 'publish station api'   $proj.StationApi   (Join-Path $staging 'ApiServer')
+            Invoke-Publish 'publish station ui'    $proj.StationUi    (Join-Path $staging 'SettingUI')
+        }
+        else {
+            Write-Host '  （-SkipPublish：跳过 publish，仅重组装/断言）' -ForegroundColor Yellow
+        }
+
+        Remove-ExcludedDirs $staging
+        Remove-DebugSymbols $staging
+        Remove-ForeignRuntimeAssets $staging
+
+        Assert-Paths $staging @(
+            'Agent\CJ.Plug.StationAgent.exe',
+            'ApiServer\CJ.Plug.StationApiServer.exe',
+            'SettingUI\StationSettingUI.exe'
+        )
+        # API 侧的专属配置由发布侧 target 生成（Agent/SettingUI 无同级同名配置冲突）
+        Assert-Paths $staging @('ApiServer\appsettings.CJ.Plug.StationApiServer.json')
+        Assert-Absent $staging @('ApiServer\CJ.Plug.AIChat.exe') '图站载荷不得混入库组件 exe（CJ.Plug.AIChat 已类库化）'
+        Assert-Clean $staging
+
+        Write-Host ("  station-settingui\ : {0} MB" -f (Get-TreeSizeMB $staging)) -ForegroundColor Green
+    }
 }
 
 Write-Host ''
-Write-Host "发布根组装完成：$releaseRoot" -ForegroundColor Green
+Write-Host "组件载荷组装完成：$(Join-Path $releaseRoot $Component)" -ForegroundColor Green
 exit 0
